@@ -198,12 +198,22 @@ class ApktoolBackend(Backend):
     # -- smali -------------------------------------------------------------
 
     def smali_path(self, class_name: str, output_dir: Path) -> Path | None:
-        """Locate a class's Smali file. ``com.foo.Bar`` → ``smali/com/foo/Bar.smali``."""
-        smali_root = output_dir / "smali"
-        if not smali_root.is_dir():
+        """Locate a class's Smali file. ``com.foo.Bar`` → ``smali/com/foo/Bar.smali``.
+
+        Apktool writes one directory per DEX, named after it: ``classes.dex`` becomes
+        ``smali/``, ``classes2.dex`` becomes ``smali_classes2/``, and so on. They are
+        siblings under the output directory, not nested — the previous version looked
+        for them *inside* ``smali/``, which found nothing at all, so the Smali fallback
+        never worked for any APK, single-dex included.
+
+        Directories are searched in sorted order, so a class name that appears in two
+        dexes resolves to the same file on every call.
+        """
+        relative = _class_to_relative_path(class_name)
+        if relative is None:
             return None
-        relative = Path(*class_name.split(".")).with_suffix(".smali")
-        for root in sorted(smali_root.glob("smali*")):
+
+        for root in _smali_directories(output_dir):
             candidate = root / relative
             if candidate.is_file():
                 return candidate
@@ -217,6 +227,57 @@ class ApktoolBackend(Backend):
             return path.read_text(encoding="utf-8", errors="replace")
         except OSError:
             return None
+
+
+#: Directory names Apktool uses for decoded DEX sources.
+_SMALI_DIR_PREFIX = "smali"
+
+
+def _smali_directories(output_dir: Path) -> list[Path]:
+    """Apktool's decoded smali roots, in sorted order.
+
+    ``smali/`` sorts before ``smali_classes2/``, so the primary dex is always searched
+    first and duplicate class names resolve deterministically.
+    """
+    if not output_dir.is_dir():
+        return []
+    return sorted(p for p in output_dir.glob(f"{_SMALI_DIR_PREFIX}*") if p.is_dir())
+
+
+def _class_to_relative_path(class_name: str) -> Path | None:
+    """``com.foo.Bar`` → ``com/foo/Bar.smali``, or None if the name is not a class name.
+
+    Class names come from an analysed APK, so they are untrusted input. Each part must
+    be a single path component; anything that would change the shape of the path —
+    ``..``, an absolute prefix, a separator, a drive letter — is rejected rather than
+    normalised, because normalising would silently change which file is read.
+    """
+    parts = class_name.split(".")
+    if not parts or not all(parts):
+        return None
+    for part in parts:
+        if not _is_single_component(part):
+            return None
+    return Path(*parts).with_suffix(".smali")
+
+
+def _is_single_component(part: str) -> bool:
+    """Whether ``part`` is exactly one path component and nothing more.
+
+    Callers reach this only for non-empty segments: ``_class_to_relative_path``
+    rejects a name with any empty segment before it splits into components, so an
+    empty string, ``"."`` and ``".."`` never arrive here. Testing for them again
+    would suggest this function is safe on its own, which it is not.
+    """
+    # A separator or drive letter means the caller handed us a path, not a class name.
+    if "/" in part or "\\" in part or ":" in part:
+        return False
+    # NUL and control characters have no place in a class name and truncate paths in
+    # the C runtime that Windows ultimately calls.
+    if any(ord(char) < 0x20 or char == "\x7f" for char in part):
+        return False
+    # Wildcards would make the glob match something other than this class.
+    return not any(char in part for char in "*?[]")
 
 
 def _parse_bool(value: str | None) -> bool | None:

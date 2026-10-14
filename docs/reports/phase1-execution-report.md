@@ -31,8 +31,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | 208（164 快 + 44 集成） | — |
-| 一方代码覆盖率 | **87.8%**（1484/1691 行） | ≥80% |
+| 测试数 | 242（190 快 + 52 集成） | — |
+| 一方代码覆盖率 | **87.8%**（1484/1691 行，v0.1.0 时点） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -65,9 +65,9 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | 164 | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | 44 | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | 208 | |
+| 快速套件（`-m "not slow"`） | 190 | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | 52 | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | 242 | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -89,6 +89,8 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 | `test_androguard_integration.py` | 真实 DEX 解析 |
 | `test_demo_app.py` | 端到端演示流程 |
 | `test_docs.py` | 文档与资产完整性 |
+| `test_apktool_smali.py` | Smali 路径定位与多 DEX 目录（v0.1.1 新增） |
+| `test_smali_fallback_integration.py` | 无 JADX 时回退到 Smali 的端到端验证（v0.1.1 新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -205,6 +207,56 @@ Rich 的 markup 错误只在 print 时发生。
 `zipfile.writestr` 会写入**当前时间**做时间戳，导致同内容在不同时刻构建的
 APK 哈希不同。本地常过、CI 偶发失败。已固定时间戳并加测试锁住。
 
+### 3.7 严重：Smali 回退从来没生效过 🔴（v0.1.1 修复）
+
+**现象：** `dexatlas source` / `--method` 在 JADX 缺失时报告「No source」，
+即使 Apktool 已经成功解码、`.smali` 文件就在工作区里躺着。
+
+**根因：** 一个目录层级的错误，影响面比标题说的更大——**它连单 DEX 都失效**。
+
+`smali_path` 先把 `output_dir/"smali"` 当作根，再在**这个根里面** `glob("smali*")`
+去找多 DEX 目录：
+
+```python
+smali_root = output_dir / "smali"        # ← 根
+for root in sorted(smali_root.glob("smali*")):   # ← 却在这里面找 smali*
+```
+
+但 apktool 把多 DEX 目录命名为 `smali_classes2/`，它是 `smali/` 的**兄弟**
+（两者同在 `output_dir` 下），不是子目录。所以 `smali/smali_classes2/` 永远不存在，
+多 DEX 的第二个 dex 一定找不到。
+
+而单 DEX 也一起坏掉，是因为这个 glob 在 `smali/` **内部**找 `smali*`：
+真实路径是 `smali/com/foo/Bar.smali`，类名转换本身是对的，
+但 glob 只在 `smali/` 下匹配以 `smali` 开头的**子目录**。
+绝大多数 APK 里不存在这样的子目录，glob 返回空列表，循环体一次都不执行，
+函数直接 `return None`。也就是说：**路径拼接是对的，但搜索范围从一开始就错了**。
+
+**为什么和 3.1 一样严重：** 这是本项目「无法点回原处的结论不算结论」原则要防的
+失败模式，而且**伪装成了成功**——分析照常完成、报告照常生成、没有一行报错，
+只是所有 Smali 回退都静默失效。一个完全骗过 JADX 的 APK 会产出「什么代码都没有」
+的报告，而使用者看不出这是工具坏了还是 APK 真的没代码。
+
+**顺带修掉的一个崩溃：** 旧代码把类名直接 `Path(*class_name.split("."))`，
+不校验。类名 `....//....//etc/passwd` 会让 `Path.with_suffix()` 抛
+`ValueError: WindowsPath('//etc/passwd/') has an empty name` ——**未处理异常**，
+在「后端失败是值不是异常」的架构里是硬缺陷。现在不合法的类名一律返回 `None`。
+
+**删掉的一段死代码：** 我最初写的 `_is_single_component` 里有一句
+`if not part or part in {".", ".."}`。覆盖率数据指出它从未被执行。
+查下来发现它**不可达**：`_class_to_relative_path` 的 `not all(parts)` 已经先挡掉了
+所有含空段的输入，而 `"."` / `".."` 单独作为类名时 `split(".")` 也产生空段，
+同样到不了这一行。留着它只会让人以为这个函数单独调用也是安全的——事实并非如此。
+已删除，并加了一个测试把这个前提锁住：如果哪天空段能到达组件检查，
+那个测试会失败，而不是让穿越防护悄悄失效。
+
+**新增测试：** 单元层覆盖三种 apktool 目录布局、重复类名的确定性解析、
+8 个路径穿越载荷；集成层用真实双 DEX APK，**强制 JADX 不可用**，
+端到端验证 `class_source` 和 `method_source` 都真的落到了 Smali 上。
+
+**验证方式：** 修复前跑新测试，11 个失败（6 个集成 + 5 单元）；
+修复后单元层 26 个 + 集成层 8 个全过。见 FIX-001 报告。
+
 ### 3.7 CI 反复失败暴露的问题
 
 CI 一共红了 **3 次**，每次都是真问题：
@@ -263,7 +315,9 @@ Androguard 4.x **移除了** xref 缓存（3.x 有）。所以调用边是从指
 - **Phase 1 计划里的 5 个测试 APK**：只有 1 个自建 + 3 个外部拉取的样本，
   且外部样本不在仓库里（靠 `scripts/fetch-fixtures.sh`）
 - **Web 工作台 / MCP / Agent**：Phase 2，尚未开始
-- **多 DEX 真实压力测试**：多 DEX 支持有单元测试，但没有用真实的多 DEX 大型 APK 验证
+- **多 DEX 大型 APK 压力测试**：v0.1.1 已用真实的双 DEX 样本（`multidex.apk`）
+  验证了 `smali/` + `smali_classes2/` 两个目录的定位，但样本仍然很小，
+  没有 10 万类以上的大型 APK 数据点
 - **混淆代码的对抗性测试**：有 XXE 和畸形输入测试，但没有真正的混淆 APK 样本
 
 ---
@@ -301,7 +355,7 @@ uv run pytest --cov=dexatlas --cov-report=term
 
 # 安装后端后跑完整套件
 bash scripts/install-backends.sh
-uv run pytest          # 应为 208 passed
+uv run pytest          # v0.1.0 时为 208；v0.1.1 起为 242
 ```
 
 CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
