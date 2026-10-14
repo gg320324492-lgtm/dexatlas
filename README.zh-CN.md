@@ -123,12 +123,15 @@ Docker 镜像已预装 JADX 与 Apktool：
 docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
 ```
 
-本仓库不提交任何 APK。跟随文档上手请先获取测试样本：
+仓库内已附带一个演示应用，无需下载任何东西：
 
 ```bash
-bash scripts/fetch-fixtures.sh
-uv run dexatlas analyze fixtures/apk/TestActivity.apk -o report.md
+uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 ```
+
+它由 [`examples/demo-app/`](examples/demo-app/) 下的 smali 源码构建而成，可用
+`scripts/build-demo-apk.sh` 重新构建——不是来历不明的二进制文件。体积更大的测试样本
+则通过 `scripts/fetch-fixtures.sh` 获取。
 
 ## 文档
 

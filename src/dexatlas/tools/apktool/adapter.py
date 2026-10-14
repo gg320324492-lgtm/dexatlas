@@ -15,6 +15,7 @@ import logging
 from pathlib import Path
 from xml.etree.ElementTree import Element, ParseError
 
+import yaml
 from defusedxml.ElementTree import parse as safe_parse
 
 from dexatlas.config.settings import Settings
@@ -152,6 +153,11 @@ class ApktoolBackend(Backend):
             info.min_sdk = uses_sdk.get(ANDROID + "minSdkVersion")
             info.target_sdk = uses_sdk.get(ANDROID + "targetSdkVersion")
 
+        # Apktool moves the version and SDK attributes out of the manifest and into
+        # apktool.yml when it decodes. A manifest-only read therefore reports "—" for
+        # every APK, which is both unhelpful and wrong. Fill the gaps from there.
+        _merge_build_metadata(info, output_dir / "apktool.yml")
+
         for element in root.findall("uses-permission") + root.findall("uses-permission-sdk-23"):
             name = element.get(ANDROID + "name")
             if name:
@@ -217,6 +223,47 @@ def _parse_bool(value: str | None) -> bool | None:
     if value is None:
         return None
     return value.strip().lower() == "true"
+
+
+def _merge_build_metadata(info: ManifestInfo, apktool_yml: Path) -> None:
+    """Fill in version and SDK values that Apktool relocated to ``apktool.yml``.
+
+    Apktool's decoded manifest omits ``versionCode``, ``versionName`` and the
+    ``uses-sdk`` block, keeping them in its own build file instead. Values already
+    present in the manifest win, so this only fills gaps.
+    """
+    if not apktool_yml.is_file():
+        return
+
+    try:
+        data = yaml.safe_load(apktool_yml.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, yaml.YAMLError) as exc:
+        logger.debug("apktool: could not read %s: %s", apktool_yml, exc)
+        return
+
+    if not isinstance(data, dict):
+        return
+
+    version = data.get("versionInfo")
+    if isinstance(version, dict):
+        if info.version_code is None:
+            info.version_code = _as_text(version.get("versionCode"))
+        if info.version_name is None:
+            info.version_name = _as_text(version.get("versionName"))
+
+    sdk = data.get("sdkInfo")
+    if isinstance(sdk, dict):
+        if info.min_sdk is None:
+            info.min_sdk = _as_text(sdk.get("minSdkVersion"))
+        if info.target_sdk is None:
+            info.target_sdk = _as_text(sdk.get("targetSdkVersion"))
+
+
+def _as_text(value: object) -> str | None:
+    """Apktool writes some of these as ints and some as strings depending on version."""
+    if value is None:
+        return None
+    return str(value)
 
 
 def _describe_filter(element: Element) -> str:

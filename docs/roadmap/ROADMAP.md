@@ -141,21 +141,22 @@ Last updated 2026-10-14. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full l
 - [x] CLI and REST API run the same analysis core
 - [x] Classes, methods, references and evidence locations are queryable
 - [x] JSON and Markdown export supported
-- [x] Unit tests plus end-to-end tests; **87% coverage on first-party code** (161 tests)
+- [x] Unit tests plus end-to-end tests; **88% coverage on first-party code** (198 tests)
 - [x] GitHub Actions green on Python 3.12 and 3.13
 - [x] Installation guide, every command verified against a fresh clone
       ([docs/install.md](../install.md))
 - [x] Architecture documentation ([docs/architecture/README.md](../architecture/README.md))
-- [ ] A self-built fixture bundled with the repository for the demo
+- [x] A self-built demo application bundled with the repository, built from smali
+      sources and rebuildable via `scripts/build-demo-apk.sh`
 - [ ] `v0.1.0` release published, with a demo recording
 
 **Phase complete means:** a stranger follows the README, installs DexAtlas on a clean
 machine, analyses a bundled authorized test APK, and gets a reproducible structured
 report. That is worth more than supporting ten more models in v0.1.
 
-A stranger can today clone, install, fetch a fixture and analyse it, following the README
-alone. What is left is a fixture that ships with the repository rather than one fetched by
-a script, and the release itself. Tracked in
+A stranger can today clone, install, analyse the bundled demo application and read a
+report, following the README alone. What is left is the `v0.1.0` release and a demo
+recording. Tracked in
 [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 
 ### 1.5 Issue backlog (`v0.1.0` milestone)

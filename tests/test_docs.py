@@ -115,11 +115,12 @@ def test_license_is_apache() -> None:
     assert "Version 2.0" in license_text
 
 
-def test_no_apk_or_binary_is_committed() -> None:
-    """The repository must not carry analysable binaries. Fixtures are fetched.
+def test_no_third_party_apk_or_binary_is_committed() -> None:
+    """The repository must not carry analysable binaries from other people's apps.
 
-    ``.gitignore`` excludes them, but the ignore rule is only a claim — this checks what
-    git actually tracks.
+    ``.gitignore`` excludes them, but an ignore rule is only a claim — this checks what
+    git actually tracks. DexAtlas's own demo application is the single exception: it is
+    first-party, built from the smali sources in ``examples/demo-app/``, and rebuildable.
     """
     import subprocess
 
@@ -133,9 +134,22 @@ def test_no_apk_or_binary_is_committed() -> None:
     if result.returncode != 0:
         pytest.skip("not a git checkout")
 
+    allowed = {"examples/demo-app/demo.apk"}
     tracked_bad = [
         name
         for name in result.stdout.splitlines()
         if Path(name).suffix.lower() in {".apk", ".dex", ".aab", ".so", ".jar"}
+        and name not in allowed
     ]
-    assert not tracked_bad, f"binary analysis artifacts are tracked: {tracked_bad}"
+    assert not tracked_bad, f"third-party analysis artifacts are tracked: {tracked_bad}"
+
+
+def test_the_bundled_demo_app_is_first_party_and_reproducible() -> None:
+    """The exception above must stay justified: sources present, rebuild script present."""
+    demo = REPO_ROOT / "examples" / "demo-app"
+
+    assert (demo / "demo.apk").is_file(), "the bundled demo APK is missing"
+    assert (demo / "AndroidManifest.xml").is_file()
+    assert (demo / "apktool.yml").is_file()
+    assert list((demo / "smali").rglob("*.smali")), "no smali sources for the demo app"
+    assert (REPO_ROOT / "scripts" / "build-demo-apk.sh").is_file()

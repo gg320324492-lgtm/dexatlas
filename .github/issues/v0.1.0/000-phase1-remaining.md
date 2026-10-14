@@ -26,10 +26,10 @@ anyone reading it — including future maintainers.
 - [x] **Architecture documentation** — `docs/architecture/README.md`, covering the
       pipeline, the division of labour between backends, provenance, evidence levels
       and the security posture.
-- [ ] **Bundled demo fixture.** The fixture used above is fetched by a script, which is
-      right for tests but not for a demo someone should be able to run from a clone.
-      Needs a self-built application, under a licence permitting redistribution,
-      committed as a demo asset.
+- [x] **Bundled demo application.** Built from hand-written smali in
+      `examples/demo-app/` and rebuildable with `scripts/build-demo-apk.sh`, so it is
+      reproducible rather than a mystery binary. `tests/test_demo_app.py` pins the
+      numbers the README quotes.
 - [ ] **A short demo recording** (target: 30 seconds) — upload an APK, extract the
       manifest and class structure, search for a call chain, show Java and Smali side by
       side, export a report with evidence attached.
@@ -44,19 +44,20 @@ anyone reading it — including future maintainers.
 | CLI and REST API share the analysis core                  | Done         |
 | Classes, methods, references and evidence locations queryable | Done       |
 | JSON and Markdown export                                  | Done         |
-| Unit and end-to-end tests, ≥80% coverage on first-party code | Done (87%) |
+| Unit and end-to-end tests, ≥80% coverage on first-party code | Done (88%) |
 | GitHub Actions green                                      | Done         |
 | Installation guide verified on a clean machine            | Done         |
 | Architecture documentation                                | Done         |
-| Demo fixture bundled with the repository                  | Not started  |
+| Demo application bundled with the repository            | Done         |
 | `v0.1.0` release and demo video                          | Not started  |
 
-**A stranger can now clone, install, fetch a fixture, analyse it and read a report,
-following the documentation alone.** What remains is a fixture that ships with the
-repository rather than being fetched by a script, and the release.
+**A stranger can now clone, install, analyse the bundled demo application and read a
+report, following the documentation alone.** What remains is the release and a demo
+recording.
 
 ## Verification before closing
 
 - [x] Clone into a fresh directory with no JADX or Apktool installed
 - [x] Follow only the documentation, start to finish, to a rendered report
+- [x] Rebuild the demo APK from its sources and confirm the analysis is unchanged
 - [x] Confirm `dexatlas backends` degrades gracefully when nothing is installed

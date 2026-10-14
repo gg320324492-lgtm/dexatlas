@@ -130,12 +130,15 @@ Docker, with JADX and Apktool preinstalled:
 docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
 ```
 
-No APK is committed to this repository. To follow along, fetch a fixture:
+A demo application is bundled, so there is nothing to download:
 
 ```bash
-bash scripts/fetch-fixtures.sh
-uv run dexatlas analyze fixtures/apk/TestActivity.apk -o report.md
+uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 ```
+
+It is built from the smali sources in [`examples/demo-app/`](examples/demo-app/)
+and rebuildable with `scripts/build-demo-apk.sh` — no mystery binary. Larger test
+fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
 ## Documentation
 

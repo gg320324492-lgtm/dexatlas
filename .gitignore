@@ -42,6 +42,12 @@ resources/
 *.so
 report.html
 
+# The one exception: DexAtlas's own demo application, built from the smali sources in
+# examples/demo-app/ and rebuildable with scripts/build-demo-apk.sh. It is first-party,
+# contains no third-party code, and a stranger needs it to run an analysis after cloning.
+# The rule above stays in force for every other APK.
+!examples/demo-app/demo.apk
+
 # Secrets
 .env
 .env.*

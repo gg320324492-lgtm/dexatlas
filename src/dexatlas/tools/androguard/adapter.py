@@ -344,10 +344,9 @@ class AndroguardBackend(Backend):
                 if instruction.get_name() not in INVOKE_OPCODES:
                     continue
                 target = instruction.get_output().rsplit(", ", 1)[-1].strip()
-                if "->" not in target:
-                    continue
-                owner, _, member = target.partition("->")
-                calls.append(f"{_to_dotted(owner)}.{member}")
+                qualified = _parse_dalvik_reference(target)
+                if qualified is not None:
+                    calls.append(qualified)
         except Exception as exc:
             logger.debug("androguard: decoding %s failed: %s", method.get_name(), exc)
         return instructions_seen, calls
@@ -372,6 +371,38 @@ class AndroguardBackend(Backend):
         except Exception as exc:
             logger.debug("androguard: string extraction failed: %s", exc)
         return constants
+
+
+def _parse_dalvik_reference(reference: str) -> str | None:
+    """Normalise an Androguard instruction operand into a canonical method id.
+
+    Androguard renders a call target for human reading, with the argument descriptors
+    space-separated::
+
+        Ljava/io/PrintStream;->println(Ljava/lang/String; Ljava/lang/Object;)V
+
+    Taking that string verbatim produces a descriptor that never equals the one the
+    symbol table stores (``get_descriptor()`` has no spaces), so every cross-reference
+    becomes unfindable. Re-join the argument list without spaces to get an id that
+    matches ``MethodRef.qualified_name``.
+    """
+    if "->" not in reference:
+        return None
+
+    owner, _, member = reference.partition("->")
+    open_paren = member.find("(")
+    if open_paren == -1:
+        return None
+    # Type descriptors contain no parentheses, so the first ")" after "(" closes the
+    # argument list. Everything after it is the return type.
+    close_paren = member.find(")", open_paren)
+    if close_paren == -1:
+        return None
+
+    name = member[:open_paren].strip()
+    arguments = member[open_paren + 1 : close_paren].replace(" ", "")
+    returns = member[close_paren + 1 :].strip()
+    return f"{_to_dotted(owner)}.{name}({arguments}){returns}"
 
 
 def _no_dex_error(apk: Path, dex_count: int) -> ToolError | None:

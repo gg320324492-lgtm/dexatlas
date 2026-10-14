@@ -130,6 +130,48 @@ def test_every_reference_carries_provenance(analysis: dict[str, Any]) -> None:
         assert reference.provenance[0].apk_sha256 == FIXTURE_APK
 
 
+def test_reference_targets_match_the_symbol_index(analysis: dict[str, Any]) -> None:
+    """A call target must be spelled exactly like a method id elsewhere in DexAtlas.
+
+    Androguard renders a call target for human reading, with argument descriptors
+    space-separated: ``sign(Ljava/lang/String; Ljava/lang/String;)``. Storing that
+    verbatim yields a descriptor that never equals the one ``get_descriptor()`` returns,
+    so the whole cross-reference index becomes unfindable while still looking healthy.
+
+    Not every target is expected to be declared in this APK — a call to
+    ``MyActivity.getApplicationContext()`` names an inherited method — so this asserts
+    the property that actually breaks: no id carries whitespace, and the ids that *are*
+    declared are found by exactly that spelling.
+    """
+    references = analysis["references"]
+    assert references
+
+    for reference in references:
+        assert " " not in reference.callee, (
+            f"call target carries whitespace and cannot match a stored descriptor: "
+            f"{reference.callee!r}"
+        )
+        assert "->" not in reference.callee
+
+    known = {method.qualified_name for method in analysis["methods"]}
+    own = {r.callee for r in references if r.callee.startswith("tests.androguard.")}
+    assert own, "expected cross-references into the fixture's own package"
+
+    # At least some targets must be declared methods that `xrefs` can actually find.
+    assert own & known, "no call target resolved against the symbol index"
+
+
+def test_callers_are_findable_under_the_stored_descriptor(analysis: dict[str, Any]) -> None:
+    """A caller id must round-trip through the method-id parser used for lookup."""
+    from dexatlas.core.storage import parse_method_id
+
+    for reference in analysis["references"][:50]:
+        parsed = parse_method_id(reference.callee)
+        assert parsed[0], f"callee id is not parseable: {reference.callee!r}"
+        assert parsed[1], f"callee id has no method name: {reference.callee!r}"
+        assert parsed[2].startswith("("), f"callee id has no descriptor: {reference.callee!r}"
+
+
 # -- limits and hostile input -----------------------------------------------
 
 
@@ -169,3 +211,60 @@ def test_a_missing_file_is_reported_not_raised(backend: AndroguardBackend, tmp_p
 
     assert error is not None
     assert error.code.value in {"parse_error", "unsupported", "not_installed"}
+
+
+# -- reference normalisation (no backend needed) -----------------------------
+
+
+@pytest.mark.parametrize(
+    ("reference", "expected"),
+    [
+        (
+            "Ljava/io/PrintStream;->println(Ljava/lang/String;)V",
+            "java.io.PrintStream.println(Ljava/lang/String;)V",
+        ),
+        (
+            "Lcom/example/demo/Crypto;->sign(Ljava/lang/String; Ljava/lang/String;)"
+            "Ljava/lang/String;",
+            "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+        ),
+        (
+            "Landroid/util/Log;->i(Ljava/lang/String; Ljava/lang/String;)I",
+            "android.util.Log.i(Ljava/lang/String;Ljava/lang/String;)I",
+        ),
+        ("Ljava/lang/Object;-><init>()V", "java.lang.Object.<init>()V"),
+        (
+            "Lcom/Foo;->baz([I Ljava/lang/String;)V",
+            "com.Foo.baz([ILjava/lang/String;)V",
+        ),
+    ],
+)
+def test_dalvik_reference_is_normalised(reference: str, expected: str) -> None:
+    from dexatlas.tools.androguard.adapter import _parse_dalvik_reference
+
+    assert _parse_dalvik_reference(reference) == expected
+
+
+@pytest.mark.parametrize("reference", ["", "garbage", "Lcom/Foo;->bar", "Lcom/Foo;->baz("])
+def test_unparseable_reference_returns_none(reference: str) -> None:
+    from dexatlas.tools.androguard.adapter import _parse_dalvik_reference
+
+    assert _parse_dalvik_reference(reference) is None
+
+
+def test_normalised_reference_equals_the_symbol_index_spelling() -> None:
+    """The two id spaces must be identical, or cross-references cannot be looked up."""
+    from dexatlas.core.storage import parse_method_id
+    from dexatlas.tools.androguard.adapter import _parse_dalvik_reference
+
+    qualified = _parse_dalvik_reference(
+        "Lcom/example/demo/Crypto;->sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+    )
+    assert qualified is not None
+
+    class_name, name, descriptor = parse_method_id(qualified)
+    assert class_name == "com.example.demo.Crypto"
+    assert name == "sign"
+    # A JVM descriptor has no spaces anywhere.
+    assert " " not in qualified
+    assert descriptor == "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"

@@ -35,10 +35,13 @@ every language model switched off.
   report export endpoints
 - **Report export** — JSON and Markdown, with backend errors surfaced rather than
   omitted
+- **Bundled demo application** — built from smali sources in `examples/demo-app/`,
+  rebuildable with `scripts/build-demo-apk.sh`, so a stranger can analyse something
+  immediately after cloning
 
 ### Engineering
 
-- 161 tests, 87% coverage on first-party code
+- 198 tests, 88% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file

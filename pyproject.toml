@@ -41,6 +41,9 @@ dependencies = [
     # AndroidManifest.xml comes from an untrusted APK. defusedxml refuses entity
     # declarations, DTDs and external references, which a plain parser does not.
     "defusedxml>=0.7",
+    # Apktool relocates versionCode / versionName / SDK levels out of the manifest and
+    # into its apktool.yml build file, so the manifest reader needs to parse YAML.
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -54,6 +57,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-defusedxml>=0.7",
+    "types-pyyaml>=6.0",
 ]
 
 [project.scripts]
