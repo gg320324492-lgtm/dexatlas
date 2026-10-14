@@ -42,6 +42,10 @@ MINIMAL_MANIFEST = """<?xml version="1.0" encoding="utf-8"?>
 
 MINIMAL_DEX = b"dex\n035\x00" + b"\x00" * 64
 
+#: Fixed DOS timestamp for generated archives, so the same content always produces the
+#: same bytes and therefore the same SHA-256. 2020-01-01 00:00:00.
+FIXED_ZIP_TIMESTAMP = (2020, 1, 1, 0, 0, 0)
+
 
 def build_apk(
     path: Path,
@@ -70,7 +74,12 @@ def build_apk(
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, payload in entries.items():
-            archive.writestr(name, payload)
+            # Fixed timestamp. writestr() would stamp the current time, so two archives
+            # built from identical content in different seconds hash differently and any
+            # test comparing their hashes fails intermittently.
+            info = zipfile.ZipInfo(name, date_time=FIXED_ZIP_TIMESTAMP)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, payload)
     return path
 
 

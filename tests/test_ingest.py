@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from dexatlas.core.ingest import ApkValidationError, inspect_apk, validate_apk
+from dexatlas.core.models import sha256_file
 from tests.conftest import MINIMAL_MANIFEST, build_apk
 
 
@@ -78,3 +79,17 @@ def test_hash_is_content_addressed_and_stable(tmp_path: Path) -> None:
     second = build_apk(tmp_path / "b.apk", manifest=MINIMAL_MANIFEST)
 
     assert inspect_apk(first).sha256 == inspect_apk(second).sha256
+
+
+def test_generated_fixtures_are_byte_reproducible(tmp_path: Path) -> None:
+    """The fixture builder must not embed the wall-clock time.
+
+    ``ZipFile.writestr`` stamps the current time into each entry, so archives built from
+    identical content in different seconds differ. Any test comparing their hashes then
+    fails intermittently — which is exactly what happened before this was pinned.
+    """
+    first = build_apk(tmp_path / "one.apk")
+    second = build_apk(tmp_path / "two.apk")
+
+    assert first.read_bytes() == second.read_bytes()
+    assert sha256_file(first) == sha256_file(second)
