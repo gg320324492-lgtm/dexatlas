@@ -78,6 +78,31 @@ boundaries:
 - **Fail loudly into the record, never crash the run.** A tool that exits non-zero becomes a
   recorded error attached to the affected results.
 
+## The demo GIFs
+
+`docs/assets/demo.gif` and `docs/assets/demo-quick.gif` are generated, not recorded by
+hand. Every frame is a real run of the real CLI, so the recording cannot drift from what
+the tool does.
+
+```bash
+# One-shot: capture a live session and render both GIFs.
+uv run python scripts/render-demo.py
+```
+
+Regenerate them whenever you change CLI output — the project id, the numbers in a
+summary or a table all appear on screen. A stale GIF is worse than none.
+
+| Piece            | Role                                                            |
+| ---------------- | --------------------------------------------------------------- |
+| `capture-demo.sh` | Runs the real commands against `examples/demo-app/`, prints the session |
+| `render-demo.py`  | Draws each frame with Pillow, encodes with ffmpeg                 |
+
+Requires `ffmpeg` and `pillow`. The renderer prefers **Cascadia Mono**, the only common
+Windows monospace font with U+2713 `✓`; Consolas renders it as an empty box.
+
+Not using [VHS](https://github.com/charmbracelet/vhs): it renders through `ttyd`, which
+silently produces no file on Windows.
+
 ## Pull request expectations
 
 - One logical change per PR; keep them reviewable.

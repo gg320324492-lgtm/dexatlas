@@ -30,9 +30,11 @@ anyone reading it — including future maintainers.
       `examples/demo-app/` and rebuildable with `scripts/build-demo-apk.sh`, so it is
       reproducible rather than a mystery binary. `tests/test_demo_app.py` pins the
       numbers the README quotes.
-- [ ] **A short demo recording** (target: 30 seconds) — upload an APK, extract the
-      manifest and class structure, search for a call chain, show Java and Smali side by
-      side, export a report with evidence attached.
+- [x] **Demo recording** — `docs/assets/demo.gif`, rendered from a live run of the real
+      CLI rather than staged. Covers backend discovery, the analysis summary, exported
+      components, code search, cross-references, decompiled source and the report.
+      `scripts/render-demo.py` regenerates it; `tests/test_docs.py` checks the assets
+      are valid and that no project id is hard-coded in the capture.
 - [ ] **`v0.1.0` release** with notes, and a `CHANGELOG.md` entry.
 
 ## Exit checklist status
@@ -49,15 +51,16 @@ anyone reading it — including future maintainers.
 | Installation guide verified on a clean machine            | Done         |
 | Architecture documentation                                | Done         |
 | Demo application bundled with the repository            | Done         |
-| `v0.1.0` release and demo video                          | Not started  |
+| Demo recording                                            | Done         |
+| `v0.1.0` release                                         | Not started  |
 
 **A stranger can now clone, install, analyse the bundled demo application and read a
-report, following the documentation alone.** What remains is the release and a demo
-recording.
+report, following the documentation alone.** What remains is the release itself.
 
 ## Verification before closing
 
 - [x] Clone into a fresh directory with no JADX or Apktool installed
 - [x] Follow only the documentation, start to finish, to a rendered report
 - [x] Rebuild the demo APK from its sources and confirm the analysis is unchanged
+- [x] Regenerate the demo recording and confirm every frame is a real run
 - [x] Confirm `dexatlas backends` degrades gracefully when nothing is installed

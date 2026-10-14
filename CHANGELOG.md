@@ -38,10 +38,14 @@ every language model switched off.
 - **Bundled demo application** — built from smali sources in `examples/demo-app/`,
   rebuildable with `scripts/build-demo-apk.sh`, so a stranger can analyse something
   immediately after cloning
+- **Generated demo recordings** — `docs/assets/demo.gif` and `demo-quick.gif`,
+  rendered from a live run of the real CLI by `scripts/render-demo.py`. Not staged:
+  the capture script reads the project id its own run produced, so the recording
+  cannot show a value a reader could not reproduce
 
 ### Engineering
 
-- 198 tests, 88% coverage on first-party code
+- 204 tests, 88% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file

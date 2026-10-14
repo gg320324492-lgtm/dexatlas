@@ -141,14 +141,14 @@ Last updated 2026-10-14. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full l
 - [x] CLI and REST API run the same analysis core
 - [x] Classes, methods, references and evidence locations are queryable
 - [x] JSON and Markdown export supported
-- [x] Unit tests plus end-to-end tests; **88% coverage on first-party code** (198 tests)
+- [x] Unit tests plus end-to-end tests; **88% coverage on first-party code** (204 tests)
 - [x] GitHub Actions green on Python 3.12 and 3.13
 - [x] Installation guide, every command verified against a fresh clone
       ([docs/install.md](../install.md))
 - [x] Architecture documentation ([docs/architecture/README.md](../architecture/README.md))
 - [x] A self-built demo application bundled with the repository, built from smali
       sources and rebuildable via `scripts/build-demo-apk.sh`
-- [ ] `v0.1.0` release published, with a demo recording
+- [ ] `v0.1.0` release published
 
 **Phase complete means:** a stranger follows the README, installs DexAtlas on a clean
 machine, analyses a bundled authorized test APK, and gets a reproducible structured

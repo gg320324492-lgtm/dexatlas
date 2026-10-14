@@ -153,3 +153,61 @@ def test_the_bundled_demo_app_is_first_party_and_reproducible() -> None:
     assert (demo / "apktool.yml").is_file()
     assert list((demo / "smali").rglob("*.smali")), "no smali sources for the demo app"
     assert (REPO_ROOT / "scripts" / "build-demo-apk.sh").is_file()
+
+
+# -- demo assets -----------------------------------------------------------
+
+
+def test_demo_gifs_exist_and_are_valid() -> None:
+    """The README embeds these; a missing or corrupt file shows as a broken image."""
+    from PIL import Image
+
+    assets = REPO_ROOT / "docs" / "assets"
+    for name in ("demo.gif", "demo-quick.gif"):
+        path = assets / name
+        assert path.is_file(), f"{name} is missing — run scripts/render-demo.py"
+        assert path.stat().st_size > 20_000, f"{name} is suspiciously small"
+
+        with Image.open(path) as image:
+            assert image.format == "GIF"
+            assert image.n_frames > 10, f"{name} has too few frames to show a session"
+            assert image.width >= 800, f"{name} is too narrow to read"
+
+
+def test_readme_embeds_the_demo_gifs() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "docs/assets/demo-quick.gif" in readme
+    assert "docs/assets/demo.gif" in readme
+
+
+def test_every_embedded_image_resolves() -> None:
+    """An <img src> pointing at a missing file is a broken image on the front page."""
+    broken = []
+
+    for markdown in _markdown_files():
+        text = markdown.read_text(encoding="utf-8", errors="replace")
+        for match in re.finditer(r'<img[^>]+src="([^"]+)"', text):
+            target = match.group(1)
+            if target.startswith(("http://", "https://")):
+                continue
+            if not (markdown.parent / target).exists():
+                relative = markdown.relative_to(REPO_ROOT)
+                broken.append(f"{relative}: {target}")
+
+    assert not broken, "missing images:\n" + "\n".join(sorted(set(broken)))
+
+
+def test_demo_capture_script_reports_a_real_project_id() -> None:
+    """The recording must never show a hard-coded project id.
+
+    Project ids are content-addressed, so a stale literal in the capture script would put
+    a value on screen that no reader could reproduce. Matching the ``apk_`` *prefix* is
+    how the script reads the id back out, so that is allowed; a full id is not.
+    """
+    capture = (REPO_ROOT / "scripts" / "capture-demo.sh").read_text(encoding="utf-8")
+
+    assert "project_id()" in capture, "the capture script should read the id it produced"
+
+    literals = re.findall(r"apk_[0-9a-f]{8,}", capture)
+    assert not literals, f"hard-coded project id(s) in the capture script: {literals}"

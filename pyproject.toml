@@ -50,6 +50,10 @@ dependencies = [
 analysis = [
     "androguard>=4.1",
 ]
+demo = [
+    # scripts/render-demo.py draws each frame with Pillow and encodes with ffmpeg.
+    "pillow>=10.0",
+]
 dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",

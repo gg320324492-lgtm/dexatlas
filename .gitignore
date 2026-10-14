@@ -41,6 +41,13 @@ resources/
 *.idsig
 *.so
 report.html
+report.md
+
+# Intermediate files from the demo renderer. scripts/render-demo.py cleans up after
+# itself, but a crashed run leaves these behind.
+.demo-capture.txt
+.demo-tmp/
+tmp*/
 
 # The one exception: DexAtlas's own demo application, built from the smali sources in
 # examples/demo-app/ and rebuildable with scripts/build-demo-apk.sh. It is first-party,

@@ -6,6 +6,14 @@
 
 An open-source, evidence-first Android reverse engineering and mobile application analysis platform.
 
+[![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-200%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)](pyproject.toml)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
+[![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
+
 </div>
 
 DexAtlas brings Android decompilation, program analysis, AI agents and developer-friendly
@@ -17,6 +25,22 @@ researchers and engineers analysing applications they own or are authorized to a
 > pipeline are being built now. Agent orchestration, MCP and the web workbench are *planned*,
 > not shipped — see the [Roadmap](#roadmap). Nothing on this page claims a feature that does
 > not yet run.
+
+<p align="center">
+  <img src="docs/assets/demo-quick.gif" alt="DexAtlas analysing a bundled demo APK: backend discovery, the analysis summary, exported components from the manifest, and the evidence levels in the report" width="900">
+</p>
+
+Every frame above is a real run against [`examples/demo-app/demo.apk`](examples/demo-app/),
+an application built from the smali sources committed beside it — not a staged recording.
+
+<details>
+<summary><b>Full session</b> — search, cross-references, decompiled source and the report</summary>
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Full DexAtlas session showing code search, method cross-references, decompiled Java source and the generated analysis report" width="900">
+</p>
+
+</details>
 
 ---
 
