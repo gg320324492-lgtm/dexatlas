@@ -5,11 +5,11 @@
 Phase 1's engineering work is done: ingestion, all three backends, the unified analysis
 core, evidence, storage, CLI, REST API and report export are implemented, tested against
 real APKs, and green in CI. This issue tracks what remains before the Phase 1 exit
-checklist in the [roadmap](../../docs/roadmap/ROADMAP.md) can be honestly marked complete.
+checklist in the [roadmap](../../../docs/roadmap/ROADMAP.md) can be honestly marked complete.
 
-The per-issue breakdown that originally planned this work is recorded in
-`.github/issues/v0.1.0/` and in the git history, so the design decisions behind each
-piece are still recoverable.
+The per-task breakdown that originally planned this work is recorded in
+[`.github/issues/v0.1.0/planned/`](planned/), so the design decisions behind each piece
+are still recoverable.
 
 ## Why this is one issue rather than eight
 
@@ -19,14 +19,17 @@ anyone reading it — including future maintainers.
 
 ## Remaining work
 
-- [ ] **Install and Quick Start** in `README.md`, verified on a genuinely clean machine:
-      clone, install, run `dexatlas analyze` against a bundled authorised fixture, read
-      the report. The current README says this ships with `v0.1.0`.
-- [ ] **Architecture diagram** rendering the pipeline: ingestion → backends → unified
-      index → search → evidence → report.
-- [ ] **Bundled fixture for the demo.** The Phase 1 demo requires a self-built or
-      explicitly licensed APK that ships with the repo. Current fixtures are fetched by
-      a script, which is right for tests but not for a stranger following the README.
+- [x] **Install and Quick Start** — `docs/install.md`, every command run against a
+      fresh clone, with its real output shown. Verified end to end: clone → venv →
+      install → fetch fixture → analyse → report, including the degraded path with
+      no backends installed.
+- [x] **Architecture documentation** — `docs/architecture/README.md`, covering the
+      pipeline, the division of labour between backends, provenance, evidence levels
+      and the security posture.
+- [ ] **Bundled demo fixture.** The fixture used above is fetched by a script, which is
+      right for tests but not for a demo someone should be able to run from a clone.
+      Needs a self-built application, under a licence permitting redistribution,
+      committed as a demo asset.
 - [ ] **A short demo recording** (target: 30 seconds) — upload an APK, extract the
       manifest and class structure, search for a call chain, show Java and Smali side by
       side, export a report with evidence attached.
@@ -41,15 +44,19 @@ anyone reading it — including future maintainers.
 | CLI and REST API share the analysis core                  | Done         |
 | Classes, methods, references and evidence locations queryable | Done       |
 | JSON and Markdown export                                  | Done         |
-| Unit and end-to-end tests, ≥80% coverage on first-party code | Done (86%) |
-| GitHub Actions green, README reproducible                  | Partly — CI green, README incomplete |
-| `v0.1.0` release and demo video                            | Not started   |
+| Unit and end-to-end tests, ≥80% coverage on first-party code | Done (87%) |
+| GitHub Actions green                                      | Done         |
+| Installation guide verified on a clean machine            | Done         |
+| Architecture documentation                                | Done         |
+| Demo fixture bundled with the repository                  | Not started  |
+| `v0.1.0` release and demo video                          | Not started  |
 
-**A stranger can already install DexAtlas and analyse an APK. What they cannot yet do is
-learn how from the README alone without reading the source.**
+**A stranger can now clone, install, fetch a fixture, analyse it and read a report,
+following the documentation alone.** What remains is a fixture that ships with the
+repository rather than being fetched by a script, and the release.
 
 ## Verification before closing
 
-- [ ] Clone into a fresh directory on a machine with no JADX, Apktool or Androguard
-- [ ] Follow only the README, start to finish, to a rendered report
-- [ ] Confirm `dexatlas backends` degrades gracefully when nothing is installed
+- [x] Clone into a fresh directory with no JADX or Apktool installed
+- [x] Follow only the documentation, start to finish, to a rendered report
+- [x] Confirm `dexatlas backends` degrades gracefully when nothing is installed

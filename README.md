@@ -97,14 +97,13 @@ src/dexatlas/
 
 ## Quick start
 
+Full instructions, including backend installation and troubleshooting:
+**[docs/install.md](docs/install.md)**.
+
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
 uv sync --extra analysis
-
-# Point DexAtlas at your analysis backends, or let it find them on PATH.
-export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
-export DEXATLAS_JADX_PATH=/path/to/jadx/bin/jadx
 
 uv run dexatlas backends              # what is installed, at what version
 uv run dexatlas analyze app.apk -o report.md --json report.json
@@ -131,8 +130,21 @@ Docker, with JADX and Apktool preinstalled:
 docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
 ```
 
-> Installation instructions verified on a clean machine are part of the remaining
-> `v0.1.0` work — [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
+No APK is committed to this repository. To follow along, fetch a fixture:
+
+```bash
+bash scripts/fetch-fixtures.sh
+uv run dexatlas analyze fixtures/apk/TestActivity.apk -o report.md
+```
+
+## Documentation
+
+- **[Installation](docs/install.md)** — every command verified against a fresh clone
+- **[Architecture](docs/architecture/README.md)** — how it fits together and why
+- **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
+
+Remaining `v0.1.0` work — a bundled demo fixture and the release — is tracked in
+[issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 
 ## Contributing
 

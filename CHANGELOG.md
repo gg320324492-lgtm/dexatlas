@@ -38,10 +38,12 @@ every language model switched off.
 
 ### Engineering
 
-- 150 tests, 86% coverage on first-party code
+- 161 tests, 87% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file
+- Installation and architecture documentation, every install command verified against
+  a fresh clone
 - No APK, DEX or native library is committed to the repository
 
 [Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.0...HEAD

@@ -92,14 +92,12 @@ src/dexatlas/
 
 ## 快速开始
 
+完整说明（含后端安装与故障排查）：**[docs/install.md](docs/install.md)**。
+
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
 uv sync --extra analysis
-
-# 指定分析后端路径，或让 DexAtlas 从 PATH 中自动发现。
-export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
-export DEXATLAS_JADX_PATH=/path/to/jadx/bin/jadx
 
 uv run dexatlas backends              # 哪些后端可用、版本号是多少
 uv run dexatlas analyze app.apk -o report.md --json report.json
@@ -125,8 +123,21 @@ Docker 镜像已预装 JADX 与 Apktool：
 docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
 ```
 
-> 在干净机器上验证过的完整安装说明属于 `v0.1.0` 的收尾工作——
-> [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1)。
+本仓库不提交任何 APK。跟随文档上手请先获取测试样本：
+
+```bash
+bash scripts/fetch-fixtures.sh
+uv run dexatlas analyze fixtures/apk/TestActivity.apk -o report.md
+```
+
+## 文档
+
+- **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
+- **[架构说明](docs/architecture/README.md)** —— 项目如何组织，以及为什么这样设计
+- **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
+
+`v0.1.0` 剩余工作（随仓库分发的演示样本、发布）见
+[issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1)。
 
 ## 参与贡献
 

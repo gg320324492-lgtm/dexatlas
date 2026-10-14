@@ -1,6 +1,6 @@
 # Initialize project structure, CI and developer tooling
 
-**Priority:** P0 · **Roadmap:** [Phase 1](../../docs/roadmap/ROADMAP.md)
+**Priority:** P0 · **Roadmap:** [Phase 1](../../../../docs/roadmap/ROADMAP.md)
 
 Establish the repository skeleton, tooling and automation that every later issue depends on.
 
