@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,8 @@ class JadxBackend(Backend):
     """Wraps the ``jadx`` command-line decompiler."""
 
     name = "jadx"
+    path_env_var = "DEXATLAS_JADX_PATH"
+    install_hint = "Install the jadx decompiler: https://github.com/skylot/jadx/releases"
 
     def __init__(self, settings: Settings) -> None:
         super().__init__(settings)
@@ -85,7 +88,30 @@ class JadxBackend(Backend):
         self._version_probed = False
 
     def resolve(self) -> Path | None:
-        return which_or_none([self._settings.jadx_path], names=("jadx", "jadx.bat", "jadx.exe"))
+        """Locate a runnable jadx launcher.
+
+        The jadx distribution ships one launcher per platform, and the plain ``jadx``
+        name in ``bin/`` is the shell script. Pointing at it from Windows yields
+        "not a valid Win32 application", so the platform's own launcher is preferred
+        when one exists next to the configured path.
+        """
+        configured = self._settings.jadx_path
+        found = which_or_none([configured], names=("jadx", "jadx.bat", "jadx.exe"))
+        if found is None:
+            return None
+        return self._platform_launcher(found)
+
+    def _platform_launcher(self, found: Path) -> Path:
+        """Prefer a launcher this platform can actually execute."""
+        if os.name != "nt":
+            return found
+        for sibling in (found.with_suffix(".bat"), found.with_suffix(".exe")):
+            if sibling.is_file():
+                return sibling
+        # A .bat needs cmd.exe; a bare shell script cannot run on Windows at all.
+        if found.suffix.lower() not in {".bat", ".exe", ".cmd"}:
+            logger.debug("jadx: %s is not executable on Windows; looking for a .bat", found)
+        return found
 
     def version(self) -> str | None:
         if self._version_probed:

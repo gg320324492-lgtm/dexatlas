@@ -92,19 +92,41 @@ src/dexatlas/
 
 ## 快速开始
 
-> 安装与命令参考随 `v0.1.0` 一起发布，参见
-> [docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)。
-
-开发环境：
-
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-uv sync --extra dev
-uv run pytest
+uv sync --extra analysis
+
+# 指定分析后端路径，或让 DexAtlas 从 PATH 中自动发现。
+export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
+export DEXATLAS_JADX_PATH=/path/to/jadx/bin/jadx
+
+uv run dexatlas backends              # 哪些后端可用、版本号是多少
+uv run dexatlas analyze app.apk -o report.md --json report.json
+uv run dexatlas manifest  <project-id>
+uv run dexatlas search   <project-id> "yourTerm"
+uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
 ```
 
-分析后端（JADX、Apktool、Androguard）默认从 `PATH` 中发现，也可通过环境变量配置。
+REST API 是同一套分析内核的 HTTP 接口：
+
+```bash
+uv run uvicorn dexatlas.api.app:app --reload
+# 交互式文档：http://localhost:8000/docs
+```
+
+**后端是可选且互相独立的。** DexAtlas 会报告它用现有后端能做什么，并把做不到的部分
+作为证据记录进报告。一个后端都不装时，仍能得到哈希、校验和 APK 自身元数据；三个都装
+时，则能获得完整的符号索引、反编译源码和交叉引用。
+
+Docker 镜像已预装 JADX 与 Apktool：
+
+```bash
+docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
+```
+
+> 在干净机器上验证过的完整安装说明属于 `v0.1.0` 的收尾工作——
+> [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1)。
 
 ## 参与贡献
 

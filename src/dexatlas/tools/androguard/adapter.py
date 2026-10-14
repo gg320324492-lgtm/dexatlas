@@ -104,6 +104,8 @@ class AndroguardBackend(Backend):
     """Reads DEX metadata via the ``androguard`` library."""
 
     name = "androguard"
+    path_env_var = ""
+    install_hint = "Install the analysis extra: uv sync --extra analysis"
 
     def __init__(self, settings: Settings) -> None:
         super().__init__(settings)

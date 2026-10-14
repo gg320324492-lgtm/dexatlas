@@ -97,21 +97,42 @@ src/dexatlas/
 
 ## Quick start
 
-> Installation and command reference land with `v0.1.0`. See
-> [docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md#phase-1--functional-foundation-v010)
-> for the Phase 1 checklist.
-
-Development setup:
-
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-uv sync --extra dev
-uv run pytest
+uv sync --extra analysis
+
+# Point DexAtlas at your analysis backends, or let it find them on PATH.
+export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
+export DEXATLAS_JADX_PATH=/path/to/jadx/bin/jadx
+
+uv run dexatlas backends              # what is installed, at what version
+uv run dexatlas analyze app.apk -o report.md --json report.json
+uv run dexatlas manifest  <project-id>
+uv run dexatlas search   <project-id> "yourTerm"
+uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
 ```
 
-Analysis backends (JADX, Apktool, Androguard) are discovered from `PATH` or configured via
-environment variables — see `docs/` once `v0.1.0` ships.
+The REST API is the same analysis core over HTTP:
+
+```bash
+uv run uvicorn dexatlas.api.app:app --reload
+# interactive docs at http://localhost:8000/docs
+```
+
+**Backends are optional and independent.** DexAtlas reports what it can do with what is
+installed and records what it could not do, as evidence in the report. With none
+installed you still get hashing, validation and the APK's own metadata; with all three
+you get a full symbol index, decompiled source and cross-references.
+
+Docker, with JADX and Apktool preinstalled:
+
+```bash
+docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends
+```
+
+> Installation instructions verified on a clean machine are part of the remaining
+> `v0.1.0` work — [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 
 ## Contributing
 

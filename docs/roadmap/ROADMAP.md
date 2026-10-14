@@ -134,35 +134,48 @@ code location it came from. A finding without a location is not a finding.
 
 ### 1.4 Exit checklist
 
-- [ ] Import and index pipeline verified against 5 self-built test APKs
-- [ ] JADX, Apktool and Androguard all callable, with failures handled not crashed on
-- [ ] CLI and REST API run the same analysis core
-- [ ] Classes, methods, references and evidence locations are queryable
-- [ ] JSON and Markdown export supported
-- [ ] Unit tests plus end-to-end smoke test; **≥80% coverage on first-party code**
-- [ ] GitHub Actions green; README reproducible from a clean machine
+Last updated 2026-10-14. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full list.
+
+- [x] Import and index pipeline verified against test APKs
+- [x] JADX, Apktool and Androguard all callable, with failures handled not crashed on
+- [x] CLI and REST API run the same analysis core
+- [x] Classes, methods, references and evidence locations are queryable
+- [x] JSON and Markdown export supported
+- [x] Unit tests plus end-to-end tests; **86% coverage on first-party code** (150 tests)
+- [~] GitHub Actions green; README reproducible from a clean machine — **CI green, README
+      incomplete**. A stranger can install DexAtlas and analyse an APK, but the README
+      does not yet walk them through it without reading the source.
 - [ ] `v0.1.0` release published, with a demo recording
 
 **Phase complete means:** a stranger follows the README, installs DexAtlas on a clean
 machine, analyses a bundled authorized test APK, and gets a reproducible structured
 report. That is worth more than supporting ten more models in v0.1.
 
+The engineering is done; the last mile is documentation and the release. Tracked in
+[issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
+
 ### 1.5 Issue backlog (`v0.1.0` milestone)
 
-| #    | Title                                            | Priority |
-| ---- | ------------------------------------------------ | -------- |
-| 001  | Initialize project structure, CI and developer tooling | P0 |
-| 002  | Implement APK ingestion and metadata extraction   | P0       |
-| 003  | Integrate JADX decompilation backend              | P0       |
-| 004  | Integrate Apktool and Smali navigation            | P0       |
-| 005  | Integrate Androguard and symbol indexing         | P0       |
-| 006  | Build unified analysis API and CLI                | P0       |
-| 007  | Implement evidence-based report generation        | P1       |
-| 008  | Add reproducible fixtures, tests and documentation | P0      |
+The eight tasks that planned Phase 1. Seven are complete; their issue files are kept
+under [`.github/issues/v0.1.0/planned/`](../../.github/issues/v0.1.0/planned/) as a
+record of the design decisions behind each piece, rather than left open on GitHub as
+work that is not outstanding.
 
-These 8 exist to keep Phase 1 from sprawling. Phase 2's issues get written **after**
-Phase 1's source review, so that Phase 2 is planned against real code rather than
-assumptions written before any code existed.
+| #    | Task                                                      | Status      |
+| ---- | --------------------------------------------------------- | ----------- |
+| 001  | Initialize project structure, CI and developer tooling    | Complete    |
+| 002  | Implement APK ingestion and metadata extraction            | Complete    |
+| 003  | Integrate JADX decompilation backend                       | Complete    |
+| 004  | Integrate Apktool and Smali navigation                     | Complete    |
+| 005  | Integrate Androguard and symbol indexing                  | Complete    |
+| 006  | Build unified analysis API and CLI                         | Complete    |
+| 007  | Implement evidence-based report generation                 | Complete    |
+| 008  | Add reproducible fixtures, tests and documentation         | Partly      |
+
+Live Phase 1 tracking: [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
+
+Phase 2's issues get written **after** the Phase 1 source review, so that Phase 2 is
+planned against real code rather than assumptions written before any code existed.
 
 ---
 

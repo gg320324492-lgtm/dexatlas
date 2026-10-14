@@ -81,15 +81,21 @@ class Backend(ABC):
     def available(self) -> bool:
         return self.resolve() is not None
 
+    #: Environment variable that pins this backend's location, when there is one.
+    path_env_var: str = "DEXATLAS_<BACKEND>_PATH"
+
+    #: Shell command that installs this backend, shown in the not-installed error.
+    install_hint: str = "Install it and make it discoverable on PATH."
+
     def missing_error(self) -> ToolError:
+        pin = f" Or point {self.path_env_var} at it." if self.path_env_var else ""
         return ToolError(
             tool=self.name,
             code=ToolErrorCode.NOT_INSTALLED,
             message=f"{self.name} is not installed or not on PATH",
             detail=(
-                f"Install {self.name} and make it discoverable, or set the "
-                f"corresponding DEXATLAS_*_PATH environment variable. "
-                f"DexAtlas continues without it and records this error."
+                f"{self.install_hint}{pin} "
+                f"DexAtlas continues without {self.name} and records this error."
             ),
         )
 

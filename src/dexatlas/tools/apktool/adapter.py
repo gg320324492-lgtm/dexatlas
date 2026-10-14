@@ -39,6 +39,11 @@ class ApktoolBackend(Backend):
     """Wraps the ``apktool`` decoder."""
 
     name = "apktool"
+    path_env_var = "DEXATLAS_APKTOOL_JAR"
+    install_hint = (
+        "Install Apktool and point DEXATLAS_APKTOOL_JAR at its jar, or put "
+        "apktool on PATH: https://github.com/iBotPeaches/Apktool/releases"
+    )
 
     def __init__(self, settings: Settings) -> None:
         super().__init__(settings)
