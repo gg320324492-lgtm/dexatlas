@@ -43,54 +43,35 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install dependencies
-        run: uv sync --extra dev --extra analysis --frozen
-      - name: Run tests
-        run: uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term -m "not slow"
-      - name: Enforce coverage threshold
-        run: uv run coverage report --fail-under=80
-
-  slow:
-    name: Backend integration tests
-    runs-on: ubuntu-latest
-    # Exercises the real JADX / Apktool / Androguard backends against fixtures.
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Install JADX
-        run: |
-          curl -fsSL --retry 3 -o jadx.zip \
-            https://github.com/skylot/jadx/releases/download/v1.5.2/jadx-1.5.2.zip
-          mkdir -p "$RUNNER_TEMP/jadx"
-          unzip -q jadx.zip -d "$RUNNER_TEMP/jadx"
-          chmod +x "$RUNNER_TEMP/jadx/bin/"*
-          echo "$RUNNER_TEMP/jadx/bin" >> "$GITHUB_PATH"
-          "$RUNNER_TEMP/jadx/bin/jadx" --version
-
-      - name: Install Apktool
-        run: |
-          curl -fsSL --retry 3 -o apktool.jar \
-            https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar
-          echo "DEXATLAS_APKTOOL_JAR=$PWD/apktool.jar" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: uv sync --extra dev --extra analysis --frozen
 
       - name: Fetch test fixtures
+        env:
+          # The script uses the gh API, which needs a token even for public content.
+          GH_TOKEN: ${{ github.token }}
         run: bash scripts/fetch-fixtures.sh
 
-      - name: Run slow tests
-        run: uv run pytest -m slow
+      # The full suite, slow tests included, is what the coverage gate measures.
+      # Running only the fast tests leaves the JADX and Apktool adapters untested and
+      # drops coverage from 82% to 70%, which would make the threshold below a fiction.
+      # 3.13 runs without backends to confirm the suite still passes when they are absent.
+      - uses: actions/setup-java@v4
+        if: matrix.python-version == '3.12'
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install analysis backends
+        if: matrix.python-version == '3.12'
+        run: bash scripts/install-backends.sh
+
+      - name: Run tests
+        run: uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term
+
+      - name: Enforce coverage threshold
+        run: uv run coverage report --fail-under=80
 
   docker:
     name: Docker image builds
@@ -99,12 +80,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build image
         run: docker build -t dexatlas:ci .
+      - name: Verify the backends in the image actually run
+        run: docker run --rm dexatlas:ci dexatlas backends
 
   security:
     name: Dependency audit
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -115,8 +96,7 @@ jobs:
       - name: Export the resolved dependency set
         run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements.txt
       - name: Audit for known vulnerabilities
-        run: |
-          uv run --with pip-audit pip-audit -r requirements.txt --strict
+        run: uv run --with pip-audit pip-audit -r requirements.txt --strict
       - name: Upload the audited requirement set
         uses: actions/upload-artifact@v4
         with:

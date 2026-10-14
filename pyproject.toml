@@ -92,7 +92,8 @@ warn_unreachable = true
 disallow_any_generics = true
 
 [[tool.mypy.overrides]]
-module = ["androguard.*"]
+# Androguard depends on loguru; it ships no type information.
+module = ["androguard.*", "loguru.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
