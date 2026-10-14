@@ -7,6 +7,7 @@ someone deciding whether this project is worth their time. These checks are chea
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -221,3 +222,92 @@ def test_demo_capture_script_reports_a_real_project_id() -> None:
 
     literals = re.findall(r"apk_[0-9a-f]{8,}", capture)
     assert not literals, f"hard-coded project id(s) in the capture script: {literals}"
+
+
+# -- execution report -------------------------------------------------------
+
+
+REPORT = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+
+
+def test_execution_report_exists() -> None:
+    assert REPORT.is_file(), "the Phase 1 execution report is missing"
+
+
+def test_execution_report_numbers_match_the_code() -> None:
+    """A report whose numbers drifted from the code is worse than no report.
+
+    The review this feeds reads claims like "10 CLI commands" and "88% coverage".
+    If those stop being true the reviewer is reading fiction.
+    """
+    report = REPORT.read_text(encoding="utf-8")
+
+    cli = (REPO_ROOT / "src/dexatlas/cli/main.py").read_text(encoding="utf-8")
+    commands = cli.count("@app.command()")
+    # Fullwidth parentheses are deliberate here: the report is written in Chinese,
+    # where they are the correct form and halfwidth ones read as machine output.
+    assert f"CLI（{commands} 个命令）" in report, (  # noqa: RUF001
+        f"the report does not state the current CLI command count ({commands})"
+    )
+
+    api = (REPO_ROOT / "src/dexatlas/api/app.py").read_text(encoding="utf-8")
+    endpoints = len(re.findall(r"@app\.(get|post|delete|put)\(", api))
+    assert f"REST API（{endpoints} 个端点）" in report, (  # noqa: RUF001
+        f"the report does not state the current endpoint count ({endpoints})"
+    )
+
+
+def test_execution_report_does_not_claim_unbuilt_features() -> None:
+    """The report must not describe Phase 2 as delivered."""
+    report = REPORT.read_text(encoding="utf-8")
+
+    for claim in (
+        "MCP server is shipped",
+        "agent orchestration works",
+        "web workbench is available",
+    ):
+        assert claim not in report.lower()
+
+    # It should say plainly that the review has not happened yet.
+    assert "评审" in report or "review" in report.lower()
+
+
+def test_execution_report_layer_counts_match_pytest() -> None:
+    """The report states 163 fast / 44 slow tests. Those must be the real numbers.
+
+    Checked by running pytest's own collector rather than counting markers in the source,
+    so the figure in the report cannot drift from what actually runs.
+    """
+    import subprocess
+
+    report = REPORT.read_text(encoding="utf-8")
+
+    counts = {}
+    for label, marker in (("fast", "not slow"), ("slow", "slow")):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "--collect-only",
+                "-q",
+                "-m",
+                marker,
+                "-p",
+                "no:cacheprovider",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        match = re.search(r"(\d+)/(\d+) tests collected", result.stdout)
+        assert match, f"could not read pytest's collection count: {result.stdout[-500:]}"
+        counts[label] = int(match.group(1))
+
+    assert f"| {counts['fast']} |" in report, (
+        f"the report does not state the current fast-suite size ({counts['fast']})"
+    )
+    assert f"| {counts['slow']} |" in report, (
+        f"the report does not state the current slow-suite size ({counts['slow']})"
+    )

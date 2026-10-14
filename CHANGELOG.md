@@ -45,7 +45,7 @@ every language model switched off.
 
 ### Engineering
 
-- 204 tests, 88% coverage on first-party code
+- 208 tests, 88% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file

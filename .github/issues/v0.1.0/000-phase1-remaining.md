@@ -35,7 +35,16 @@ anyone reading it — including future maintainers.
       components, code search, cross-references, decompiled source and the report.
       `scripts/render-demo.py` regenerates it; `tests/test_docs.py` checks the assets
       are valid and that no project id is hard-coded in the capture.
-- [ ] **`v0.1.0` release** with notes, and a `CHANGELOG.md` entry.
+- [x] **`v0.1.0` release** published 2026-10-14, with release notes covering the known
+      limitations alongside the features, and a dated `CHANGELOG.md` entry.
+
+---
+
+## Outcome
+
+**Phase 1 is complete.** All eleven exit-checklist items pass. The next step is the
+[Phase 1 source review](../../../docs/roadmap/ROADMAP.md#review-protocol), after which
+Phase 2's issues get written from that review rather than from this plan.
 
 ## Exit checklist status
 
@@ -52,7 +61,7 @@ anyone reading it — including future maintainers.
 | Architecture documentation                                | Done         |
 | Demo application bundled with the repository            | Done         |
 | Demo recording                                            | Done         |
-| `v0.1.0` release                                         | Not started  |
+| `v0.1.0` release                                          | Done         |
 
 **A stranger can now clone, install, analyse the bundled demo application and read a
 report, following the documentation alone.** What remains is the release itself.
