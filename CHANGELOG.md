@@ -9,7 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing changed yet.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-10-14
 
 Phase 1 — Functional Foundation. A working static analysis pipeline that operates with
 every language model switched off.
