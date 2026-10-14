@@ -159,16 +159,26 @@ def test_the_bundled_demo_app_is_first_party_and_reproducible() -> None:
 
 
 def test_demo_gifs_exist_and_are_valid() -> None:
-    """The README embeds these; a missing or corrupt file shows as a broken image."""
-    from PIL import Image
+    """The README embeds these; a missing or corrupt file shows as a broken image.
 
+    The deep check needs Pillow, which lives in the optional `demo` extra. When it is
+    absent the files are still checked for existence and plausibility — a corrupt GIF
+    should fail CI, but a missing optional dependency should not.
+    """
     assets = REPO_ROOT / "docs" / "assets"
     for name in ("demo.gif", "demo-quick.gif"):
         path = assets / name
         assert path.is_file(), f"{name} is missing — run scripts/render-demo.py"
         assert path.stat().st_size > 20_000, f"{name} is suspiciously small"
+        # A GIF always starts with this magic; checking it needs no dependency.
+        assert path.read_bytes()[:3] == b"GIF", f"{name} is not a GIF"
 
-        with Image.open(path) as image:
+    pytest.importorskip("PIL", reason="the demo extra installs Pillow for deep checks")
+
+    from PIL import Image
+
+    for name in ("demo.gif", "demo-quick.gif"):
+        with Image.open(assets / name) as image:
             assert image.format == "GIF"
             assert image.n_frames > 10, f"{name} has too few frames to show a session"
             assert image.width >= 800, f"{name} is too narrow to read"
