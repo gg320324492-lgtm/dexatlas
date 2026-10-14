@@ -48,8 +48,7 @@ jobs:
       - name: Run tests
         run: uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term -m "not slow"
       - name: Enforce coverage threshold
-        run: |
-          uv run --with coverage coverage report --fail-under=80
+        run: uv run coverage report --fail-under=80
 
   slow:
     name: Backend integration tests
@@ -70,19 +69,25 @@ jobs:
 
       - name: Install JADX
         run: |
-          curl -sSL -o jadx.zip \
+          curl -fsSL --retry 3 -o jadx.zip \
             https://github.com/skylot/jadx/releases/download/v1.5.2/jadx-1.5.2.zip
-          unzip -q jadx.zip
-          echo "$PWD/jadx-1.5.2/bin" >> "$GITHUB_PATH"
+          mkdir -p "$RUNNER_TEMP/jadx"
+          unzip -q jadx.zip -d "$RUNNER_TEMP/jadx"
+          chmod +x "$RUNNER_TEMP/jadx/bin/"*
+          echo "$RUNNER_TEMP/jadx/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/jadx/bin/jadx" --version
 
       - name: Install Apktool
         run: |
-          curl -sSL -o apktool.jar \
+          curl -fsSL --retry 3 -o apktool.jar \
             https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar
           echo "DEXATLAS_APKTOOL_JAR=$PWD/apktool.jar" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: uv sync --extra dev --extra analysis --frozen
+
+      - name: Fetch test fixtures
+        run: bash scripts/fetch-fixtures.sh
 
       - name: Run slow tests
         run: uv run pytest -m slow
@@ -100,7 +105,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -108,8 +112,14 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync --extra dev --extra analysis --frozen
-      - name: Audit
-        run: uv export --format requirements-txt --no-hashes -o requirements.txt
-      - uses: pypa/dependency-review-action@v4
+      - name: Export the resolved dependency set
+        run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements.txt
+      - name: Audit for known vulnerabilities
+        run: |
+          uv run --with pip-audit pip-audit -r requirements.txt --strict
+      - name: Upload the audited requirement set
+        uses: actions/upload-artifact@v4
         with:
-          file: requirements.txt
+          name: audited-requirements
+          path: requirements.txt
+          retention-days: 30

@@ -15,6 +15,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
+        unzip \
         openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
@@ -23,11 +24,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 # Dependency layer first so source edits do not invalidate the dependency cache.
-COPY pyproject.toml README.md LICENSE ./
-RUN uv sync --no-dev --extra analysis --frozen || uv sync --no-dev --extra analysis
+# uv.lock is committed, so --frozen installs exactly the reviewed set.
+COPY pyproject.toml uv.lock README.md LICENSE ./
+RUN uv sync --no-dev --extra analysis --frozen
 
 COPY src/ ./src/
-RUN uv sync --no-dev --extra analysis
+RUN uv sync --no-dev --extra analysis --frozen
 
 ENV PATH="/app/.venv/bin:${PATH}" \
     DEXATLAS_JADX_PATH=/opt/jadx/bin/jadx \
@@ -39,14 +41,19 @@ RUN mkdir -p /opt/jadx /opt/apktool "${DEXATLAS_WORKSPACE}"
 ARG JADX_VERSION=1.5.2
 ARG APKTOOL_VERSION=2.11.1
 
-RUN curl -sSL -o /tmp/jadx.zip \
+# The jadx archive unpacks directly into bin/ and lib/ — there is no version-named
+# top-level directory to move.
+RUN curl -fsSL --retry 3 -o /tmp/jadx.zip \
         "https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip" \
-    && unzip -q /tmp/jadx.zip -d /opt \
-    && mv "/opt/jadx-${JADX_VERSION}" /opt/jadx \
-    && rm /tmp/jadx.zip
+    && unzip -q /tmp/jadx.zip -d /opt/jadx \
+    && chmod +x /opt/jadx/bin/* \
+    && rm /tmp/jadx.zip \
+    && test -x /opt/jadx/bin/jadx \
+    || { echo "jadx launcher missing after extraction" >&2; ls -R /opt/jadx | head -40 >&2; exit 1; }
 
-RUN curl -sSL -o /opt/apktool/apktool.jar \
-        "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar"
+RUN curl -fsSL --retry 3 -o /opt/apktool/apktool.jar \
+        "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar" \
+    && java -jar /opt/apktool/apktool.jar --version
 
 VOLUME ["${DEXATLAS_WORKSPACE}"]
 

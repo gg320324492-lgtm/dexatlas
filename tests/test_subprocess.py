@@ -36,9 +36,7 @@ def _backend(settings) -> _StubBackend:
 
 
 def test_successful_invocation(settings) -> None:
-    outcome = _backend(settings).run(
-        ToolInvocation(argv=[sys.executable, "-c", "print('hello')"])
-    )
+    outcome = _backend(settings).run(ToolInvocation(argv=[sys.executable, "-c", "print('hello')"]))
 
     assert outcome.ok
     assert outcome.returncode == 0
