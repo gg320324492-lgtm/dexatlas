@@ -1,0 +1,58 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+
+# DexAtlas runtime data
+.dexatlas/
+workspace/
+*.db
+*.sqlite
+*.sqlite3
+
+# Test + coverage artifacts
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+junit*.xml
+
+# Analysis output — never commit decompiled third-party code
+out/
+_decompile/
+jadx-out/
+apktool-out/
+smali/
+resources/
+*.apk
+*.aab
+*.apks
+*.dex
+*.idsig
+*.so
+report.html
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

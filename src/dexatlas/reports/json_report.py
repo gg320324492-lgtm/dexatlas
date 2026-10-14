@@ -1,0 +1,69 @@
+"""JSON report — the machine-readable form, and the CLI/API's shared shape."""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime
+from typing import Any
+
+from dexatlas.core.models import Evidence, Project
+from dexatlas.core.pipeline import AnalysisResult
+
+
+def build_json_report(result: AnalysisResult) -> dict[str, Any]:
+    """Assemble the full analysis as a serializable document.
+
+    Backend failures are included in ``errors`` rather than omitted: a report that hides
+    which steps did not run is exactly the report that gets over-trusted.
+    """
+    project = result.project
+    return {
+        "schema_version": 1,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "project": _project_block(project),
+        "tools": project.tool_versions,
+        "errors": [e.model_dump(mode="json") for e in project.errors],
+        "manifest": result.manifest.model_dump(mode="json") if result.manifest else None,
+        "evidence": [e.model_dump(mode="json") for e in result.evidence],
+        "summary": _summary_block(result),
+    }
+
+
+def _project_block(project: Project) -> dict[str, Any]:
+    return {
+        "id": project.id,
+        "apk": {
+            "sha256": project.apk.sha256,
+            "size_bytes": project.apk.size_bytes,
+            "path": str(project.apk.path),
+            "dex_files": project.apk.dex_files,
+            "native_libraries": project.apk.native_libraries,
+            "has_signed_certificate": project.apk.has_signed_certificate,
+        },
+        "status": project.status.value,
+        "created_at": project.created_at.isoformat(),
+        "class_count": project.class_count,
+        "method_count": project.method_count,
+        "reference_count": project.reference_count,
+        "evidence_count": project.evidence_count,
+    }
+
+
+def _summary_block(result: AnalysisResult) -> dict[str, Any]:
+    return {
+        "classes": result.project.class_count,
+        "methods": result.project.method_count,
+        "cross_references": result.project.reference_count,
+        "evidence_by_level": _evidence_counts(result.evidence),
+        "duration_seconds": round(result.duration_seconds, 2),
+        "backends_with_errors": sorted({e.tool for e in result.project.errors}),
+    }
+
+
+def _evidence_counts(evidence: list[Evidence]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in evidence:
+        counts[item.level.value] = counts.get(item.level.value, 0) + 1
+    return counts
+
+
+__all__ = ["build_json_report"]

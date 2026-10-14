@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Mypy
+        run: uv run mypy
+
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --frozen
+      - name: Run tests
+        run: uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term -m "not slow"
+      - name: Enforce coverage threshold
+        run: |
+          uv run --with coverage coverage report --fail-under=80
+
+  slow:
+    name: Backend integration tests
+    runs-on: ubuntu-latest
+    # Exercises the real JADX / Apktool / Androguard backends against fixtures.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install JADX
+        run: |
+          curl -sSL -o jadx.zip \
+            https://github.com/skylot/jadx/releases/download/v1.5.2/jadx-1.5.2.zip
+          unzip -q jadx.zip
+          echo "$PWD/jadx-1.5.2/bin" >> "$GITHUB_PATH"
+
+      - name: Install Apktool
+        run: |
+          curl -sSL -o apktool.jar \
+            https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar
+          echo "DEXATLAS_APKTOOL_JAR=$PWD/apktool.jar" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --frozen
+
+      - name: Run slow tests
+        run: uv run pytest -m slow
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t dexatlas:ci .
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --frozen
+      - name: Audit
+        run: uv export --format requirements-txt --no-hashes -o requirements.txt
+      - uses: pypa/dependency-review-action@v4
+        with:
+          file: requirements.txt

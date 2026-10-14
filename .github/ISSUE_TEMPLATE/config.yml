@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/gg320324492-lgtm/dexatlas/security/advisories/new
+    about: Report privately. Please do not open a public issue for a vulnerability.
+  - name: Read the roadmap first
+    url: https://github.com/gg320324492-lgtm/dexatlas/blob/main/docs/roadmap/ROADMAP.md
+    about: Check whether this is already planned or explicitly out of scope.
+  - name: Intended use and scope
+    url: https://github.com/gg320324492-lgtm/dexatlas/blob/main/SECURITY.md
+    about: What DexAtlas is and is not for, before proposing analysis capabilities.

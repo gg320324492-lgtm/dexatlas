@@ -1,0 +1,45 @@
+name: "Feature request"
+description: "Suggest a capability or improvement"
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: "What are you trying to do that is hard today? Describe the workflow, not the solution."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+    validations:
+      required: true
+
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Which phase does this belong to?
+      options:
+        "Phase 1 — Foundation"
+        "Phase 2 — Agentic Intelligence"
+        "Phase 3 — Production-Ready"
+        "Not sure"
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you have considered
+
+  - type: checkboxes
+    id: evidence
+    attributes:
+      label: Evidence model
+      options:
+        - label: >
+            If this produces a security finding, I understand it must be marked verified,
+            a static-analysis lead, or insufficiently evidenced — never presented as a
+            confirmed vulnerability without proof.

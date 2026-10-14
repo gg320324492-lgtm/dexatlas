@@ -1,0 +1,18 @@
+# Normalise line endings so the repository is byte-identical on Windows, macOS and Linux.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never diffed, never line-ending converted.
+*.apk binary
+*.aab binary
+*.dex binary
+*.so binary
+*.jar binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.pdf binary
+*.zip binary

@@ -1,0 +1,20 @@
+version: "2"
+
+services:
+  dexatlas:
+    build:
+      context: .
+    image: dexatlas:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - dexatlas-workspace:/workspace
+    environment:
+      # Analysis backends are auto-detected in the image. Override to point at your own
+      # installs, or set DEXATLAS_JADX_PATH="" to run without external engines.
+      DEXATLAS_WORKSPACE: /workspace
+      DEXATLAS_LOG_LEVEL: INFO
+    restart: unless-stopped
+
+volumes:
+  dexatlas-workspace:

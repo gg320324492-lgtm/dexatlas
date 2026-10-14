@@ -1,0 +1,70 @@
+name: "Bug report"
+description: "Something in DexAtlas behaves incorrectly"
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing this. Please do not attach APKs or decompiled source from
+        applications you are not authorized to analyse — a hash from an app you built
+        yourself is more useful anyway.
+
+  - type: input
+    id: version
+    attributes:
+      label: DexAtlas version
+      placeholder: "0.1.0, or `main` at <sha>"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - APK ingestion
+        - JADX backend
+        - Apktool backend
+        - Androguard backend
+        - Search / indexing
+        - CLI
+        - REST API
+        - Reports
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: "Minimal steps to reproduce, including the exact command."
+      placeholder: |
+        1. Run `dexatlas analyze sample.apk`
+        2. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: "Full traceback or error output if there is one."
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Ubuntu 24.04, Python 3.12, JDK 21, JADX 1.5.2"
+    validations:
+      required: true
