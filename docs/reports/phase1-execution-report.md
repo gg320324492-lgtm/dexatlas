@@ -8,6 +8,12 @@
 本报告供你审核。按路线图约定的评审机制，**Phase 1 已交付但评审尚未进行**，
 Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原计划。
 
+> **v0.1.1 补充（未发布）**
+>
+> 报告 3.7 ~ 3.9 节记录了 v0.1.1 的 FIX-001「修复 Smali 回退与 Multi-DEX 路径定位」。
+> 三个提交已在 `main` 上推送，但**尚未创建 v0.1.1 Release**——按约定，发布要等你审阅之后。
+> 本报告中的测试数、覆盖率、提交数已同步到 v0.1.1 的状态。
+
 ---
 
 ## 1. 交付了什么
@@ -32,22 +38,27 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | 244（192 快 + 52 集成） | — |
-| 一方代码覆盖率 | **87.8%**（1484/1691 行，v0.1.0 时点） | ≥80% |
+| 一方代码覆盖率 | **89.1%**（1523/1709 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
 | Python 代码量 | 6975 行 / 42 文件 | — |
-| 提交数 | 10 | — |
+| 提交数 | 15（v0.1.1 已推送 3 个） | — |
 
 ### 1.3 覆盖率分布（诚实披露薄弱处）
 
 ```
- 70.7%  cli/main.py              46/157 未覆盖
+ 70.1%  cli/main.py              47/157 未覆盖
  76.8%  tools/jadx/adapter.py    48/207 未覆盖
  82.4%  cli/console.py            6/34  未覆盖
- 82.7%  tools/apktool/adapter.py 24/139 未覆盖
  85.7%  api/app.py              21/147 未覆盖
  88.5%  tools/androguard/adapter 20/174 未覆盖
+ 89.4%  reports/markdown.py       5/47  未覆盖
+```
+
+`tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
+v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
+现在它是 **94%（5/159 未覆盖）**，已经离开这份清单。
 ```
 
 **未覆盖的是什么：** 主要是错误分支（后端超时/非零退出后的恢复路径）和一些
@@ -57,7 +68,7 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 87.8% 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 89.1% 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -83,7 +94,7 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 | `test_evidence.py` | 证据等级纪律 |
 | `test_reports.py` | 报告渲染 |
 | `test_subprocess.py` | 执行边界（超时/非零退出/注入） |
-| `test_backend_discovery.py` | 后端发现、平台差异 |
+| `test_backend_discovery.py` | 后端发现、平台差异、一个已知缺陷的 xfail 记录 |
 | `test_cli.py` | CLI 命令真实执行 |
 | `test_api.py` | REST 端点 |
 | `test_androguard_integration.py` | 真实 DEX 解析 |
@@ -257,7 +268,7 @@ for root in sorted(smali_root.glob("smali*")):   # ← 却在这里面找 smali*
 **验证方式：** 修复前跑新测试，11 个失败（6 个集成 + 5 单元）；
 修复后单元层 26 个 + 集成层 8 个全过。见 FIX-001 报告。
 
-### 3.7 CI 反复失败暴露的问题
+### 3.8 CI 反复失败暴露的问题
 
 CI 一共红了 **4 次**，每次都是真问题：
 
@@ -280,7 +291,14 @@ CI 一共红了 **4 次**，每次都是真问题：
 
 **一个只在别人机器上才失败的测试，比没有这个测试更糟**，因为它会让人怀疑
 CI 而不是怀疑测试。这条修正后的做法是直接 patch 后端的解析逻辑本身，
-不依赖机器上装了什么。本地两种环境（jadx 在 PATH 上 / 不在）都验证过。
+不依赖机器上装了什么。
+
+修正后我做了两项验证，而不是只重跑一遍：
+
+1. **本地把 jadx 放进 `PATH`**（复现 CI 条件），8 个集成测试全过；
+2. **本地保持 jadx 不在 `PATH`**，同样全过。
+
+也就是说这个测试现在与「机器上装了什么」完全无关。
 
 **顺带发现一个既有缺陷（不在本次修复范围，留待你裁决）：**
 `src/dexatlas/config/settings.py` 第 28 行的注释写着
@@ -295,7 +313,39 @@ PosixPath('/usr/local/bin/jadx')
 ```
 
 也就是说，**没有任何办法通过配置禁用一个后端**。这不是 FIX-001 引入的，
-但它正是导致第 4 次 CI 失败的机制。建议作为独立 Issue 处理。
+但它正是导致第 4 次 CI 失败的机制。
+
+我没有修它（超出本次 Issue 范围），但也没有让它继续藏在注释里：
+已加一个 `strict=True` 的 `xfail` 测试记录这个行为。**strict 意味着**
+如果哪天它被修好了，这个测试会**失败**，强制有人回来摘掉标记——
+这样它既不会被遗忘，也不会把一个 bug 固化成期望行为。
+
+修正后 CI 5 个 job 全绿（Lint / Tests 3.12 / Tests 3.13 / Docker / 依赖审计）。
+
+---
+
+### 3.9 另一个我差点漏掉的静默失效（v0.1.1 修复）
+
+3.8 节的第 4 次 CI 失败是**测试本身**坏了。这一节是相反的方向：
+**测试是好的，但从来没被执行过。**
+
+写完 FIX-001 的集成测试后，我意识到 `scripts/fetch-fixtures.sh` 拉取的 fixture
+列表里没有 `multidex.apk`——它是后来才加进测试的，而脚本没同步。
+集成测试找不到 fixture 就 `pytest.skip()`，于是：
+
+> 在我的机器上 8 个测试全过，在 CI 上 8 个测试全部跳过，**两边都是绿的**。
+
+这和 3.7 节的 Smali 回退是同一类失败：**保护消失了，但没有一样东西变红。**
+更糟的是，3.8 节里 CI 的红灯反而是幸运的——如果那个测试依赖的是
+「JADX 本来就没装」这种恰好成立的条件，CI 会一直绿着，而保护一直是空的。
+
+修法不只是补上文件名。我加了一个测试，让 fetch 脚本声明的 fixture 列表与集成测试
+实际引用的 fixture **双向一致**——多一个没用过的、或者用了一个没拉取的，都会失败。
+这个测试我验证过它真的会失败（故意加一个多余 fixture，它立刻报出来）。
+
+顺带发现 `fetch-fixtures.sh` 一直在拉两个**没有任何测试使用**的 APK。每个 CI run
+都在为没人读的文件付出下载和存储成本，而一个没人用的 fixture 恰恰是「列表漂移」
+最容易发生的地方。已删除，现在脚本只拉真正被读的两个。
 
 ---
 
@@ -347,25 +397,6 @@ Androguard 4.x **移除了** xref 缓存（3.x 有）。所以调用边是从指
   没有 10 万类以上的大型 APK 数据点
 - **混淆代码的对抗性测试**：有 XXE 和畸形输入测试，但没有真正的混淆 APK 样本
 
-### 4.6 一个我差点漏掉的静默失效（v0.1.1 修复）
-
-写完 FIX-001 的集成测试后，我意识到一个更隐蔽的问题：**那个测试在 CI 上会跳过。**
-
-`scripts/fetch-fixtures.sh` 拉取的 fixture 列表里没有 `multidex.apk`——它是后来才
-加进测试的，而脚本没同步。集成测试找不到 fixture 就 `pytest.skip()`，于是：
-
-> 在我的机器上 8 个测试全过，在 CI 上 8 个测试全部跳过，**两边都是绿的**。
-
-这和 3.7 节的 Smali 回退是同一类失败：**保护消失了，但没有一样东西变红。**
-
-修法不只是补上文件名。我加了一个测试，让 fetch 脚本声明的 fixture 列表与集成测试
-实际引用的 fixture **双向一致**——多一个没用过的、或者用了一个没拉取的，都会失败。
-这个测试我验证过它真的会失败（故意加一个多余 fixture，它立刻报出来）。
-
-顺带发现 `fetch-fixtures.sh` 一直在拉两个**没有任何测试使用**的 APK。每个 CI run
-都在为没人读的文件付出下载和存储成本，而一个没人用的 fixture 恰恰是「列表漂移」
-最容易发生的地方。已删除，现在脚本只拉真正被读的两个。
-
 ---
 
 ## 5. 安全边界执行情况
@@ -391,8 +422,9 @@ Androguard 4.x **移除了** xref 缓存（3.x 有）。所以调用边是从指
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout v0.1.0
 
+# v0.1.0（已发布）
+git checkout v0.1.0
 uv sync --extra dev --extra analysis
 uv run ruff check .
 uv run ruff format --check .
@@ -401,7 +433,17 @@ uv run pytest --cov=dexatlas --cov-report=term
 
 # 安装后端后跑完整套件
 bash scripts/install-backends.sh
-uv run pytest          # v0.1.0 时为 208；v0.1.1 起为 244
+uv run pytest          # v0.1.0 时为 208 passed
+
+# v0.1.1（含 FIX-001，尚未发布）
+git checkout main
+uv run pytest          # 244：243 passed + 1 xfailed
+```
+
+集成测试依赖的第三方样本不入库，先拉下来：
+
+```bash
+bash scripts/fetch-fixtures.sh   # 拉 TestActivity.apk 和 multidex.apk
 ```
 
 CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
@@ -414,15 +456,20 @@ CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
 
 1. **Phase 2 的 Issue 从评审结论写起**，而不是从原计划写。原计划里对 Agent 架构的
    设想是基于「代码不存在」时的假设，现在有真实代码了。
-2. **优先补 Phase 1 的已知薄弱处**（如果评审认为必要）：
-   - `cli/main.py` 覆盖率 70.7%，缺参数组合测试
-   - 多 DEX / 混淆样本的对抗性测试
-3. **补充一份分析覆盖度文档**（尚未存在）：调研中发现 Androguard 用「哪些结论由哪个
+2. **把「空路径不能禁用后端」立为独立 Issue**（见 3.8 节末）。它是一个真实的、
+   已被记录的缺陷，`strict` 的 xfail 会在它被修好时强制有人清理标记。
+3. **优先补 Phase 1 的已知薄弱处**（如果评审认为必要）：
+   - `cli/main.py` 覆盖率 70.1%，缺参数组合测试
+   - 混淆样本的对抗性测试
+4. **补充一份分析覆盖度文档**（尚未存在）：调研中发现 Androguard 用「哪些结论由哪个
    后端的哪个版本产出」作为可信度凭证，这比任何自述都有说服力。
+5. **考虑把报告里的测试数字改成自动生成**。目前报告写死数字，每次新增测试都要手工
+   同步——本次修复中这个测试失败了两次，都是它在正确地报警，但摩擦是真实的。
+   （本条属于报告工具化，不在 FIX-001 范围内。）
 
 ---
 
-## 附：10 次提交
+## 附：15 次提交
 
 ```
 91748b0  Initial commit: evidence-first Android analysis core
@@ -435,7 +482,16 @@ d6e5804  Fix three defects the demo app surfaced: gitignore, backend-dependent t
 af3f0e0  Add a generated demo recording, and the badges it needs
 a56838f  Make the GIF validation degrade when Pillow is absent
 efa86d5  Prepare the v0.1.0 release
+9e98b0a  Add the Phase 1 execution report, and tests that keep it honest
+33d8c71  Link the execution report from the release notes
+574a3ee  Fix Smali fallback, which never worked for any APK
+1856c07  Fetch the multidex fixture, and stop a test from skipping unnoticed
+77cf0c9  Make the fallback test independent of what is installed
 ```
 
-注意提交历史里 **6 次是修 bug**。这个比例偏高，但每个都在提交信息里写清了
+注意提交历史里 **9 次是修 bug**。这个比例偏高，但每个都在提交信息里写清了
 「为什么写错了」和「为什么测试没抓到」——这比一次性的完美提交更有信息量。
+
+其中 3.8 节记录的第 4 次 CI 失败，值得单独说一句：那个 bug 是**我自己的新测试**
+在**我的机器上通过、在 CI 上失败**才暴露的。它不在原来的 208 个测试的覆盖范围内，
+是这次改动引入的。**新写的测试自己也会有 bug**，这一点在这次修复里比任何文档都更有说服力。

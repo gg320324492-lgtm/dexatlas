@@ -7,7 +7,38 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+### Fixed
+
+- **The Smali fallback never worked for any APK.** `smali_path()` searched for the
+  per-dex directories *inside* `smali/`, but Apktool writes `classes2.dex` to
+  `smali_classes2/`, a sibling rather than a child. Single-dex APKs failed too: the
+  glob only ever matched subdirectories of `smali/` whose name began with "smali", and
+  a normally decoded APK has none, so the function returned `None` for every class.
+  A source request reported "No source" while the decoded Smali sat in the workspace,
+  with no error recorded anywhere. The directories are now discovered as siblings
+  under the output directory and searched in sorted order, so a class present in two
+  dexes resolves to the same file on every call.
+- **A hostile class name could crash the analysis.** The name was joined into a path
+  without validation, so `....//....//etc/passwd` raised `ValueError` from
+  `Path.with_suffix()`. A name that is not a class name now returns `None`, which is
+  what the rest of the architecture expects: backend failure is a value, not an
+  exception.
+
+### Added
+
+- Unit coverage for the three Apktool directory layouts, deterministic resolution of
+  duplicate class names, and eight path-traversal payloads
+- An integration test that analyses a real two-dex APK with JADX made unavailable, so
+  the Smali fallback is the thing actually under test
+- A check that the fixture-fetching script and the integration tests agree on the
+  fixture list, in both directions — a test that skips because its fixture was never
+  fetched is a regression guard that has silently disappeared
+
+### Known issues
+
+- **An empty backend path does not disable that backend**, although `settings.py`
+  documents that it should. The path is skipped and a `PATH` lookup follows. Recorded
+  as a strict `xfail` test so it cannot be forgotten; see the execution report.
 
 ## [0.1.0] — 2026-10-14
 
