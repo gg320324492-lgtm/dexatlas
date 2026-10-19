@@ -12,7 +12,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 >
 > 报告 3.7 ~ 3.9 节记录了 v0.1.1 的 FIX-001「修复 Smali 回退与 Multi-DEX 路径定位」。
 > v0.1.1 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
-> 本报告中的测试数、覆盖率、提交数已同步到 v0.1.1 的状态。
+> 本报告中的测试数、覆盖率已随 v0.1.1 同步过一次；现在这些数字改由脚本自动生成
+> （见 1.2 节与 6 节），不必再随每次发布手工同步。
 >
 > **v0.1.2 补充（已发布）**
 >
@@ -20,7 +21,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 > 以及一个没有 bug、但同样需要修正的问题：Phase 1 的退出清单曾被我改写成
 > 更容易打勾的措辞。
 > v0.1.2 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2
-> 本报告中的测试数、覆盖率、提交数已同步到 v0.1.2 的状态。
+> 本报告中的测试数、覆盖率已随 v0.1.2 同步过一次；现在这些数字改由脚本自动生成
+> （见 1.2 节与 6 节），每次刷新都会与当前代码对齐。
 
 ---
 
@@ -37,45 +39,61 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 统一分析模型 + provenance | 完成 | 每个产物都有来源校验 |
 | 证据等级（verified/lead/insufficient） | 完成 | 反直觉输入的专门测试 |
 | SQLite + FTS5 存储与检索 | 完成 | 单元测试 + 注入测试 |
-| CLI（10 个命令） | 完成 | 每个命令都被真实执行 |
-| REST API（15 个端点） | 完成 | httpx 测试客户端 |
+| CLI（<!--fig:cli.commands-->10<!--/fig--> 个命令） | 完成 | 每个命令都被真实执行 |
+| REST API（<!--fig:api.endpoints-->15<!--/fig--> 个端点） | 完成 | httpx 测试客户端 |
 | JSON / Markdown 报告导出 | 完成 | 快照式断言 |
 
 ### 1.2 工程指标
 
+**本报告里的测试数与覆盖率是自动生成的**（出现在 1.2、1.3、2.1 和 6 节）。
+`scripts/refresh-report-figures.py` 测量一次，把结果写回本文件；
+`tests/test_docs.py` 核对本文件与代码是否一致，不一致时它会指名是哪一个数字对不上。
+改完代码跑一次脚本即可，不必再手工同步——这条约束是第三次被手工同步打断之后
+才补上的（见 7 节第 5 条）。表里其余几行是当时的实测结论，不随代码漂移。
+
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | 275（196 快 + 79 集成） | — |
-| 一方代码覆盖率 | **89.2%**（1525/1709 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->278<!--/fig-->（<!--fig:tests.fast-->199<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->89.2%<!--/fig-->**（<!--fig:coverage.covered-->1525<!--/fig-->/<!--fig:coverage.total-->1709<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
-| 自建测试 APK | **5 个**（验收清单要求 5 个） | 5 个 |
-| 提交数 | 18 | — |
+| 自建测试 APK | **<!--fig:samples.apks-->5<!--/fig--> 个**（验收清单要求 5 个） | 5 个 |
+| 提交数 | 20（截至 v0.1.2，明细见文末附录） | — |
 
 ### 1.3 覆盖率分布（诚实披露薄弱处）
 
-```
- 70.1%  cli/main.py              47/157 未覆盖
- 76.8%  tools/jadx/adapter.py    48/207 未覆盖
- 82.4%  cli/console.py            6/34  未覆盖
- 85.7%  api/app.py              21/147 未覆盖
- 88.5%  tools/androguard/adapter 20/174 未覆盖
- 89.4%  reports/markdown.py       5/47  未覆盖
-```
+下面这张表列出覆盖率低于 90% 的一方模块。**清单里的模块是人工挑选的，数字是自动
+生成的**（刷新方式见 6 节）；没列出来的模块都在 90% 以上。
+
+| 模块 | 覆盖率 | 未覆盖行 / 总行数 |
+|------|--------|------------------|
+| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->70.1%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->47<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->157<!--/fig--> |
+| `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->77.8%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->46<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->207<!--/fig--> |
+| `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
+| `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->85.7%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->21<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
+| `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.5%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->174<!--/fig--> |
+| `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->89.4%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->47<!--/fig--> |
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
-现在它是 **94%（5/159 未覆盖）**，已经离开这份清单。
+现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->93.6%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->10<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->157<!--/fig--> 未覆盖）**，已经离开这份清单。
 
 **未覆盖的是什么：** 主要是错误分支（后端超时/非零退出后的恢复路径）和一些
 CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块都在 90% 以上。
+
+**口径：** 覆盖率由 `uv run pytest --cov=dexatlas` 测得，测的是 `src/dexatlas` 一方代码
+（不含测试、示例与脚本）。**这个数字只有一次「完整测量」才有意义**：装齐 JADX /
+Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，于是每一个测试都
+真正跑过，一个都不跳过。少任何一样，套件就会跳过一部分测试——**跳过的测试不产生
+覆盖率**，同样的命令会得到更低的数字。刷新脚本只在完整测量下改写覆盖率那几行；
+否则它保留原值，并告诉你缺什么。
 
 ---
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 89.2% 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->89.2%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -83,9 +101,9 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | 196 | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | 79 | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | 275 | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->199<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->79<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->278<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -481,35 +499,52 @@ Phase 1 计划里的 5 个自建测试 APK 已由 FIX-002 补齐（见 3.10 节�
 
 ## 6. 怎么复现这个报告里的每个数字
 
+**本报告里的测试数和覆盖率是自动生成的**，不是手抄的表格。测量由
+`scripts/refresh-report-figures.py` 完成：
+
+```bash
+uv sync --extra dev --extra analysis --extra demo
+bash scripts/install-backends.sh    # JADX / Apktool
+bash scripts/fetch-fixtures.sh      # 两个第三方集成样本
+uv run python scripts/refresh-report-figures.py
+```
+
+脚本会跑一遍完整套件（约 100 秒），把测量结果写回本文件里带标记的数字。
+想确认报告是不是最新，用 `--check`：它只比较、不写入，有出入就以非零码退出。
+
+**在没有装后端、没拉样本的机器上，脚本测出来的覆盖率会更低**（跳过的测试不产生
+覆盖率）。这种情况下它**不会**改写覆盖率那几行——报告里的覆盖率必须对应一次完整
+测量——而是保留原值，并告诉你缺了什么。口径写在 1.3 节末尾。
+
+当前分支的状态：
+
+```bash
+uv run pytest          # 收集 <!--fig:tests.total-->278<!--/fig--> 个：<!--fig:tests.fast-->199<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成
+uv run pytest --cov=dexatlas --cov-report=term
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->89.2%<!--/fig-->（<!--fig:coverage.covered-->1525<!--/fig-->/<!--fig:coverage.total-->1709<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->277<!--/fig--> passed + <!--fig:suite.xfailed-->1<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+```
+
+各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
+
+```bash
+git checkout v0.1.0    # 208 passed
+git checkout v0.1.1    # 244：243 passed + 1 xfailed
+git checkout v0.1.2    # 275：274 passed + 1 xfailed
+```
+
+从零复现一次完整测量：
+
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-
-# v0.1.0（已发布）
-git checkout v0.1.0
-uv sync --extra dev --extra analysis
+uv sync --extra dev --extra analysis --extra demo
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy
-uv run pytest --cov=dexatlas --cov-report=term
-
-# 安装后端后跑完整套件
 bash scripts/install-backends.sh
-uv run pytest          # v0.1.0 时为 208 passed
-
-# v0.1.1（含 FIX-001）
-git checkout v0.1.1
-uv run pytest          # 244：243 passed + 1 xfailed
-
-# v0.1.2（含 FIX-002：5 个自建样本 + 演示视频）
-git checkout v0.1.2
-uv run pytest          # 275：274 passed + 1 xfailed
-```
-
-集成测试依赖的第三方样本不入库，先拉下来：
-
-```bash
 bash scripts/fetch-fixtures.sh   # 拉 TestActivity.apk 和 multidex.apk
+uv run pytest --cov=dexatlas --cov-report=term
 ```
 
 5 个自建样本已经提交在 `examples/` 下，可以直接分析，也可以从源码重建：
@@ -538,13 +573,17 @@ CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
    - 真实加固 APK：`obfuscated-app` 是手写的短类名，不是有控制流混淆的加固产物
 4. **补充一份分析覆盖度文档**（尚未存在）：调研中发现 Androguard 用「哪些结论由哪个
    后端的哪个版本产出」作为可信度凭证，这比任何自述都有说服力。
-5. **考虑把报告里的测试数字改成自动生成**。目前报告写死数字，每次新增测试都要手工
-   同步——本次修复中这个测试失败了两次，都是它在正确地报警，但摩擦是真实的。
-   （本条属于报告工具化，不在 FIX-001 范围内。）
+5. **（已完成）把报告里的测试数字改成自动生成。** 起因是这段话：「目前报告写死数字，
+   每次新增测试都要手工同步——本次修复中这个测试失败了两次，都是它在正确地报警，
+   但摩擦是真实的。」现在这些数字由 `scripts/refresh-report-figures.py` 测量并写回
+   本报告，`tests/test_docs.py` 核对本报告与代码是否一致；改完代码跑一次脚本即可，
+   详见 1.2 节与 6 节。
 
 ---
 
 ## 附：提交历史
+
+以下是**截至 v0.1.2** 的提交历史（此后的提交不在其中）：
 
 ```
 91748b0  Initial commit: evidence-first Android analysis core
@@ -566,6 +605,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
 0f2b117  Prepare the v0.1.1 release
 5b4dc23  Build the five self-built test APKs the checklist asks for, and a demo video
 34e140b  Sync the reported figures after FIX-002
+5ffd631  Prepare the v0.1.2 release
 ```
 
 注意提交历史里 **9 次是修 bug**。这个比例偏高，但每个都在提交信息里写清了
@@ -577,3 +617,64 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
 
 而 3.10 节是这份历史里唯一一次**没有 bug、但仍然是错的**提交：
 宣布完成的时候，验收清单已经被我改写过了。
+
+---
+
+## 附：自动生成的数据（机器可读）
+
+下面这段是 HTML 注释，渲染之后看不见。它是**上一次测量的记录**：
+`scripts/refresh-report-figures.py` 写进去，`tests/test_docs.py` 读出来核对。
+其中 `source_fingerprint` 是那次测量所针对的源码指纹——源码一改，指纹就对不上，
+上面的覆盖率数字会被立刻判为过期，而不是继续冒充现状。
+
+<!--report-figures:{
+  "code": {
+    "api_endpoints": 15,
+    "cli_commands": 10,
+    "sample_apks": 5
+  },
+  "coverage": {
+    "files": {
+      "__init__.py": [3, 0],
+      "api/__init__.py": [3, 0],
+      "api/app.py": [147, 21],
+      "cli/__init__.py": [3, 0],
+      "cli/console.py": [34, 6],
+      "cli/main.py": [157, 47],
+      "config/__init__.py": [3, 0],
+      "config/settings.py": [34, 0],
+      "core/__init__.py": [3, 0],
+      "core/evidence.py": [36, 0],
+      "core/ingest.py": [36, 2],
+      "core/models.py": [165, 3],
+      "core/pipeline.py": [179, 9],
+      "core/storage.py": [161, 8],
+      "reports/__init__.py": [4, 0],
+      "reports/json_report.py": [18, 0],
+      "reports/markdown.py": [47, 5],
+      "tools/__init__.py": [3, 0],
+      "tools/androguard/__init__.py": [3, 0],
+      "tools/androguard/adapter.py": [174, 20],
+      "tools/apktool/__init__.py": [3, 0],
+      "tools/apktool/adapter.py": [157, 10],
+      "tools/base.py": [98, 7],
+      "tools/jadx/__init__.py": [3, 0],
+      "tools/jadx/adapter.py": [207, 46],
+      "tools/registry.py": [28, 0]
+    },
+    "missing": 184,
+    "statements": 1709
+  },
+  "schema": 1,
+  "source_fingerprint": "sha256:bf77439888014d919615ad886c5a6cf158068cc4864451b7260db599579ba7f8",
+  "suite": {
+    "passed": 277,
+    "skipped": 0,
+    "xfailed": 1
+  },
+  "tests": {
+    "fast": 199,
+    "slow": 79,
+    "total": 278
+  }
+}-->
