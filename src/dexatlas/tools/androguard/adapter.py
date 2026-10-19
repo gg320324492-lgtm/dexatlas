@@ -308,9 +308,11 @@ class AndroguardBackend(Backend):
                         name=method.get_name(),
                         descriptor=descriptor,
                         access_flags=sorted(method.get_access_flags_string().split()),
-                        # A method with no code item is abstract or native: declared,
-                        # but with no body to decompile.
-                        decompiled=bool(method.get_code()),
+                        # Whether a method was decompiled is the decompiler's
+                        # answer, not this backend's: Androguard reads the DEX,
+                        # and a method with a code item is not the same thing as
+                        # a method JADX turned into Java. The pipeline sets the
+                        # flag once JADX has run.
                         provenance=[self.provenance(apk_sha256, f"{class_locator}#{qualified}")],
                     )
                 )

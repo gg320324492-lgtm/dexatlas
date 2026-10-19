@@ -58,8 +58,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->382<!--/fig-->（<!--fig:tests.fast-->295<!--/fig--> 快 + <!--fig:tests.slow-->87<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.9%<!--/fig-->**（<!--fig:coverage.covered-->1683<!--/fig-->/<!--fig:coverage.total-->1812<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->404<!--/fig-->（<!--fig:tests.fast-->315<!--/fig--> 快 + <!--fig:tests.slow-->89<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.7%<!--/fig-->**（<!--fig:coverage.covered-->1784<!--/fig-->/<!--fig:coverage.total-->1904<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -73,12 +73,12 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
-| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->159<!--/fig--> |
-| `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->77.8%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->46<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->207<!--/fig--> |
+| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->171<!--/fig--> |
+| `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->85.4%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->35<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->240<!--/fig--> |
 | `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
 | `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->87.1%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->19<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
 | `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.6%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->175<!--/fig--> |
-| `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->90.0%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->50<!--/fig--> |
+| `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->91.4%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->58<!--/fig--> |
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
@@ -98,7 +98,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.9%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.7%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -106,9 +106,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->295<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->87<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->382<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->315<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->89<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->404<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -501,6 +501,163 @@ method_id = "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)L
 **新增测试：** 26 个方法 id 的测试，核心是那条端到端的：
 从 `list_methods` 拿到的 `qualified_name` 拿去查 `get_method_references`，必须能查到调用方。
 
+### 3.12 严重：报告里的数字和数据库里的行数对不上 🔴（v0.1.3 修复）
+
+**现象：** 分析多 dex 样本，报告说 14 个方法：
+
+```
+$ dexatlas analyze examples/multidex-app/multidex.apk
+✓ apk_a488e43e38c2b8e9 — 4 classes, 14 methods, 13 cross-references
+```
+
+而 `methods` 表里只有 **11 行**。
+
+**根因：** 计数取自写进表**之前**的那份列表。Androguard 把两个 DEX 里的
+`SharedConfig` 各索引一遍，得到 14 个方法；`methods` 表的主键是
+`(project_id, class_name, name, descriptor)`，重复的被 `INSERT OR REPLACE` 折叠掉了，
+而 `project.method_count = len(methods)` 数的是**折叠前**的长度。
+
+**为什么严重：** 报告里的数字和每一条查询的结果对不上。一个声称有 14 个方法的项目，
+数据库里查出来是 11 个——用户既不知道那三个方法去了哪里，也没法判断另外十一个
+是不是真的。**报告说谎的时候，它看起来和说真话时一模一样。**
+
+**修法：** 计数由表自己量。`Store.save_symbols` 写完之后数它写进去的行数
+（`SymbolCounts`），管道报这个数——**报出来的数就是查得到的数**。
+
+折叠掉的那三个方法**也没有丢**：它们合并成一条带两份 provenance 的方法
+（`_merge_methods`），就像一个类被两个后端看到时那样。说「这个方法在 classes2.dex 里」
+不再会把「它在 classes.dex 里也有一份」这件事一起抹掉。
+
+**为什么测试没抓到：** 计数是照着更早一次运行的**字面量**断言的（demo 应用的 8 个方法、
+23 条交叉引用），而 demo 只有一个 DEX——那里没有东西会折叠。多 dex 样本被分析过，
+但只为了看它的**布局**（哪个 smali 目录、fallback 有没有到第二个 dex），
+**没有人把报出来的数和表里的行数比一比**。
+
+**新增测试：** `tests/test_storage.py`（`save_symbols` 报出它写的行数、重复的符号只存一行）、
+`tests/test_first_party_samples.py`（`the reported counts are the rows in the tables`、
+`a class defined in two dexes is one method with two sources`）。
+
+### 3.13 严重：交叉引用从不产生证据 🔴（v0.1.3 修复）
+
+**现象：** 分析完一个 APK，报告里**一条 `cross_reference` 证据都没有**。
+
+**根因：** `EvidenceBuilder.add_method_references` 存在，测试里有两个调用点，
+**`src/` 里一个都没有**。交叉引用被索引了（`xrefs` 表），但它从不变成证据行。
+
+**为什么严重：** 「谁调用了什么」是这个项目要回答的核心问题之一。
+索引是原料，**证据才是结论**——一条不能被引用的结论等于没有结论。
+而这个缺陷伪装成了成功：交叉引用的**条数**在报告里是有的，只是没有一条记录说明
+这些边意味着什么。
+
+**修法：** 管道现在为**这个 APK 自己的、被调用过的方法**各记一条记录。
+
+- **单位是「被调用的方法」，不是「调用」。** 一个被五十处调用的方法是**一条**结论，
+  不是五十条。
+- **只有这个 APK 自己的方法才有记录。** 一次对 `java.lang.StringBuilder.append`
+  的调用是关于 JDK 的事实，不是关于这个应用的结论；调用本身照样在 `xrefs` 表里查得到。
+- **最常被调用的排在前面，记录数有上限**（100），所以大应用给的是样本而不是洪水；
+  顺序每次运行都一样，证据 id 因此稳定。
+- **provenance 指向调用点**，因为这条结论说的是那些调用；同时保留被调方法自己的
+  provenance，两边都能找到。
+
+**为什么测试没抓到：** 那两个测试是在**隔离状态**下测 builder 的。
+**没有人问过管道「你到底产出没有」。**
+
+**新增测试：** `tests/test_evidence.py`（7 个：一条调用一条记录、库调用不产生记录、
+provenance 指向调用点、排序、上限、截断时仍报出调用数）、
+`tests/test_first_party_samples.py`（`the analysis produces cross-reference evidence`、
+`a cross-reference record names the caller`）、
+`tests/test_reports.py`（报告分清「索引里的条数」和「有证据的条数」）。
+
+### 3.14 中等：`decompiled` 这个字段名和它的值对不上 🟡（v0.1.3 修复）
+
+**现象：** 方法表里有一个 `decompiled` 字段。读代码发现它的值来自 Androguard 的
+`bool(method.get_code())`——**「这个方法在 DEX 里有字节码」**。
+而名字说的是「这个方法被反编译了」。
+
+这是两件事：
+
+- **有字节码**：几乎每个方法都有，是 DEX 的结构事实
+- **反编译成功**：JADX 能把它还原成 Java——重混淆的代码常常失败
+
+而且这个字段**从来没有人读**：写进数据库，没人查、没人显示、报告里也没有。
+
+**根因：** JADX 那边的「成功/失败」信息（`method_decompiled()` 那个正则和占位符）
+在 `src/` 里**一个调用点都没有**；唯一读 JADX 日志的 `summarize_jadx_log()`
+读的是一个 **JADX 根本不写的文件**（见本节末尾）。
+
+**为什么严重：** 一个叫 `decompiled` 的字段写着别的事实，是最容易被下游当成结论用的
+那种错。读者看到 `decompiled=True` 会以为「这段代码能读」，
+而它实际在说「DEX 里有这段字节码」。
+
+**修法：** 让名字和值对起来。
+
+- **模型层**：`decompiled` 现在就是「JADX 反编译成功了」。
+- **后端层**：Androguard **不再碰这个字段**——读 DEX 答不了「反编译出来了吗」。
+- **管道层**：JADX 跑完之后，按 JADX **实际写出来的 `.java`** 逐类判定，
+  把标志记在 Androguard 产出的那一条方法上。
+- **CLI**：`dexatlas methods` 多一列「Decompiled」。
+- **报告**：Summary 多一行「Methods decompiled by JADX」，另有一条 `observation`
+  证据记录覆盖度（有多少方法反编译成功、哪些失败了、哪些类根本没有源码）。
+
+**名字、数据库列名、API 字段名都没改。** 数据库那一列本来就叫 `decompiled`，
+API 的输出字段名有外部消费者，改名就是破坏它们。既有工作区**不需要重建**
+（列名没变、schema 没变），但旧工作区里那一列装的是旧意思——重新分析一次即可。
+
+**顺带挖出来的两个坑：**
+
+1. **占位符的正则把 `JADX WARN` 也算成失败。** JADX 会在方法**上方**写
+   `/* JADX WARN: Type inference failed ... */`——那是**类的**注释，不是失败信号：
+   它背后的方法体是真代码。demo 应用的 `NetworkClient.post` 就带着这么一条，
+   于是它被误判成「没反编译出来」。
+   **判定只读方法自己**（声明 + 方法体），不读它上面的注释；正则里的 `JADX WARN`
+   去掉（`JADX ERROR` 留着，那是硬错误）。
+2. **构造器不能按名字认。** JADX 用**类名**写构造器，而混淆后的类可能有一个
+   **和类同名的方法**——回归样本 `obfuscated-app` 里的 `a.a.a` 正好有一个叫 `a` 的方法。
+   所以构造器是按「**没有返回类型**」认的，不是按名字。
+
+**死代码的处理：** `method_decompiled()` 现在在生产路径上（判定占位符就用它）。
+`summarize_jadx_log()` **删了**：它解析 `sources/resources/log/error.log`——
+这个路径跟 JADX 的输出结构对不上（JADX 把 `resources/` 放在输出目录的**根**下，
+不在 `sources/` 里），而且 **jadx 1.5.2 压根不写它**：整个 jar 里没有 `error.log`
+这个字符串，`jadx.core.export.OutDirs` 只有 `srcOutDir` 和 `resOutDir` 两个目录，
+跑一次会失败的 APK 也只留下 `sources/` 和 `resources/` 两个空目录。
+它对着一个不存在的文件返回空字典——留着只会让人以为
+「哪些类反编译失败了」这个问题已经有答案了。
+
+**新增测试：** `tests/test_decompilation.py`（12 个：占位符、警告不算失败、
+构造器、静态初始化块、嵌套类、同名方法）、
+`tests/test_first_party_samples.py`（索引里哪些方法被反编译了、覆盖度记录）、
+`tests/test_reports.py`（报告里的那一行，以及没有反编译器时这一行整个不出现）。
+
+### 3.15 中等：CLI 只显示前两条 provenance，却不说 🟡（v0.1.3 修复）
+
+**现象：** `dexatlas classes` 里是硬编码的 `for source in cls.provenance[:2]:`。
+REST API 返回的是**完整**的 provenance，所以 **CLI 看到的比 API 看到的少**。
+
+**后果：** 一个类在两个 DEX 里都定义时（`examples/multidex-app` 里的
+`com.example.multidex.SharedConfig`），CLI 只显示 3 条来源里的 2 条，
+**用户不知道还有别的来源**。而「这个类在两个 DEX 里都定义了」正是值得知道的事实。
+
+**根因：** 折叠是硬编码的，而且**不说是折叠过的**——看起来像一个完整的列表。
+
+**为什么严重：** 这和 3.12 节是同一类问题：**报告/输出说的和实际有的不一样，
+而读者没有办法知道。**
+
+**修法：** 默认仍然折叠（一个类可能有几十条来源，全倒出来没法看），
+但**明确写出折叠了多少**，并给出看全部的办法：
+
+- `--all` 显示全部来源
+- `--provenance-limit N` 指定要显示几条
+- 折叠时打印 `… 1 more source not shown (use --all to see all 3)`
+- 类列表本身被 `--limit` 截断时也一样说明截断了多少
+
+**`dexatlas methods` 没有这个问题**：它根本不显示 provenance，
+所以不是「显示了一部分」，是「一条都没显示」——方法和字段的来源只能从 REST API 拿。
+
+**新增测试：** `tests/test_cli.py`（4 个：`--all` 显示全部、默认折叠时说明折叠了几条、
+`--provenance-limit` 可调、类列表被 `--limit` 截断时说明）。
+
 ---
 
 ## 4. 需要你重点审核的判断
@@ -562,10 +719,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->382<!--/fig--> 个：<!--fig:tests.fast-->295<!--/fig--> 快 + <!--fig:tests.slow-->87<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->404<!--/fig--> 个：<!--fig:tests.fast-->315<!--/fig--> 快 + <!--fig:tests.slow-->89<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.9%<!--/fig-->（<!--fig:coverage.covered-->1683<!--/fig-->/<!--fig:coverage.total-->1812<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->382<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.7%<!--/fig-->（<!--fig:coverage.covered-->1784<!--/fig-->/<!--fig:coverage.total-->1904<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->404<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -680,18 +837,19 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "api/app.py": [147, 19],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [159, 0],
+      "cli/main.py": [171, 0],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
       "core/evidence.py": [56, 0],
       "core/ingest.py": [36, 2],
-      "core/models.py": [193, 4],
-      "core/pipeline.py": [202, 5],
+      "core/models.py": [194, 4],
+      "core/pipeline.py": [228, 7],
       "core/storage.py": [184, 7],
       "reports/__init__.py": [4, 0],
-      "reports/json_report.py": [18, 0],
-      "reports/markdown.py": [50, 5],
+      "reports/coverage.py": [11, 0],
+      "reports/json_report.py": [19, 0],
+      "reports/markdown.py": [58, 5],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
       "tools/androguard/adapter.py": [175, 20],
@@ -699,22 +857,22 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/apktool/adapter.py": [157, 8],
       "tools/base.py": [101, 7],
       "tools/jadx/__init__.py": [3, 0],
-      "tools/jadx/adapter.py": [207, 46],
+      "tools/jadx/adapter.py": [240, 35],
       "tools/registry.py": [28, 0]
     },
-    "missing": 129,
-    "statements": 1812
+    "missing": 120,
+    "statements": 1904
   },
   "schema": 2,
-  "source_fingerprint": "sha256:1e4f246f81174644bca358d3fc9396e9bd897fe5def19cb33cf4642c02e52c92",
+  "source_fingerprint": "sha256:5919717d67faf3cc371b7b74433384b5326c10308d967d4dc41ee7d00b347a5e",
   "suite": {
-    "passed": 382,
+    "passed": 404,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 295,
-    "slow": 87,
-    "total": 382
+    "fast": 315,
+    "slow": 89,
+    "total": 404
   }
 }-->

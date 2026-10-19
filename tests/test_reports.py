@@ -68,6 +68,22 @@ def _cross_reference(
     )
 
 
+def _decompilation(decompiled: int = 6, total: int = 8) -> Evidence:
+    """The record an analysis leaves behind about what the decompiler could read."""
+    return Evidence(
+        id="E-0003",
+        kind=EvidenceKind.OBSERVATION,
+        level=EvidenceLevel.VERIFIED,
+        summary=f"jadx produced real Java for {decompiled} of {total} methods",
+        provenance=[
+            Provenance(
+                tool="jadx", tool_version="1.5.2", apk_sha256="c" * 64, locator="jadx:sources"
+            )
+        ],
+        detail={"decompilation": {"methods_decompiled": decompiled, "methods_total": total}},
+    )
+
+
 def _result(
     evidence: list[Evidence] | None = None,
     manifest: ManifestInfo | None = None,
@@ -238,3 +254,38 @@ def test_markdown_explains_which_cross_references_become_evidence() -> None:
     report = render_markdown(_result(evidence=[_cross_reference()]))
 
     assert "method of this APK" in report
+
+
+# -- decompilation coverage --------------------------------------------------
+
+
+def test_markdown_states_how_much_of_the_code_was_decompiled() -> None:
+    """The report says how much of the indexed code can be read as Java.
+
+    The flag on a method means exactly that, so the report has to give the
+    number behind it.
+    """
+    report = render_markdown(_result(evidence=[_decompilation()]))
+
+    assert "| Methods decompiled by JADX | 6 of 8 |" in report
+
+
+def test_a_report_without_a_decompiler_says_nothing_about_decompilation() -> None:
+    """No decompiler means no coverage — not zero coverage."""
+    report = render_markdown(_result())
+
+    assert "Methods decompiled" not in report
+
+
+def test_json_report_states_how_much_of_the_code_was_decompiled() -> None:
+    report = build_json_report(_result(evidence=[_decompilation()]))
+
+    coverage = report["summary"]["decompilation"]
+    assert coverage["methods_decompiled"] == 6
+    assert coverage["methods_total"] == 8
+
+
+def test_json_report_leaves_decompilation_unset_without_a_decompiler() -> None:
+    report = build_json_report(_result())
+
+    assert report["summary"]["decompilation"] is None

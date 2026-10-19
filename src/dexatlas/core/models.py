@@ -185,7 +185,19 @@ class MethodRef(Sourced):
     access_flags: list[str] = Field(default_factory=list)
     signature: str | None = None
     decompiled: bool = False
-    """False when the backend has the symbol but could not produce a body."""
+    """Whether the decompiler produced Java for this method.
+
+    True means JADX wrote real Java for it. False means there is no decompiled
+    source: either JADX emitted a placeholder for a method it could not
+    reconstruct, or it wrote no source for the method at all — an elided
+    constructor, an abstract or a native method with no body.
+
+    The flag used to sit on a different fact — Androguard's "this method has a
+    code item in the DEX" — which is true of nearly every method in an APK and
+    says nothing about whether the code can be read. That other fact is not
+    lost: a method with no code item is an abstract or a native method, and the
+    access flags say which.
+    """
 
     @field_validator("descriptor")
     @classmethod
@@ -327,6 +339,13 @@ class Evidence(Sourced):
     level: EvidenceLevel
     summary: str
     detail: dict[str, Any] = Field(default_factory=dict)
+
+
+#: The key under which an evidence record's detail carries the decompilation
+#: coverage of an analysis. The reports read it back rather than recomputing
+#: it: a report built from a stored project has no method list to recompute
+#: from, and the record is what the analysis stated.
+DECOMPILATION_DETAIL = "decompilation"
 
 
 # ---------------------------------------------------------------------------

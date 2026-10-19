@@ -414,3 +414,58 @@ def test_a_cross_reference_record_names_the_caller(samples: dict[str, object]) -
 
     assert sign is not None, "the demo app calls Crypto.sign; no record says so"
     assert any("MainActivity.onCreate" in caller for caller in sign.detail["callers"])
+
+
+# -- the decompiler's own answer ---------------------------------------------
+
+
+def test_the_index_says_which_methods_jadx_decompiled(samples: dict[str, object]) -> None:
+    """The ``decompiled`` flag has to be the decompiler's answer.
+
+    It used to be Androguard's "this method has a code item", which is true of
+    nearly every method in an APK — so the flag said nothing about whether the
+    code could be read, and the name promised something the value did not.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    methods = {m.qualified_name: m for m in analyzer.store.list_methods(project_id)}
+
+    # JADX wrote both of these, in the file it wrote.
+    assert (
+        methods[
+            "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+        ].decompiled
+        is True
+    )
+    assert (
+        methods["com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V"].decompiled is True
+    )
+
+    # The constructor is in the DEX, and JADX elided it: there is no decompiled
+    # source for it, and the flag has to say so rather than claim one.
+    assert methods["com.example.demo.MainActivity.<init>()V"].decompiled is False
+
+
+def test_the_analysis_records_the_decompilation_coverage(samples: dict[str, object]) -> None:
+    """How much of the APK the decompiler could read is a fact about the analysis.
+
+    It used to be nowhere: the decompiler wrote no log file, so the only trace
+    of a failure was a placeholder in the Java that nothing read.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    evidence = analyzer.store.list_evidence(project_id)
+    coverage = next(
+        (item.detail["decompilation"] for item in evidence if "decompilation" in item.detail),
+        None,
+    )
+
+    assert coverage is not None, "the analysis said nothing about what JADX could read"
+
+    methods = analyzer.store.list_methods(project_id)
+    flagged = [method for method in methods if method.decompiled]
+    assert coverage["methods_decompiled"] == len(flagged)
+    assert coverage["methods_total"] == len(methods)
+    assert 0 < len(flagged) < len(methods), "the demo application's methods are all readable"
