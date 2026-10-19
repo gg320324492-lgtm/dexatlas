@@ -210,12 +210,29 @@ class Backend(ABC):
 
 
 def which_or_none(candidates: Sequence[str | None], *, names: Sequence[str] = ()) -> Path | None:
-    """Resolve the first configured path, else fall back to a ``PATH`` lookup."""
+    """Resolve the first configured path, else fall back to a ``PATH`` lookup.
+
+    A candidate says one of three things, and the three are not interchangeable:
+
+    - ``None`` — not configured. The tool is looked up on ``PATH``, the default
+      behaviour.
+    - ``""`` — explicitly disabled. No ``PATH`` lookup happens, so a tool that
+      happens to be installed cannot be used against the operator's wishes.
+    - a path — the tool to use. A path that does not exist is ignored and the
+      ``PATH`` lookup still applies, so a stale pin does not take a backend
+      offline; the substitution is logged rather than made silently.
+
+    An empty string anywhere in ``candidates`` disables the backend outright: an
+    explicit "not this one" outranks any other candidate.
+    """
+    if any(candidate == "" for candidate in candidates):
+        return None
     for candidate in candidates:
         if candidate:
             path = Path(candidate).expanduser()
             if path.exists():
                 return path
+            logger.warning("configured path %s does not exist; falling back to a PATH lookup", path)
     for name in names:
         found = shutil.which(name)
         if found:
