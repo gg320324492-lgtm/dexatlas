@@ -7,8 +7,12 @@ someone deciding whether this project is worth their time. These checks are chea
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -363,8 +367,78 @@ def test_demo_capture_script_reports_a_real_project_id() -> None:
 
 # -- execution report -------------------------------------------------------
 
-
 REPORT = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+
+#: The script that owns the report's generated numbers.
+FIGURE_SCRIPT = REPO_ROOT / "scripts" / "refresh-report-figures.py"
+
+#: Every figure the report has to state. A figure that quietly disappears is as
+#: wrong as one that states the wrong value.
+REQUIRED_FIGURES = (
+    "cli.commands",
+    "api.endpoints",
+    "samples.apks",
+    "tests.total",
+    "tests.fast",
+    "tests.slow",
+    "suite.passed",
+    "suite.skipped",
+    "suite.xfailed",
+    "coverage.pct",
+    "coverage.covered",
+    "coverage.total",
+)
+
+
+def _figure_script() -> ModuleType:
+    """The script that writes the figures; the tests read its rules, not a copy."""
+    spec = spec_from_file_location("dexatlas_report_figures", FIGURE_SCRIPT)
+    assert spec is not None and spec.loader is not None
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _stated_figures() -> dict[str, list[str]]:
+    """Every figure the report states, with every value it states it as."""
+    script = _figure_script()
+    stated: dict[str, list[str]] = {}
+    for key, value in script.FIGURE.findall(REPORT.read_text(encoding="utf-8")):
+        stated.setdefault(key, []).append(value)
+    return stated
+
+
+def _recorded_measurement() -> dict[str, Any]:
+    """The measurement the report recorded the last time it was refreshed."""
+    return _figure_script().read_record(REPORT.read_text(encoding="utf-8"))
+
+
+def _collected(marker: str) -> tuple[int, int]:
+    """How many tests pytest's collector selects for a marker expression.
+
+    The collector is used rather than a count of ``@pytest.mark.slow``
+    decorators, so the figure cannot drift from what actually runs.
+    """
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "-m",
+            marker,
+            "-p",
+            "no:cacheprovider",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    match = re.search(r"(\d+)/(\d+) tests collected", result.stdout)
+    assert match, f"could not read pytest's collection count: {result.stdout[-500:]}"
+    return int(match.group(1)), int(match.group(2))
 
 
 def test_execution_report_exists() -> None:
@@ -372,25 +446,120 @@ def test_execution_report_exists() -> None:
 
 
 def test_execution_report_numbers_match_the_code() -> None:
-    """A report whose numbers drifted from the code is worse than no report.
+    """Every number the report states about the code must be the number the code has.
 
-    The review this feeds reads claims like "10 CLI commands" and "88% coverage".
-    If those stop being true the reviewer is reading fiction.
+    The old check looked for a literal such as ``| 196 |`` in the report. That
+    could not say what was wrong when the formatting changed, and it did not
+    notice a number that had been deleted. This one recomputes each figure and
+    names the ones that disagree.
     """
-    report = REPORT.read_text(encoding="utf-8")
+    stated = _stated_figures()
+    fast, total = _collected("not slow")
+    slow, _ = _collected("slow")
 
     cli = (REPO_ROOT / "src/dexatlas/cli/main.py").read_text(encoding="utf-8")
-    commands = cli.count("@app.command()")
-    # Fullwidth parentheses are deliberate here: the report is written in Chinese,
-    # where they are the correct form and halfwidth ones read as machine output.
-    assert f"CLI（{commands} 个命令）" in report, (  # noqa: RUF001
-        f"the report does not state the current CLI command count ({commands})"
+    api = (REPO_ROOT / "src/dexatlas/api/app.py").read_text(encoding="utf-8")
+    expected = {
+        "tests.total": total,
+        "tests.fast": fast,
+        "tests.slow": slow,
+        "cli.commands": cli.count("@app.command()"),
+        "api.endpoints": len(re.findall(r"@app\.(get|post|delete|put)\(", api)),
+        "samples.apks": len(list((REPO_ROOT / "examples").rglob("*.apk"))),
+    }
+
+    problems = []
+    for key, actual in expected.items():
+        values = sorted(set(stated.get(key, [])))
+        if values != [str(actual)]:
+            problems.append(
+                f"{key}: the report says {values or ['nothing']}, the code has {actual}"
+            )
+
+    assert not problems, "the execution report disagrees with the code:\n" + "\n".join(problems)
+
+
+def test_execution_report_states_each_figure_one_way() -> None:
+    """The same figure must not appear twice with two different values."""
+    stated = _stated_figures()
+    inconsistent = {
+        key: sorted(set(values)) for key, values in stated.items() if len(set(values)) > 1
+    }
+    assert not inconsistent, (
+        "the report states the same figure in two different ways: "
+        + "; ".join(f"{key}: {values}" for key, values in sorted(inconsistent.items()))
     )
 
-    api = (REPO_ROOT / "src/dexatlas/api/app.py").read_text(encoding="utf-8")
-    endpoints = len(re.findall(r"@app\.(get|post|delete|put)\(", api))
-    assert f"REST API（{endpoints} 个端点）" in report, (  # noqa: RUF001
-        f"the report does not state the current endpoint count ({endpoints})"
+
+def test_execution_report_states_every_generated_figure() -> None:
+    """A figure that disappeared from the report must not disappear silently."""
+    stated = _stated_figures()
+    missing = [key for key in REQUIRED_FIGURES if key not in stated]
+    assert not missing, "the report no longer states: " + ", ".join(missing)
+
+
+def test_execution_report_coverage_figures_describe_the_current_code() -> None:
+    """The coverage figures must describe the code that is in the tree now.
+
+    Re-measuring coverage takes a couple of minutes, so the report carries the
+    fingerprint of the source tree it was measured on. Change the code and the
+    fingerprint changes with it, which declares the figures stale instead of
+    letting them go on passing for the present.
+    """
+    script = _figure_script()
+    record = _recorded_measurement()
+    stated = _stated_figures()
+
+    assert record, "the report carries no measurement record; run scripts/refresh-report-figures.py"
+
+    fingerprint = script.source_fingerprint()
+    assert record["source_fingerprint"] == fingerprint, (
+        "the coverage figures were measured on a different source tree "
+        f"({record['source_fingerprint']} -> {fingerprint}); "
+        "run scripts/refresh-report-figures.py to measure the current code"
+    )
+
+    coverage = record["coverage"]
+    assert coverage["statements"] == sum(s for s, _ in coverage["files"].values()), (
+        "the per-module statements do not add up to the total"
+    )
+    assert coverage["missing"] == sum(m for _, m in coverage["files"].values()), (
+        "the per-module missing lines do not add up to the total"
+    )
+
+    values = script.render_figures(record)
+    wrong = [
+        f"{key}: the report says {sorted(set(stated[key]))}, the measurement says {values[key]}"
+        for key in sorted(stated)
+        if key in values and set(stated[key]) != {values[key]}
+    ]
+    assert not wrong, "the execution report disagrees with its own measurement:\n" + "\n".join(
+        wrong
+    )
+
+
+def test_execution_report_discloses_every_weak_module() -> None:
+    """A module below the disclosure threshold has to be listed in the report.
+
+    The report promises to show where it is weak. A module that falls below the
+    threshold and is not mentioned is a gap in that promise, and the table of
+    weak modules is the first thing a reviewer reads.
+    """
+    script = _figure_script()
+    record = _recorded_measurement()
+    stated = _stated_figures()
+
+    assert record, "the report carries no measurement record"
+
+    weak = {
+        module
+        for module, (statements, missing) in record["coverage"]["files"].items()
+        if statements and (statements - missing) / statements * 100 < script.WEAK_MODULE_PERCENT
+    }
+    hidden = sorted(module for module in weak if f"coverage.file.{module}.pct" not in stated)
+    assert not hidden, (
+        f"these modules are below {script.WEAK_MODULE_PERCENT}% coverage but the report "
+        "does not list them: " + ", ".join(hidden)
     )
 
 
@@ -407,44 +576,3 @@ def test_execution_report_does_not_claim_unbuilt_features() -> None:
 
     # It should say plainly that the review has not happened yet.
     assert "评审" in report or "review" in report.lower()
-
-
-def test_execution_report_layer_counts_match_pytest() -> None:
-    """The report states 163 fast / 44 slow tests. Those must be the real numbers.
-
-    Checked by running pytest's own collector rather than counting markers in the source,
-    so the figure in the report cannot drift from what actually runs.
-    """
-    import subprocess
-
-    report = REPORT.read_text(encoding="utf-8")
-
-    counts = {}
-    for label, marker in (("fast", "not slow"), ("slow", "slow")):
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "--collect-only",
-                "-q",
-                "-m",
-                marker,
-                "-p",
-                "no:cacheprovider",
-            ],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        match = re.search(r"(\d+)/(\d+) tests collected", result.stdout)
-        assert match, f"could not read pytest's collection count: {result.stdout[-500:]}"
-        counts[label] = int(match.group(1))
-
-    assert f"| {counts['fast']} |" in report, (
-        f"the report does not state the current fast-suite size ({counts['fast']})"
-    )
-    assert f"| {counts['slow']} |" in report, (
-        f"the report does not state the current slow-suite size ({counts['slow']})"
-    )
