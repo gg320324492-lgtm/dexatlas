@@ -67,7 +67,7 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 89.1% 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 89.2% 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -525,7 +525,9 @@ CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
    已被记录的缺陷，`strict` 的 xfail 会在它被修好时强制有人清理标记。
 3. **优先补 Phase 1 的已知薄弱处**（如果评审认为必要）：
    - `cli/main.py` 覆盖率 70.1%，缺参数组合测试
-   - 混淆样本的对抗性测试
+   - 大型 APK 的性能压测：现有样本都太小（最大不到 3 KB），索引性能和指令上限
+     从未被真实压过
+   - 真实加固 APK：`obfuscated-app` 是手写的短类名，不是有控制流混淆的加固产物
 4. **补充一份分析覆盖度文档**（尚未存在）：调研中发现 Androguard 用「哪些结论由哪个
    后端的哪个版本产出」作为可信度凭证，这比任何自述都有说服力。
 5. **考虑把报告里的测试数字改成自动生成**。目前报告写死数字，每次新增测试都要手工
@@ -554,6 +556,7 @@ efa86d5  Prepare the v0.1.0 release
 77cf0c9  Make the fallback test independent of what is installed
 cb11aa3  Record the v0.1.1 findings in the report and the changelog
 0f2b117  Prepare the v0.1.1 release
+5b4dc23  Build the five self-built test APKs the checklist asks for, and a demo video
 ```
 
 注意提交历史里 **9 次是修 bug**。这个比例偏高，但每个都在提交信息里写清了
