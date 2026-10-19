@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from dexatlas.config.settings import Settings
-from dexatlas.core.models import EvidenceKind, EvidenceLevel
+from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.jadx.adapter import JadxBackend
@@ -85,6 +85,12 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
     settings = Settings(workspace=workspace)
     analyzer = Analyzer(settings)
 
+    # Whether a decompiler was there to answer. The answer decides what the index
+    # may claim, so it is recorded with the analysis rather than read off the
+    # environment afterwards: a machine with JADX installed and a machine without
+    # it are two configurations, and the analysis has to be right in both.
+    jadx_available = JadxBackend(settings).resolve() is not None
+
     results: dict[str, object] = {}
     for name in SAMPLE_APKS:
         apk = _sample_apk(name)
@@ -97,6 +103,38 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
         "analyzer": analyzer,
         "settings": settings,
         "projects": results,
+        "jadx_available": jadx_available,
+    }
+
+
+@pytest.fixture(scope="module")
+def demo_without_jadx(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
+    """Analyse the demo application again, with the decompiler taken away.
+
+    The samples above share one analysis, run under whatever the machine happens
+    to have installed. A missing decompiler is a configuration of its own — the
+    one the Smali fallback exists for — so it is analysed here on every machine
+    rather than only on the ones that happen to lack JADX.
+    """
+    apk = _sample_apk("demo-app")
+    if not apk.is_file():
+        pytest.skip("sample demo-app is missing; run scripts/build-test-apks.sh")
+
+    workspace = tmp_path_factory.mktemp("first-party-no-jadx")
+    settings = Settings(workspace=workspace)
+    analyzer = Analyzer(settings)
+
+    with pytest.MonkeyPatch.context() as patch:
+        # Not a path that does not exist: ``which_or_none`` falls back to a
+        # ``PATH`` lookup, so a JADX installed there would still be found and
+        # the decompiler would answer instead of the fallback being tested.
+        patch.setattr(JadxBackend, "resolve", lambda self: None)
+        result = analyzer.analyze(apk)
+
+    return {
+        "analyzer": analyzer,
+        "project_id": result.project.id,
+        "evidence": analyzer.store.list_evidence(result.project.id),
     }
 
 
@@ -109,6 +147,50 @@ def _project_id(samples: dict[str, object], name: str) -> str:
     projects: dict[str, object] = samples["projects"]  # type: ignore[assignment]
     project = projects[name]
     return project.id  # type: ignore[union-attr]
+
+
+def _decompiled_flags(analyzer: Analyzer, project_id: str) -> dict[str, bool]:
+    """Every indexed method, by qualified name, with its ``decompiled`` flag."""
+    return {
+        method.qualified_name: method.decompiled
+        for method in analyzer.store.list_methods(project_id)
+    }
+
+
+def _analyzer_of(fixture: dict[str, object]) -> Analyzer:
+    analyzer: Analyzer = fixture["analyzer"]  # type: ignore[assignment]
+    return analyzer
+
+
+def _project_of(fixture: dict[str, object]) -> str:
+    project_id: str = fixture["project_id"]  # type: ignore[assignment]
+    return project_id
+
+
+def _evidence_of(fixture: dict[str, object]) -> list[Evidence]:
+    evidence: list[Evidence] = fixture["evidence"]  # type: ignore[assignment]
+    return evidence
+
+
+def _decompilation_coverage(evidence: list[Evidence]) -> dict[str, object] | None:
+    """The coverage record an analysis left behind, if it left one."""
+    for item in evidence:
+        if "decompilation" in item.detail:
+            return item.detail["decompilation"]
+    return None
+
+
+def _missing_backend_evidence(evidence: list[Evidence], tool: str) -> Evidence | None:
+    """The record of a backend that never ran.
+
+    Such a record cites the tool and cites no version — a tool that did not run
+    has no version to quote — and points at the failure in its locator.
+    """
+    for item in evidence:
+        for provenance in item.provenance:
+            if provenance.tool == tool and provenance.locator.startswith("error/"):
+                return item
+    return None
 
 
 # -- the samples themselves ------------------------------------------------
@@ -419,53 +501,102 @@ def test_a_cross_reference_record_names_the_caller(samples: dict[str, object]) -
 # -- the decompiler's own answer ---------------------------------------------
 
 
-def test_the_index_says_which_methods_jadx_decompiled(samples: dict[str, object]) -> None:
+def test_the_index_says_which_methods_jadx_decompiled(
+    samples: dict[str, object], demo_without_jadx: dict[str, object]
+) -> None:
     """The ``decompiled`` flag has to be the decompiler's answer.
 
     It used to be Androguard's "this method has a code item", which is true of
     nearly every method in an APK — so the flag said nothing about whether the
     code could be read, and the name promised something the value did not.
+
+    The answer depends on whether a decompiler was there to give one. With JADX
+    installed it wrote Java for some methods and elided others, and the flag says
+    which is which. With no JADX at all nobody decompiled anything, and the
+    honest answer for every method is "no" — the index must not borrow the DEX's
+    answer to fill the gap.
     """
     analyzer = _analyzer(samples)
     project_id = _project_id(samples, "demo-app")
+    methods = _decompiled_flags(analyzer, project_id)
 
-    methods = {m.qualified_name: m for m in analyzer.store.list_methods(project_id)}
+    if samples["jadx_available"]:
+        # JADX wrote both of these, in the file it wrote.
+        assert (
+            methods[
+                "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+            ]
+            is True
+        )
+        assert methods["com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V"] is True
 
-    # JADX wrote both of these, in the file it wrote.
-    assert (
-        methods[
-            "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
-        ].decompiled
-        is True
+        # The constructor is in the DEX, and JADX elided it: there is no decompiled
+        # source for it, and the flag has to say so rather than claim one.
+        assert methods["com.example.demo.MainActivity.<init>()V"] is False
+    else:
+        assert methods, "the DEX index is empty; the sample exercised nothing"
+        flagged = [name for name, decompiled in methods.items() if decompiled]
+        assert not flagged, f"methods were marked decompiled although no decompiler ran: {flagged}"
+
+    # The same question, asked of an analysis that had no decompiler at all —
+    # whichever configuration this machine happens to be in. The bytecode is
+    # still there and still readable; nobody produced Java for it, and the flag
+    # has to answer "no" rather than borrow the DEX's answer.
+    without_jadx = _decompiled_flags(
+        _analyzer_of(demo_without_jadx), _project_of(demo_without_jadx)
     )
-    assert (
-        methods["com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V"].decompiled is True
-    )
-
-    # The constructor is in the DEX, and JADX elided it: there is no decompiled
-    # source for it, and the flag has to say so rather than claim one.
-    assert methods["com.example.demo.MainActivity.<init>()V"].decompiled is False
+    assert without_jadx, "the DEX index is empty; the sample exercised nothing"
+    flagged = [name for name, decompiled in without_jadx.items() if decompiled]
+    assert not flagged, f"methods were marked decompiled although no decompiler ran: {flagged}"
 
 
-def test_the_analysis_records_the_decompilation_coverage(samples: dict[str, object]) -> None:
+def test_the_analysis_records_the_decompilation_coverage(
+    samples: dict[str, object], demo_without_jadx: dict[str, object]
+) -> None:
     """How much of the APK the decompiler could read is a fact about the analysis.
 
     It used to be nowhere: the decompiler wrote no log file, so the only trace
     of a failure was a placeholder in the Java that nothing read.
+
+    With no decompiler there is no coverage to report, and that is not the same
+    as zero coverage: a record claiming "0 of 8 methods decompiled" would be a
+    claim about a run that never happened. The analysis says nothing about
+    coverage, and it says why — JADX never ran.
     """
     analyzer = _analyzer(samples)
     project_id = _project_id(samples, "demo-app")
 
     evidence = analyzer.store.list_evidence(project_id)
-    coverage = next(
-        (item.detail["decompilation"] for item in evidence if "decompilation" in item.detail),
-        None,
+    coverage = _decompilation_coverage(evidence)
+
+    if samples["jadx_available"]:
+        assert coverage is not None, "the analysis said nothing about what JADX could read"
+
+        methods = analyzer.store.list_methods(project_id)
+        flagged = [method for method in methods if method.decompiled]
+        assert coverage["methods_decompiled"] == len(flagged)
+        assert coverage["methods_total"] == len(methods)
+        assert 0 < len(flagged) < len(methods), "the demo application's methods are all readable"
+    else:
+        assert coverage is None, "coverage was reported although no decompiler ran"
+        failure = _missing_backend_evidence(evidence, "jadx")
+        assert failure is not None, "the analysis did not record that JADX never ran"
+
+    # An analysis with no decompiler says nothing about coverage, and says why:
+    # a reader who finds no decompiled source has to be able to tell "the code
+    # could not be read" from "the decompiler was never installed".
+    without_evidence = _evidence_of(demo_without_jadx)
+    assert _decompilation_coverage(without_evidence) is None, (
+        "coverage was reported although no decompiler ran"
     )
 
-    assert coverage is not None, "the analysis said nothing about what JADX could read"
+    failure = _missing_backend_evidence(without_evidence, "jadx")
+    assert failure is not None, "the analysis did not record that JADX never ran"
+    assert failure.kind == EvidenceKind.OBSERVATION
+    assert failure.summary == "jadx did not complete: jadx is not installed or not on PATH"
 
-    methods = analyzer.store.list_methods(project_id)
-    flagged = [method for method in methods if method.decompiled]
-    assert coverage["methods_decompiled"] == len(flagged)
-    assert coverage["methods_total"] == len(methods)
-    assert 0 < len(flagged) < len(methods), "the demo application's methods are all readable"
+    provenance = failure.provenance[0]
+    assert provenance.tool == "jadx"
+    assert provenance.tool_version is None, "a tool that never ran has no version"
+    assert provenance.locator == "error/not_installed"
+    assert failure.detail["error"]["code"] == "not_installed"
