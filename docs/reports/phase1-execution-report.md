@@ -58,8 +58,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->361<!--/fig-->（<!--fig:tests.fast-->278<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.6%<!--/fig-->**（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->382<!--/fig-->（<!--fig:tests.fast-->295<!--/fig--> 快 + <!--fig:tests.slow-->87<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.9%<!--/fig-->**（<!--fig:coverage.covered-->1683<!--/fig-->/<!--fig:coverage.total-->1812<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -78,7 +78,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
 | `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->87.1%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->19<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
 | `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.6%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->175<!--/fig--> |
-| `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->89.4%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->47<!--/fig--> |
+| `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->90.0%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->50<!--/fig--> |
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
@@ -98,7 +98,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.6%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.9%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -106,9 +106,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->278<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->83<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->361<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->295<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->87<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->382<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -562,10 +562,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->361<!--/fig--> 个：<!--fig:tests.fast-->278<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->382<!--/fig--> 个：<!--fig:tests.fast-->295<!--/fig--> 快 + <!--fig:tests.slow-->87<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.6%<!--/fig-->（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->361<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.9%<!--/fig-->（<!--fig:coverage.covered-->1683<!--/fig-->/<!--fig:coverage.total-->1812<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->382<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -684,14 +684,14 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
-      "core/evidence.py": [36, 0],
+      "core/evidence.py": [56, 0],
       "core/ingest.py": [36, 2],
       "core/models.py": [193, 4],
-      "core/pipeline.py": [179, 5],
-      "core/storage.py": [168, 7],
+      "core/pipeline.py": [202, 5],
+      "core/storage.py": [184, 7],
       "reports/__init__.py": [4, 0],
       "reports/json_report.py": [18, 0],
-      "reports/markdown.py": [47, 5],
+      "reports/markdown.py": [50, 5],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
       "tools/androguard/adapter.py": [175, 20],
@@ -703,18 +703,18 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/registry.py": [28, 0]
     },
     "missing": 129,
-    "statements": 1750
+    "statements": 1812
   },
   "schema": 2,
-  "source_fingerprint": "sha256:0006afd1126ec1b4595f8ba313a5470a113662e81a6d4b60c111845abab90805",
+  "source_fingerprint": "sha256:1e4f246f81174644bca358d3fc9396e9bd897fe5def19cb33cf4642c02e52c92",
   "suite": {
-    "passed": 361,
+    "passed": 382,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 278,
-    "slow": 83,
-    "total": 361
+    "fast": 295,
+    "slow": 87,
+    "total": 382
   }
 }-->

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from dexatlas.core.models import Evidence, EvidenceLevel, ManifestInfo, Project
+from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel, ManifestInfo, Project
 from dexatlas.core.pipeline import AnalysisResult
 
 _LEVEL_NOTE = {
@@ -18,6 +18,13 @@ _LEVEL_NOTE = {
 }
 
 _MAX_EVIDENCE_ROWS = 200
+
+#: What a cross-reference record is, said where the records are.
+_XREF_NOTE = (
+    "A cross-reference record is made for a method of this APK that is called from "
+    "elsewhere. Calls into library code are indexed as cross-references but are not "
+    "evidence: they say something about the JDK, not about this app."
+)
 
 
 def render_markdown(result: AnalysisResult) -> str:
@@ -40,7 +47,8 @@ def render_markdown(result: AnalysisResult) -> str:
         "| --- | ---: |",
         f"| Classes indexed | {project.class_count:,} |",
         f"| Methods indexed | {project.method_count:,} |",
-        f"| Cross-references | {project.reference_count:,} |",
+        f"| Cross-references indexed | {project.reference_count:,} |",
+        f"| Cross-references with evidence | {_cross_reference_count(result.evidence):,} |",
         f"| Evidence records | {project.evidence_count:,} |",
         f"| DEX files | {len(project.apk.dex_files)} |",
         f"| Native libraries | {len(project.apk.native_libraries)} |",
@@ -129,6 +137,11 @@ def _manifest_section(manifest: ManifestInfo) -> list[str]:
     return lines
 
 
+def _cross_reference_count(evidence: list[Evidence]) -> int:
+    """How many of the indexed cross-references became evidence records."""
+    return sum(1 for item in evidence if item.kind == EvidenceKind.CROSS_REFERENCE)
+
+
 def _evidence_section(evidence: list[Evidence]) -> list[str]:
     if not evidence:
         return ["", "## Evidence", "", "_No evidence records were produced._"]
@@ -136,6 +149,8 @@ def _evidence_section(evidence: list[Evidence]) -> list[str]:
     lines = [
         "",
         "## Evidence",
+        "",
+        _XREF_NOTE,
         "",
         "| ID | Level | Kind | Summary | Source |",
         "| --- | --- | --- | --- | --- |",

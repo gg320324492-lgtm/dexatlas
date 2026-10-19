@@ -371,6 +371,78 @@ def test_method_references_for_unknown_method_is_empty(store: Store, tmp_path: P
     assert store.get_method_references(project.id, "malformed") == []
 
 
+# -- the counts a report may state ------------------------------------------
+
+
+def _row_count(store: Store, table: str, project_id: str) -> int:
+    with store.transaction() as connection:
+        row = connection.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE project_id = ?", (project_id,)
+        ).fetchone()
+    return int(row[0])
+
+
+def test_save_symbols_reports_the_rows_it_stored(store: Store, tmp_path: Path) -> None:
+    """The number a report states must be the number a query returns.
+
+    The counts are measured from the tables, because the tables collapse
+    duplicate keys: the number of symbols that went in is not the number of
+    rows that are there afterwards.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields, references, strings = _symbol_set()
+
+    counts = store.save_symbols(project.id, classes, methods, fields, references, strings)
+
+    assert counts.classes == len(store.list_classes(project.id))
+    assert counts.methods == len(store.list_methods(project.id))
+    assert counts.fields == _row_count(store, "fields", project.id)
+    assert counts.references == _row_count(store, "xrefs", project.id)
+
+
+def test_a_symbol_defined_twice_is_stored_once(store: Store, tmp_path: Path) -> None:
+    """Two dex files that define the same method give one row, not two.
+
+    The method table keys on the method id, so the second definition replaces
+    the first. The count has to say one: the report used to state the number
+    of symbols that went in, which was a number the table could not produce.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields, references, strings = _symbol_set()
+    # The same method, indexed twice — as a class defined in two dex files is.
+    methods = [*methods, methods[0].model_copy(deep=True)]
+
+    counts = store.save_symbols(project.id, classes, methods, fields, references, strings)
+
+    assert len(methods) == 3
+    assert counts.methods == 2
+    assert len(store.list_methods(project.id)) == 2
+
+
+def test_a_generator_of_symbols_still_fills_the_search_index(store: Store, tmp_path: Path) -> None:
+    """The search index reads the same symbols the tables do.
+
+    They used to be read from the caller's iterables twice, so a caller that
+    passed a generator filled the tables and left the search index empty.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields, references, strings = _symbol_set()
+
+    store.save_symbols(
+        project.id,
+        (c for c in classes),
+        (m for m in methods),
+        (f for f in fields),
+        (r for r in references),
+        (s for s in strings),
+    )
+
+    assert store.search(project.id, "NetworkClient")
+
+
 # -- search -----------------------------------------------------------------
 
 

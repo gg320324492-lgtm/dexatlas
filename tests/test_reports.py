@@ -52,6 +52,22 @@ def _evidence(level: EvidenceLevel, summary: str) -> Evidence:
     )
 
 
+def _cross_reference(
+    summary: str = "com.a.Crypto.sign()V is called from 1 location(s)",
+) -> Evidence:
+    return Evidence(
+        id="E-0002",
+        kind=EvidenceKind.CROSS_REFERENCE,
+        level=EvidenceLevel.VERIFIED,
+        summary=summary,
+        provenance=[
+            Provenance(
+                tool="androguard", tool_version="4.1", apk_sha256="c" * 64, locator="classes.dex"
+            )
+        ],
+    )
+
+
 def _result(
     evidence: list[Evidence] | None = None,
     manifest: ManifestInfo | None = None,
@@ -109,6 +125,20 @@ def test_json_report_carries_provenance_for_each_evidence_record() -> None:
 
     assert report["evidence"][0]["provenance"][0]["tool"] == "androguard"
     assert report["evidence"][0]["provenance"][0]["locator"] == "classes.dex"
+
+
+def test_json_report_tells_indexed_cross_references_from_evidence() -> None:
+    """Two numbers that look alike must not be mistaken for each other.
+
+    An indexed cross-reference is a fact about the bytecode; a cross-reference
+    record is a conclusion about this app's own methods.
+    """
+    result = _result(evidence=[_cross_reference()])
+
+    summary = build_json_report(result)["summary"]
+
+    assert summary["cross_references"] == 3100
+    assert summary["cross_references_with_evidence"] == 1
 
 
 # -- Markdown ---------------------------------------------------------------
@@ -191,3 +221,20 @@ def test_markdown_records_missing_backends() -> None:
     report = render_markdown(_result())
 
     assert "androguard not installed" in report
+
+
+def test_markdown_tells_indexed_cross_references_from_evidence() -> None:
+    result = _result(evidence=[_cross_reference()])
+
+    report = render_markdown(result)
+
+    assert "| Cross-references indexed | 3,100 |" in report
+    assert "| Cross-references with evidence | 1 |" in report
+
+
+def test_markdown_explains_which_cross_references_become_evidence() -> None:
+    """A report that shows 13 cross-references and no record of one of them
+    looks broken. The rule has to be written down where the records are."""
+    report = render_markdown(_result(evidence=[_cross_reference()]))
+
+    assert "method of this APK" in report
