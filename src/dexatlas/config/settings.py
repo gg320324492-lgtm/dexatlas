@@ -25,7 +25,8 @@ class Settings(BaseSettings):
 
     workspace: Path = Field(default=Path(".dexatlas"))
 
-    # External analysis backends. Empty string disables that backend.
+    # External analysis backends. An empty string disables that backend; an unset
+    # value leaves it to the default discovery, which looks for the tool on PATH.
     jadx_path: str | None = None
     apktool_jar: str | None = None
     rizin_path: str | None = None
