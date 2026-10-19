@@ -173,6 +173,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
 - **[Architecture](docs/architecture/README.md)** — how it fits together and why
+- **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
+  which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
 
 Remaining Phase 1 work — the source review, and the issues written from it — is tracked
