@@ -58,7 +58,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->360<!--/fig-->（<!--fig:tests.fast-->277<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->361<!--/fig-->（<!--fig:tests.fast-->278<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->92.6%<!--/fig-->**（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -106,9 +106,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->277<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->278<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->83<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->360<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->361<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -562,10 +562,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->360<!--/fig--> 个：<!--fig:tests.fast-->277<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->361<!--/fig--> 个：<!--fig:tests.fast-->278<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->92.6%<!--/fig-->（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->360<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->361<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -706,15 +706,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "statements": 1750
   },
   "schema": 2,
-  "source_fingerprint": "sha256:256cab784a9f54b8d74a343a36e7520a0c90dc117fdbd510ca100af428f8ac4c",
+  "source_fingerprint": "sha256:0006afd1126ec1b4595f8ba313a5470a113662e81a6d4b60c111845abab90805",
   "suite": {
-    "passed": 360,
+    "passed": 361,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 277,
+    "fast": 278,
     "slow": 83,
-    "total": 360
+    "total": 361
   }
 }-->

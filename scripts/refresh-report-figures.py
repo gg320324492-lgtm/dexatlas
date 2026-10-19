@@ -294,12 +294,18 @@ def source_fingerprint() -> str:
     When the code changes, the coverage number in the report stops being true. A
     fingerprint makes that visible without re-measuring: the test suite recomputes
     it and asks for a refresh.
+
+    Line endings are normalised before hashing. Git checks out CRLF on Windows and
+    LF on Linux, so hashing the raw bytes would give the same source two different
+    fingerprints -- and the report would be declared stale on every platform but
+    the one it was measured on. The fingerprint answers "is this the same code?",
+    not "is this the same byte sequence?".
     """
     digest = hashlib.sha256()
     for path in sorted(SOURCE_ROOT.rglob("*.py")):
         digest.update(path.relative_to(REPO_ROOT).as_posix().encode("utf-8"))
         digest.update(b"\0")
-        digest.update(path.read_bytes())
+        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
         digest.update(b"\0")
     return "sha256:" + digest.hexdigest()
 

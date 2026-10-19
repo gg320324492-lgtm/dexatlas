@@ -832,3 +832,35 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
     # The coverage figures describe a complete measurement, so the previous
     # ones stay rather than the partial measurement's.
     assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")
+
+
+def test_the_source_fingerprint_ignores_line_endings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same source must fingerprint the same on Windows and on Linux.
+
+    Git checks out CRLF on Windows and LF on Linux. Hashing the raw bytes gave
+    the same code two different fingerprints, and the report was declared stale
+    on every platform except the one it was measured on -- which is how a
+    fingerprint meant to catch drift ends up failing CI for a reason that has
+    nothing to do with drift.
+    """
+    script = _figure_script()
+    source_root = tmp_path / "pkg"
+    source_root.mkdir()
+    (source_root / "mod.py").write_bytes(b"def f():\n    return 1\n")
+
+    monkeypatch.setattr(script, "SOURCE_ROOT", source_root)
+    # The fingerprint names files relative to the repository root, so the
+    # stand-in root moves with the stand-in source.
+    monkeypatch.setattr(script, "REPO_ROOT", tmp_path)
+    lf_fingerprint = script.source_fingerprint()
+
+    (source_root / "mod.py").write_bytes(b"def f():\r\n    return 1\r\n")
+    crlf_fingerprint = script.source_fingerprint()
+
+    assert lf_fingerprint == crlf_fingerprint
+
+    # And a real change still moves the fingerprint, which is the whole point.
+    (source_root / "mod.py").write_bytes(b"def f():\n    return 2\n")
+    assert script.source_fingerprint() != lf_fingerprint
