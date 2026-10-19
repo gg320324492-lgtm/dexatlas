@@ -7,7 +7,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+### Added
+
+- **Five self-built test APKs**, the number the Phase 1 acceptance checklist asks
+  for. Each covers a different layout, and each is built from the smali sources
+  committed beside it, so none is a mystery binary:
+  - `demo-app` — the general case: components, permissions, cross-references
+  - `multidex-app` — two dexes, so `smali/` and `smali_classes2/` both exist, and
+    one class name appears in both
+  - `obfuscated-app` — one-letter packages, classes and methods, no source hints
+  - `strings-app` — mostly string constants, for the search index
+  - `wide-app` — an interface with two implementations and a factory
+- `scripts/build-test-apks.sh` rebuilds all five from source;
+  `scripts/build-demo-apk.sh` now delegates to it
+- **A demo video** at `docs/assets/demo.mp4`, encoded from the same frames as the
+  README's GIFs, so the two cannot drift apart
+- Tests that keep the acceptance checklist honest: every committed APK must have
+  its smali sources beside it, the build script's sample list must match what is
+  on disk, and the set of APKs allowed in the repository is derived from the
+  filesystem rather than written out by hand
+
+### Fixed
+
+- **The Phase 1 exit checklist had been paraphrased into something easier to tick.**
+  The plan asks for "five **self-built** test APKs" and a "demo **video**"; the
+  checklist said "verified against test APKs" and "a generated demo recording",
+  and every box was ticked. One self-built sample and a GIF are not five samples
+  and a video. The wording is now the plan's own, and the items behind it exist.
 
 ## [0.1.1] — 2026-10-19
 

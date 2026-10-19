@@ -1,0 +1,21 @@
+version: 3.0.3
+apkFileName: strings.apk
+isFrameworkApk: false
+usesFramework:
+  ids:
+  - 1
+sdkInfo:
+  minSdkVersion: 26
+  targetSdkVersion: 34
+packageInfo:
+  renameManifestPackage: null
+sharedLibrary: false
+sparseResources: false
+unknownFiles:
+  dirs: []
+  files: []
+doNotCompress:
+- resources.arsc
+versionInfo:
+  versionCode: 7
+  versionName: 7.1.3

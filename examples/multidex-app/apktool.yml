@@ -1,0 +1,21 @@
+version: 3.0.3
+apkFileName: multidex.apk
+isFrameworkApk: false
+usesFramework:
+  ids:
+  - 1
+sdkInfo:
+  minSdkVersion: 24
+  targetSdkVersion: 34
+packageInfo:
+  renameManifestPackage: null
+sharedLibrary: false
+sparseResources: false
+unknownFiles:
+  dirs: []
+  files: []
+doNotCompress:
+- resources.arsc
+versionInfo:
+  versionCode: 2
+  versionName: 2.0

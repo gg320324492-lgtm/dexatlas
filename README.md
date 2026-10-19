@@ -33,6 +33,9 @@ researchers and engineers analysing applications they own or are authorized to a
 Every frame above is a real run against [`examples/demo-app/demo.apk`](examples/demo-app/),
 an application built from the smali sources committed beside it — not a staged recording.
 
+The same recording is available as a [video](docs/assets/demo.mp4) — it is encoded from
+the identical frames, so the two cannot drift apart.
+
 <details>
 <summary><b>Full session</b> — search, cross-references, decompiled source and the report</summary>
 

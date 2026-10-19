@@ -120,8 +120,13 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     """The repository must not carry analysable binaries from other people's apps.
 
     ``.gitignore`` excludes them, but an ignore rule is only a claim — this checks what
-    git actually tracks. DexAtlas's own demo application is the single exception: it is
-    first-party, built from the smali sources in ``examples/demo-app/``, and rebuildable.
+    git actually tracks.
+
+    The exception is DexAtlas's own test applications. They are first-party, built from
+    the smali sources committed beside them, and rebuildable with
+    ``scripts/build-test-apks.sh``. The allowed set is derived from what is on disk
+    rather than written out by hand, so a sample added without its sources — or a
+    third-party APK slipped into ``examples/`` — fails here.
     """
     import subprocess
 
@@ -135,7 +140,14 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     if result.returncode != 0:
         pytest.skip("not a git checkout")
 
-    allowed = {"examples/demo-app/demo.apk"}
+    examples = REPO_ROOT / "examples"
+    allowed = {
+        str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+        for path in examples.rglob("*.apk")
+        if path.is_file()
+    }
+    assert allowed, "no first-party sample was found under examples/"
+
     tracked_bad = [
         name
         for name in result.stdout.splitlines()
@@ -143,6 +155,43 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
         and name not in allowed
     ]
     assert not tracked_bad, f"third-party analysis artifacts are tracked: {tracked_bad}"
+
+
+def test_every_committed_sample_has_its_sources_beside_it() -> None:
+    """A committed APK is only honest if the sources that produced it are committed.
+
+    Otherwise the repository carries a binary nobody can explain, which is the one
+    thing this project's sample policy exists to prevent.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "ls-files", "examples"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        pytest.skip("not a git checkout")
+
+    tracked = result.stdout.splitlines()
+    apks = [name for name in tracked if name.endswith(".apk")]
+    assert apks, "no sample APK is committed"
+
+    for apk in apks:
+        # git always reports paths with forward slashes; Path renders them with the
+        # platform separator, so the prefix is normalised before comparing.
+        directory = str(Path(apk).parent).replace("\\", "/")
+        assert (REPO_ROOT / directory / "AndroidManifest.xml").is_file(), (
+            f"{apk} has no manifest beside it"
+        )
+        sources = [
+            name
+            for name in tracked
+            if name.startswith(f"{directory}/smali") and name.endswith(".smali")
+        ]
+        assert sources, f"{apk} has no smali sources beside it"
 
 
 def test_every_integration_fixture_the_fetch_script_declares_is_one_a_test_uses() -> None:
@@ -183,6 +232,31 @@ def test_the_bundled_demo_app_is_first_party_and_reproducible() -> None:
     assert (demo / "apktool.yml").is_file()
     assert list((demo / "smali").rglob("*.smali")), "no smali sources for the demo app"
     assert (REPO_ROOT / "scripts" / "build-demo-apk.sh").is_file()
+    assert (REPO_ROOT / "scripts" / "build-test-apks.sh").is_file()
+
+
+def test_the_build_script_covers_every_sample() -> None:
+    """Every sample on disk must be buildable by the script, and vice versa.
+
+    The script's list and the directories under ``examples/`` are two statements of
+    the same thing. When they drift, a sample is silently unbuildable — the APK
+    stays in the repository but nobody can regenerate it.
+    """
+    script = (REPO_ROOT / "scripts" / "build-test-apks.sh").read_text(encoding="utf-8")
+    declared = set(re.findall(r'"([a-z0-9-]+):([a-z0-9]+\.apk)"', script))
+    assert declared, "no samples are declared in scripts/build-test-apks.sh"
+
+    on_disk = {
+        path.name
+        for path in (REPO_ROOT / "examples").iterdir()
+        if path.is_dir() and list(path.glob("*.apk"))
+    }
+    assert on_disk, "no sample directories under examples/"
+
+    assert {name for name, _ in declared} == on_disk, (
+        "scripts/build-test-apks.sh and examples/ disagree about the samples: "
+        f"declared={sorted(name for name, _ in declared)} on disk={sorted(on_disk)}"
+    )
 
 
 # -- demo assets -----------------------------------------------------------
@@ -219,6 +293,40 @@ def test_readme_embeds_the_demo_gifs() -> None:
 
     assert "docs/assets/demo-quick.gif" in readme
     assert "docs/assets/demo.gif" in readme
+
+
+def test_the_demo_video_exists_and_is_a_playable_mp4() -> None:
+    """The Phase 1 checklist asks for a demo video, and the README links it.
+
+    Checked without ffprobe, which is not a dependency: an MP4 carries the ``ftyp``
+    box at the start of the file, and its size is a reasonable proxy for "a recording
+    rather than a stub". The deep check below uses ffmpeg when it is available.
+    """
+    path = REPO_ROOT / "docs" / "assets" / "demo.mp4"
+    assert path.is_file(), "demo.mp4 is missing — run scripts/render-demo.py"
+    assert path.stat().st_size > 20_000, "demo.mp4 is suspiciously small"
+
+    header = path.read_bytes()[:12]
+    assert header[4:8] == b"ftyp", "demo.mp4 does not start with an MP4 file-type box"
+
+
+def test_the_demo_video_decodes_when_ffmpeg_is_available() -> None:
+    """A truncated or unplayable file would satisfy the header check above."""
+    import shutil
+    import subprocess
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg is not installed")
+
+    path = REPO_ROOT / "docs" / "assets" / "demo.mp4"
+    result = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, f"demo.mp4 does not decode: {result.stderr[-400:]}"
+    assert not result.stderr.strip(), f"demo.mp4 decoded with errors: {result.stderr[-400:]}"
 
 
 def test_every_embedded_image_resolves() -> None:

@@ -175,12 +175,15 @@ def render_frames(lines: list[str], directory: Path, font: ImageFont.FreeTypeFon
     return frames
 
 
-def encode(frames: list[Path], out: Path, workdir: Path) -> None:
+def encode(frames: list[Path], out: Path, workdir: Path) -> Path:
     """Frames to GIF, through a high-quality H.264 intermediate.
 
     ffmpeg cannot take a directory of numbered PNGs as one input without a pattern that
     matches the sequence exactly, so the frame list is written to a concat demuxer file
     and streamed by path. That has no ambiguity about ordering or start numbers.
+
+    Returns the intermediate, which is the same video the GIF was made from — a
+    published video is then the identical recording, not a second take.
     """
     intermediate = workdir / f"{out.stem}.mp4"
     listing = workdir / "frames.txt"
@@ -205,6 +208,10 @@ def encode(frames: list[Path], out: Path, workdir: Path) -> None:
             str(listing),
             "-c:v",
             "libx264",
+            # yuv420p is what browsers and GitHub will actually play, and it
+            # requires even dimensions.
+            "-vf",
+            "scale=trunc(iw/2)*2:trunc(ih/2)*2",
             "-pix_fmt",
             "yuv420p",
             "-crf",
@@ -239,14 +246,24 @@ def encode(frames: list[Path], out: Path, workdir: Path) -> None:
         check=True,
         capture_output=True,
     )
+    return intermediate
 
 
-def render(lines: list[str], out: Path, font: ImageFont.FreeTypeFont) -> None:
+def render(
+    lines: list[str],
+    out: Path,
+    font: ImageFont.FreeTypeFont,
+    video: Path | None = None,
+) -> None:
+    """Render the session to an asset, and optionally to a video of the same frames."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp:
         work = Path(tmp)
         frames = render_frames(lines, work, font)
         print(f"  {len(frames)} frames")
-        encode(frames, out, work)
+        intermediate = encode(frames, out, work)
+        if video is not None:
+            video.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(intermediate, video)
         for frame in frames:
             frame.unlink(missing_ok=True)
 
@@ -262,10 +279,12 @@ def main() -> None:
     print(f"Rendering demo-quick.gif (first {QUICK_LINES} lines)...")
     render(captured[:QUICK_LINES], asset_dir / "demo-quick.gif", font)
 
-    print("Rendering demo.gif (full session)...")
-    render(captured, asset_dir / "demo.gif", font)
+    # The video is the same recording as the full GIF, encoded from the same frames,
+    # so the two cannot drift apart.
+    print("Rendering demo.gif and demo.mp4 (full session)...")
+    render(captured, asset_dir / "demo.gif", font, video=asset_dir / "demo.mp4")
 
-    for asset in sorted(asset_dir.glob("*.gif")):
+    for asset in sorted(asset_dir.glob("*.gif")) + sorted(asset_dir.glob("*.mp4")):
         size_kb = asset.stat().st_size / 1024
         print(f"  {asset.relative_to(REPO_ROOT)}  {size_kb:.0f} KB")
 

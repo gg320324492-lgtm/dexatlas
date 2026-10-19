@@ -141,21 +141,33 @@ code location it came from. A finding without a location is not a finding.
 
 ### 1.4 Exit checklist
 
-Last updated 2026-10-14. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full list.
+Last updated 2026-10-20. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full list.
 
-- [x] Import and index pipeline verified against test APKs
+The eight items are the Phase 1 acceptance checklist, in the original plan's wording.
+An earlier version of this file paraphrased them — "verified against test APKs" for
+"five **self-built** test APKs", and "demo recording" for "demo **video**" — and then
+ticked every box. The wording was doing the work the items were supposed to do. This
+version keeps the original phrasing so the ticks mean what they say.
+
+- [x] Import and index pipeline verified against **five self-built test APKs**
+      (under [examples/](../../examples/demo-app), each built from committed smali
+      sources and rebuildable with `scripts/build-test-apks.sh`: a general one, a
+      two-dex one, an obfuscated one, a strings-heavy one, and one with an interface
+      hierarchy)
 - [x] JADX, Apktool and Androguard all callable, with failures handled not crashed on
 - [x] CLI and REST API run the same analysis core
 - [x] Classes, methods, references and evidence locations are queryable
 - [x] JSON and Markdown export supported
-- [x] Unit tests plus end-to-end tests; **88% coverage on first-party code** (204 tests)
+- [x] Unit tests plus end-to-end tests; **coverage above the 80% target on first-party
+      code** — the current figure is in
+      [the execution report](../reports/phase1-execution-report.md)
 - [x] GitHub Actions green on Python 3.12 and 3.13
 - [x] Installation guide, every command verified against a fresh clone
       ([docs/install.md](../install.md))
 - [x] Architecture documentation ([docs/architecture/README.md](../architecture/README.md))
-- [x] A self-built demo application bundled with the repository, built from smali
-      sources and rebuildable via `scripts/build-demo-apk.sh`
-- [x] `v0.1.0` release published 2026-10-14, with a generated demo recording
+- [x] `v0.1.0` release published 2026-10-14
+- [x] A demo **video** ([docs/assets/demo.mp4](../assets/demo.mp4)), encoded from the
+      same frames as the GIFs in the README, so the two cannot drift apart
 - [x] `v0.1.1` release published 2026-10-19 — Foundation Hardening, fixing the Smali
       fallback that had never worked for any APK
 

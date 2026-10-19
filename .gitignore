@@ -49,14 +49,18 @@ report.md
 .demo-tmp/
 tmp*/
 
-# The one exception: DexAtlas's own demo application, built from the smali sources in
-# examples/demo-app/ and rebuildable with scripts/build-demo-apk.sh. It is first-party,
-# contains no third-party code, and a stranger needs it to run an analysis after cloning.
-# The rules above stay in force for every other APK and smali tree.
-!examples/demo-app/
-!examples/demo-app/demo.apk
-!examples/demo-app/smali/
-!examples/demo-app/smali/**
+# The exceptions: DexAtlas's own test applications, built from the smali sources under
+# examples/ and rebuildable with scripts/build-test-apks.sh. They are first-party,
+# contain no third-party code, and a stranger needs them to run an analysis after
+# cloning. The rules above stay in force for every other APK and smali tree.
+!examples/*/
+!examples/*/*.apk
+!examples/*/res/
+!examples/*/res/**
+!examples/*/smali/
+!examples/*/smali/**
+!examples/*/smali_classes*/
+!examples/*/smali_classes*/**
 
 # Secrets
 .env
