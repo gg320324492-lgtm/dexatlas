@@ -159,6 +159,74 @@ def test_read_smali_of_missing_class_returns_none(apktool: ApktoolBackend, tmp_p
     assert apktool.read_smali("com.nope.Missing", tmp_path) is None
 
 
+# -- read failures ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "error",
+    [
+        OSError("the file could not be read"),
+        PermissionError("access is denied"),
+        FileNotFoundError("the file is gone"),
+    ],
+    ids=["oserror", "permission-denied", "not-found"],
+)
+def test_read_smali_returns_none_when_the_file_cannot_be_read(
+    apktool: ApktoolBackend,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    error: OSError,
+) -> None:
+    """A backend that fails is a value, not an exception.
+
+    ``smali_path`` decided the file was there and the read that followed failed — the
+    file was deleted, the disk hiccuped, the permissions changed. Smali is the last
+    resort for a method JADX could not decompile, so letting the error escape here
+    would turn a missing fallback into a failed analysis. The failure is a ``None``
+    the caller carries on from.
+    """
+    path = _smali_file(tmp_path, "smali", "com.foobar.foo.Foobar")
+    original = Path.read_text
+    attempts: list[Path] = []
+
+    def failing_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        attempts.append(self)
+        if self == path:
+            raise error
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", failing_read_text)
+
+    assert apktool.read_smali("com.foobar.foo.Foobar", tmp_path) is None
+    # Without this the assertion above would also pass if the class had never been
+    # found at all, and the OSError branch would stay untested.
+    assert attempts == [path], "the file was never read; the OSError branch was not taken"
+
+
+def test_read_smali_returns_none_when_the_file_disappears_between_check_and_read(
+    apktool: ApktoolBackend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resolving the path and reading it are two separate filesystem operations.
+
+    Apktool's output directory is written by another process, so a file that exists
+    when it is located can be gone by the time it is opened. The race is reproduced
+    here for real: the file is deleted from inside ``is_file``, so the check succeeds
+    and the read that follows fails with a genuine ``FileNotFoundError``.
+    """
+    path = _smali_file(tmp_path, "smali", "com.foobar.foo.Foobar")
+    original = Path.is_file
+
+    def is_file_then_delete(self: Path) -> bool:
+        present = original(self)
+        if self == path:
+            path.unlink()
+        return present
+
+    monkeypatch.setattr(Path, "is_file", is_file_then_delete)
+
+    assert apktool.read_smali("com.foobar.foo.Foobar", tmp_path) is None
+
+
 # -- path traversal ---------------------------------------------------------
 
 
