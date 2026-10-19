@@ -11,6 +11,7 @@ import json
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
 
@@ -38,6 +39,24 @@ SCHEMA_VERSION = 1
 #: Tables cleared when a project is re-analysed. Content-addressed project ids mean a
 #: re-analysis replaces rather than accumulates.
 _SYMBOL_TABLES = ("classes", "methods", "fields", "xrefs", "strings", "search_index")
+
+
+@dataclass(frozen=True, slots=True)
+class SymbolCounts:
+    """How many rows each symbol table holds for one project.
+
+    These are measured after the write, not predicted from the lists that were
+    handed in. The tables collapse duplicate keys — a class defined in two dex
+    files is one row — so a count taken from the input is a number the database
+    cannot produce, and a report built on it disagrees with every query run
+    against it.
+    """
+
+    classes: int
+    methods: int
+    fields: int
+    references: int
+
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_info (
@@ -307,14 +326,29 @@ class Store:
         fields: Iterable[FieldRef],
         references: Iterable[MethodReference],
         strings: Iterable[StringConstant],
-    ) -> None:
+    ) -> SymbolCounts:
         """Replace a project's symbol tables. Callers re-analyse, so this is idempotent.
 
         Descriptors and method ids are stored in their canonical spelling. The models
         already normalise them, but the database is the durable contract: an id
         written here has to be the id the lookup below matches, whatever the caller
         handed in.
+
+        Returns the number of rows each table ended up holding. The count is the
+        one a query returns, which is the only count a report may state: the
+        symbol tables key on the symbol, so two dex files that define the same
+        method are one row, and a count taken from the input list would be
+        higher than anything the database can show.
         """
+        # The lists are read twice: once for the tables, once for the search
+        # index. Materialising them here keeps a caller that passes a generator
+        # from filling the tables and leaving the search index empty.
+        class_list = list(classes)
+        method_list = list(methods)
+        field_list = list(fields)
+        reference_list = list(references)
+        string_list = list(strings)
+
         with self.transaction() as connection:
             for table in _SYMBOL_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
@@ -333,7 +367,7 @@ class Store:
                         c.field_count,
                         _dump_provenance(c),
                     )
-                    for c in classes
+                    for c in class_list
                 ],
             )
             connection.executemany(
@@ -349,7 +383,7 @@ class Store:
                         int(m.decompiled),
                         _dump_provenance(m),
                     )
-                    for m in methods
+                    for m in method_list
                 ],
             )
             connection.executemany(
@@ -364,7 +398,7 @@ class Store:
                         f.constant_value,
                         _dump_provenance(f),
                     )
-                    for f in fields
+                    for f in field_list
                 ],
             )
             connection.executemany(
@@ -377,19 +411,26 @@ class Store:
                         r.kind,
                         _dump_provenance(r),
                     )
-                    for r in references
+                    for r in reference_list
                 ],
             )
             connection.executemany(
                 "INSERT INTO strings VALUES (?,?,?,?,?)",
                 [
                     (project_id, s.value, s.class_name, s.method_name, _dump_provenance(s))
-                    for s in strings
+                    for s in string_list
                 ],
             )
             connection.executemany(
                 "INSERT INTO search_index (kind, qualified_name, project_id, body) VALUES (?,?,?,?)",
-                _search_rows(project_id, classes, methods, fields, strings),
+                _search_rows(project_id, class_list, method_list, field_list, string_list),
+            )
+
+            return SymbolCounts(
+                classes=_count_rows(connection, "classes", project_id),
+                methods=_count_rows(connection, "methods", project_id),
+                fields=_count_rows(connection, "fields", project_id),
+                references=_count_rows(connection, "xrefs", project_id),
             )
 
     def list_classes(self, project_id: str, *, prefix: str | None = None) -> list[ClassRef]:
@@ -509,6 +550,19 @@ def _dump_provenance(item: Any) -> str:
     return json.dumps([p.model_dump(mode="json") for p in item.provenance])
 
 
+def _count_rows(connection: sqlite3.Connection, table: str, project_id: str) -> int:
+    """How many rows a symbol table holds for one project.
+
+    The table is the only authority on how many symbols were stored: the
+    primary keys collapse duplicates, and a count taken from the list that was
+    written is a count of something the database never held.
+    """
+    row = connection.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE project_id = ?", (project_id,)
+    ).fetchone()
+    return int(row[0]) if row else 0
+
+
 def _canonical_search_name(kind: str, name: str) -> str:
     """Canonicalise a search hit's name.
 
@@ -609,4 +663,4 @@ def _search_rows(
     return rows
 
 
-__all__ = ["SCHEMA_VERSION", "Store", "parse_method_id"]
+__all__ = ["SCHEMA_VERSION", "Store", "SymbolCounts", "parse_method_id"]

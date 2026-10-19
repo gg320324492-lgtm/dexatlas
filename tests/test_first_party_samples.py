@@ -24,6 +24,7 @@ from pathlib import Path
 import pytest
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.models import EvidenceKind, EvidenceLevel
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.jadx.adapter import JadxBackend
@@ -315,3 +316,101 @@ def test_a_constructor_call_resolves_back_to_its_caller(samples: dict[str, objec
 
     assert callers, "the constructor had no callers"
     assert any("HandlerFactory.create" in caller.caller for caller in callers)
+
+
+# -- the numbers the report states ------------------------------------------
+
+
+def _row_count(analyzer: Analyzer, table: str, project_id: str) -> int:
+    with analyzer.store.transaction() as connection:
+        row = connection.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE project_id = ?", (project_id,)
+        ).fetchone()
+    return int(row[0])
+
+
+def test_the_reported_counts_are_the_rows_in_the_tables(samples: dict[str, object]) -> None:
+    """The report's numbers must be the numbers a query returns.
+
+    They used not to be. The method count was taken from the list of symbols
+    before the table collapsed the duplicates, so a class defined in two dex
+    files was counted twice in the report and once in the database — and
+    ``dexatlas methods`` could not show the difference.
+    """
+    analyzer = _analyzer(samples)
+
+    for name in sorted(SAMPLE_APKS):
+        project_id = _project_id(samples, name)
+        project = analyzer.store.get_project(project_id)
+        assert project is not None, name
+
+        assert project.class_count == len(analyzer.store.list_classes(project_id)), name
+        assert project.method_count == len(analyzer.store.list_methods(project_id)), name
+        assert project.reference_count == _row_count(analyzer, "xrefs", project_id), name
+
+
+def test_a_class_defined_in_two_dexes_is_one_method_with_two_sources(
+    samples: dict[str, object],
+) -> None:
+    """``SharedConfig`` is defined in both dex files.
+
+    It is one method with two sources, so it is one row, and the row has to say
+    where it came from — otherwise "this method lives in classes2.dex" would
+    hide the copy in classes.dex.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "multidex-app")
+
+    methods = [
+        method
+        for method in analyzer.store.list_methods(project_id)
+        if method.class_name == "com.example.multidex.SharedConfig"
+    ]
+    assert methods, "the duplicated class has no methods at all"
+
+    for method in methods:
+        locators = {provenance.locator for provenance in method.provenance}
+        assert any("classes.dex" in locator for locator in locators), method.qualified_name
+        assert any("classes2.dex" in locator for locator in locators), method.qualified_name
+
+
+# -- cross-references become evidence ---------------------------------------
+
+
+def test_the_analysis_produces_cross_reference_evidence(samples: dict[str, object]) -> None:
+    """A cross-reference is a conclusion about the code, so it has to be evidence.
+
+    It used to be index data only: the method that records it had no caller in
+    the pipeline, so an analysed APK produced no cross-reference record at all,
+    and the report could not say who calls what.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    evidence = analyzer.store.list_evidence(project_id)
+    cross = [item for item in evidence if item.kind == EvidenceKind.CROSS_REFERENCE]
+
+    assert cross, "the analysis produced no cross-reference evidence"
+    for item in cross:
+        assert item.level == EvidenceLevel.VERIFIED
+        assert item.detail["callers"], item.summary
+        assert item.provenance, item.summary
+
+
+def test_a_cross_reference_record_names_the_caller(samples: dict[str, object]) -> None:
+    """The record has to point back at the code that makes the call."""
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    evidence = analyzer.store.list_evidence(project_id)
+    sign = next(
+        (
+            item
+            for item in evidence
+            if item.kind == EvidenceKind.CROSS_REFERENCE and "Crypto.sign" in item.summary
+        ),
+        None,
+    )
+
+    assert sign is not None, "the demo app calls Crypto.sign; no record says so"
+    assert any("MainActivity.onCreate" in caller for caller in sign.detail["callers"])

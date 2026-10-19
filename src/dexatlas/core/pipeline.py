@@ -124,6 +124,11 @@ class Analyzer:
             classes.extend(apktool_classes)
             if error is not None:
                 project.errors.append(error)
+            if manifest is not None:
+                # The manifest's findings come before the code's index: an
+                # exported component is a conclusion, and the report's evidence
+                # table is capped, so what is recorded last is what gets dropped.
+                builder.add_exported_components(manifest.components)
 
         if include_androguard:
             extracted = self._run_androguard(apk.path, project, builder)
@@ -142,17 +147,18 @@ class Analyzer:
                 project.errors.append(error)
 
         classes = _merge_classes(classes)
-        self._store.save_symbols(project.id, classes, methods, fields, references, strings)
-
-        if manifest is not None:
-            builder.add_exported_components(manifest.components)
+        counts = self._store.save_symbols(project.id, classes, methods, fields, references, strings)
 
         evidence = builder.build()
         project.evidence_count = self._store.save_evidence(project.id, evidence)
 
-        project.class_count = len(classes)
-        project.method_count = len(methods)
-        project.reference_count = len(references)
+        # The counts are the ones the tables hold. A count taken from the lists
+        # that went in is a count of symbols the database never stored — a class
+        # defined in two dex files is one row — and a report built on it
+        # disagrees with every query run against it.
+        project.class_count = counts.classes
+        project.method_count = counts.methods
+        project.reference_count = counts.references
         project.status = (
             ProjectStatus.FAILED if not classes and not manifest else ProjectStatus.COMPLETED
         )
@@ -218,9 +224,21 @@ class Analyzer:
         classes, methods, fields, references, strings, error = self._androguard.extract(
             apk, project.apk.sha256
         )
+        # A method defined in two dex files is one method with two sources, not
+        # two methods. The symbol table keys on the method id, so the second
+        # definition would replace the first and take its provenance with it —
+        # which is how "this method lives in classes.dex" could be lost.
+        methods = _merge_methods(methods)
+        fields = _merge_fields(fields)
+
         if error is not None:
             builder.add_error(error)
         else:
+            # Conclusions before the index. A cross-reference says something about
+            # the code; a class declaration only says the class exists. The
+            # report's evidence table is capped, so what is recorded last is what
+            # gets dropped.
+            builder.add_cross_references(methods, references)
             builder.add_classes(classes[:MAX_EVIDENCE_CLASSES])
             if len(classes) > MAX_EVIDENCE_CLASSES:
                 logger.info(
@@ -337,6 +355,58 @@ def _merge_classes(classes: list[ClassRef]) -> list[ClassRef]:
             }
         )
     return sorted(merged.values(), key=lambda c: c.name)
+
+
+def _merge_methods(methods: list[MethodRef]) -> list[MethodRef]:
+    """Combine the definitions of one method into one symbol.
+
+    A class defined in two dex files yields two definitions of the same method.
+    The symbol table keys on ``(class, name, descriptor)``, so the second
+    definition would replace the first — and the method's own provenance, which
+    dex file it came from, with it. Merging keeps every source, the way
+    :func:`_merge_classes` keeps every backend's view of a class.
+    """
+    merged: dict[str, MethodRef] = {}
+    for method in methods:
+        key = method.qualified_name
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = method.model_copy(deep=True)
+            continue
+        merged[key] = existing.model_copy(
+            update={
+                "access_flags": sorted({*existing.access_flags, *method.access_flags}),
+                "signature": existing.signature or method.signature,
+                # A body in either dex file is a body.
+                "decompiled": existing.decompiled or method.decompiled,
+                "provenance": [*existing.provenance, *method.provenance],
+            }
+        )
+    return sorted(merged.values(), key=lambda m: m.qualified_name)
+
+
+def _merge_fields(fields: list[FieldRef]) -> list[FieldRef]:
+    """Combine the definitions of one field into one symbol.
+
+    The same thing :func:`_merge_methods` does for methods: the field table keys
+    on the field, so a field defined in two dex files is one row, and the row
+    has to say so.
+    """
+    merged: dict[str, FieldRef] = {}
+    for field_ref in fields:
+        key = field_ref.qualified_name
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = field_ref.model_copy(deep=True)
+            continue
+        merged[key] = existing.model_copy(
+            update={
+                "access_flags": sorted({*existing.access_flags, *field_ref.access_flags}),
+                "constant_value": existing.constant_value or field_ref.constant_value,
+                "provenance": [*existing.provenance, *field_ref.provenance],
+            }
+        )
+    return sorted(merged.values(), key=lambda f: f.qualified_name)
 
 
 __all__ = ["AnalysisResult", "Analyzer", "ApkValidationError", "ToolErrorCode"]

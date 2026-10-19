@@ -26,6 +26,12 @@ from dexatlas.core.models import (
 #: References listed in evidence detail before truncating.
 MAX_LISTED_CALLERS = 50
 
+#: Called methods that get an evidence record. A large app calls thousands of its
+#: own methods, and one record each would bury the findings under index data.
+#: The report's evidence table shows 200 rows, so this leaves room for the class
+#: declarations in the same table.
+MAX_EVIDENCE_CALLED_METHODS = 100
+
 
 @dataclass(slots=True)
 class EvidenceBuilder:
@@ -131,22 +137,90 @@ class EvidenceBuilder:
     def add_method_references(
         self, method: MethodRef, references: Sequence[MethodReference]
     ) -> None:
+        """Record that a method is called, and the call sites that prove it.
+
+        The claim is about the call sites, so the provenance points at them: the
+        bytecode scan that found the edge is the evidence for it. The method's own
+        provenance is kept as well, so a reader can also find where the callee is
+        defined — for a method defined in two dex files, that is both of them.
+        """
         if not references:
             return
         callers = sorted({r.caller for r in references})
-        self.add_sourced(
+        self.add(
             kind=EvidenceKind.CROSS_REFERENCE,
+            # A call edge is read out of the bytecode by a deterministic tool and
+            # points at a code location, which is what VERIFIED means here.
             level=EvidenceLevel.VERIFIED,
             summary=f"{method.qualified_name} is called from {len(callers)} location(s)",
-            source=method,
+            provenance=[*_call_site_provenance(references), *method.provenance],
             detail={
                 "callers": callers[:MAX_LISTED_CALLERS],
                 "truncated": len(callers) > MAX_LISTED_CALLERS,
+                "call_count": len(callers),
             },
         )
+
+    def add_cross_references(
+        self, methods: Sequence[MethodRef], references: Sequence[MethodReference]
+    ) -> None:
+        """Record one observation per method that this APK calls.
+
+        The unit of evidence is the called method, not the call. A method with
+        fifty callers is one conclusion — "this is called from fifty places" —
+        and fifty conclusions about one method would bury everything else.
+
+        Only callees that are methods of this APK get a record. A call to
+        ``java.lang.StringBuilder.append`` is a fact about the JDK; a report full
+        of those says nothing about the app under analysis. The calls themselves
+        stay queryable in the cross-reference table either way.
+        """
+        if not references:
+            return
+
+        index = {method.qualified_name: method for method in methods}
+        by_callee: dict[str, list[MethodReference]] = {}
+        for reference in references:
+            by_callee.setdefault(reference.callee, []).append(reference)
+
+        called = [(index[callee], edges) for callee, edges in by_callee.items() if callee in index]
+        # Most-called first: that is the order a reader wants, and it is the same
+        # order every run over the same APK produces, so the evidence ids stay
+        # stable.
+        called.sort(key=lambda item: (-_distinct_callers(item[1]), item[0].qualified_name))
+
+        for method, edges in called[:MAX_EVIDENCE_CALLED_METHODS]:
+            self.add_method_references(method, edges)
 
     def build(self) -> list[Evidence]:
         return list(self.items)
 
 
-__all__ = ["MAX_LISTED_CALLERS", "EvidenceBuilder"]
+def _distinct_callers(references: Sequence[MethodReference]) -> int:
+    """How many distinct methods call the callee.
+
+    A caller that appears in two dex files is one caller, not two: the same
+    method, indexed twice.
+    """
+    return len({reference.caller for reference in references})
+
+
+def _call_site_provenance(references: Sequence[MethodReference]) -> list[Provenance]:
+    """The locators that prove the calls, one per call site.
+
+    The locator is what tells two calls apart — the same caller in two dex
+    files, the same callee reached from two places — so each distinct locator
+    is kept once.
+    """
+    by_locator: dict[str, Provenance] = {}
+    for reference in references:
+        for provenance in reference.provenance:
+            by_locator.setdefault(provenance.locator, provenance)
+    return list(by_locator.values())[:MAX_LISTED_CALLERS]
+
+
+__all__ = [
+    "MAX_EVIDENCE_CALLED_METHODS",
+    "MAX_LISTED_CALLERS",
+    "EvidenceBuilder",
+]

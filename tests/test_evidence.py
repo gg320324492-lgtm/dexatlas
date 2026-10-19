@@ -6,7 +6,11 @@ finding, so it gets tested directly.
 
 from __future__ import annotations
 
-from dexatlas.core.evidence import MAX_LISTED_CALLERS, EvidenceBuilder
+from dexatlas.core.evidence import (
+    MAX_EVIDENCE_CALLED_METHODS,
+    MAX_LISTED_CALLERS,
+    EvidenceBuilder,
+)
 from dexatlas.core.models import (
     ClassKind,
     ClassRef,
@@ -19,7 +23,13 @@ from dexatlas.core.models import (
     ToolError,
     ToolErrorCode,
 )
-from dexatlas.core.pipeline import _extract_smali_method, _merge_classes, _smali_declares
+from dexatlas.core.pipeline import (
+    _extract_smali_method,
+    _merge_classes,
+    _merge_fields,
+    _merge_methods,
+    _smali_declares,
+)
 
 
 def _provenance(tool: str = "androguard") -> list[Provenance]:
@@ -28,6 +38,21 @@ def _provenance(tool: str = "androguard") -> list[Provenance]:
 
 def _builder() -> EvidenceBuilder:
     return EvidenceBuilder(project_id="apk_test", apk_sha256="b" * 64)
+
+
+def _method(name: str = "m", class_name: str = "com.a.C") -> MethodRef:
+    return MethodRef(class_name=class_name, name=name, descriptor="()V", provenance=_provenance())
+
+
+def _reference(caller: str, callee: str, locator: str = "androguard:x") -> MethodReference:
+    """A call edge, with the locator that says where the call was seen."""
+    return MethodReference(
+        caller=caller,
+        callee=callee,
+        provenance=[
+            Provenance(tool="androguard", tool_version="1.0", apk_sha256="b" * 64, locator=locator)
+        ],
+    )
 
 
 # -- ids --------------------------------------------------------------------
@@ -158,6 +183,176 @@ def test_no_references_records_nothing() -> None:
     )
 
     assert builder.items == []
+
+
+# -- cross-references -------------------------------------------------------
+
+
+def test_a_called_method_produces_one_cross_reference_record() -> None:
+    """The unit of evidence is the called method, not the call."""
+    builder = _builder()
+    method = _method()
+
+    builder.add_cross_references(
+        [method], [_reference("com.a.Caller.run()V", method.qualified_name)]
+    )
+
+    assert len(builder.items) == 1
+    evidence = builder.items[0]
+    assert evidence.kind == EvidenceKind.CROSS_REFERENCE
+    assert evidence.level == EvidenceLevel.VERIFIED
+    assert "com.a.C.m()V" in evidence.summary
+    assert evidence.detail["callers"] == ["com.a.Caller.run()V"]
+
+
+def test_a_call_to_a_method_outside_the_apk_is_not_a_record() -> None:
+    """A call to ``java.lang.StringBuilder.append`` is a fact about the JDK.
+
+    It says nothing about the app under analysis, and a report full of those
+    would say nothing about it either.
+    """
+    builder = _builder()
+    library = "java.lang.StringBuilder.append(Ljava/lang/String;)Ljava/lang/StringBuilder;"
+
+    builder.add_cross_references([_method()], [_reference("com.a.Caller.run()V", library)])
+
+    assert builder.items == []
+
+
+def test_the_provenance_points_at_the_call_site() -> None:
+    """The claim is about the call, so the locator is the call site.
+
+    The method's own provenance is kept as well, so a reader can also find
+    where the callee is defined.
+    """
+    builder = _builder()
+    method = _method()
+    reference = _reference(
+        "com.a.Caller.run()V", method.qualified_name, locator="androguard:classes.dex#run->m"
+    )
+
+    builder.add_cross_references([method], [reference])
+
+    evidence = builder.items[0]
+    assert evidence.provenance[0].locator == "androguard:classes.dex#run->m"
+    assert evidence.provenance[-1].locator == "androguard:x"
+
+
+def test_the_most_called_method_is_recorded_first() -> None:
+    """The order a reader wants is the order the records take."""
+    builder = _builder()
+    quiet = _method("quiet")
+    busy = _method("busy")
+
+    builder.add_cross_references(
+        [quiet, busy],
+        [
+            _reference("com.a.Caller.run()V", busy.qualified_name),
+            _reference("com.a.Other.run()V", busy.qualified_name),
+        ],
+    )
+
+    assert builder.items[0].summary.startswith("com.a.C.busy()V")
+
+
+def test_the_number_of_records_is_capped() -> None:
+    """An app has thousands of called methods; the report has room for a sample."""
+    builder = _builder()
+    methods = [_method(f"m{index}") for index in range(MAX_EVIDENCE_CALLED_METHODS + 10)]
+    references = [
+        _reference(f"com.a.Caller{index}.run()V", method.qualified_name)
+        for index, method in enumerate(methods)
+    ]
+
+    builder.add_cross_references(methods, references)
+
+    assert len(builder.items) == MAX_EVIDENCE_CALLED_METHODS
+
+
+def test_the_caller_count_is_stated_even_when_the_list_is_truncated() -> None:
+    """A truncated list must not read as "these are all of them"."""
+    builder = _builder()
+    method = _method()
+    references = [
+        _reference(f"com.a.Caller{index}.run()V", method.qualified_name)
+        for index in range(MAX_LISTED_CALLERS + 5)
+    ]
+
+    builder.add_cross_references([method], references)
+
+    evidence = builder.items[0]
+    assert evidence.detail["truncated"] is True
+    assert evidence.detail["call_count"] == MAX_LISTED_CALLERS + 5
+    assert len(evidence.detail["callers"]) == MAX_LISTED_CALLERS
+
+
+def test_no_references_produces_no_record() -> None:
+    builder = _builder()
+
+    builder.add_cross_references([_method()], [])
+
+    assert builder.items == []
+
+
+# -- merging definitions of one symbol --------------------------------------
+
+
+def test_a_method_defined_in_two_dexes_keeps_both_sources() -> None:
+    """The method table keys on the method id, so the second definition replaces
+    the first — and takes its provenance with it."""
+    first = _method()
+    second = _method()
+    second.provenance = [
+        Provenance(
+            tool="androguard", tool_version="1.0", apk_sha256="b" * 64, locator="androguard:y"
+        )
+    ]
+
+    merged = _merge_methods([first, second])
+
+    assert len(merged) == 1
+    assert {p.locator for p in merged[0].provenance} == {"androguard:x", "androguard:y"}
+
+
+def test_merging_methods_keeps_a_body_found_in_either_dex() -> None:
+    without_body = _method()
+    without_body.decompiled = False
+    with_body = _method()
+    with_body.decompiled = True
+
+    merged = _merge_methods([without_body, with_body])
+
+    assert merged[0].decompiled is True
+
+
+def test_merging_methods_unions_the_access_flags() -> None:
+    public = _method()
+    public.access_flags = ["public"]
+    final = _method()
+    final.access_flags = ["final"]
+
+    merged = _merge_methods([public, final])
+
+    assert merged[0].access_flags == ["final", "public"]
+
+
+def test_a_field_defined_in_two_dexes_keeps_both_sources() -> None:
+    from dexatlas.core.models import FieldRef
+
+    first = FieldRef(
+        class_name="com.a.C", name="KEY", descriptor="Ljava/lang/String;", provenance=_provenance()
+    )
+    second = FieldRef(class_name="com.a.C", name="KEY", descriptor="Ljava/lang/String;")
+    second.provenance = [
+        Provenance(
+            tool="androguard", tool_version="1.0", apk_sha256="b" * 64, locator="androguard:y"
+        )
+    ]
+
+    merged = _merge_fields([first, second])
+
+    assert len(merged) == 1
+    assert {p.locator for p in merged[0].provenance} == {"androguard:x", "androguard:y"}
 
 
 # -- class merging ----------------------------------------------------------

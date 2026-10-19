@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from dexatlas.core.models import Evidence, Project
+from dexatlas.core.models import Evidence, EvidenceKind, Project
 from dexatlas.core.pipeline import AnalysisResult
 
 
@@ -53,6 +53,12 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
         "classes": result.project.class_count,
         "methods": result.project.method_count,
         "cross_references": result.project.reference_count,
+        # How many of those cross-references are backed by an evidence record.
+        # The two numbers differ on purpose: an indexed call into library code
+        # is a fact about the JDK, not a conclusion about this app.
+        "cross_references_with_evidence": sum(
+            1 for item in result.evidence if item.kind == EvidenceKind.CROSS_REFERENCE
+        ),
         "evidence_by_level": _evidence_counts(result.evidence),
         "duration_seconds": round(result.duration_seconds, 2),
         "backends_with_errors": sorted({e.tool for e in result.project.errors}),
