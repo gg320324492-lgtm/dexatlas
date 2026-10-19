@@ -6,6 +6,8 @@ someone deciding whether this project is worth their time. These checks are chea
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
 import sys
@@ -367,7 +369,16 @@ def test_demo_capture_script_reports_a_real_project_id() -> None:
 
 # -- execution report -------------------------------------------------------
 
-REPORT = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+#: The report the self-checks below read. ``scripts/refresh-report-figures.py``
+#: points this at a *candidate* copy while it measures itself, so a self-check
+#: never sees a report that is half-refreshed and the report on disk is only
+#: ever replaced whole.
+REPORT = Path(
+    os.environ.get(
+        "DEXATLAS_REPORT_PATH",
+        REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md",
+    )
+)
 
 #: The script that owns the report's generated numbers.
 FIGURE_SCRIPT = REPO_ROOT / "scripts" / "refresh-report-figures.py"
@@ -395,6 +406,9 @@ def _figure_script() -> ModuleType:
     spec = spec_from_file_location("dexatlas_report_figures", FIGURE_SCRIPT)
     assert spec is not None and spec.loader is not None
     module = module_from_spec(spec)
+    # The module has to be in ``sys.modules`` before it runs: the script's
+    # dataclasses resolve their annotations through it.
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -576,3 +590,245 @@ def test_execution_report_does_not_claim_unbuilt_features() -> None:
 
     # It should say plainly that the review has not happened yet.
     assert "评审" in report or "review" in report.lower()
+
+
+# -- the refresh script's convergence ---------------------------------------
+
+#: How many self-checks the fake measurement reports.
+FAKE_CHECKS = 8
+
+
+def _fake_report() -> str:
+    """A report small enough to read, with the figures the refresh script owns.
+
+    The record it carries describes an earlier measurement, so the script has
+    something to keep when a new measurement turns out to be partial.
+    """
+    record = {
+        "schema": 2,
+        "code": {"api_endpoints": 15, "cli_commands": 10, "sample_apks": 5},
+        "coverage": {"files": {"cli/main.py": [100, 45]}, "missing": 45, "statements": 100},
+        "source_fingerprint": "sha256:stale",
+        "suite": {"passed": 1, "skipped": 0, "xfailed": 0},
+        "tests": {"fast": 1, "slow": 1, "total": 1},
+    }
+    return (
+        "# A report\n\n"
+        "Tests: <!--fig:tests.total-->1<!--/fig--> "
+        "(<!--fig:tests.fast-->1<!--/fig--> fast + <!--fig:tests.slow-->1<!--/fig--> slow)\n\n"
+        "Suite: <!--fig:suite.passed-->1<!--/fig--> passed, "
+        "<!--fig:suite.skipped-->0<!--/fig--> skipped, "
+        "<!--fig:suite.xfailed-->0<!--/fig--> xfailed\n\n"
+        "Coverage: <!--fig:coverage.pct-->55.0%<!--/fig--> "
+        "(<!--fig:coverage.covered-->55<!--/fig-->/<!--fig:coverage.total-->100<!--/fig-->)\n\n"
+        "<!--report-figures:" + json.dumps(record) + "-->\n"
+    )
+
+
+def _install_fake_measurements(
+    script: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    total: int = 354,
+    fast: int = 271,
+    slow: int = 83,
+    code_failures: tuple[str, ...] = (),
+    checks_failures: tuple[str, ...] = (),
+) -> None:
+    """Replace the script's slow measurements with instant ones.
+
+    The self-checks are modelled the way the real ones behave: they fail while
+    the report states a number the code does not have, and pass once it states
+    the current one. That is the whole difference the refresh has to keep
+    straight — a self-check that fails because the report is out of date is the
+    refresh's own problem; a test that fails because the code is broken is not.
+    """
+
+    def collected_tests(marker: str) -> tuple[int, int]:
+        return (fast, total) if marker == "not slow" else (slow, total)
+
+    def measure_code_tests() -> Any:
+        return script.Outcome(
+            counts={
+                "passed": total - FAKE_CHECKS - len(code_failures),
+                "failed": len(code_failures),
+                "skipped": 0,
+                "xfailed": 0,
+                "deselected": 0,
+            },
+            failures=code_failures,
+        )
+
+    def measure_report_checks(candidate: str, report_path: Path) -> Any:
+        if checks_failures:
+            return script.Outcome(
+                counts={
+                    "passed": FAKE_CHECKS - len(checks_failures),
+                    "failed": len(checks_failures),
+                    "skipped": 0,
+                    "xfailed": 0,
+                },
+                failures=checks_failures,
+            )
+        stated = dict(script.FIGURE.findall(candidate))
+        if stated.get("tests.total") != str(total):
+            return script.Outcome(
+                counts={"passed": FAKE_CHECKS - 1, "failed": 1, "skipped": 0, "xfailed": 0},
+                failures=(
+                    "tests/test_docs.py::test_execution_report_numbers_match_the_code"
+                    " - AssertionError: the report disagrees with the code",
+                ),
+            )
+        return script.Outcome(
+            counts={"passed": FAKE_CHECKS, "failed": 0, "skipped": 0, "xfailed": 0},
+            failures=(),
+        )
+
+    def read_coverage() -> Any:
+        # ``cli/main.py`` sits exactly on the disclosure threshold, so the fake
+        # measurement does not provoke a disclosure warning.
+        return script.Coverage(files={"cli/main.py": [100, 10]}, statements=100, missing=10)
+
+    monkeypatch.setattr(script, "collected_tests", collected_tests)
+    monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
+    monkeypatch.setattr(script, "measure_report_checks", measure_report_checks)
+    monkeypatch.setattr(script, "read_coverage", read_coverage)
+
+
+def test_the_refresh_script_corrects_a_wrong_figure_in_one_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One run of the refresh must leave a report the self-checks pass.
+
+    The report's numbers decide whether the self-checks pass, so a refresh that
+    measured once and wrote once recorded the *failing* state of the self-checks
+    — the state they are in precisely because the numbers are stale — and a
+    second run was needed to correct it. The refresh now measures the
+    self-checks against a report that is already consistent, so one run is
+    enough, and a second run must change nothing at all.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_fake_report(), encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 0
+
+    refreshed = report.read_text(encoding="utf-8")
+    assert "<!--fig:tests.total-->354<!--/fig-->" in refreshed
+    assert "<!--fig:suite.passed-->354<!--/fig-->" in refreshed
+    assert "<!--fig:coverage.pct-->90.0%<!--/fig-->" in refreshed
+
+    # Running it again must find nothing left to change.
+    assert script.main(["--report", str(report)]) == 0
+    assert report.read_text(encoding="utf-8") == refreshed
+
+
+def test_the_refresh_script_reports_a_real_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A test that fails for its own reasons must be reported, not swallowed.
+
+    The refresh has to tell two things apart: a self-check that fails because
+    the report is out of date, and a test that fails because the code is
+    broken. Reporting only a count would hide which one it was, so the failing
+    test is named.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report()
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(
+        script,
+        monkeypatch,
+        code_failures=("tests/test_api.py::test_list_projects - AssertionError: boom",),
+    )
+
+    assert script.main(["--report", str(report)]) == 1
+
+    out = capsys.readouterr().out
+    assert "tests/test_api.py::test_list_projects" in out
+    assert "does not pass its own tests" in out
+    # The report was left alone: its figures describe a run in which every test
+    # passed, and this run was not one.
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_the_refresh_script_reports_a_self_check_it_cannot_fix(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A self-check that still fails after the refresh needs a hand, not a rerun.
+
+    The refresh can put the numbers right; it cannot add a row to a table a
+    human wrote. When that happens the failure has to stay visible rather than
+    being folded into the numbers.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_fake_report(), encoding="utf-8")
+    _install_fake_measurements(
+        script,
+        monkeypatch,
+        checks_failures=(
+            "tests/test_docs.py::test_execution_report_discloses_every_weak_module"
+            " - AssertionError: a weak module is not disclosed",
+        ),
+    )
+
+    assert script.main(["--report", str(report)]) == 1
+
+    out = capsys.readouterr().out
+    assert "test_execution_report_discloses_every_weak_module" in out
+    assert "needs a hand" in out
+    # The numbers themselves are right, so they were written.
+    assert "<!--fig:tests.total-->354<!--/fig-->" in report.read_text(encoding="utf-8")
+
+
+def test_the_refresh_script_check_mode_names_the_figures_that_differ(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """--check must say which numbers are wrong, and must not write anything."""
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report()
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report), "--check"]) == 1
+
+    out = capsys.readouterr().out
+    assert "tests.total: 1 -> 354" in out
+    assert "does not match a fresh measurement" in out
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A partial measurement must not be written as if it were a complete one.
+
+    A skipped test produces no coverage, so a run with skips measures a
+    different tree. The refresh keeps the previous coverage and says what is
+    missing instead of quietly publishing a lower number.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_fake_report(), encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    def measure_code_tests() -> Any:
+        outcome = script.Outcome(
+            counts={"passed": 340, "failed": 0, "skipped": 6, "xfailed": 0, "deselected": 8},
+            failures=(),
+        )
+        return outcome
+
+    monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
+
+    assert script.main(["--report", str(report)]) == 0
+
+    out = capsys.readouterr().out
+    assert "partial" in out
+    # The coverage figures describe a complete measurement, so the previous
+    # ones stay rather than the partial measurement's.
+    assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")

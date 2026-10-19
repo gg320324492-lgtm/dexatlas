@@ -31,6 +31,31 @@ The record of the last measurement is written into the report as well, in a
 machine-readable comment. It carries the fingerprint of the source tree the
 coverage numbers describe, which is what lets the test suite notice that the
 figures have gone stale.
+
+Why the measurement is split in two
+-----------------------------------
+
+The report's numbers decide whether ``tests/test_docs.py`` passes, so measuring
+the suite and writing the numbers into the report is circular: the report the
+suite sees is the report the suite is about to change. A refresh that measured
+once and wrote once would record the *failing* state of the self-checks — the
+state they are in precisely because the numbers are stale — and a second run
+would be needed to correct it. An honest tool should not ask for two.
+
+So the refresh measures the two kinds of test apart:
+
+* The **code tests** — everything except the report's own self-checks. They fail
+  when the code is broken, and a failure here is a real one.
+* The **self-checks** — the tests that read the report's generated numbers. They
+  fail when the report is out of date, which is not the same thing at all.
+
+The code tests are measured first, and their failures are reported by name. The
+self-checks are then measured against a *candidate* report — one the script
+builds in memory and points the checks at, so the file on disk is never caught
+half-refreshed. Writing the numbers changes what the self-checks say, so the
+candidate is rebuilt and re-measured until the two stop moving. One run of the
+script is enough: the report it leaves behind is one the self-checks pass, and
+running the script again changes nothing.
 """
 
 from __future__ import annotations
@@ -43,6 +68,8 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
@@ -70,10 +97,63 @@ COLLECTED = re.compile(r"(\d+)(?:/(\d+))? tests collected")
 #: The outcome words pytest prints in its final summary line.
 OUTCOMES = ("passed", "failed", "skipped", "xfailed", "xpassed", "error", "deselected")
 
+#: The self-checks of the report share this name. They read the report's generated
+#: numbers, so they fail when the report is out of date. That is not the same as
+#: the code being broken, and the refresh must not confuse the two: the first is
+#: its own job to fix, the second belongs to the reader.
+REPORT_CHECK = "test_execution_report"
 
-def run(*args: str) -> subprocess.CompletedProcess[str]:
+#: How many times the refresh may re-measure the self-checks before it gives up.
+MAX_ROUNDS = 3
+
+#: The environment variable the self-checks read the report from. The refresh
+#: points it at a candidate copy, so a self-check never sees a half-written
+#: report and the report on disk is only ever replaced whole.
+REPORT_PATH_ENV = "DEXATLAS_REPORT_PATH"
+
+#: pytest's short summary: "FAILED tests/test_x.py::test_y - AssertionError: ...".
+FAILED_LINE = re.compile(r"^(?:FAILED|ERROR) (\S+)(?: - (.*))?$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """What one run of a set of tests measured."""
+
+    counts: dict[str, int]
+    failures: tuple[str, ...] = ()
+
+    def describe(self) -> str:
+        parts = [
+            f"{name}={self.counts[name]}"
+            for name in ("passed", "failed", "skipped", "xfailed")
+            if self.counts.get(name)
+        ]
+        return ", ".join(parts) or "nothing ran"
+
+
+@dataclass(frozen=True)
+class Coverage:
+    """What a coverage run measured: per module, and in total."""
+
+    files: dict[str, list[int]]
+    statements: int
+    missing: int
+
+
+@dataclass(frozen=True)
+class Refresh:
+    """The result of bringing a report and its self-checks into agreement."""
+
+    text: str
+    record: dict[str, Any]
+    checks: Outcome
+    converged: bool
+    rounds: int
+
+
+def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
     """Run a command in the repository and capture what it says."""
-    return subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True, check=False)
+    return subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
 
 
 def collected_tests(marker: str) -> tuple[int, int]:
@@ -109,9 +189,27 @@ def outcome_counts(output: str) -> dict[str, int]:
     return counts
 
 
-def measure_suite() -> dict[str, Any]:
-    """Run the whole suite with coverage and report what it measured."""
-    result = run(sys.executable, "-m", "pytest", "--cov=dexatlas", "--cov-report=term")
+def failed_tests(output: str) -> tuple[str, ...]:
+    """The tests pytest reported as failed or errored, by name.
+
+    A count says how many; a name says which. The self-checks are measured
+    apart, so a failure listed here is a failure of the code, and the reader has
+    to be able to see it.
+    """
+    failures: list[str] = []
+    for node, message in FAILED_LINE.findall(output):
+        summary = message.splitlines()[0].strip() if message else ""
+        failures.append(f"{node} - {summary}" if summary else node)
+    return tuple(dict.fromkeys(failures))
+
+
+def read_outcome(output: str) -> Outcome:
+    """Read a pytest run's summary: the counts and the names that failed."""
+    return Outcome(counts=outcome_counts(output), failures=failed_tests(output))
+
+
+def read_coverage() -> Coverage:
+    """Read the coverage the runs produced."""
     data = json.loads(run(sys.executable, "-m", "coverage", "json", "-o", "-").stdout)
 
     files: dict[str, list[int]] = {}
@@ -126,12 +224,68 @@ def measure_suite() -> dict[str, Any]:
         ]
 
     totals = data["totals"]
-    return {
-        "outcome": outcome_counts(result.stdout),
-        "files": files,
-        "statements": totals["num_statements"],
-        "missing": totals["missing_lines"],
-    }
+    return Coverage(
+        files=files,
+        statements=totals["num_statements"],
+        missing=totals["missing_lines"],
+    )
+
+
+def measure_code_tests() -> Outcome:
+    """Run the whole suite, except the report's own self-checks, with coverage.
+
+    The self-checks are left out on purpose. They read the report's generated
+    numbers, so a report that is out of date makes them fail, and counting that
+    failure would describe a tree as broken when it is merely out of date. They
+    are measured on their own afterwards, against a report that is already
+    consistent, and the two results are added up.
+    """
+    result = run(
+        sys.executable,
+        "-m",
+        "pytest",
+        "--cov=dexatlas",
+        "--cov-report=term",
+        "-k",
+        f"not {REPORT_CHECK}",
+    )
+    return read_outcome(result.stdout)
+
+
+def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
+    """Measure the report's self-checks against a candidate report.
+
+    The candidate is written to a temporary file and the checks are pointed at
+    it, so a check never sees the report half-refreshed and the report on disk
+    is only ever replaced whole. The coverage of this run is appended to the
+    coverage of the code tests, so the figures describe the whole suite.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / report_path.name
+        path.write_text(candidate, encoding="utf-8")
+        env = dict(os.environ)
+        env[REPORT_PATH_ENV] = str(path)
+        result = run(
+            sys.executable,
+            "-m",
+            "pytest",
+            "--cov=dexatlas",
+            "--cov-append",
+            "-k",
+            REPORT_CHECK,
+            env=env,
+        )
+    return read_outcome(result.stdout)
+
+
+def add_counts(first: dict[str, int], second: dict[str, int]) -> dict[str, int]:
+    """Add two runs' outcomes together.
+
+    ``deselected`` is left out: the two runs select each other's complement, so
+    their deselected counts say nothing once added.
+    """
+    names = [name for name in OUTCOMES if name != "deselected"]
+    return {name: first.get(name, 0) + second.get(name, 0) for name in names}
 
 
 def source_fingerprint() -> str:
@@ -161,22 +315,27 @@ def code_facts() -> dict[str, int]:
     }
 
 
-def build_record(measurement: dict[str, Any], fast: int, slow: int, total: int) -> dict[str, Any]:
+def build_record(
+    coverage: Coverage,
+    suite: dict[str, int],
+    fast: int,
+    slow: int,
+    total: int,
+) -> dict[str, Any]:
     """The record of one measurement: everything the report can state."""
-    outcome = measurement["outcome"]
     return {
-        "schema": 1,
+        "schema": 2,
         "code": code_facts(),
         "coverage": {
-            "files": measurement["files"],
-            "missing": measurement["missing"],
-            "statements": measurement["statements"],
+            "files": coverage.files,
+            "missing": coverage.missing,
+            "statements": coverage.statements,
         },
         "source_fingerprint": source_fingerprint(),
         "suite": {
-            "passed": outcome["passed"],
-            "skipped": outcome["skipped"],
-            "xfailed": outcome["xfailed"],
+            "passed": suite.get("passed", 0),
+            "skipped": suite.get("skipped", 0),
+            "xfailed": suite.get("xfailed", 0),
         },
         "tests": {"fast": fast, "slow": slow, "total": total},
     }
@@ -239,6 +398,28 @@ def apply_record(text: str, record: dict[str, Any]) -> str:
     return text.rstrip("\n") + "\n\n" + block + "\n"
 
 
+def render_report(text: str, record: dict[str, Any]) -> tuple[str, list[str]]:
+    """Write a record into the report: the figures, and the record itself."""
+    updated, unknown = apply_figures(text, render_figures(record))
+    return apply_record(updated, record), unknown
+
+
+def render_or_fail(text: str, record: dict[str, Any]) -> str:
+    """Write a record into the report, or refuse to guess at a figure it cannot fill.
+
+    A figure the script does not know how to fill in is a figure nobody can
+    check, and guessing at one would put a number in the report that nothing
+    stands behind. Better to stop and say which one it is.
+    """
+    updated, unknown = render_report(text, record)
+    if unknown:
+        raise SystemExit(
+            "the report refers to figures this script does not know how to fill in: "
+            + ", ".join(sorted(set(unknown)))
+        )
+    return updated
+
+
 def render_record(record: dict[str, Any]) -> str:
     """The record as JSON, with one line per module.
 
@@ -292,6 +473,90 @@ def missing_prerequisites() -> list[str]:
     return missing
 
 
+def converge(
+    text: str,
+    report_path: Path,
+    code: Outcome,
+    coverage: Coverage,
+    fast: int,
+    slow: int,
+    total: int,
+) -> Refresh:
+    """Bring the report and its self-checks into agreement, within one run.
+
+    Writing the numbers changes what the self-checks say, so a refresh that
+    measured once and wrote once could leave the two disagreeing: the numbers it
+    wrote would describe a run in which the self-checks failed, and the
+    self-checks fail because the numbers are stale. So the self-checks are
+    measured against a candidate report, and the candidate is rebuilt until the
+    two stop moving.
+
+    The loop ends when a candidate is measured and nothing about it changes the
+    measurement — at that point the report the refresh leaves behind is one the
+    self-checks pass.
+    """
+    suite = dict(code.counts)
+    record = build_record(coverage, suite, fast, slow, total)
+    candidate = render_or_fail(text, record)
+
+    checks = Outcome(counts={})
+    for round_number in range(1, MAX_ROUNDS + 1):
+        checks = measure_report_checks(candidate, report_path)
+        new_coverage = read_coverage()
+        new_suite = add_counts(code.counts, checks.counts)
+        if new_suite == suite and new_coverage == coverage:
+            return Refresh(
+                text=candidate,
+                record=record,
+                checks=checks,
+                converged=True,
+                rounds=round_number,
+            )
+        suite, coverage = new_suite, new_coverage
+        record = build_record(coverage, suite, fast, slow, total)
+        candidate = render_or_fail(text, record)
+
+    return Refresh(
+        text=candidate,
+        record=record,
+        checks=checks,
+        converged=False,
+        rounds=MAX_ROUNDS,
+    )
+
+
+def figure_changes(text: str, record: dict[str, Any]) -> list[tuple[str, str, str]]:
+    """The figures the report states that a fresh measurement would change.
+
+    One line per figure, not per occurrence: the same figure is stated in
+    several places, and the reader wants to know which ones moved.
+    """
+    values = render_figures(record)
+    changes: list[tuple[str, str, str]] = []
+    seen: set[str] = set()
+    for key, old in FIGURE.findall(text):
+        new = values.get(key)
+        if new is not None and new != old and key not in seen:
+            seen.add(key)
+            changes.append((key, old, new))
+    return changes
+
+
+def report_failures(headline: str, failures: tuple[str, ...]) -> None:
+    """Name the tests that failed, so the reader can go and look at them."""
+    print(f"\n{headline}")
+    for failure in failures:
+        print(f"  {failure}")
+
+
+def display_path(path: Path) -> str:
+    """The report's path, relative to the repository when it is inside it."""
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Refresh the generated figures in the Phase 1 execution report."
@@ -316,46 +581,64 @@ def main(argv: list[str] | None = None) -> int:
     print("Collecting the test suite...")
     fast, total = collected_tests("not slow")
     slow, _ = collected_tests("slow")
+    print(f"  {total} tests: {fast} fast, {slow} integration")
 
     print("Running the suite with coverage (this takes a couple of minutes)...")
-    measurement = measure_suite()
-    outcome = measurement["outcome"]
+    code = measure_code_tests()
+    coverage = read_coverage()
+    print(f"  {code.describe()} (the report's own self-checks are measured separately)")
+
+    if code.failures:
+        report_failures("The tree does not pass its own tests:", code.failures)
+        print(
+            "\nThe report was not touched. Its figures describe a run in which every "
+            "test passed, and this run was not one. Fix the failures and run this again."
+        )
+        return 1
 
     # A measurement is complete when it ran the same set of tests the recorded one
     # ran. The canonical basis skips nothing; a tree that has grown a test which
-    # always skips is still a tree whose basis has not changed.
+    # always skips is still a tree whose basis has not changed. The self-checks
+    # never skip, so the code tests alone decide this.
     recorded_skips = previous.get("suite", {}).get("skipped")
-    complete = (
-        outcome["skipped"] == recorded_skips
-        if recorded_skips is not None
-        else outcome["skipped"] == 0
-    )
+    skipped = code.counts.get("skipped", 0)
+    complete = skipped == recorded_skips if recorded_skips is not None else skipped == 0
 
-    record = build_record(measurement, fast, slow, total)
-    if not complete:
+    if complete:
+        print("Measuring the report's self-checks against a candidate report...")
+        refresh = converge(text, report_path, code, coverage, fast, slow, total)
+        record = refresh.record
+        updated = refresh.text
+        checks = refresh.checks
+        if refresh.converged:
+            print(
+                f"  the self-checks agree with the refreshed report "
+                f"({checks.describe()}) after {refresh.rounds} round(s)"
+            )
+        else:
+            print(
+                f"  the self-checks and the report did not settle after "
+                f"{refresh.rounds} rounds ({checks.describe()})"
+            )
+    else:
         if not previous.get("coverage") or not previous.get("suite"):
             raise SystemExit(
                 "this machine could not take a complete measurement and the report has no "
                 "recorded measurement to keep.\n"
                 "The report's coverage figures describe a run in which every test "
                 "executed; this one skipped "
-                f"{outcome['skipped']} of them.\n"
+                f"{skipped} of them.\n"
                 "Install what the report lists as its basis, then run this again:\n  "
                 + "\n  ".join(missing_prerequisites() or ["(nothing obvious is missing)"])
             )
+        # The coverage and the pass/skip split of a partial run describe a
+        # different tree, so the previous measurement of them is kept.
+        record = build_record(coverage, code.counts, fast, slow, total)
         record["coverage"] = previous["coverage"]
         record["suite"] = previous["suite"]
         record["source_fingerprint"] = previous["source_fingerprint"]
-
-    values = render_figures(record)
-    updated, unknown = apply_figures(text, values)
-    updated = apply_record(updated, record)
-
-    if unknown:
-        raise SystemExit(
-            "the report refers to figures this script does not know how to fill in: "
-            + ", ".join(sorted(set(unknown)))
-        )
+        updated = render_or_fail(text, record)
+        checks = Outcome(counts={})
 
     hidden = undisclosed_modules(record, updated)
     if hidden:
@@ -364,15 +647,10 @@ def main(argv: list[str] | None = None) -> int:
             f"{WEAK_MODULE_PERCENT}% but the report does not list them: " + ", ".join(hidden)
         )
 
-    # One line per figure, not per occurrence: the same figure is stated in
-    # several places, and the reader wants to know which ones moved.
-    changes: list[tuple[str, str, str]] = []
-    seen: set[str] = set()
-    for key, old in FIGURE.findall(text):
-        new = values.get(key)
-        if new is not None and new != old and key not in seen:
-            seen.add(key)
-            changes.append((key, old, new))
+    changes = figure_changes(text, record)
+
+    if not complete:
+        warn_partial(code)
 
     if args.check:
         if updated == text:
@@ -381,41 +659,41 @@ def main(argv: list[str] | None = None) -> int:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
             print("The report does not match a fresh measurement.")
-        warn(outcome, complete)
-        return 0 if updated == text else 1
-
-    report_path.write_bytes(updated.encode("utf-8"))
-    if changes:
-        for key, old, new in changes:
-            print(f"{key}: {old} -> {new}")
-    if updated == text:
-        print("The report was already up to date.")
+        matched = updated == text
     else:
-        print(f"Updated {report_path.relative_to(REPO_ROOT)}.")
-    warn(outcome, complete)
-    return 0
+        report_path.write_bytes(updated.encode("utf-8"))
+        if changes:
+            for key, old, new in changes:
+                print(f"{key}: {old} -> {new}")
+        if updated == text:
+            print("The report was already up to date.")
+        else:
+            print(f"Updated {display_path(report_path)}.")
+        matched = True
+
+    if checks.failures:
+        report_failures(
+            "The report's self-checks still fail against the refreshed report, so this "
+            "one needs a hand rather than another refresh:",
+            checks.failures,
+        )
+        return 1
+    return 0 if matched else 1
 
 
-def warn(outcome: dict[str, int], complete: bool) -> None:
+def warn_partial(code: Outcome) -> None:
     """Say plainly what this run could and could not measure."""
-    if not complete:
-        print(
-            "\nThis run was partial: "
-            + ", ".join(
-                f"{name}={outcome[name]}"
-                for name in ("passed", "skipped", "xfailed")
-                if outcome[name]
-            )
-            + ".\nThe coverage figures were left as they were, because they describe a "
-            "complete measurement. A complete one needs:\n  "
-            + "\n  ".join(missing_prerequisites() or ["(nothing obvious is missing)"])
+    print(
+        "\nThis run was partial: "
+        + ", ".join(
+            f"{name}={code.counts.get(name, 0)}"
+            for name in ("passed", "skipped", "xfailed")
+            if code.counts.get(name)
         )
-    if outcome["failed"] or outcome["error"]:
-        print(
-            f"\nThe suite itself did not pass ({outcome['failed']} failed, "
-            f"{outcome['error']} errors). The numbers above describe a tree that does "
-            "not pass its own tests; re-run this once it is green."
-        )
+        + ".\nThe coverage figures were left as they were, because they describe a "
+        "complete measurement. A complete one needs:\n  "
+        + "\n  ".join(missing_prerequisites() or ["(nothing obvious is missing)"])
+    )
 
 
 if __name__ == "__main__":
