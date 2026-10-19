@@ -29,6 +29,8 @@ from dexatlas.core.models import (
     ProjectStatus,
     StringConstant,
     ToolError,
+    canonical_descriptor,
+    canonical_method_id,
 )
 
 SCHEMA_VERSION = 1
@@ -125,7 +127,12 @@ CREATE TABLE IF NOT EXISTS evidence (
 CREATE INDEX IF NOT EXISTS idx_classes_project ON classes(project_id);
 CREATE INDEX IF NOT EXISTS idx_methods_class   ON methods(project_id, class_name);
 CREATE INDEX IF NOT EXISTS idx_refs_caller     ON xrefs(project_id, caller);
-CREATE INDEX IF NOT EXISTS idx_refs_callee     ON xrefs(project_id, callee);
+-- The lookup compares the *canonical* form of a callee, so the index is on that
+-- form. A workspace indexed before descriptors were canonicalised holds the
+-- spaced spelling, and it still has to be found — without this index the
+-- comparison would be a scan of every cross-reference in the project.
+CREATE INDEX IF NOT EXISTS idx_refs_callee_canonical
+    ON xrefs(project_id, REPLACE(callee, ' ', ''));
 CREATE INDEX IF NOT EXISTS idx_strings_project ON strings(project_id);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
@@ -301,7 +308,13 @@ class Store:
         references: Iterable[MethodReference],
         strings: Iterable[StringConstant],
     ) -> None:
-        """Replace a project's symbol tables. Callers re-analyse, so this is idempotent."""
+        """Replace a project's symbol tables. Callers re-analyse, so this is idempotent.
+
+        Descriptors and method ids are stored in their canonical spelling. The models
+        already normalise them, but the database is the durable contract: an id
+        written here has to be the id the lookup below matches, whatever the caller
+        handed in.
+        """
         with self.transaction() as connection:
             for table in _SYMBOL_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
@@ -330,7 +343,7 @@ class Store:
                         project_id,
                         m.class_name,
                         m.name,
-                        m.descriptor,
+                        canonical_descriptor(m.descriptor),
                         json.dumps(m.access_flags),
                         m.signature,
                         int(m.decompiled),
@@ -346,7 +359,7 @@ class Store:
                         project_id,
                         f.class_name,
                         f.name,
-                        f.descriptor,
+                        canonical_descriptor(f.descriptor),
                         json.dumps(f.access_flags),
                         f.constant_value,
                         _dump_provenance(f),
@@ -356,7 +369,16 @@ class Store:
             )
             connection.executemany(
                 "INSERT INTO xrefs VALUES (?,?,?,?,?)",
-                [(project_id, r.caller, r.callee, r.kind, _dump_provenance(r)) for r in references],
+                [
+                    (
+                        project_id,
+                        canonical_method_id(r.caller),
+                        canonical_method_id(r.callee),
+                        r.kind,
+                        _dump_provenance(r),
+                    )
+                    for r in references
+                ],
             )
             connection.executemany(
                 "INSERT INTO strings VALUES (?,?,?,?,?)",
@@ -401,14 +423,22 @@ class Store:
         return [_row_to_method(row) for row in rows]
 
     def get_method_references(self, project_id: str, method_id: str) -> list[MethodReference]:
-        """Callers of ``method_id``, formatted ``com.foo.Bar.baz(Ljava/lang/String;)V``."""
-        class_name, name, descriptor = parse_method_id(method_id)
+        """Callers of ``method_id``, formatted ``com.foo.Bar.baz(Ljava/lang/String;)V``.
+
+        The comparison is on the canonical form of both sides: the id is
+        canonicalised here, and the stored callee is canonicalised by the index. So a
+        workspace indexed by an earlier version of DexAtlas — which stored the
+        descriptor with Androguard's human-readable spacing — resolves just like a
+        current one.
+        """
+        class_name, _, _ = parse_method_id(method_id)
         if not class_name:
             return []
+        canonical = canonical_method_id(method_id)
         with self.transaction() as connection:
             rows = connection.execute(
-                "SELECT * FROM xrefs WHERE project_id = ? AND callee = ?",
-                (project_id, f"{class_name}.{name}{descriptor}"),
+                "SELECT * FROM xrefs WHERE project_id = ? AND REPLACE(callee, ' ', '') = ?",
+                (project_id, canonical),
             ).fetchall()
         return [_row_to_reference(row) for row in rows]
 
@@ -432,7 +462,11 @@ class Store:
                 (phrase, project_id, limit),
             ).fetchall()
         return [
-            {"kind": row["kind"], "name": row["qualified_name"], "excerpt": row["excerpt"]}
+            {
+                "kind": row["kind"],
+                "name": _canonical_search_name(row["kind"], row["qualified_name"]),
+                "excerpt": row["excerpt"],
+            }
             for row in rows
         ]
 
@@ -473,6 +507,19 @@ class Store:
 
 def _dump_provenance(item: Any) -> str:
     return json.dumps([p.model_dump(mode="json") for p in item.provenance])
+
+
+def _canonical_search_name(kind: str, name: str) -> str:
+    """Canonicalise a search hit's name.
+
+    The indexed name of a method is its id, so it has to be spelled the same way as
+    the one the method table prints — otherwise a search result and the method it
+    names would look like two different methods. A workspace indexed before
+    descriptors were canonicalised holds the spaced spelling here.
+    """
+    if kind == "method":
+        return canonical_method_id(name)
+    return name
 
 
 def _row_to_project(row: sqlite3.Row) -> Project:

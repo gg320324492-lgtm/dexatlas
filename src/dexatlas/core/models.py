@@ -17,7 +17,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ---------------------------------------------------------------------------
 # Errors and provenance
@@ -88,6 +88,55 @@ class Sourced(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Canonical identifiers
+# ---------------------------------------------------------------------------
+
+
+def canonical_descriptor(descriptor: str) -> str:
+    """Return the canonical spelling of a JVM descriptor.
+
+    A descriptor packs its argument types together::
+
+        (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+
+    Androguard renders the very same descriptor for human reading, with a space after
+    every argument separator::
+
+        (Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;
+
+    Both spell one method, so DexAtlas keeps only the canonical form. Otherwise a
+    method id copied out of the symbol table never equals the id in the
+    cross-reference table, and the lookup silently returns nothing.
+    """
+    open_paren = descriptor.find("(")
+    if open_paren == -1:
+        return descriptor.strip()
+    # Type descriptors contain no parentheses, so the first ")" after "(" closes the
+    # argument list. Everything after it is the return type.
+    close_paren = descriptor.find(")", open_paren)
+    if close_paren == -1:
+        return descriptor.strip()
+    arguments = "".join(descriptor[open_paren + 1 : close_paren].split())
+    returns = "".join(descriptor[close_paren + 1 :].split())
+    return f"({arguments}){returns}"
+
+
+def canonical_method_id(method_id: str) -> str:
+    """Return the canonical spelling of a qualified method id.
+
+    ``com.foo.Bar.baz(Ljava/lang/String; Ljava/lang/String;)V`` becomes
+    ``com.foo.Bar.baz(Ljava/lang/String;Ljava/lang/String;)V``. The class and method
+    names keep their own spelling; only the whitespace is removed, so an id that was
+    wrapped across two lines of a terminal still resolves.
+    """
+    open_paren = method_id.find("(")
+    if open_paren == -1:
+        return "".join(method_id.split())
+    prefix = "".join(method_id[:open_paren].split())
+    return f"{prefix}{canonical_descriptor(method_id[open_paren:])}"
+
+
+# ---------------------------------------------------------------------------
 # Symbols
 # ---------------------------------------------------------------------------
 
@@ -127,12 +176,21 @@ class MethodRef(Sourced):
     class_name: str
     name: str
     descriptor: str
-    """JVM descriptor, e.g. ``(Ljava/lang/String;)V``. Stable across backends."""
+    """JVM descriptor, e.g. ``(Ljava/lang/String;)V``. Stable across backends.
+
+    Always canonical: argument types are packed together, with no separator
+    whitespace, so that the id is the same everywhere it appears.
+    """
 
     access_flags: list[str] = Field(default_factory=list)
     signature: str | None = None
     decompiled: bool = False
     """False when the backend has the symbol but could not produce a body."""
+
+    @field_validator("descriptor")
+    @classmethod
+    def _canonicalise_descriptor(cls, value: str) -> str:
+        return canonical_descriptor(value)
 
     @property
     def qualified_name(self) -> str:
@@ -148,6 +206,11 @@ class FieldRef(Sourced):
     access_flags: list[str] = Field(default_factory=list)
     constant_value: str | None = None
 
+    @field_validator("descriptor")
+    @classmethod
+    def _canonicalise_descriptor(cls, value: str) -> str:
+        return canonical_descriptor(value)
+
     @property
     def qualified_name(self) -> str:
         return f"{self.class_name}.{self.name}:{self.descriptor}"
@@ -160,6 +223,11 @@ class MethodReference(Sourced):
     callee: str
     kind: str = "invoke"
     """``invoke``, ``virtual``, ``direct``, ``interface`` or ``dynamic``."""
+
+    @field_validator("caller", "callee")
+    @classmethod
+    def _canonicalise_ids(cls, value: str) -> str:
+        return canonical_method_id(value)
 
 
 class StringConstant(Sourced):

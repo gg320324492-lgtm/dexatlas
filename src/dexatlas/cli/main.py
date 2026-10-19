@@ -19,6 +19,7 @@ from dexatlas import __version__
 from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
+from dexatlas.core.models import canonical_method_id
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -296,6 +297,9 @@ def xrefs(
 ) -> None:
     """List the callers of a method."""
     analyzer = Analyzer()
+    # Canonicalise before the lookup, so the id echoed back on failure is the one
+    # that was actually searched for — and can be pasted again.
+    method_id = canonical_method_id(method_id)
     rows = analyzer.store.get_method_references(project_id, method_id)
     if not rows:
         err_console.print(f"[yellow]No callers of {method_id}.[/yellow]")

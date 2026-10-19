@@ -7,7 +7,9 @@ misses all of it.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
+import re
 import shutil
 import sys
 import zipfile
@@ -19,6 +21,9 @@ from typer.testing import CliRunner
 from dexatlas.cli.main import app
 
 runner = CliRunner()
+
+#: A method id as the CLI prints it: qualified name, then the descriptor.
+_METHOD_ID = re.compile(r"[A-Za-z0-9_.$<>]+\([^)]*\)[^\s]*")
 
 
 @pytest.fixture
@@ -211,6 +216,16 @@ def jadx_available(workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPa
     stub.write_text("", encoding="utf-8")
     monkeypatch.setenv("DEXATLAS_JADX_PATH", str(stub))
     get_settings.cache_clear()
+
+
+def _printed_method_id(output: str, marker: str) -> str:
+    """The method id the CLI printed on the line that names ``marker``."""
+    for line in output.splitlines():
+        if marker in line:
+            match = _METHOD_ID.search(line)
+            assert match, f"no method id on the line naming {marker}: {line!r}"
+            return match.group(0)
+    raise AssertionError(f"no line naming {marker} in:\n{output}")
 
 
 # -- meta -------------------------------------------------------------------
@@ -621,3 +636,40 @@ def test_the_module_entry_point_runs_a_command(monkeypatch: pytest.MonkeyPatch) 
         runpy.run_module("dexatlas.cli.main", run_name="__main__")
 
     assert excinfo.value.code == 0
+
+
+@pytest.mark.slow
+def test_an_id_printed_by_methods_resolves_in_xrefs(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The path a user actually takes: copy the id out of `dexatlas methods`, look it
+    up in `dexatlas xrefs`.
+
+    The id is taken from what the command printed, not written out by hand. The
+    method table and the cross-reference table once spelled the same method
+    differently — the method table spaced the argument descriptors, the
+    cross-reference table did not — so the id a user could read was the id that
+    could not be looked up.
+    """
+    from dexatlas.tools.androguard.adapter import androguard_available
+
+    demo = Path(__file__).parent.parent / "examples" / "demo-app" / "demo.apk"
+    if not demo.is_file():
+        pytest.skip("demo APK missing")
+    if not androguard_available():
+        pytest.skip("androguard not installed")
+    # Rich sizes its table to the terminal, and a narrow one truncates the id with
+    # an ellipsis — there would be nothing left to copy.
+    monkeypatch.setenv("COLUMNS", "200")
+
+    assert _run("analyze", str(demo)).exit_code == 0
+    project_id = f"apk_{hashlib.sha256(demo.read_bytes()).hexdigest()[:16]}"
+
+    methods_out = _run("methods", project_id)
+    assert methods_out.exit_code == 0
+    sign_id = _printed_method_id(methods_out.stdout, "Crypto.sign")
+    assert " " not in sign_id, f"the printed id carries whitespace: {sign_id!r}"
+
+    refs = _run("xrefs", project_id, sign_id)
+    assert refs.exit_code == 0, f"no callers for {sign_id!r}: {refs.output}"
+    assert "MainActivity.onCreate" in refs.stdout
