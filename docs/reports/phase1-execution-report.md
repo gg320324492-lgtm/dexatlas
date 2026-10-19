@@ -53,8 +53,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->278<!--/fig-->（<!--fig:tests.fast-->199<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->89.2%<!--/fig-->**（<!--fig:coverage.covered-->1525<!--/fig-->/<!--fig:coverage.total-->1709<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->324<!--/fig-->（<!--fig:tests.fast-->245<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.4%<!--/fig-->**（<!--fig:coverage.covered-->1584<!--/fig-->/<!--fig:coverage.total-->1714<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -68,7 +68,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
-| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->70.1%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->47<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->157<!--/fig--> |
+| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->157<!--/fig--> |
 | `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->77.8%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->46<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->207<!--/fig--> |
 | `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
 | `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->85.7%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->21<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
@@ -77,7 +77,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
-现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->93.6%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->10<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->157<!--/fig--> 未覆盖）**，已经离开这份清单。
+现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->94.9%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->8<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->157<!--/fig--> 未覆盖）**，已经离开这份清单。
 
 **未覆盖的是什么：** 主要是错误分支（后端超时/非零退出后的恢复路径）和一些
 CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块都在 90% 以上。
@@ -93,7 +93,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->89.2%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.4%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -101,9 +101,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->199<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->245<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->79<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->278<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->324<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -181,27 +181,32 @@ def test_rejects_entity_declaration():
 **现象：** 索引填充正常、报告显示 6033 条交叉引用、看起来一切健康，
 但**每次 `xrefs` 查询都返回空**。
 
-**根因：** Androguard 为了人类可读，把调用目标渲染成
+**根因：** Androguard 4.1.4 为了人类可读，把**方法描述符**渲染成带空格的形式：
 
 ```
-Lcom/example/demo/Crypto;->sign(Ljava/lang/String; Ljava/lang/String;)
+(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;
 ```
 
-每个分号后有空格。而方法表里 `get_descriptor()` 返回的是规范形式
+分号后有一个空格。调用目标和 `get_descriptor()` **都**是这种形式——我当初写下的
+「方法表是规范形式」是**记反了**，后来实测确认了两边都带空格。
 
-```
-Lcom/example/demo/Crypto;->sign(Ljava/lang/String;Ljava/lang/String;)
-```
-
-我直接把前者当作 callee id 存储，**两者永远不可能相等**。
+于是我把带空格的调用目标直接当作 callee id 存储，而查询时用另一种拼写去找，
+**两者永远不可能相等**。
 
 **为什么严重：** 这正是本项目「无法点回原处的结论不算结论」原则要防的失败模式，
 而它伪装成了成功。
 
-**修复：** 规范化解析（`_parse_dalvik_reference`）。
+**当时的修复：** 规范化调用目标（`_parse_dalvik_reference`）。这让 `xrefs` 一侧
+变成了规范形式，但**方法表那一侧没动**——所以断裂没有消失，只是从
+「所有查询都返回空」变成了「多参数方法的查询返回空」。
+
+**补上的修复（v0.1.3）：** 见 3.11 节。现在方法 id 在模型层、存储层、查询层
+三处都只有一个拼写。
 
 **新增测试：** 断言「任何 call target 不得含空白」+「必须有 target 能在符号索引中解析到」
-+ 端到端通过公开 API 查一次调用者。
++ 端到端通过公开 API 查一次调用者。**这三个测试都用了手写的规范 id**，
+所以它们在「方法表那一侧没规范化」的情况下照样会通过——这正是这个缺陷
+能活到今天的原因，详见 3.11 节。
 
 ### 3.2 中等：CLI 普通命令直接崩溃 🟡
 
@@ -421,6 +426,68 @@ Phase 1 计划书 1.4 节给了一份 8 项验收清单。回头逐条核对，�
 而清单和它声称依据的事实之间，没有任何机制保证一致。
 所以 FIX-002 的重点不是"再补几个测试"，而是**让清单本身变成可验证的**。
 
+### 3.11 严重：方法 id 在两张表里拼写不同 🔴（v0.1.3 修复）
+
+这个缺陷是**分析覆盖度文档**的编写过程中发现的——让另一个 agent 去读代码并
+实测每个后端实际产出什么，结果它发现了一个我在 v0.1.0 就宣称修好的问题还剩一半。
+
+**现象：** 从 `dexatlas methods` 复制一个方法 id，去 `dexatlas xrefs` 查，**查不到**。
+
+```
+$ dexatlas methods apk_xxx
+com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;
+
+$ dexatlas xrefs apk_xxx "com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+No callers of com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)...
+```
+
+**根因：** 两个表用同一套 id，但拼写不同：
+
+```
+methods.descriptor:  (Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;   ← 带空格
+xrefs.callee:        (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;     ← 无空格
+```
+
+`methods.descriptor` 直接取 Androguard 的 `get_descriptor()`，而 `xrefs.callee`
+经过 `_parse_dalvik_reference` 规范化。3.1 节那次修复只动了 `xrefs` 一侧。
+
+**单参数方法不受影响**——没有分号，就没有空格。所以这个缺陷在 demo 上
+只影响多参数方法，看起来像是「部分方法查不到」，很容易被当成数据问题。
+
+**为什么这次测试没抓到：** 3.1 节加的三个测试用的都是**手写的规范 id**：
+
+```python
+    method_id = (
+        "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+    )
+```
+
+它们测的是「一个我手写的、格式正确的 id 能查到」，不是「从 `dexatlas methods`
+拿到的 id 能查到」。**真实使用路径被整个绕过了。**
+
+这和 v0.1.1 修的 Smali 回退是同一类问题的第三个变体：
+
+| 版本 | 缺陷 | 隐藏方式 |
+|---|---|---|
+| v0.1.0 | xrefs 存的 id 带空格，查询用规范形式 | 所有查询返回空 |
+| v0.1.0 | methods 存的 id 带空格 | 断裂变成「多参数方法返回空」 |
+| v0.1.1 | Smali 路径定位错误 | 报告「No source」，像 APK 没代码 |
+
+**共同的根源都是「测试用理想输入，而不是真实输出」。** 前两次是靠新的端到端
+测试发现的，这一次是靠另一个 agent 去读真实数据发现的——说明单靠写断言
+覆盖不到这类问题，得有人去**跑一遍真实流程**。
+
+**修复：** 方法 id 现在在三层各有一个单一来源：
+
+- **模型层**：`MethodRef` / `FieldRef` / `MethodReference` 在构造时规范化，
+  `qualified_name` 天然是规范形式，`dexatlas methods` 印出来的就是能用的 id
+- **存储层**：写入时规范化，数据库从此自洽
+- **查询层**：用户输入先规范化再比较，库里的值用 `REPLACE(callee,' ','')` 规范化后
+  比较——**既有的旧工作区不需要重建也能查**，而且走的是表达式索引不是全表扫
+
+**新增测试：** 26 个方法 id 的测试，核心是那条端到端的：
+从 `list_methods` 拿到的 `qualified_name` 拿去查 `get_method_references`，必须能查到调用方。
+
 ---
 
 ## 4. 需要你重点审核的判断
@@ -519,10 +586,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->278<!--/fig--> 个：<!--fig:tests.fast-->199<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->324<!--/fig--> 个：<!--fig:tests.fast-->245<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->89.2%<!--/fig-->（<!--fig:coverage.covered-->1525<!--/fig-->/<!--fig:coverage.total-->1709<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->277<!--/fig--> passed + <!--fig:suite.xfailed-->1<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.4%<!--/fig-->（<!--fig:coverage.covered-->1584<!--/fig-->/<!--fig:coverage.total-->1714<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->324<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -640,15 +707,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "api/app.py": [147, 21],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [157, 47],
+      "cli/main.py": [157, 0],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
       "core/evidence.py": [36, 0],
       "core/ingest.py": [36, 2],
       "core/models.py": [165, 3],
-      "core/pipeline.py": [179, 9],
-      "core/storage.py": [161, 8],
+      "core/pipeline.py": [179, 5],
+      "core/storage.py": [163, 7],
       "reports/__init__.py": [4, 0],
       "reports/json_report.py": [18, 0],
       "reports/markdown.py": [47, 5],
@@ -656,25 +723,25 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/androguard/__init__.py": [3, 0],
       "tools/androguard/adapter.py": [174, 20],
       "tools/apktool/__init__.py": [3, 0],
-      "tools/apktool/adapter.py": [157, 10],
-      "tools/base.py": [98, 7],
+      "tools/apktool/adapter.py": [157, 8],
+      "tools/base.py": [101, 7],
       "tools/jadx/__init__.py": [3, 0],
       "tools/jadx/adapter.py": [207, 46],
       "tools/registry.py": [28, 0]
     },
-    "missing": 184,
-    "statements": 1709
+    "missing": 130,
+    "statements": 1714
   },
   "schema": 1,
-  "source_fingerprint": "sha256:bf77439888014d919615ad886c5a6cf158068cc4864451b7260db599579ba7f8",
+  "source_fingerprint": "sha256:e4565a0f040ee3cc2b76f17c17dca46acdce4fdd1d936c891eebf85aed97bd40",
   "suite": {
-    "passed": 277,
+    "passed": 324,
     "skipped": 0,
-    "xfailed": 1
+    "xfailed": 0
   },
   "tests": {
-    "fast": 199,
+    "fast": 245,
     "slow": 79,
-    "total": 278
+    "total": 324
   }
 }-->

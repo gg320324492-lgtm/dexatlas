@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from dexatlas import __version__
 from dexatlas.config.settings import Settings, get_settings
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
-from dexatlas.core.models import Project
+from dexatlas.core.models import Project, canonical_method_id
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -284,7 +284,10 @@ def get_references(project_id: str, method_id: str, analyzer: AnalyzerDep) -> di
     references = analyzer.store.get_method_references(project_id, method_id)
     return {
         "project_id": project_id,
-        "method_id": method_id,
+        # The canonical spelling, not whatever the caller typed. A response that
+        # echoes the request is less useful than one that can be pasted into the
+        # next call, and the two spellings differ in exactly the way that matters.
+        "method_id": canonical_method_id(method_id),
         "total": len(references),
         "references": [r.model_dump(mode="json") for r in references],
     }

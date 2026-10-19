@@ -183,3 +183,65 @@ def test_report_format_is_validated(client: TestClient) -> None:
     response = client.get("/projects/apk_missing/report", params={"format": "pdf"})
 
     assert response.status_code == 422
+
+
+def test_xrefs_returns_the_canonical_method_id(client: TestClient, tmp_path: Path) -> None:
+    """The response must carry an id that can be pasted into the next request.
+
+    Echoing whatever the caller typed back is less useful than returning the one
+    spelling, and the two differ in exactly the way that matters: a method id
+    with spaced argument descriptors did not resolve, so a response carrying one
+    could not be used again.
+    """
+    from dexatlas.core.models import (
+        ApkMetadata,
+        MethodRef,
+        MethodReference,
+        Project,
+        canonical_method_id,
+    )
+
+    settings = Settings(workspace=tmp_path / "workspace")
+    settings.ensure_workspace()
+    store = Store.open(settings.database_path)
+
+    project = Project.create(
+        ApkMetadata(sha256="c" * 64, size_bytes=1, path=tmp_path / "demo.apk")
+    )
+    project_id = project.id
+    store.save_project(project, tmp_path / "workspace", manifest=None)
+    store.save_symbols(
+        project_id,
+        classes=[],
+        methods=[
+            MethodRef(
+                class_name="com.example.Demo",
+                name="sign",
+                descriptor="(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;",
+                access_flags=["public"],
+            )
+        ],
+        fields=[],
+        references=[
+            MethodReference(
+                caller="com.example.Demo.caller()V",
+                callee="com.example.Demo.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
+                kind="invoke",
+            )
+        ],
+        strings=[],
+    )
+
+    spaced = "com.example.Demo.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+    response = client.get(f"/projects/{project_id}/xrefs/{spaced}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    assert body["method_id"] == canonical_method_id(spaced)
+    assert " " not in body["method_id"], "the returned id still carries whitespace"
+
+    # And the returned id resolves on a second call, which the spaced one did not.
+    again = client.get(f"/projects/{project_id}/xrefs/{body['method_id']}")
+    assert again.status_code == 200
+    assert again.json()["total"] == 1

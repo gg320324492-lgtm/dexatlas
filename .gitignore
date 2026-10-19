@@ -76,3 +76,8 @@ secrets.json
 *.swp
 .DS_Store
 Thumbs.db
+
+# Local tooling state — Claude Code's worktrees and settings live here. A worktree
+# is a full copy of the repository, so leaving it untracked-but-unignored would
+# let a stray `git add .` commit a second copy of the whole project.
+.claude/
