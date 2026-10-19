@@ -145,6 +145,35 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     assert not tracked_bad, f"third-party analysis artifacts are tracked: {tracked_bad}"
 
 
+def test_every_integration_fixture_the_fetch_script_declares_is_one_a_test_uses() -> None:
+    """The fetch script and the integration tests must agree on the fixture list.
+
+    ``scripts/fetch-fixtures.sh`` downloads what the ``slow`` suite needs. If a test
+    starts using a fixture the script does not fetch, that test skips on every machine
+    that ran the script — CI included — and a regression guard disappears without
+    anything turning red. That is the same silent failure the Smali fallback bug was.
+
+    The check runs in both directions: an un-fetched fixture fails, and so does a
+    fetched one that no test reads any more.
+    """
+    script = (REPO_ROOT / "scripts" / "fetch-fixtures.sh").read_text(encoding="utf-8")
+    declared = set(re.findall(r'^\s*"([^"]+\.apk)"\s*$', script, re.MULTILINE))
+    assert declared, "no .apk entries found in scripts/fetch-fixtures.sh"
+
+    used: set[str] = set()
+    for test_file in (REPO_ROOT / "tests").glob("test_*.py"):
+        text = test_file.read_text(encoding="utf-8")
+        # Only .apk values: `FIXTURE_APK` is also used for a SHA-256 placeholder,
+        # which is not a file name.
+        used.update(re.findall(r'FIXTURE_DIR\s*/\s*"([^"]+\.apk)"', text))
+        used.update(re.findall(r'FIXTURE_APK\s*=\s*"([^"]+\.apk)"', text))
+
+    assert declared == used, (
+        "scripts/fetch-fixtures.sh and the integration tests disagree about fixtures: "
+        f"fetched but unused={sorted(declared - used)}, used but not fetched={sorted(used - declared)}"
+    )
+
+
 def test_the_bundled_demo_app_is_first_party_and_reproducible() -> None:
     """The exception above must stay justified: sources present, rebuild script present."""
     demo = REPO_ROOT / "examples" / "demo-app"
