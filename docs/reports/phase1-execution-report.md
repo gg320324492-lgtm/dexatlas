@@ -13,6 +13,14 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 > 报告 3.7 ~ 3.9 节记录了 v0.1.1 的 FIX-001「修复 Smali 回退与 Multi-DEX 路径定位」。
 > v0.1.1 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
 > 本报告中的测试数、覆盖率、提交数已同步到 v0.1.1 的状态。
+>
+> **v0.1.2 补充（已发布）**
+>
+> 报告 3.10 节记录了 v0.1.2 的 FIX-002「补齐 5 个自建测试 APK 与演示视频」——
+> 以及一个没有 bug、但同样需要修正的问题：Phase 1 的退出清单曾被我改写成
+> 更容易打勾的措辞。
+> v0.1.2 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2
+> 本报告中的测试数、覆盖率、提交数已同步到 v0.1.2 的状态。
 
 ---
 
@@ -493,8 +501,8 @@ uv run pytest          # v0.1.0 时为 208 passed
 git checkout v0.1.1
 uv run pytest          # 244：243 passed + 1 xfailed
 
-# main（含 FIX-002：5 个自建样本 + 演示视频）
-git checkout main
+# v0.1.2（含 FIX-002：5 个自建样本 + 演示视频）
+git checkout v0.1.2
 uv run pytest          # 275：274 passed + 1 xfailed
 ```
 
@@ -557,6 +565,7 @@ efa86d5  Prepare the v0.1.0 release
 cb11aa3  Record the v0.1.1 findings in the report and the changelog
 0f2b117  Prepare the v0.1.1 release
 5b4dc23  Build the five self-built test APKs the checklist asks for, and a demo video
+34e140b  Sync the reported figures after FIX-002
 ```
 
 注意提交历史里 **9 次是修 bug**。这个比例偏高，但每个都在提交信息里写清了

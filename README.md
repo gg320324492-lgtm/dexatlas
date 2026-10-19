@@ -80,6 +80,7 @@ DexAtlas is built around fixing that:
 | -------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | **1**    | `v0.1.0` | Functional Foundation  | APK ingestion, JADX/Apktool/Androguard backends, unified index, search, CLI, REST API, JSON/Markdown reports |
 | **1**    | `v0.1.1` | Foundation Hardening   | Fixed the Smali fallback, which had never run for any APK                                              |
+| **1**    | `v0.1.2` | Acceptance Checklist    | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words             |
 | **2**    | `v0.5.0` | Agentic Intelligence   | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                     |
 | **3**    | `v1.0.0` | Production-Ready       | Native (Ghidra) and dynamic (Frida) analysis, plugin ecosystem, HTML/PDF reports, public benchmark   |
 

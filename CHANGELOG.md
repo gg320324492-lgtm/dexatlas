@@ -7,6 +7,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing changed yet.
+
+## [0.1.2] — 2026-10-20
+
+The Phase 1 acceptance checklist, actually met. Five test APKs built by this
+project, a demo video, and a correction to how the checklist had been recorded.
+
 ### Added
 
 - **Five self-built test APKs**, the number the Phase 1 acceptance checklist asks
@@ -34,6 +41,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   checklist said "verified against test APKs" and "a generated demo recording",
   and every box was ticked. One self-built sample and a GIF are not five samples
   and a video. The wording is now the plan's own, and the items behind it exist.
+
+### Engineering
+
+- 275 tests (196 fast, 79 integration), up from 244
+- First-party coverage 89.2% (1525/1709 lines)
+- `mypy` strict, `ruff` lint and format, GitHub Actions green on Python 3.12 and 3.13
+
+### Known limitations
+
+- The samples are small — the largest is under 3 KB. The *layouts* are covered, the
+  *scale* is not: there is still no large-APK data point, so index performance and
+  the instruction limits have never been under real load
+- The obfuscated sample is hand-written obfuscation, not a realistically hardened APK
 
 ## [0.1.1] — 2026-10-19
 
@@ -124,6 +144,7 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.0
