@@ -9,8 +9,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-200%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-244%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-89%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
@@ -76,6 +76,7 @@ DexAtlas is built around fixing that:
 | Phase    | Version  | Theme                  | Scope                                                                                                  |
 | -------- | -------- | ---------------------- | ------------------------------------------------------------------------------------------------------ |
 | **1**    | `v0.1.0` | Functional Foundation  | APK ingestion, JADX/Apktool/Androguard backends, unified index, search, CLI, REST API, JSON/Markdown reports |
+| **1**    | `v0.1.1` | Foundation Hardening   | Fixed the Smali fallback, which had never run for any APK                                              |
 | **2**    | `v0.5.0` | Agentic Intelligence   | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                     |
 | **3**    | `v1.0.0` | Production-Ready       | Native (Ghidra) and dynamic (Frida) analysis, plugin ecosystem, HTML/PDF reports, public benchmark   |
 
@@ -170,8 +171,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Architecture](docs/architecture/README.md)** — how it fits together and why
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
 
-Remaining `v0.1.0` work — a bundled demo fixture and the release — is tracked in
-[issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
+Remaining Phase 1 work — the source review, and the issues written from it — is tracked
+in [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 
 ## Contributing
 

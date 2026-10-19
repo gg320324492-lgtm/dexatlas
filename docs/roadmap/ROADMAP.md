@@ -7,8 +7,9 @@ This document is the working contract for how DexAtlas grows. It is a plan, not 
 promise of features — the README describes what actually ships, this file describes
 what comes next.
 
-- **Current phase:** Phase 1 shipped `v0.1.0` on 2026-10-14 — awaiting the Phase 1 source
-  review, which is the entry condition for Phase 2
+- **Current phase:** Phase 1 shipped `v0.1.0` on 2026-10-14 and `v0.1.1` on 2026-10-19
+  (Foundation Hardening) — awaiting the Phase 1 source review, which is the entry
+  condition for Phase 2
 - **Plan version:** 2026-10
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
@@ -49,14 +50,16 @@ extracting unauthorized data, or reproducing proprietary application code. See
 | Phase    | Version   | Theme                  | Outcome                                                       |
 | -------- | --------- | ---------------------- | ------------------------------------------------------------- |
 | Phase 1  | `v0.1.0`  | Functional Foundation  | ✅ Shipped 2026-10-14                                        |
+| Phase 1  | `v0.1.1`  | Foundation Hardening   | ✅ Shipped 2026-10-19                                        |
 | Phase 2  | `v0.5.0`  | Agentic Intelligence   | Demonstrable, evaluable agentic analysis platform               |
 | Phase 3  | `v1.0.0`  | Production-Ready       | Extensible, deliverable, maintainable platform with real users  |
 
 **Promotion rule:** a phase is complete when its exit checklist passes *and* the source
 review raises no blocking findings. Promotion is not a calendar event.
 
-Phase 1 shipped on 2026-10-14. Its exit checklist passes in full; the source review is
-still outstanding and is what gates Phase 2.
+Phase 1 shipped on 2026-10-14, and `v0.1.1` followed on 2026-10-19 with the fixes that
+the Phase 1 review work surfaced. Its exit checklist passes in full; the source review
+is still outstanding and is what gates Phase 2.
 
 ---
 
@@ -153,14 +156,15 @@ Last updated 2026-10-14. See [`CHANGELOG.md`](../../CHANGELOG.md) for the full l
 - [x] A self-built demo application bundled with the repository, built from smali
       sources and rebuildable via `scripts/build-demo-apk.sh`
 - [x] `v0.1.0` release published 2026-10-14, with a generated demo recording
+- [x] `v0.1.1` release published 2026-10-19 — Foundation Hardening, fixing the Smali
+      fallback that had never worked for any APK
 
 **Phase complete means:** a stranger follows the README, installs DexAtlas on a clean
 machine, analyses a bundled authorized test APK, and gets a reproducible structured
 report. That is worth more than supporting ten more models in v0.1.
 
 A stranger can today clone, install, analyse the bundled demo application and read a
-report, following the README alone. What is left is the `v0.1.0` release and a demo
-recording. Tracked in
+report, following the README alone. What remains is the source review. Tracked in
 [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 
 ### 1.5 Issue backlog (`v0.1.0` milestone)

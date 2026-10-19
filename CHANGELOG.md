@@ -7,6 +7,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing changed yet.
+
+## [0.1.1] — 2026-10-19
+
+Foundation Hardening. The Smali fallback — the mechanism that keeps a finding
+verifiable when decompilation fails — had never run, for any APK.
+
 ### Fixed
 
 - **The Smali fallback never worked for any APK.** `smali_path()` searched for the
@@ -33,6 +40,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A check that the fixture-fetching script and the integration tests agree on the
   fixture list, in both directions — a test that skips because its fixture was never
   fetched is a regression guard that has silently disappeared
+
+### Engineering
+
+- 244 tests (192 fast, 52 integration), up from 208
+- First-party coverage 89.1% (1523/1709 lines), up from 87.8%. The Apktool adapter
+  went from 82.7% to 94%
+- `mypy` strict, `ruff` lint and format, GitHub Actions green on Python 3.12 and 3.13
 
 ### Known issues
 
@@ -84,5 +98,6 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.0

@@ -8,10 +8,10 @@
 本报告供你审核。按路线图约定的评审机制，**Phase 1 已交付但评审尚未进行**，
 Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原计划。
 
-> **v0.1.1 补充（未发布）**
+> **v0.1.1 补充（已发布）**
 >
 > 报告 3.7 ~ 3.9 节记录了 v0.1.1 的 FIX-001「修复 Smali 回退与 Multi-DEX 路径定位」。
-> 三个提交已在 `main` 上推送，但**尚未创建 v0.1.1 Release**——按约定，发布要等你审阅之后。
+> v0.1.1 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
 > 本报告中的测试数、覆盖率、提交数已同步到 v0.1.1 的状态。
 
 ---
@@ -435,8 +435,8 @@ uv run pytest --cov=dexatlas --cov-report=term
 bash scripts/install-backends.sh
 uv run pytest          # v0.1.0 时为 208 passed
 
-# v0.1.1（含 FIX-001，尚未发布）
-git checkout main
+# v0.1.1（含 FIX-001）
+git checkout v0.1.1
 uv run pytest          # 244：243 passed + 1 xfailed
 ```
 

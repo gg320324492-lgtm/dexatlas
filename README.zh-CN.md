@@ -64,6 +64,7 @@ DexAtlas 要解决的正是这个问题：
 | 阶段        | 版本      | 主题           | 范围                                                                                              |
 | ----------- | --------- | -------------- | ------------------------------------------------------------------------------------------------- |
 | **Phase 1** | `v0.1.0`  | 基础能力建设   | APK 导入、JADX/Apktool/Androguard 后端、统一索引、代码检索、CLI、REST API、JSON/Markdown 报告      |
+| **Phase 1** | `v0.1.1`  | 基础能力加固   | 修复了此前对任何 APK 都从未生效过的 Smali 回退                                                    |
 | **Phase 2** | `v0.5.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
 | **Phase 3** | `v1.0.0`  | 生产级开源平台 | Native（Ghidra）与动态（Frida）分析、插件生态、HTML/PDF 报告、公开 Benchmark                        |
 
@@ -155,7 +156,7 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 - **[架构说明](docs/architecture/README.md)** —— 项目如何组织，以及为什么这样设计
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 
-`v0.1.0` 剩余工作（随仓库分发的演示样本、发布）见
+Phase 1 剩余工作（源码评审，以及由评审结论写出的任务清单）见
 [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1)。
 
 ## 参与贡献
