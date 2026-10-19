@@ -34,6 +34,7 @@ from dexatlas.core.models import (
     StringConstant,
     ToolError,
     ToolErrorCode,
+    canonical_descriptor,
 )
 from dexatlas.tools.base import Backend
 
@@ -295,12 +296,17 @@ class AndroguardBackend(Backend):
                 return
 
             for method in class_methods:
-                qualified = f"{class_name}.{method.get_name()}{method.get_descriptor()}"
+                # Androguard renders a descriptor for human reading, with a space
+                # after every argument separator. Canonicalise it here, where the
+                # descriptor enters DexAtlas, so that the method table and the
+                # cross-reference table spell every id the same way.
+                descriptor = canonical_descriptor(method.get_descriptor())
+                qualified = f"{class_name}.{method.get_name()}{descriptor}"
                 methods.append(
                     MethodRef(
                         class_name=class_name,
                         name=method.get_name(),
-                        descriptor=method.get_descriptor(),
+                        descriptor=descriptor,
                         access_flags=sorted(method.get_access_flags_string().split()),
                         # A method with no code item is abstract or native: declared,
                         # but with no body to decompile.
@@ -382,9 +388,9 @@ def _parse_dalvik_reference(reference: str) -> str | None:
         Ljava/io/PrintStream;->println(Ljava/lang/String; Ljava/lang/Object;)V
 
     Taking that string verbatim produces a descriptor that never equals the one the
-    symbol table stores (``get_descriptor()`` has no spaces), so every cross-reference
-    becomes unfindable. Re-join the argument list without spaces to get an id that
-    matches ``MethodRef.qualified_name``.
+    symbol table stores — ``get_descriptor()`` spaces its arguments the same way — so
+    every cross-reference becomes unfindable. Re-join the argument list without spaces
+    to get an id that matches ``MethodRef.qualified_name``.
     """
     if "->" not in reference:
         return None
