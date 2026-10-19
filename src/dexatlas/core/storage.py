@@ -172,6 +172,19 @@ def parse_method_id(method_id: str) -> tuple[str, str, str]:
     return class_name, name, method_id[open_paren:]
 
 
+def _escape_like(value: str) -> str:
+    """Escape ``value`` so SQLite's LIKE treats it as a literal.
+
+    SQLite's LIKE has two wildcards: ``%`` matches any run of characters and ``_``
+    matches any single one. A literal underscore is legal in a package name, so a
+    prefix filter that leaves it unescaped returns classes whose names merely look
+    like the prefix. The backslash is the LIKE escape character and is escaped
+    first: escaping it later would double-escape the escapes this function
+    introduces for the two wildcards.
+    """
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 class Store:
     """Project and symbol persistence."""
 
@@ -362,7 +375,7 @@ class Store:
         params: list[Any] = [project_id]
         if prefix:
             query += " AND name LIKE ? ESCAPE '\\'"
-            params.append(prefix.replace("\\", "\\\\").replace("%", "\\%") + "%")
+            params.append(_escape_like(prefix) + "%")
         query += " ORDER BY name"
         with self.transaction() as connection:
             rows = connection.execute(query, params).fetchall()

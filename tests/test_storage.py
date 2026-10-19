@@ -20,7 +20,7 @@ from dexatlas.core.models import (
     Provenance,
     StringConstant,
 )
-from dexatlas.core.storage import Store, parse_method_id
+from dexatlas.core.storage import Store, _escape_like, parse_method_id
 
 
 def _project(name: str = "demo.apk") -> Project:
@@ -196,6 +196,140 @@ def test_prefix_filter_escapes_wildcards(store: Store, tmp_path: Path) -> None:
     store.save_symbols(project.id, *_symbol_set())
 
     assert store.list_classes(project.id, prefix="%") == []
+
+
+# -- prefix filtering: every LIKE wildcard must be a literal ----------------
+
+#: Names that differ only in the character a LIKE wildcard would consume. SQLite's
+#: LIKE has two wildcards: ``%`` matches any run of characters and ``_`` matches any
+#: single one. ``com.example.com_ex`` and ``com.example.comXex`` are different
+#: classes, so a prefix filter on the first must never return the second.
+_LIKE_TRICKY_NAMES = [
+    "com.example.com_ex.Alpha",
+    "com.example.comXex.Alpha",
+    "com.example.per%cent.Beta",
+    "com.example.perXcent.Beta",
+    "com.example.back\\slash.Gamma",
+    "com.example.backXslash.Gamma",
+    "com.example.plain.Delta",
+]
+
+
+def _seed_like_tricky_classes(store: Store, tmp_path: Path) -> str:
+    """Load a project whose class names probe every LIKE wildcard."""
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes = [
+        ClassRef(name=name, kind=ClassKind.CLASS, provenance=_provenance())
+        for name in _LIKE_TRICKY_NAMES
+    ]
+    store.save_symbols(project.id, classes, [], [], [], [])
+    return project.id
+
+
+def test_prefix_filter_treats_underscore_as_a_literal(store: Store, tmp_path: Path) -> None:
+    """``_`` matches any single character in a LIKE pattern, so it must be escaped.
+
+    ``com.example.comXex.Alpha`` is a different class from ``com.example.com_ex.Alpha``
+    and must not be returned by a filter on the latter.
+    """
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.com_ex")]
+
+    assert names == ["com.example.com_ex.Alpha"]
+
+
+def test_prefix_filter_treats_underscore_at_the_end_as_a_literal(
+    store: Store, tmp_path: Path
+) -> None:
+    """A trailing underscore is the case a wildcard swallows most convincingly."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.com_")]
+
+    assert names == ["com.example.com_ex.Alpha"]
+
+
+def test_prefix_filter_treats_percent_as_a_literal(store: Store, tmp_path: Path) -> None:
+    """A ``%`` in a prefix is a literal percent sign, not a wildcard."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.per%cent")]
+
+    assert names == ["com.example.per%cent.Beta"]
+
+
+def test_prefix_filter_treats_backslash_as_a_literal(store: Store, tmp_path: Path) -> None:
+    """A backslash is the LIKE escape character and must be escaped first."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.back\\slash")]
+
+    assert names == ["com.example.back\\slash.Gamma"]
+
+
+def test_prefix_filter_of_only_wildcards_matches_nothing(store: Store, tmp_path: Path) -> None:
+    """A prefix made entirely of wildcards must not match every class."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    for prefix in ("%", "_", "%_", "_%_", "%\\%"):
+        assert store.list_classes(project_id, prefix=prefix) == [], prefix
+
+
+def test_prefix_filter_still_matches_longer_names(store: Store, tmp_path: Path) -> None:
+    """The trailing ``%`` belongs to the filter and must keep working."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.")]
+
+    assert names == sorted(_LIKE_TRICKY_NAMES)
+
+
+def test_prefix_filter_matches_the_exact_name_too(store: Store, tmp_path: Path) -> None:
+    """A prefix that is a whole class name still matches that class."""
+    project_id = _seed_like_tricky_classes(store, tmp_path)
+
+    names = [c.name for c in store.list_classes(project_id, prefix="com.example.plain.Delta")]
+
+    assert names == ["com.example.plain.Delta"]
+
+
+def test_escape_like_escapes_every_like_wildcard() -> None:
+    """SQLite's LIKE has two wildcards; both have to be neutralised."""
+    assert _escape_like("a%b") == "a\\%b"
+    assert _escape_like("a_b") == "a\\_b"
+    assert _escape_like("a\\b") == "a\\\\b"
+
+
+def test_escape_like_escapes_the_backslash_before_the_wildcards() -> None:
+    """Escaping the wildcards first would double-escape the escape character."""
+    assert _escape_like("\\%") == "\\\\\\%"
+
+
+def test_list_methods_class_filter_is_an_exact_match(store: Store, tmp_path: Path) -> None:
+    """``list_methods`` filters with ``=``, not ``LIKE``, so no wildcard applies.
+
+    This pins the audit result that ``list_classes`` holds the only LIKE in the
+    storage layer.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    store.save_symbols(project.id, *_symbol_set())
+
+    assert store.list_methods(project.id, "com.example.demo") == []
+    crypto_methods = store.list_methods(project.id, "com.example.demo.Crypto")
+    assert [m.qualified_name for m in crypto_methods] == ["com.example.demo.Crypto.encrypt([B)[B"]
+
+
+def test_search_has_no_like_wildcards(store: Store, tmp_path: Path) -> None:
+    """``search`` goes through FTS5, which knows no ``%`` or ``_`` wildcards."""
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    store.save_symbols(project.id, *_symbol_set())
+
+    assert store.search(project.id, "%") == []
+    assert store.search(project.id, "_") == []
 
 
 def test_resaving_replaces_rather_than_accumulates(store: Store, tmp_path: Path) -> None:
