@@ -205,9 +205,7 @@ def test_xrefs_returns_the_canonical_method_id(client: TestClient, tmp_path: Pat
     settings.ensure_workspace()
     store = Store.open(settings.database_path)
 
-    project = Project.create(
-        ApkMetadata(sha256="c" * 64, size_bytes=1, path=tmp_path / "demo.apk")
-    )
+    project = Project.create(ApkMetadata(sha256="c" * 64, size_bytes=1, path=tmp_path / "demo.apk"))
     project_id = project.id
     store.save_project(project, tmp_path / "workspace", manifest=None)
     store.save_symbols(

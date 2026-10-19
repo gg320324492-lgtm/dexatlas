@@ -58,8 +58,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->359<!--/fig-->（<!--fig:tests.fast-->276<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.5%<!--/fig-->**（<!--fig:coverage.covered-->1619<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->360<!--/fig-->（<!--fig:tests.fast-->277<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.6%<!--/fig-->**（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -76,7 +76,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->159<!--/fig--> |
 | `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->77.8%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->46<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->207<!--/fig--> |
 | `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
-| `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->85.7%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->21<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
+| `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->87.1%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->19<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
 | `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.6%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->175<!--/fig--> |
 | `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->89.4%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->47<!--/fig--> |
 
@@ -98,7 +98,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.5%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.6%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -106,9 +106,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->276<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->277<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->83<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->359<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->360<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -124,7 +124,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_evidence.py` | 证据等级纪律 |
 | `test_reports.py` | 报告渲染 |
 | `test_subprocess.py` | 执行边界（超时/非零退出/注入） |
-| `test_backend_discovery.py` | 后端发现、平台差异、一个已知缺陷的 xfail 记录 |
+| `test_backend_discovery.py` | 后端发现、平台差异、后端的三态配置语义 |
 | `test_cli.py` | CLI 命令真实执行 |
 | `test_api.py` | REST 端点 |
 | `test_androguard_integration.py` | 真实 DEX 解析 |
@@ -351,10 +351,18 @@ PosixPath('/usr/local/bin/jadx')
 也就是说，**没有任何办法通过配置禁用一个后端**。这不是 FIX-001 引入的，
 但它正是导致第 4 次 CI 失败的机制。
 
-我没有修它（超出本次 Issue 范围），但也没有让它继续藏在注释里：
-已加一个 `strict=True` 的 `xfail` 测试记录这个行为。**strict 意味着**
+我当时没有修它（超出那次 Issue 的范围），但也没有让它继续藏在注释里：
+加了一个 `strict=True` 的 `xfail` 测试记录这个行为。**strict 意味着**
 如果哪天它被修好了，这个测试会**失败**，强制有人回来摘掉标记——
 这样它既不会被遗忘，也不会把一个 bug 固化成期望行为。
+
+**它后来被修好了（v0.1.3）。** 配置值现在有三态：`None` 表示未配置、
+照旧在 `PATH` 上找；**空字符串表示显式禁用**，不查 `PATH`；
+一个存在的路径直接用。那个 `xfail` 已经摘掉，变成普通断言测试。
+
+顺带补上了一条之前没人注意的细节：**原来的测试之所以全绿，是因为它们
+同时清空了 `PATH` 并设了空串**——回退查找也找不到东西，于是断言
+「返回 None」因为错误的原因而通过。修不修都过。
 
 修正后 CI 5 个 job 全绿（Lint / Tests 3.12 / Tests 3.13 / Docker / 依赖审计）。
 
@@ -464,9 +472,7 @@ xrefs.callee:        (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;   
 **为什么这次测试没抓到：** 3.1 节加的三个测试用的都是**手写的规范 id**：
 
 ```python
-    method_id = (
-        "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
-    )
+method_id = "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
 ```
 
 它们测的是「一个我手写的、格式正确的 id 能查到」，不是「从 `dexatlas methods`
@@ -556,10 +562,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->359<!--/fig--> 个：<!--fig:tests.fast-->276<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->360<!--/fig--> 个：<!--fig:tests.fast-->277<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.5%<!--/fig-->（<!--fig:coverage.covered-->1619<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->359<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.6%<!--/fig-->（<!--fig:coverage.covered-->1621<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->360<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -601,10 +607,7 @@ CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions
 
 1. **Phase 2 的 Issue 从评审结论写起**，而不是从原计划写。原计划里对 Agent 架构的
    设想是基于「代码不存在」时的假设，现在有真实代码了。
-2. **把「空路径不能禁用后端」立为独立 Issue**（见 3.8 节末）。它是一个真实的、
-   已被记录的缺陷，`strict` 的 xfail 会在它被修好时强制有人清理标记。
-3. **优先补 Phase 1 的已知薄弱处**（如果评审认为必要）：
-   - `cli/main.py` 覆盖率 70.1%，缺参数组合测试
+2. **优先补 Phase 1 的已知薄弱处**（如果评审认为必要）：
    - 大型 APK 的性能压测：现有样本都太小（最大不到 3 KB），索引性能和指令上限
      从未被真实压过
    - 真实加固 APK：`obfuscated-app` 是手写的短类名，不是有控制流混淆的加固产物
@@ -674,7 +677,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "files": {
       "__init__.py": [3, 0],
       "api/__init__.py": [3, 0],
-      "api/app.py": [147, 21],
+      "api/app.py": [147, 19],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
       "cli/main.py": [159, 0],
@@ -699,19 +702,19 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/jadx/adapter.py": [207, 46],
       "tools/registry.py": [28, 0]
     },
-    "missing": 131,
+    "missing": 129,
     "statements": 1750
   },
   "schema": 2,
-  "source_fingerprint": "sha256:659139b26a991846033a0b4df2e99b272079ccec897f990f5edb7bd1b8ecc16c",
+  "source_fingerprint": "sha256:256cab784a9f54b8d74a343a36e7520a0c90dc117fdbd510ca100af428f8ac4c",
   "suite": {
-    "passed": 359,
+    "passed": 360,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 276,
+    "fast": 277,
     "slow": 83,
-    "total": 359
+    "total": 360
   }
 }-->
