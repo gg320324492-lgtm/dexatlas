@@ -19,6 +19,7 @@ from dexatlas.config.settings import Settings
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
 from dexatlas.core.models import (
+    DECOMPILATION_DETAIL,
     ClassRef,
     Evidence,
     EvidenceKind,
@@ -29,6 +30,7 @@ from dexatlas.core.models import (
     MethodReference,
     Project,
     ProjectStatus,
+    Provenance,
     StringConstant,
     ToolError,
     ToolErrorCode,
@@ -36,7 +38,7 @@ from dexatlas.core.models import (
 from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
-from dexatlas.tools.jadx.adapter import JadxBackend
+from dexatlas.tools.jadx.adapter import ClassDecompilation, JadxBackend
 from dexatlas.tools.registry import BackendRegistry
 
 logger = logging.getLogger(__name__)
@@ -141,10 +143,22 @@ class Analyzer:
                 project.errors.append(extracted[5])
 
         if include_jadx:
-            jadx_classes, error = self._run_jadx(apk.path, project, workspace, builder)
+            jadx_classes, error, jadx_status = self._run_jadx(apk.path, project, workspace, builder)
             classes.extend(jadx_classes)
             if error is not None:
                 project.errors.append(error)
+            # The decompiler is the only backend that can say whether a method
+            # was decompiled, so the flag is set here — after JADX has run, and
+            # before the symbols are written.
+            _apply_decompilation(methods, jadx_status)
+            _record_decompilation(
+                builder,
+                project=project,
+                classes=classes,
+                methods=methods,
+                status=jadx_status,
+                output_dir=workspace / "jadx",
+            )
 
         classes = _merge_classes(classes)
         counts = self._store.save_symbols(project.id, classes, methods, fields, references, strings)
@@ -250,19 +264,19 @@ class Analyzer:
 
     def _run_jadx(
         self, apk: Path, project: Project, workspace: Path, builder: EvidenceBuilder
-    ) -> tuple[list[ClassRef], ToolError | None]:
+    ) -> tuple[list[ClassRef], ToolError | None, dict[str, ClassDecompilation]]:
         backend = self._jadx
         if not backend.available():
             error = backend.missing_error()
             builder.add_error(error)
-            return [], error
+            return [], error, {}
 
         output_dir = workspace / "jadx"
         outcome = backend.decompile(apk, output_dir)
         classes, extract_error = backend.extract(project.apk.sha256, output_dir, outcome)
         if extract_error is not None:
             builder.add_error(extract_error)
-        return classes, extract_error
+        return classes, extract_error, backend.decompilation_status(output_dir)
 
     # -- queries -----------------------------------------------------------
 
@@ -407,6 +421,100 @@ def _merge_fields(fields: list[FieldRef]) -> list[FieldRef]:
             }
         )
     return sorted(merged.values(), key=lambda f: f.qualified_name)
+
+
+# ---------------------------------------------------------------------------
+# Decompilation status
+# ---------------------------------------------------------------------------
+
+#: Methods listed in a record's detail before truncating.
+MAX_LISTED_METHODS = 50
+
+
+def _apply_decompilation(
+    methods: list[MethodRef], status: dict[str, ClassDecompilation]
+) -> list[MethodRef]:
+    """Mark the methods the decompiler produced Java for.
+
+    The flag on a method says whether JADX turned it into Java, so only JADX
+    can set it. A method in a class JADX never wrote has no decompiled source,
+    and so has a method JADX wrote a placeholder for — the two are different
+    facts, and the index keeps the difference.
+    """
+    for method in methods:
+        entry = status.get(method.class_name.partition("$")[0])
+        if entry is None:
+            continue
+        if entry.method_status(method.class_name, method.name) is True:
+            method.decompiled = True
+    return methods
+
+
+def _record_decompilation(
+    builder: EvidenceBuilder,
+    *,
+    project: Project,
+    classes: list[ClassRef],
+    methods: list[MethodRef],
+    status: dict[str, ClassDecompilation],
+    output_dir: Path,
+) -> None:
+    """Record how much of the APK the decompiler could read.
+
+    "The decompiler failed on this class" is a fact about the analysis, and
+    without it a reader cannot tell an APK that is mostly unreadable from one
+    that is fully readable. It used to be nowhere: JADX wrote no log file, so
+    the only trace of a failure was the placeholder in the Java, which nothing
+    read.
+    """
+    if not status:
+        return
+
+    decompiled = [method for method in methods if method.decompiled]
+    failed: list[str] = []
+    for method in methods:
+        entry = status.get(method.class_name.partition("$")[0])
+        if entry is None:
+            continue
+        if entry.method_status(method.class_name, method.name) is False:
+            failed.append(method.qualified_name)
+
+    # A class the decompiler never wrote is a gap too, and it is invisible in
+    # the method list: every one of its methods simply has no source.
+    indexed = {cls.name for cls in classes}
+    without_source = sorted(name for name in indexed if name.partition("$")[0] not in status)
+
+    sources = output_dir / "sources"
+    builder.add(
+        kind=EvidenceKind.OBSERVATION,
+        # The coverage is read out of the decompiler's own output, and that
+        # output is a location a reader can open.
+        level=EvidenceLevel.VERIFIED,
+        summary=(
+            f"jadx produced real Java for {len(decompiled)} of {len(methods)} methods "
+            f"in {len(status)} of {len(indexed)} classes"
+        ),
+        provenance=[
+            Provenance(
+                tool="jadx",
+                tool_version=project.tool_versions.get("jadx"),
+                apk_sha256=project.apk.sha256,
+                locator=f"jadx:{sources.as_posix()}",
+            )
+        ],
+        detail={
+            DECOMPILATION_DETAIL: {
+                "methods_decompiled": len(decompiled),
+                "methods_total": len(methods),
+                "classes_with_source": len(status),
+                "classes_total": len(indexed),
+                "methods_jadx_failed": failed[:MAX_LISTED_METHODS],
+                "methods_jadx_failed_truncated": len(failed) > MAX_LISTED_METHODS,
+                "classes_without_source": without_source[:MAX_LISTED_METHODS],
+                "classes_without_source_truncated": len(without_source) > MAX_LISTED_METHODS,
+            }
+        },
+    )
 
 
 __all__ = ["AnalysisResult", "Analyzer", "ApkValidationError", "ToolErrorCode"]

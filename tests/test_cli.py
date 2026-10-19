@@ -199,6 +199,77 @@ def seeded_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 @pytest.fixture
+def multi_source_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A project with one class that has three sources.
+
+    A class defined in two dex files, plus the decompiler's own output, is three
+    provenances — which is what the CLI used to cut off without saying so.
+    """
+    from dexatlas.config.settings import get_settings
+    from dexatlas.core.models import (
+        ApkMetadata,
+        ClassKind,
+        ClassRef,
+        Project,
+        ProjectStatus,
+        Provenance,
+    )
+    from dexatlas.core.storage import Store
+
+    monkeypatch.setenv("COLUMNS", "200")
+
+    store = Store.open(get_settings().database_path)
+    project = Project(
+        id=Project.new_id(SEEDED_SHA256),
+        apk=ApkMetadata(sha256=SEEDED_SHA256, size_bytes=4096, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=1,
+        method_count=1,
+    )
+    project_workspace = workspace / "projects" / project.id
+    project_workspace.mkdir(parents=True, exist_ok=True)
+    store.save_project(project, project_workspace, manifest=None)
+
+    provenance = [
+        Provenance(
+            tool="androguard",
+            tool_version="androguard 4.1.4",
+            apk_sha256=SEEDED_SHA256,
+            locator="androguard:classes.dex#com.example.demo.SharedConfig",
+        ),
+        Provenance(
+            tool="androguard",
+            tool_version="androguard 4.1.4",
+            apk_sha256=SEEDED_SHA256,
+            locator="androguard:classes2.dex#com.example.demo.SharedConfig",
+        ),
+        Provenance(
+            tool="jadx",
+            tool_version="1.5.2",
+            apk_sha256=SEEDED_SHA256,
+            locator="jadx:sources/com/example/demo/SharedConfig.java",
+        ),
+    ]
+    store.save_symbols(
+        project.id,
+        [
+            ClassRef(
+                name="com.example.demo.SharedConfig",
+                kind=ClassKind.CLASS,
+                access_flags=["public"],
+                method_count=1,
+                provenance=provenance,
+            )
+        ],
+        [],
+        [],
+        [],
+        [],
+    )
+    return project.id
+
+
+@pytest.fixture
 def jadx_available(workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Make the JADX backend discoverable without running JADX.
 
@@ -421,6 +492,50 @@ def test_classes_limit_caps_the_listing(seeded_project: str) -> None:
     assert result.exit_code == 0
     assert "com.example.demo.MainActivity" in result.stdout
     assert "com.example.demo.SyncService" not in result.stdout
+
+
+def test_classes_says_how_many_classes_the_limit_hid(seeded_project: str) -> None:
+    """A capped listing that does not say so is a listing that looks complete."""
+    result = _run("classes", seeded_project, "--limit", "1")
+
+    assert result.exit_code == 0
+    assert "1 more class" in result.stdout
+
+
+def test_classes_shows_every_source_with_all(multi_source_project: str) -> None:
+    """``--all`` shows every provenance entry, not the first two."""
+    result = _run("classes", multi_source_project, "--all")
+
+    assert result.exit_code == 0
+    assert "androguard:classes.dex#com.example.demo.SharedConfig" in result.stdout
+    assert "androguard:classes2.dex#com.example.demo.SharedConfig" in result.stdout
+    assert "jadx:sources/com/example/demo/SharedConfig.java" in result.stdout
+
+
+def test_classes_says_how_many_sources_it_hid(multi_source_project: str) -> None:
+    """The default hides the third source, and has to admit it.
+
+    A class defined in two dex files is worth knowing about, and the REST API
+    returns all three — so a CLI that quietly showed two was showing less than
+    the tool it fronts.
+    """
+    result = _run("classes", multi_source_project)
+
+    assert result.exit_code == 0
+    assert "androguard:classes.dex#com.example.demo.SharedConfig" in result.stdout
+    assert "androguard:classes2.dex#com.example.demo.SharedConfig" in result.stdout
+    assert "jadx:sources/com/example/demo/SharedConfig.java" not in result.stdout
+    assert "1 more source" in result.stdout
+    assert "--all" in result.stdout
+
+
+def test_classes_provenance_limit_is_configurable(multi_source_project: str) -> None:
+    result = _run("classes", multi_source_project, "--provenance-limit", "1")
+
+    assert result.exit_code == 0
+    assert "androguard:classes.dex#com.example.demo.SharedConfig" in result.stdout
+    assert "androguard:classes2.dex#com.example.demo.SharedConfig" not in result.stdout
+    assert "2 more sources" in result.stdout
 
 
 def test_methods_lists_the_indexed_methods(seeded_project: str) -> None:

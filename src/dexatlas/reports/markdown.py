@@ -8,8 +8,15 @@ from __future__ import annotations
 
 from collections import Counter
 
-from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel, ManifestInfo, Project
+from dexatlas.core.models import (
+    Evidence,
+    EvidenceKind,
+    EvidenceLevel,
+    ManifestInfo,
+    Project,
+)
 from dexatlas.core.pipeline import AnalysisResult
+from dexatlas.reports.coverage import decompilation_coverage
 
 _LEVEL_NOTE = {
     EvidenceLevel.VERIFIED: "Deterministically established by an analysis tool.",
@@ -30,6 +37,29 @@ _XREF_NOTE = (
 def render_markdown(result: AnalysisResult) -> str:
     """Render an analysis as a Markdown report."""
     project = result.project
+    metrics: list[tuple[str, str]] = [
+        ("Classes indexed", f"{project.class_count:,}"),
+        ("Methods indexed", f"{project.method_count:,}"),
+    ]
+    coverage = decompilation_coverage(result.evidence)
+    if coverage is not None:
+        # The decompiler's own answer, so the reader knows how much of the
+        # indexed code can be read as Java.
+        metrics.append(
+            (
+                "Methods decompiled by JADX",
+                f"{coverage.get('methods_decompiled', 0):,} of {coverage.get('methods_total', 0):,}",
+            )
+        )
+    metrics += [
+        ("Cross-references indexed", f"{project.reference_count:,}"),
+        ("Cross-references with evidence", f"{_cross_reference_count(result.evidence):,}"),
+        ("Evidence records", f"{project.evidence_count:,}"),
+        ("DEX files", f"{len(project.apk.dex_files)}"),
+        ("Native libraries", f"{len(project.apk.native_libraries)}"),
+        ("Analysis time", f"{result.duration_seconds:.1f}s"),
+    ]
+
     lines: list[str] = [
         "# DexAtlas analysis report",
         "",
@@ -45,14 +75,9 @@ def render_markdown(result: AnalysisResult) -> str:
         "",
         "| Metric | Value |",
         "| --- | ---: |",
-        f"| Classes indexed | {project.class_count:,} |",
-        f"| Methods indexed | {project.method_count:,} |",
-        f"| Cross-references indexed | {project.reference_count:,} |",
-        f"| Cross-references with evidence | {_cross_reference_count(result.evidence):,} |",
-        f"| Evidence records | {project.evidence_count:,} |",
-        f"| DEX files | {len(project.apk.dex_files)} |",
-        f"| Native libraries | {len(project.apk.native_libraries)} |",
-        f"| Analysis time | {result.duration_seconds:.1f}s |",
+    ]
+    lines += [f"| {name} | {value} |" for name, value in metrics]
+    lines += [
         "",
         "## Evidence levels",
         "",

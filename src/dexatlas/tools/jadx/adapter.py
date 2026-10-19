@@ -10,18 +10,21 @@ input:
 
 - JADX exits non-zero after partially succeeding. Its output directory is usually still
   populated, so :meth:`extract` proceeds and the error is attached to the project.
-- A single method fails to decompile and JADX emits a placeholder body. Those are marked
-  ``decompiled=False`` and keep a Smali fallback path.
+- A single method fails to decompile and JADX emits a placeholder body. Those are
+  reported as *not* decompiled, and the method keeps a Smali fallback path.
+
+JADX writes no log file. Its command line reports failures on the console, and the
+placeholder bodies it leaves in the ``.java`` files are the only per-method record of
+what went wrong — so that is what this backend reads.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from dexatlas.config.settings import Settings
 from dexatlas.core.models import ClassKind, ClassRef, ToolError
@@ -31,12 +34,22 @@ logger = logging.getLogger(__name__)
 
 #: JADX substitutes these when a body could not be reconstructed. The text is useful
 #: source, but it is not a decompilation and must never back a "verified" claim.
+#:
+#: A JADX *warning* is not one of them. JADX writes ``/* JADX WARN: ... */`` above a
+#: method it decompiled with a caveat — "type inference failed for r0v2" — and the body
+#: behind it is real code. Treating that as a failure marked working methods as
+#: unreadable.
 _DECOMPILE_FAILED_RE = re.compile(
-    r"(?:JADX (?:ERROR|WARN)"
+    r"(?:JADX ERROR"
     r"|Method not decompiled"
     r"|Method could not be decompiled"
     r"|UnsupportedOperationException\(\"Method not decompiled)"
 )
+
+#: A static initializer block. JADX writes it as ``static { ... }``, which is not a
+#: method signature, so the method pattern never sees it — and the DEX calls that
+#: method ``<clinit>``.
+_STATIC_INITIALIZER_RE = re.compile(r"^[ \t]*static[ \t]*\{", re.MULTILINE)
 
 _PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 _TYPE_RE = re.compile(
@@ -44,11 +57,16 @@ _TYPE_RE = re.compile(
 )
 
 #: A top-level method signature: modifiers, return type, name, parameters, then ``{``.
+#: The return type is optional, because a constructor has none — and a constructor
+#: is a method like any other as far as the index is concerned. A span without a
+#: return type is a constructor, and that is what tells it apart from a method of
+#: the same name: an obfuscated class can have a method called exactly what the
+#: class is called.
 #: Keywords that introduce a block rather than declare a method are excluded.
 _METHOD_START_RE = re.compile(
     r"^[ \t]*(?:@[\w.]+(?:\([^)]*\))?[ \t]*\n[ \t]*)*"
     r"(?:(?:public|protected|private|static|final|synchronized|native|abstract|strictfp)[ \t]+)*"
-    r"(?P<return_type>[\w.$<>\[\],?\s]+?)[ \t]+"
+    r"(?:(?P<return_type>[\w.$<>\[\],? \t]+?)[ \t]+)?"
     r"(?P<name>\w+)[ \t]*\((?P<params>[^)]*)\)[ \t]*"
     r"(?:throws[ \w.,\s]+)?[ \t]*\{",
     re.MULTILINE,
@@ -73,6 +91,60 @@ _NOT_A_METHOD = frozenset(
         "throw",
     }
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ClassDecompilation:
+    """What JADX made of one class file.
+
+    ``decompiled`` holds the method names JADX produced real Java for, and
+    ``failed`` the ones it wrote a placeholder for. The two are different
+    facts: a placeholder is a method JADX *tried* and could not reconstruct,
+    while a method in neither set is one JADX never wrote at all.
+
+    ``constructors`` holds the names of the classes whose constructor JADX
+    wrote. A constructor is kept apart from the methods because it is written
+    under the class's own name, and a class can have a method of that name too.
+    """
+
+    decompiled: frozenset[str] = frozenset()
+    failed: frozenset[str] = frozenset()
+    constructors: frozenset[str] = frozenset()
+    has_static_initializer: bool = False
+
+    def method_status(self, dex_class_name: str, method_name: str) -> bool | None:
+        """Whether JADX decompiled one method of a DEX class.
+
+        ``True`` — JADX produced real Java for it.
+        ``False`` — JADX wrote the method but could not decompile it.
+        ``None`` — there is no Java for it: JADX wrote no source for the method.
+
+        The DEX spells a constructor ``<init>`` and a class initializer
+        ``<clinit>``; Java spells them with the class's own name and a static
+        block. The names are translated here rather than in the caller, because
+        the translation is JADX's convention.
+        """
+        if method_name == "<clinit>":
+            return True if self.has_static_initializer else None
+        if method_name == "<init>":
+            key = _simple_class_name(dex_class_name)
+            if key in self.constructors:
+                return True
+            return False if key in self.failed else None
+        if method_name in self.decompiled:
+            return True
+        if method_name in self.failed:
+            return False
+        return None
+
+
+def _simple_class_name(class_name: str) -> str:
+    """The bare name of a class, without its package or its outer class.
+
+    ``com.example.Outer$Helper`` is ``Helper``. A constructor is written under
+    the class's own name in Java, so this is what a DEX ``<init>`` matches.
+    """
+    return class_name.rpartition(".")[2].rpartition("$")[2]
 
 
 class JadxBackend(Backend):
@@ -233,6 +305,62 @@ class JadxBackend(Backend):
         """Whether a body is real decompilation rather than a JADX placeholder."""
         return _DECOMPILE_FAILED_RE.search(source) is None
 
+    def decompilation_status(self, output_dir: Path) -> dict[str, ClassDecompilation]:
+        """What JADX decompiled, per class.
+
+        JADX writes a placeholder body for a method it could not reconstruct,
+        and the placeholder is indistinguishable from a real body to anything
+        that does not know the marker. This is where the marker is read, so the
+        rest of DexAtlas can tell a decompilation from a stub.
+
+        The key is the class the file holds — the top-level one. A nested class
+        shares its outer class's file, exactly as it does on disk.
+        """
+        sources = output_dir / "sources"
+        if not sources.is_dir():
+            return {}
+
+        status: dict[str, ClassDecompilation] = {}
+        for java_file in sorted(sources.rglob("*.java")):
+            text = read_text(java_file)
+            if text is None:
+                continue
+            class_name = self._class_name(java_file, sources, text)
+            if class_name is None:
+                continue
+
+            decompiled: set[str] = set()
+            failed: set[str] = set()
+            constructors: set[str] = set()
+            for span in self._method_spans(text):
+                # The method is read on its own — its declaration and its body,
+                # and nothing that precedes it. The comments JADX writes above
+                # a method belong to the class, not to the method: a warning
+                # about type inference is not a failed decompilation.
+                body = _body_from(text, span.start)
+                if body is None:
+                    continue
+                # A constructor has no return type. That is what tells it apart
+                # from a method of the same name, which an obfuscated class
+                # can have.
+                if span.return_type is None:
+                    if self.method_decompiled(body):
+                        constructors.add(span.name)
+                    else:
+                        failed.add(span.name)
+                elif self.method_decompiled(body):
+                    decompiled.add(span.name)
+                else:
+                    failed.add(span.name)
+
+            status[class_name] = ClassDecompilation(
+                decompiled=frozenset(decompiled),
+                failed=frozenset(failed),
+                constructors=frozenset(constructors),
+                has_static_initializer=_STATIC_INITIALIZER_RE.search(text) is not None,
+            )
+        return status
+
     # -- parsing helpers ---------------------------------------------------
 
     @staticmethod
@@ -268,19 +396,31 @@ class JadxBackend(Backend):
                 continue
             end = _match_brace(text, match.end() - 1)
             if end is not None:
-                spans.append(_MethodSpan(name=match.group("name"), start=match.start(), end=end))
+                spans.append(
+                    _MethodSpan(
+                        name=match.group("name"),
+                        start=match.start(),
+                        end=end,
+                        return_type=match.group("return_type"),
+                    )
+                )
         return spans
 
 
 class _MethodSpan:
-    """A located method declaration: its name and brace offsets."""
+    """A located method declaration: its name, its return type and its offsets.
 
-    __slots__ = ("end", "name", "start")
+    The return type is ``None`` for a constructor, which is what it has in
+    Java as well.
+    """
 
-    def __init__(self, name: str, start: int, end: int) -> None:
+    __slots__ = ("end", "name", "return_type", "start")
+
+    def __init__(self, name: str, start: int, end: int, return_type: str | None = None) -> None:
         self.name = name
         self.start = start
         self.end = end
+        self.return_type = return_type
 
 
 def _match_brace(text: str, open_index: int) -> int | None:
@@ -353,25 +493,4 @@ def read_text(path: Path) -> str | None:
         return None
 
 
-def summarize_jadx_log(output_dir: Path) -> dict[str, list[dict[str, Any]]]:
-    """Parse JADX's per-class error log, so a failure is attributable to a class."""
-    log = output_dir / "sources" / "resources" / "log" / "error.log"
-    if not log.is_file():
-        return {}
-    contents = read_text(log)
-    if contents is None:
-        return {}
-
-    summary: dict[str, list[dict[str, Any]]] = {}
-    for line in contents.splitlines():
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        class_name = record.get("class")
-        if isinstance(class_name, str):
-            summary.setdefault(class_name, []).append(record)
-    return summary
-
-
-__all__ = ["JadxBackend", "read_text", "summarize_jadx_log"]
+__all__ = ["ClassDecompilation", "JadxBackend", "read_text"]

@@ -35,6 +35,14 @@ err_console = make_console(stderr=True)
 
 ExitCode = typer.Exit
 
+#: The mark for elided output. ``mark`` spells it safely on a legacy code page.
+ELLIPSIS = "…"
+
+
+def _more(count: int, singular: str, plural: str | None = None) -> str:
+    """``1 more source`` / ``2 more sources`` — a count and the noun that fits it."""
+    return f"{count} more {singular if count == 1 else (plural or singular + 's')}"
+
 
 @app.callback()
 def _root(
@@ -177,18 +185,48 @@ def classes(
         str | None, typer.Option("--prefix", help="Filter by package prefix.")
     ] = None,
     limit: Annotated[int, typer.Option("--limit", help="Maximum classes to list.")] = 50,
+    provenance_limit: Annotated[
+        int,
+        typer.Option(
+            "--provenance-limit",
+            help="How many sources to show per class. 0 shows none.",
+        ),
+    ] = 2,
+    all_sources: Annotated[
+        bool, typer.Option("--all", help="Show every source of every class.")
+    ] = False,
 ) -> None:
-    """List the classes indexed for a project."""
+    """List the classes indexed for a project.
+
+    A class can have several sources — one per backend that saw it, and one per
+    dex file that defines it. The listing shows the first two and says how many
+    it left out; ``--all`` shows them all, and the REST API returns them all.
+    """
     analyzer = Analyzer()
-    rows = analyzer.store.list_classes(project_id, prefix=prefix)[:limit]
-    if not rows:
+    indexed = analyzer.store.list_classes(project_id, prefix=prefix)
+    if not indexed:
         err_console.print("[yellow]No classes matched.[/yellow]")
         raise ExitCode(code=1)
 
+    rows = indexed[:limit]
     for cls in rows:
         console.print(f"[bold]{cls.name}[/bold] [dim]{cls.kind.value}[/dim]")
-        for source in cls.provenance[:2]:
+        sources = cls.provenance if all_sources else cls.provenance[:provenance_limit]
+        for source in sources:
             console.print(f"  [dim]{source.ref()}[/dim]")
+        hidden = len(cls.provenance) - len(sources)
+        if hidden > 0:
+            console.print(
+                f"  [dim]{mark(ELLIPSIS)} {_more(hidden, 'source')} not shown "
+                f"(use --all to see all {len(cls.provenance)})[/dim]"
+            )
+
+    hidden_classes = len(indexed) - len(rows)
+    if hidden_classes > 0:
+        console.print(
+            f"[dim]{mark(ELLIPSIS)} {_more(hidden_classes, 'class', 'classes')} not shown "
+            f"(use --limit to see more)[/dim]"
+        )
 
 
 @app.command()
@@ -199,7 +237,12 @@ def methods(
     ] = None,
     limit: Annotated[int, typer.Option("--limit", help="Maximum methods to list.")] = 100,
 ) -> None:
-    """List the methods indexed for a project."""
+    """List the methods indexed for a project.
+
+    The ``Decompiled`` column is the decompiler's own answer: it says whether
+    JADX produced Java for the method, so ``no`` means there is no decompiled
+    source to read.
+    """
     analyzer = Analyzer()
     rows = analyzer.store.list_methods(project_id, class_name)[:limit]
     if not rows:
@@ -209,8 +252,13 @@ def methods(
     table = Table(header_style="bold")
     table.add_column("Method")
     table.add_column("Flags")
+    table.add_column("Decompiled")
     for method in rows:
-        table.add_row(method.qualified_name, " ".join(method.access_flags))
+        table.add_row(
+            method.qualified_name,
+            " ".join(method.access_flags),
+            "yes" if method.decompiled else "no",
+        )
     console.print(table)
 
 

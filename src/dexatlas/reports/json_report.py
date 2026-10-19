@@ -7,6 +7,7 @@ from typing import Any
 
 from dexatlas.core.models import Evidence, EvidenceKind, Project
 from dexatlas.core.pipeline import AnalysisResult
+from dexatlas.reports.coverage import decompilation_coverage
 
 
 def build_json_report(result: AnalysisResult) -> dict[str, Any]:
@@ -60,6 +61,9 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
             1 for item in result.evidence if item.kind == EvidenceKind.CROSS_REFERENCE
         ),
         "evidence_by_level": _evidence_counts(result.evidence),
+        # How much of the indexed code the decompiler turned into Java. It is
+        # what the ``decompiled`` flag on a method means, counted.
+        "decompilation": decompilation_coverage(result.evidence),
         "duration_seconds": round(result.duration_seconds, 2),
         "backends_with_errors": sorted({e.tool for e in result.project.errors}),
     }

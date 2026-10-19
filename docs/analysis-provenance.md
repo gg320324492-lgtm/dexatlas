@@ -13,7 +13,8 @@
 ## 1. 覆盖度总表：每类结论由谁产出
 
 DexAtlas 目前有 3 个分析后端（`src/dexatlas/tools/registry.py:19-20`）加 1 个不依赖任何后端的
-APK 检查步骤。它们的产出范围是**互不重叠**的：
+APK 检查步骤。它们的产出范围**基本互不重叠**——唯一的交叉是方法表里的 `decompiled`
+标志，下面会说清楚：
 
 | 结论类型 | 产出后端 | 落在哪里 | 代码位置 |
 |---|---|---|---|
@@ -21,35 +22,39 @@ APK 检查步骤。它们的产出范围是**互不重叠**的：
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:102-196` |
 | manifest 的版本号 / SDK（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:289-320` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard**（主）+ **JADX**（并） | `ClassRef` | `tools/androguard/adapter.py:263-274` |
-| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取 | `core/pipeline.py:251-281` |
-| 方法（签名、描述符、访问标志、是否有字节码） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:297-310` |
+| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取 | `core/pipeline.py:283-314` |
+| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:305-320` |
+| 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:308-361` |
 | 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:276-287` |
-| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:318-329` |
-| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:354-373` |
+| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:326-338` |
+| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:362-381` |
 | 资源（`res/`、布局、字符串表） | **没有人** | 不在模型里 | 见 5.4 |
 
 几条需要注意的推论：
 
 - **JADX 不产出方法、字段、交叉引用里的任何一条。** JADX 后端只产出 `ClassRef`
-  （`tools/jadx/adapter.py:185-192`）。方法表、字段表、交叉引用表 100% 来自 Androguard。
+  （`tools/jadx/adapter.py:257-265`）。方法表、字段表、交叉引用表 100% 来自 Androguard。
+  **唯一的例外是 `decompiled` 这个标志**：它是 JADX 对「这个方法我反编译出来了」的
+  回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:434-451`）。
+  它是**状态**，不是结构——方法的签名、描述符、访问标志仍然全部来自 Androguard。
 - **Apktool 不产出任何符号。** 它产出 manifest 和 Smali 文件；Smali 是**按需读取**的，
-  不进索引、不进证据表（`core/pipeline.py:251-281`）。
+  不进索引、不进证据表（`core/pipeline.py:283-314`）。
 - **资源没有覆盖。** Apktool 会把 `res/` 解码到工作区，但 `src/` 里没有任何代码读它
   （`grep -rn "res/values\|resources" src/` 只命中 `ingest.py:15` 的文件名常量
-  `resources.arsc`、Apktool/JADX 模块的 docstring，以及 `jadx/adapter.py:358` 的
-  `"sources" / "resources" / "log"` ——那是 JADX **自己**的输出目录，不是 APK 的 `res/`）。这一条在 5.4 里展开。
+  `resources.arsc`、Apktool/JADX 模块的 docstring，以及 `jadx/adapter.py` 里
+  JADX **自己**的输出目录名 `sources` ——那不是 APK 的 `res/`）。这一条在 5.4 里展开。
 
 ---
 
 ## 2. 冲突时谁说了算
 
-只有一类结论有两个来源：**类**。Androguard 从 DEX 定义读到一个类，JADX 从它写出的
-`.java` 文件读到同一个类。合并规则写在 `core/pipeline.py:316-339` 的 `_merge_classes` 里，
+只有一类结论有两个后端都看得到：**类**。Androguard 从 DEX 定义读到一个类，JADX 从它写出的
+`.java` 文件读到同一个类。合并规则写在 `core/pipeline.py:348-372` 的 `_merge_classes` 里，
 不是「谁后跑谁覆盖」：
 
 | 字段 | 规则 | 实际效果 |
 |---|---|---|
-| `kind`（class/interface/enum/annotation） | 除非新值是 `class`，否则保留先到的 | **Androguard 说了算**（它先跑，`pipeline.py:128-136` 早于 `138-142`） |
+| `kind`（class/interface/enum/annotation） | 除非新值是 `class`，否则保留先到的 | **Androguard 说了算**（它先跑，`core/pipeline.py:124-133` 早于 `135-143`） |
 | `superclass` | `existing.superclass or cls.superclass` | **Androguard 说了算** |
 | `interfaces` | 两个集合的并集 | 两边都保留 |
 | `access_flags` | 两个集合的并集 | 两边都保留 |
@@ -75,6 +80,11 @@ Androguard 先跑不是因为它更重要，是因为它是**结构**的正确�
 
 三个来源，一条都不丢。**没有「优先后端」这个概念——只有「每一类结论归谁」。**
 
+**还有一处不是「冲突」，是分工：** `MethodRef.decompiled`（这个方法有没有被反编译成
+Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所以这条标志是
+**JADX 写、Androguard 的那条方法上记**（`core/pipeline.py:434-451`）。
+它不是结构，合并规则对它不适用：方法表里没有第二个来源跟它抢。
+
 ---
 
 ## 3. provenance 具体记录了什么
@@ -94,8 +104,8 @@ Androguard 先跑不是因为它更重要，是因为它是**结构**的正确�
 注意是**列表**：一个产物可以有多个来源（见第 2 节）。
 
 还有一个项目级的版本表 `Project.tool_versions: dict[str, str | None]`
-（`models.py:285`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
-（`core/storage.py:52`）。它和 `provenance.tool_version` 是**两份独立的数据**——
+（`models.py:372`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
+（`core/storage.py:73`）。它和 `provenance.tool_version` 是**两份独立的数据**——
 下面 6.5 会说明它们会不一致。
 
 ### 3.2 locator 的实际格式
@@ -108,8 +118,9 @@ locator 的格式**每个后端都不一样**，因为 `Backend.provenance()`（
 | Apktool（manifest 证据） | `AndroidManifest.xml` | `AndroidManifest.xml` |
 | Apktool（导出组件证据） | `AndroidManifest.xml#/application` | `AndroidManifest.xml#/application` |
 | JADX | `jadx:<绝对路径>.java` | `jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81204c9f/jadx/sources/com/example/demo/Crypto.java` |
+| JADX（反编译覆盖度） | `jadx:<绝对路径>/sources` | `jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81204c9f/jadx/sources` |
 | Androguard（类） | `androguard:<dex 名>#<类全名>` | `androguard:classes.dex#com.example.demo.Crypto` |
-| Androguard（方法） | `androguard:<dex 名>#<类全名>#<方法全名><描述符>` | `androguard:classes.dex#com.example.demo.Crypto#com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;` |
+| Androguard（方法） | `androguard:<dex 名>#<类全名>#<方法全名><描述符>` | `androguard:classes.dex#com.example.demo.Crypto#com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;` |
 | Androguard（字段） | `androguard:<dex 名>#<类全名>#<字段名>` | `androguard:classes.dex#com.example.demo.MainActivity#TAG` |
 | Androguard（交叉引用） | `androguard:<dex 名>#<调用方>-><被调方>` | `androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V->com.example.demo.Crypto.sign(...)Ljava/lang/String;` |
 | Androguard（字符串） | `androguard:<dex 名>#str/<字符串前 64 字符>` | `androguard:classes.dex#str/api_key` |
@@ -117,9 +128,13 @@ locator 的格式**每个后端都不一样**，因为 `Backend.provenance()`（
 
 **这些 locator 里没有行号。** 这不是偷懒，是一个可以追溯的因果链：
 
-- JADX 被以 `--no-debug-info` 调用（`tools/jadx/adapter.py:148`），反编译结果里没有行号表，
+- JADX 被以 `--no-debug-info` 调用（`tools/jadx/adapter.py:220`），反编译结果里没有行号表，
   所以 locator 只能指到**文件**，不能指到**行**。方法级别只能靠方法名区分。
 - Androguard 的 locator 指的是 DEX 里的**符号**，不是字节码偏移量。
+
+**只有一个 locator 指的不是文件而是目录：** JADX 的「反编译覆盖度」记录
+（`core/pipeline.py:453-512`）说的是「JADX 写出来的这一整个 `sources/` 目录里，
+有多少方法是真反编译出来的」——它的证据就是这个目录本身。
 
 **JADX 的 locator 含绝对路径。** 它指向本次分析的工作区，换一台机器、换一个工作区目录，
 同一个 locator 字符串就指向不同的东西。读一份别人的报告时，JADX 那一半的 locator
@@ -131,15 +146,20 @@ locator 的格式**每个后端都不一样**，因为 `Backend.provenance()`（
 
 - **行号。** 原因见上。
 - **字符串常量出自哪个类、哪个方法。** `StringConstant` 有 `class_name` / `method_name`
-  两个字段（`models.py:169-170`），但唯一的生产者 `AndroguardBackend._index_strings`
-  从不填它们（`tools/androguard/adapter.py:362-367`）。实测全部为 `null`。
+  两个字段（`models.py:249-250`），但唯一的生产者 `AndroguardBackend._index_strings`
+  从不填它们（`tools/androguard/adapter.py:366-377`）。实测全部为 `null`。
   一条字符串常量**只能定位到「哪个 DEX 里有这个字符串」，定位不到「哪段代码用了它」**。
 - **资源。** 见 5.4。
-- **Smali 内容的来源。** Smali 回退路径（`core/pipeline.py:262-264`、`279-281`）返回的是
+- **Smali 内容的来源。** Smali 回退路径（`core/pipeline.py:305-307`、`311-314`）返回的是
   裸字符串，**不附带任何 provenance**。也就是说：当 `class_source` 返回 Smali 而不是 Java 时，
   调用方从返回值里**无法判断**这是 Apktool 的输出。只能靠「工作区里有没有 jadx 目录」间接推断。
 - **同一产物的多个来源之间没有主次标记。** `provenance` 是一个扁平的列表，
   顺序即合并顺序（Androguard 在前，JADX 在后），但这个顺序**不表达可信度**。
+- **方法的 provenance 里没有 JADX 那一半。** 一个方法的 provenance 仍然只有 Androguard
+  那一半（它在 DEX 里的位置）——JADX 的贡献是 `decompiled` 这个标志，
+  **不是**一条 provenance 记录。理由是 JADX 不产出方法（见 1 节）：
+  它只回答「这个方法我反编译出来了吗」。所以「这个方法的 Java 在哪」这个问题，
+  provenance 答不了——得看 `decompiled` 标志，然后去工作区的 `jadx/sources` 里找。
 
 ---
 
@@ -193,7 +213,7 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-demo.json
 ```
 
 `apk_80a8fe0e81204c9f` 不是写死的：**项目 id 是内容寻址的**，
-`Project.new_id()` 取 SHA-256 的前 16 位（`models.py:292-295`）。
+`Project.new_id()` 取 SHA-256 的前 16 位（`models.py:380-383`）。
 所以任何人都能自己算出这个 id：
 
 ```console
@@ -222,7 +242,7 @@ JSON 报告的 `project` 段和 `tools` 段（节选自真实输出）：
     "class_count": 5,
     "method_count": 8,
     "reference_count": 23,
-    "evidence_count": 6
+    "evidence_count": 10
   },
   "tools": {
     "jadx": "1.5.2",
@@ -239,7 +259,7 @@ JSON 报告的 `project` 段和 `tools` 段（节选自真实输出）：
 
 ```console
 $ uv run dexatlas analyze examples/multidex-app/multidex.apk --json multidex.json
-✓ apk_a488e43e38c2b8e9 — 4 classes, 14 methods, 13 cross-references (2.7s)
+✓ apk_a488e43e38c2b8e9 — 4 classes, 11 methods, 13 cross-references (2.7s)
 JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
 ```
 
@@ -256,9 +276,9 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
     },
     "status": "completed",
     "class_count": 4,
-    "method_count": 14,
+    "method_count": 11,
     "reference_count": 13,
-    "evidence_count": 7
+    "evidence_count": 8
   },
   "tools": {
     "jadx": "1.5.2",
@@ -269,42 +289,47 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
 }
 ```
 
-**`method_count` 报 14，但数据库里只有 11 行。** 原因：Androguard 把两个 DEX 里的
-`SharedConfig` 各索引一遍，得到 14 个方法；`methods` 表的主键是
-`(project_id, class_name, name, descriptor)`（`core/storage.py:84`），重复的被
-`INSERT OR REPLACE` 折叠掉了。`project.method_count = len(methods)` 取的是**折叠前**的列表长度
-（`core/pipeline.py:154`）。详见 6.2。
+**`method_count` 报 11，`methods` 表里也是 11 行。** 这一点不是自动成立的：
+Androguard 把两个 DEX 里的 `SharedConfig` 各索引一遍，会得到 14 个方法；
+`methods` 表的主键是 `(project_id, class_name, name, descriptor)`（`core/storage.py:105`），
+重复的被 `INSERT OR REPLACE` 折叠掉了，而计数一度取的是**折叠前**的列表长度。
+现在计数由表自己量（`core/pipeline.py:170-176`），折叠掉的那三个方法没有丢——
+它们合并成了一条带两份 provenance 的方法。详见 6.2。
 
 ### 4.4 五个自建样本的实际结果
 
 全部在 4.1 的环境里跑出来，数字原样：
 
-| 项目 id | APK | 大小 | 类 | 方法 | 交叉引用 | 证据 | 字符串 | 状态 |
-|---|---|---:|---:|---:|---:|---:|---:|---|
-| `apk_80a8fe0e81204c9f` | demo.apk | 2951 B | 5 | 8 | 23 | 6 | 63 | completed |
-| `apk_a488e43e38c2b8e9` | multidex.apk | 2350 B | 4 | 14 | 13 | 7 | 44 | completed |
-| `apk_d342e11b7931077d` | wide.apk | 1440 B | 4 | 11 | 15 | 5 | 29 | completed |
-| `apk_2f8d476fb9e71ac4` | obfuscated.apk | 1892 B | 4 | 11 | 10 | 6 | 33 | completed |
-| `apk_17c6da79f2d5467b` | strings.apk | 1547 B | 1 | 10 | 6 | 2 | 33 | completed |
+| 项目 id | APK | 大小 | 类 | 方法 | 交叉引用 | 证据 | 字符串 | 反编译成功 | 状态 |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| `apk_80a8fe0e81204c9f` | demo.apk | 2951 B | 5 | 8 | 23 | 10 | 63 | 7 / 8 | completed |
+| `apk_a488e43e38c2b8e9` | multidex.apk | 2350 B | 4 | 11 | 13 | 8 | 44 | 7 / 11 | completed |
+| `apk_d342e11b7931077d` | wide.apk | 1440 B | 4 | 11 | 15 | 9 | 29 | 6 / 11 | completed |
+| `apk_2f8d476fb9e71ac4` | obfuscated.apk | 1892 B | 4 | 11 | 10 | 7 | 33 | 7 / 11 | completed |
+| `apk_17c6da79f2d5467b` | strings.apk | 1547 B | 1 | 10 | 6 | 4 | 33 | 9 / 10 | completed |
 
-`multidex.apk` 那一行的「方法」是 14（CLI 打印的 `method_count`），
-`methods` 表实际 11 行。详见 6.2。
+「反编译成功」是 `MethodRef.decompiled` 为真的方法数——**JADX 真的把方法还原成了 Java**。
+没成功的那些全是构造器（`<init>`）或接口里的抽象方法：JADX 不给平凡构造器写代码，
+接口方法本来就没有方法体。详见 5.2。
 
 `strings-app` 只有 1 个类——它本来就是「一个类塞满字符串」的样本。
 
-**五个样本、26 条证据，全部是 `declaration` / `verified`：**
+**五个样本、38 条证据，三种 `kind`，全部是 `verified`：**
 
 ```console
 $ python -c "import sqlite3; c=sqlite3.connect(r'C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/dexatlas.db'); print(c.execute('SELECT kind, level, COUNT(*) FROM evidence GROUP BY kind, level').fetchall())"
-[('declaration', 'verified', 26)]
+[('cross_reference', 'verified', 7), ('declaration', 'verified', 26), ('observation', 'verified', 5)]
 ```
 
-**注意 `kind` 只有 `declaration` 一种。** `EvidenceKind` 定义了 5 种
-（`models.py:229-234`），但管道里只产出两种：`declaration` 和 `observation`（后端失败时）。
-`cross_reference`、`behaviour`、`code_located` **一次都不会出现**——
-`EvidenceBuilder.add_method_references`（`core/evidence.py:131-146`）这个方法
-**在 `src/` 里没有任何调用点**。交叉引用确实被索引了（`xrefs` 表），但它**从不变成证据行**。
-详见 6.4。
+**管道里产出三种 `kind`：** `declaration`（类、manifest、导出组件）、
+`cross_reference`（这个 APK 自己的方法被谁调用）和 `observation`（后端失败，
+以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:309-314`），
+`behaviour` 和 `code_located` **一次都不会出现**——它们是给 Phase 2 的模型输出准备的。
+
+**`cross_reference` 的粒度是「被调用的方法」，不是「调用」**：一个被五十处调用的方法
+是**一条**结论，不是五十条。而且只有**这个 APK 自己的方法**才有记录——
+一次对 `java.lang.StringBuilder.append` 的调用是关于 JDK 的事实，不是关于这个应用的结论；
+调用本身照样能在 `xrefs` 表里查到。详见 6.4。
 
 ### 4.5 逐条核对一条结论
 
@@ -403,11 +428,11 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 
 1. **类数从 5 掉到 4。** 少掉的那个是 `com.example.demo.R`——它**只存在于 JADX 的输出里**，
    DEX 里没有这个类（见 5.2）。
-2. **缺后端会变成一条证据**（`core/evidence.py:76-91`）：
+2. **缺后端会变成一条证据**（`core/evidence.py:82-97`）：
 
 ```json
 {
-  "id": "E-0006",
+  "id": "E-0010",
   "kind": "observation",
   "level": "verified",
   "summary": "jadx did not complete: jadx is not installed or not on PATH",
@@ -419,7 +444,11 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 }
 ```
 
-这时候 `class_source` 会落到 Smali（`core/pipeline.py:257-264`）：
+**没有 JADX 就没有「反编译覆盖度」那条记录**，报告里的「Methods decompiled by JADX」
+这一行整个不出现——不是 0，是「没有这一说」。
+同理，方法表里的 `decompiled` 全部是 `false`：没有反编译器，就没有反编译出来的 Java。
+
+这时候 `class_source` 会落到 Smali（`core/pipeline.py:283-296`）：
 
 ```smali
 .class public final Lcom/example/demo/Crypto;
@@ -529,7 +558,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
   **`JsonHandler.handle` 和 `XmlHandler.handle` 看起来「没有调用者」**，
   而实际上运行时它们很可能就是被调用的那一个。
   **静态交叉引用在多态处会漏掉实现类。** 想要实现类的调用者，得自己沿
-  `ClassRef.interfaces`（`models.py:110`）往下展开——DexAtlas 不做这件事。
+  `ClassRef.interfaces`（`models.py:159`）往下展开——DexAtlas 不做这件事。
   > 补充：DEX 编码的是**声明类型**（这里是接口），不是子类。实现类只有在运行时多态分派时
   > 才知道，所以任何静态工具都拿不到「运行时被调用的实现」。
 
@@ -584,6 +613,12 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
   所以 DEX 解析崩溃会打在**我们**的进程里——代码用 try/except 把它兜成 `ToolError`
   （`tools/androguard/adapter.py:198-206`），但解析器本身的内存安全风险是继承来的。
 
+- **它答不了「这个方法反编译出来了吗」。** Androguard 读 DEX，能回答「这个方法有没有
+  字节码」——但那不是同一个问题，而且几乎每个方法都有字节码，所以这个答案没有信息量。
+  **「方法表里的 `decompiled`」现在由 JADX 回答**（见 5.2），Androguard 不再碰这个字段。
+  「有没有字节码」这个信息没有丢：没有方法体的方法就是 `abstract` 或 `native` 的方法，
+  访问标志里写着。
+
 ### 5.2 JADX
 
 - **JADX 会产出 DEX 里根本不存在的类。** demo-app 的第 5 个类 `com.example.demo.R`
@@ -624,44 +659,67 @@ jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81
   Androguard 索引不到它，Apktool 也解不出对应的 Smali。
   **JADX 产出的类不一定在字节码里存在**——这是一个类级「多出来的」结论。
 
-- **JADX 的输出可能不是反编译结果，而是占位符。** JADX 对付不了的方法会写一段
-  `/* Method could not be decompiled */`。DexAtlas 有检测它的正则
-  （`_DECOMPILE_FAILED_RE`，`tools/jadx/adapter.py:34-39`）和
-  `JadxBackend.method_decompiled()`（`tools/jadx/adapter.py:232-234`），
-  **但这个方法在 `src/` 里没有任何调用点**，只有测试在用：
+- **JADX 的输出可能不是反编译结果，而是占位符。** JADX 对付不了的方法会写一个
+  占位方法体：`throw new UnsupportedOperationException("Method not decompiled: ...")`。
+  （`/* Method could not be decompiled */` 是更早版本的写法——jadx 1.5.2 的 jar 里
+  没有这个字符串，正则里保留它只是为了兼容别的版本。）
+  DexAtlas 用正则 `_DECOMPILE_FAILED_RE`（`tools/jadx/adapter.py:35-47`）和
+  `JadxBackend.method_decompiled()`（`tools/jadx/adapter.py:304-306`）认它，
+  **现在这条检测在生产路径上**：`JadxBackend.decompilation_status()`
+  （`tools/jadx/adapter.py:308-361`）逐个类读 JADX 写出的 `.java`，
+  把「真反编译出来的方法」和「JADX 写不出来的方法」分开。
+
+  管道把结果记在方法表里：**`MethodRef.decompiled` 现在就是「JADX 反编译成功了」**，
+  字段名和它的值是一回事了。`dexatlas methods` 直接把这一列印出来：
 
   ```console
-  $ grep -rn "method_decompiled" --include=*.py src tests | sort
-  src/dexatlas/tools/jadx/adapter.py:232:    def method_decompiled(source: str) -> bool:
-  tests/test_jadx_parsing.py:165:    assert JadxBackend.method_decompiled('void f() { Log.d("a"); }') is True
-  tests/test_jadx_parsing.py:167:        JadxBackend.method_decompiled(
-  tests/test_jadx_parsing.py:172:    assert JadxBackend.method_decompiled("// JADX ERROR: Method code generation failed") is False
-  tests/test_jadx_parsing.py:173:    assert JadxBackend.method_decompiled("/* Method could not be decompiled */") is False
+  $ uv run dexatlas methods apk_80a8fe0e81204c9f
+  ┌───────────────────────────────────────────┬────────────────────┬────────────┐
+  │ Method                                    │ Flags              │ Decompiled │
+  ├───────────────────────────────────────────┼────────────────────┼────────────┤
+  │ com.example.demo.Crypto.digestOf(Ljava/l… │ public static      │ yes        │
+  │ com.example.demo.Crypto.obfuscate(Ljava/… │ public static      │ yes        │
+  │ com.example.demo.Crypto.sign(Ljava/lang/… │ public static      │ yes        │
+  │ com.example.demo.MainActivity.<init>()V   │ constructor public │ no         │
+  │ com.example.demo.MainActivity.describe(L… │ public static      │ yes        │
+  │ com.example.demo.MainActivity.onCreate(L… │ protected          │ yes        │
+  │ com.example.demo.NetworkClient.post(Ljav… │ public static      │ yes        │
+  │ com.example.demo.SyncService.onBind(Land… │ public             │ yes        │
+  └───────────────────────────────────────────┴────────────────────┴────────────┘
   ```
 
-  同时 DexAtlas 是以 `--show-bad-code` 调 JADX 的（`tools/jadx/adapter.py:148`），
+  `MainActivity.<init>` 是 `no`，而且这是对的：JADX 不给平凡构造器写代码，
+  所以**没有反编译出来的 Java**，只有字节码。
+
+  同时 DexAtlas 是以 `--show-bad-code` 调 JADX 的（`tools/jadx/adapter.py:220`），
   那个选项的含义就是「尽力输出，不行就输出残缺代码」。
-  **结论：管道无法告诉你某个方法是真反编译还是占位符。** 方法表里的
-  `decompiled` 字段也帮不上忙——它来自 Androguard 的 `bool(method.get_code())`
-  （`tools/androguard/adapter.py:307`），含义是「这个方法有字节码」，
-  **不是「JADX 反编译成功了」**。字段名有误导性。
 
-- **JADX 的 per-class 错误日志没有被采集。** `summarize_jadx_log()`
-  （`tools/jadx/adapter.py:356-374`）能解析 `sources/resources/log/error.log`，
-  同样**在 `src/` 里没有调用点**：
+  **这个标志是怎么判定的，边界在哪：** 判定读的是**方法自己**（声明 + 方法体），
+  不读它上面的注释——JADX 会在方法上方写 `/* JADX WARN: Type inference failed ... */`，
+  那是**类的**注释，不是失败信号（demo-app 的 `NetworkClient.post` 就带着这么一条，
+  它的方法体是真代码）。名字对上了不代表是同一个方法：JADX 用**类名**写构造器，
+  而混淆后的类可能有一个**和类同名的方法**，所以构造器是按「没有返回类型」认的，
+  不是按名字认的。
 
-  ```console
-  $ grep -rn "summarize_jadx_log" --include=*.py src tests | sort
-  src/dexatlas/tools/jadx/adapter.py:356:def summarize_jadx_log(output_dir: Path) -> dict[str, list[dict[str, Any]]]:
-  src/dexatlas/tools/jadx/adapter.py:377:__all__ = ["JadxBackend", "read_text", "summarize_jadx_log"]
-  ```
+- **「哪些类反编译失败了」现在有答案了。** 分析结束时会记录一条证据：
+  `jadx produced real Java for 7 of 8 methods in 5 of 5 classes`，
+  它的 `detail` 里带着失败的方法清单和没有源码的类清单
+  （`core/pipeline.py:453-512`）。报告的 Summary 里也有一行
+  「Methods decompiled by JADX」。
 
-  所以「哪些类反编译失败了」这个信息**不在索引里、不在证据里、也不在报告里**。
+  **这里没有 per-class 的错误日志可读，因为 JADX 根本不写那个文件。**
+  旧的 `summarize_jadx_log()` 解析的是 `sources/resources/log/error.log`——
+  这个路径跟 JADX 的输出目录结构对不上（JADX 把 `resources/` 放在输出目录的根下，
+  不在 `sources/` 里），而且 **jadx 1.5.2 压根不写它**：整个 jar 里没有 `error.log`
+  这个字符串，`jadx.core.export.OutDirs` 只有 `srcOutDir` 和 `resOutDir` 两个目录，
+  跑一次会失败的 APK 也只留下 `sources/` 和 `resources/` 两个空目录。
+  所以这个函数被删了：它对着一个不存在的文件，返回一个永远是空的字典。
 
 - **locator 含绝对路径**，不可跨机器复现（见 3.2）。
 
-- **在这 5 个自建样本上，JADX 一次都没失败。** 五个样本的
-  `jadx/sources/resources/log/error.log` 都不存在，`errors` 全空。
+- **在这 5 个自建样本上，JADX 一次都没失败。** 五个样本的 `errors` 全空，
+  也没有一个方法带占位符——**没成功的那些全是 JADX 根本没写的方法**
+  （平凡构造器、接口里的抽象方法），不是失败。
   **所以本节关于 JADX 失败路径的描述来自代码和已知缺陷，不是来自一次真实失败。**
   真正打穿 JADX 的样本不在仓库里——这正是
   [`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 4.5 节
@@ -686,9 +744,9 @@ jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81
   而 provenance 只写了 `AndroidManifest.xml` 一个。
 
 - **manifest 里的 `exported` 属性只有显式写了才为 `true`。**
-  `ManifestComponent.exported` 是 `bool | None`（`models.py:190`），
+  `ManifestComponent.exported` 是 `bool | None`（`models.py:270`），
   `_parse_bool` 把没写的当 `None`（`tools/apktool/adapter.py:283-286`）。
-  `exported_components` 只挑 `exported is True`（`models.py:208-209`）。
+  `exported_components` 只挑 `exported is True`（`models.py:288-289`）。
   **一个没有显式 `android:exported` 的组件，在 API 31+ 上默认不导出，
   但在这份报告里它不会出现在「已导出组件」列表里——这是对的；
   但反过来，如果 APK 显式写了 `exported="true"` 而实际有权限保护，
@@ -721,7 +779,7 @@ jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81
 
 - **`lead` 和 `insufficient` 两个证据等级在 Phase 1 一次都不会出现。**
   管道里所有证据都是显式传 `EvidenceLevel.VERIFIED` 的
-  （`core/evidence.py:80`、`97`、`114`、`139`，`core/pipeline.py:193`）。
+  （`core/evidence.py:86`、`103`、`120`、`154`，`core/pipeline.py:211`）。
   这两个等级是给 Phase 2 的模型输出准备的。
 
 - **原生库（`.so`）只被统计，不被分析。** `ApkMetadata.native_libraries`
@@ -734,47 +792,28 @@ jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_80a8fe0e81
 
 ## 6. 读这份文档时会撞上的六处不一致
 
-这些不是猜测，是这次为了写这份文档而实际跑出来的。它们**没有被修**——
-修它们要动 `src/`，超出本文档的范围。列在这里，是因为一份声称讲「证据来源」的文档
-如果藏起这些，就不值得读。
+这些不是猜测，是写这份文档时实际跑出来的。**其中四处已经修好了**，
+下面每一节都写明了现在的状态；剩下的两处**还没有修**——
+一份声称讲「证据来源」的文档如果藏起这些，就不值得读。
 
-### 6.1 方法 id 的两种写法，`dexatlas xrefs` 只认其中一种
+| 节 | 不一致 | 状态 |
+|---|---|---|
+| 6.1 | 方法 id 有两种写法，`dexatlas xrefs` 只认其中一种 | **已修**（v0.1.3） |
+| 6.2 | `method_count` 报的数比表里的行数多 | **已修** |
+| 6.3 | `dexatlas classes` 只显示前两条 provenance | **已修** |
+| 6.4 | 交叉引用永远不产生证据行 | **已修** |
+| 6.5 | 「已导出组件」这条证据的 `tool_version` 是 `null` | **未修** |
+| 6.6 | `xrefs` 表里可能有重复的 caller/callee 对 | 未修，但这是对的（见该节） |
 
-`dexatlas methods` 打印的方法 id 来自 Androguard 的 `get_descriptor()`，
-**参数之间有空格**：
+### 6.1 方法 id 的两种写法，`dexatlas xrefs` 只认其中一种（已修）
 
-```console
-$ uv run dexatlas methods apk_80a8fe0e81204c9f
-┌────────────────────────────────────────────────────────┬────────────────────┐
-│ Method                                                 │ Flags              │
-├────────────────────────────────────────────────────────┼────────────────────┤
-│ com.example.demo.Crypto.digestOf(Ljava/lang/String;)L… │ public static      │
-│ com.example.demo.Crypto.obfuscate(Ljava/lang/String;)… │ public static      │
-│ com.example.demo.Crypto.sign(Ljava/lang/String;        │ public static      │
-│ Ljava/lang/String;)Ljava/lang/String;                  │                    │
-│ com.example.demo.MainActivity.<init>()V                │ constructor public │
-│ com.example.demo.MainActivity.describe(Ljava/lang/Str… │ public static      │
-│ com.example.demo.MainActivity.onCreate(Landroid/os/Bu… │ protected          │
-│ com.example.demo.NetworkClient.post(Ljava/lang/String; │ public static      │
-│ Ljava/lang/String;)Ljava/lang/String;                  │                    │
-│ com.example.demo.SyncService.onBind(Landroid/content/… │ public             │
-└────────────────────────────────────────────────────────┴────────────────────┘
-```
+**当时的现象：** `dexatlas methods` 打印的方法 id 来自 Androguard 的 `get_descriptor()`，
+**参数之间有空格**；而 `dexatlas xrefs` 要的是**没有空格**的写法。把前者原样复制过去，
+一次都查不到。
 
-而 `dexatlas xrefs` 要的是**没有空格**的写法。把前者原样复制过去：
-
-```console
-$ uv run dexatlas xrefs apk_80a8fe0e81204c9f "com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
-No callers of com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;.
-$ echo "exit=$?"
-exit=1
-```
-
-去掉空格就有结果（见 4.5 第一步）。
-
-根因：Androguard 4.1.4 的 `get_descriptor()` 返回
+**根因：** Androguard 4.1.4 的 `get_descriptor()` 返回
 `'(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;'`（带空格），
-而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:403`）在解析调用目标时
+而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:384-411`）在解析调用目标时
 **去掉了空格**。于是 `methods` 表里存的是带空格的 id，`xrefs` 表里存的是不带空格的 id，
 **两张表按字符串精确相等是连不上的**：
 
@@ -791,129 +830,104 @@ for pid in ('apk_80a8fe0e81204c9f','apk_a488e43e38c2b8e9','apk_d342e11b7931077d'
         " WHERE x.project_id=?", (pid,)).fetchone()[0]
     print(pid, 'xrefs=%d  exactly-joinable-to-methods=%d' % (total, exact))
 PY
-apk_80a8fe0e81204c9f xrefs=23  exactly-joinable-to-methods=1
+apk_80a8fe0e81204c9f xrefs=23  exactly-joinable-to-methods=3
 apk_a488e43e38c2b8e9 xrefs=13  exactly-joinable-to-methods=0
 apk_d342e11b7931077d xrefs=15  exactly-joinable-to-methods=3
 ```
 
 （剩下的边指向 `java.lang.StringBuilder.append` 之类**不在这个 APK 里**的库方法，
-本来就 join 不上，那是正常的。demo-app 唯一 join 上的那一条是 `MainActivity.describe`，
-它的描述符只有一个参数，所以两边都没有空格。）
+本来就 join 不上，那是正常的。）
 
-**规律：描述符里有 2 个及以上参数时，`get_descriptor()` 才在分号后插入空格；
-1 个参数时没有空格。** 所以这个方法 id 分歧只影响多参数方法。
+**现在的行为：** 方法 id 在模型层、存储层、查询层三处都只有**一个**拼写——
+规范的 JVM 描述符，参数类型紧挨着（`models.py:95-136`）。`dexatlas methods` 印出来的
+就是能用的 id，`dexatlas xrefs` 也认两种写法（查询时两边都规范化）：
 
-> 注意：`docs/reports/phase1-execution-report.md` 3.1 节说
-> 「方法表里 `get_descriptor()` 返回的是规范形式」（无空格）。
-> **在 androguard 4.1.4 上实测不是这样**——它返回带空格的。
-> 那次修复解决的是「调用目标」这一侧，没解决「方法表」这一侧。
+```console
+$ uv run dexatlas xrefs apk_80a8fe0e81204c9f "com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+  com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V  →
+com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/St
+ring;
+```
 
-### 6.2 `method_count` 报的数比表里的行数多
+**既有的旧工作区不需要重建也能查**：查询比较的是规范化之后的 id，
+索引也建在规范化形式上。详见
+[`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 3.11 节。
 
-见 4.3。multidex-app 报 14，`methods` 表 11 行。
-`project.method_count` 数的是折叠前的列表（`core/pipeline.py:154`），
-`methods` 表的主键会折叠重复（`core/storage.py:84`）。
+### 6.2 `method_count` 报的数比表里的行数多（已修）
+
+**当时的现象：** multidex-app 报 14，`methods` 表 11 行。
+`project.method_count` 数的是折叠前的列表（`core/pipeline.py:174` 之前的写法），
+`methods` 表的主键会折叠重复（`core/storage.py:105`）。
 **类在多个 DEX 里重复定义时就会不一致。**
 
-### 6.3 `dexatlas classes` 只显示前两条 provenance
+**现在的行为：** 计数由表自己量——`Store.save_symbols` 数的是它写进去的行数
+（`core/storage.py:429-434`），管道报的是这个数。**报出来的数就是查得到的数。**
+折叠掉的那三个方法也没有丢：它们合并成了一条带两份 provenance 的方法
+（`core/pipeline.py:375-400`），就像一个类被两个后端看到时那样。
 
-`cli/main.py:189` 是 `for source in cls.provenance[:2]:`。
-multidex-app 的 `SharedConfig` 有**三条**来源（两个 DEX + JADX），CLI 只显示前两条：
+### 6.3 `dexatlas classes` 只显示前两条 provenance（已修）
+
+**当时的现象：** `cli/main.py` 里是 `for source in cls.provenance[:2]:`。
+multidex-app 的 `SharedConfig` 有**三条**来源（两个 DEX + JADX），CLI 只显示前两条，
+而且**不说是截断的**：
 
 ```console
 $ uv run dexatlas classes apk_a488e43e38c2b8e9
-com.example.multidex.PayloadLoader class
-  androguard androguard 4.1.4 -> 
-androguard:classes2.dex#com.example.multidex.PayloadLoader
-  jadx 1.5.2 -> 
-jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_a488e43e38
-c2b8e9/jadx/sources/com/example/multidex/PayloadLoader.java
-com.example.multidex.PrimaryHelper class
-  androguard androguard 4.1.4 -> 
-androguard:classes.dex#com.example.multidex.PrimaryHelper
-  jadx 1.5.2 -> 
-jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_a488e43e38
-c2b8e9/jadx/sources/com/example/multidex/PrimaryHelper.java
-com.example.multidex.SecondaryHelper class
-  androguard androguard 4.1.4 -> 
-androguard:classes2.dex#com.example.multidex.SecondaryHelper
-  jadx 1.5.2 -> 
-jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_a488e43e38
-c2b8e9/jadx/sources/com/example/multidex/SecondaryHelper.java
+...
 com.example.multidex.SharedConfig class
-  androguard androguard 4.1.4 -> 
+  androguard androguard 4.1.4 ->
 androguard:classes.dex#com.example.multidex.SharedConfig
-  androguard androguard 4.1.4 -> 
+  androguard androguard 4.1.4 ->
 androguard:classes2.dex#com.example.multidex.SharedConfig
 ```
 
-第三条（JADX）被截掉了。要拿完整列表，用 REST API（`api/app.py:236-239` 返回完整的
-`model_dump`）：
+第三条（JADX）被截掉了，而 REST API（`api/app.py:228-241` 返回完整的
+`model_dump`）返回的是**全部三条**——**CLI 看到的比 API 看到的少**。
+
+**现在的行为：** 默认仍然只显示前两条（一个类可能有几十条来源，全倒出来没法看），
+但**明确写出折叠了多少**，并给出看全部的办法：
 
 ```console
-$ curl -s "http://127.0.0.1:8137/projects/apk_a488e43e38c2b8e9/classes?prefix=com.example.multidex.SharedConfig" | python -m json.tool
+$ uv run dexatlas classes apk_a488e43e38c2b8e9
+...
+com.example.multidex.SharedConfig class
+  androguard androguard 4.1.4 ->
+androguard:classes.dex#com.example.multidex.SharedConfig
+  androguard androguard 4.1.4 ->
+androguard:classes2.dex#com.example.multidex.SharedConfig
+  … 1 more source not shown (use --all to see all 3)
 ```
 
-```json
-{
-    "project_id": "apk_a488e43e38c2b8e9",
-    "total": 1,
-    "classes": [
-        {
-            "provenance": [
-                {
-                    "tool": "androguard",
-                    "tool_version": "androguard 4.1.4",
-                    "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
-                    "locator": "androguard:classes.dex#com.example.multidex.SharedConfig"
-                },
-                {
-                    "tool": "androguard",
-                    "tool_version": "androguard 4.1.4",
-                    "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
-                    "locator": "androguard:classes2.dex#com.example.multidex.SharedConfig"
-                },
-                {
-                    "tool": "jadx",
-                    "tool_version": "1.5.2",
-                    "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
-                    "locator": "jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/apk_a488e43e38c2b8e9/jadx/sources/com/example/multidex/SharedConfig.java"
-                }
-            ],
-            "name": "com.example.multidex.SharedConfig",
-            "kind": "class",
-            "superclass": "java.lang.Object",
-            "interfaces": [],
-            "access_flags": [
-                "public"
-            ],
-            "method_count": 3,
-            "field_count": 0
-        }
-    ]
-}
-```
+`--all` 显示全部来源，`--provenance-limit N` 指定要显示几条。
+类列表本身被 `--limit` 截断时也一样会说明截断了多少。
 
-### 6.4 交叉引用永远不产生证据行
+**`dexatlas methods` 没有这个问题**：它根本不显示 provenance，
+所以不是「显示了一部分」，是「一条都没显示」——方法和字段的来源只能从 REST API 拿。
 
-`EvidenceKind.CROSS_REFERENCE` 存在（`models.py:231`），
-`EvidenceBuilder.add_method_references` 也存在（`core/evidence.py:131-146`），
-**但 `src/` 里没有任何地方调用它**：
+### 6.4 交叉引用永远不产生证据行（已修）
 
-```console
-$ grep -rn "add_method_references" --include=*.py src tests | sort
-src/dexatlas/core/evidence.py:131:    def add_method_references(
-tests/test_evidence.py:146:    builder.add_method_references(method, references)
-tests/test_evidence.py:156:    builder.add_method_references(
-```
+**当时的现象：** `EvidenceKind.CROSS_REFERENCE` 存在，
+`EvidenceBuilder.add_method_references` 也存在，
+**但 `src/` 里没有任何地方调用它**——所以交叉引用只是索引数据，不是证据。
+报告里看不到「谁调用了什么」这一层，只能在索引里查。
 
-**所以交叉引用只是索引数据，不是证据。** 报告里看不到「谁调用了什么」这一层，
-只能在索引里查。`EvidenceKind.CODE_LOCATED` 和 `EvidenceKind.BEHAVIOUR` 同理，
-在 `src/` 里都没有生产者。
+**现在的行为：** 管道会为**这个 APK 自己的、被调用过的方法**各记一条证据
+（`core/pipeline.py:249-256` 调用 `core/evidence.py:164-193` 的
+`add_cross_references`）。粒度是**被调用的方法**，不是「调用」：
+一个被五十处调用的方法是**一条**结论。调用库代码（`java.lang.StringBuilder.append`）
+**不产生记录**——那是关于 JDK 的事实，不是关于这个应用的结论；
+调用本身照样在 `xrefs` 表里查得到。
 
-### 6.5 「已导出组件」这条证据的 `tool_version` 是 `null`
+所以报告里现在有两个数：**索引里的交叉引用条数**，和**有证据记录的条数**
+（`reports/markdown.py:50-51`）。两个数不一样是**故意**的：
+一个所有调用都进了库的应用，不能被误读成一个交叉引用坏掉的应用。
 
-`core/evidence.py:103-129` 的 `add_exported_components` 硬编码了 `tool_version=None`，
+`EvidenceKind.CODE_LOCATED` 和 `EvidenceKind.BEHAVIOUR` 仍然没有生产者——
+它们是给 Phase 2 准备的。
+
+### 6.5 「已导出组件」这条证据的 `tool_version` 是 `null`（未修）
+
+`core/evidence.py:109-135` 的 `add_exported_components` 硬编码了 `tool_version=None`，
 **即使 apktool 的版本是已知的**。对比同一份报告里 manifest 那条证据：
 
 ```console
@@ -923,11 +937,11 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 | 证据 | 来源 |
 |---|---|
 | `E-0001` Package com.example.demo (...) | `apktool 2.11.1 -> AndroidManifest.xml` |
-| `E-0006` 2 component(s) are explicitly exported | `apktool -> AndroidManifest.xml#/application` |
+| `E-0002` 2 component(s) are explicitly exported | `apktool -> AndroidManifest.xml#/application` |
 
 **同一条工具链的两条证据，一条带版本一条不带。** 报告里的
 `Tool versions: androguard androguard 4.1.4, apktool 2.11.1, jadx 1.5.2` 那行
-（`reports/markdown.py:90-96`）是从 `Project.tool_versions` 来的，
+（`reports/markdown.py:70`、`reports/markdown.py:123-129`）是从 `Project.tool_versions` 来的，
 和 per-evidence 的 `tool_version` 是两份数据（见 3.1）。
 
 顺带一提 `Provenance.ref()`（`models.py:68-76`）的输出是
@@ -937,7 +951,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 ### 6.6 `xrefs` 表里可能有重复的 caller/callee 对
 
 `Project.reference_count` 数的是 Androguard 遍历出来的边数，
-`xrefs` 表没有主键（`core/storage.py:98-104`），重复的 caller/callee 对会**各自保留**
+`xrefs` 表没有主键（`core/storage.py:119-125`），重复的 caller/callee 对会**各自保留**
 （因为 provenance 不同：哪个 DEX 里扫到的）。multidex-app 的
 `SharedConfig.<init>()V -> java.lang.Object.<init>()V` 就有两条，
 分别来自 `classes.dex` 和 `classes2.dex`：
@@ -955,6 +969,7 @@ com.example.multidex.SharedConfig.<init>()V -> java.lang.Object.<init>()V | andr
 
 这个是对的（两条边确实来自两个 DEX），但读表的人需要知道 `xrefs` 表
 **可能有重复的 caller/callee 对**。
+
 
 ---
 
@@ -998,7 +1013,8 @@ rm -rf "$DEXATLAS_WORKSPACE"
 | 代码在哪儿 | `provenance[].locator`（格式见 3.2，**没有行号**） |
 | 这个结论有多硬 | `Evidence.level`（Phase 1 全部是 `verified`） |
 | 后端有没有降级 | `Project.errors` / 报告的「Backend errors」段 / `kind=observation` 的证据 |
-| 想看完整 provenance 列表 | 用 REST API 的 `/classes`，别用 CLI（6.3） |
-| 想查调用者 | `dexatlas xrefs`，**方法 id 不能带空格**（6.1） |
-| 想知道 JADX 有没有反编译失败 | **查不到**，看 5.2 |
+| 这个方法反编译出来了吗 | `MethodRef.decompiled` / `dexatlas methods` 的「Decompiled」列 / 报告的「Methods decompiled by JADX」 |
+| 有多少代码读不出来 | 报告的「Methods decompiled by JADX」和那条 `observation` 证据的 `detail` |
+| 想看完整 provenance 列表 | `dexatlas classes --all`，或者 REST API 的 `/classes`（6.3） |
+| 想查调用者 | `dexatlas xrefs`，方法 id 两种拼写都认（6.1） |
 | 想知道字符串在不在资源里 | **查不到**，看 5.4 |
