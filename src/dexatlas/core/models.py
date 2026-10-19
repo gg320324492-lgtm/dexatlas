@@ -7,11 +7,17 @@ failure and an Apktool Smali body stay different things, and both are reachable.
 Every extracted item carries :class:`Provenance`: which tool produced it, at what
 version, against which APK hash, and where in that tool's output it lives. A conclusion
 that cannot be traced back to a code location is not a conclusion.
+
+The location has to survive the trip, too. A locator that names a path on the machine
+that ran the analysis points at nothing on the reader's machine, so a locator names a
+place *inside an artefact* — the APK, or the output tree a backend wrote — and never
+an absolute path.
 """
 
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -54,6 +60,32 @@ class ToolError(BaseModel):
         return f"[{self.tool}/{self.code}] {self.message}{suffix}"
 
 
+#: A locator written before the JADX output tree became a relative path. The old
+#: form was ``jadx:<absolute path>``, and that path ran through the project
+#: workspace on the machine that ran the analysis. Only the tail after the
+#: project directory is a fact about the analysis; the rest was a fact about
+#: the machine.
+_LEGACY_JADX_LOCATOR = re.compile(r"^jadx:.*?/projects/apk_[0-9a-f]{16}/jadx/(?P<path>.+)$")
+
+
+def normalize_locator(locator: str) -> str:
+    """Rewrite a locator written in an older format into the current one.
+
+    The only format that changed is JADX's, which used to carry the absolute
+    path of the file it had written. A workspace indexed before the change still
+    holds those, and reading them back in the current form keeps an old
+    database producing a portable report — without a migration, and without the
+    reader having to know which format a row was written in.
+
+    A locator that does not match the old shape is left exactly as it is: an
+    unfamiliar locator is not one to guess at.
+    """
+    match = _LEGACY_JADX_LOCATOR.match(locator)
+    if match is None:
+        return locator
+    return f"jadx:{match.group('path')}"
+
+
 class Provenance(BaseModel):
     """Where one fact came from."""
 
@@ -62,8 +94,20 @@ class Provenance(BaseModel):
     tool: str
     tool_version: str | None = None
     apk_sha256: str
-    #: Backend-native pointer back to the source, e.g. ``jadx:.../Foo.java#42``.
+    #: Backend-native pointer back to the source, e.g. ``jadx:sources/a/Foo.java``.
+    #:
+    #: The shape is ``<tool>:<place>``, and the place is relative to the
+    #: artefact the tool names: a member of the APK for Androguard, a file
+    #: inside the output tree for JADX and Apktool. An absolute path would name
+    #: the machine that ran the analysis instead of the analysis itself, and a
+    #: reader on another machine could not follow it.
     locator: str
+
+    @field_validator("locator")
+    @classmethod
+    def _read_an_older_locator_in_the_current_form(cls, value: str) -> str:
+        """A locator stored in an older format is read as the current one."""
+        return normalize_locator(value)
 
     def ref(self) -> str:
         """Short citation form used in reports.

@@ -38,11 +38,30 @@ class EvidenceBuilder:
     """Accumulates evidence for one project, assigning ids as it goes."""
 
     project_id: str
+    tool_versions: dict[str, str | None]
+    """The version of each tool that took part in the analysis.
+
+    Evidence names the tool that produced it, and a tool without a version
+    cannot be reproduced: a reader cannot tell "this tool has no version" from
+    "nobody filled this in". The versions are therefore a constructor argument
+    rather than something to be remembered later — an evidence record cannot be
+    written without them.
+    """
+
     apk_sha256: str = ""
     items: list[Evidence] = field(default_factory=list)
 
     def _next_id(self) -> str:
         return f"E-{len(self.items) + 1:04d}"
+
+    def _version(self, tool: str) -> str | None:
+        """The version of one tool, if the analysis knew it.
+
+        ``None`` means the tool never ran — it was not installed, or it was
+        left out of the run. That is a fact about the tool, not a gap in the
+        record.
+        """
+        return self.tool_versions.get(tool)
 
     def add(
         self,
@@ -88,9 +107,9 @@ class EvidenceBuilder:
             provenance=[
                 Provenance(
                     tool=error.tool,
-                    tool_version=None,
+                    tool_version=self._version(error.tool),
                     apk_sha256=self.apk_sha256,
-                    locator=f"error/{error.code}",
+                    locator=f"{error.tool}:error/{error.code}",
                 )
             ],
             detail={"error": error.model_dump(mode="json")},
@@ -122,9 +141,9 @@ class EvidenceBuilder:
             provenance=[
                 Provenance(
                     tool="apktool",
-                    tool_version=None,
+                    tool_version=self._version("apktool"),
                     apk_sha256=self.apk_sha256,
-                    locator="AndroidManifest.xml#/application",
+                    locator="apktool:AndroidManifest.xml#/application",
                 )
             ],
             detail={

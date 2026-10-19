@@ -38,7 +38,7 @@ from dexatlas.core.models import (
 from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
-from dexatlas.tools.jadx.adapter import ClassDecompilation, JadxBackend
+from dexatlas.tools.jadx.adapter import ClassDecompilation, JadxBackend, source_locator
 from dexatlas.tools.registry import BackendRegistry
 
 logger = logging.getLogger(__name__)
@@ -111,8 +111,16 @@ class Analyzer:
         self._store.save_project(project, workspace, manifest=None)
         self._store.set_status(project.id, ProjectStatus.RUNNING)
 
-        builder = EvidenceBuilder(project_id=project.id, apk_sha256=apk.sha256)
+        # The versions are probed before the evidence is built, because the
+        # evidence names the version of the tool that produced it. Probing them
+        # once, here, keeps one answer for the project record and for every
+        # evidence record.
         project.tool_versions = self._backends.versions()
+        builder = EvidenceBuilder(
+            project_id=project.id,
+            tool_versions=project.tool_versions,
+            apk_sha256=apk.sha256,
+        )
 
         manifest: ManifestInfo | None = None
         classes: list[ClassRef] = []
@@ -216,7 +224,7 @@ class Analyzer:
                     f"(versionName={manifest.version_name}, minSdk={manifest.min_sdk}, "
                     f"targetSdk={manifest.target_sdk})"
                 ),
-                provenance=[backend.provenance(project.apk.sha256, "AndroidManifest.xml")],
+                provenance=[backend.provenance(project.apk.sha256, "apktool:AndroidManifest.xml")],
                 detail={
                     "permissions": [p.name for p in manifest.permissions],
                     "components": len(manifest.components),
@@ -499,7 +507,7 @@ def _record_decompilation(
                 tool="jadx",
                 tool_version=project.tool_versions.get("jadx"),
                 apk_sha256=project.apk.sha256,
-                locator=f"jadx:{sources.as_posix()}",
+                locator=source_locator(output_dir, sources),
             )
         ],
         detail={
