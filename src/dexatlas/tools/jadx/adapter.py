@@ -147,6 +147,18 @@ def _simple_class_name(class_name: str) -> str:
     return class_name.rpartition(".")[2].rpartition("$")[2]
 
 
+def source_locator(output_dir: Path, path: Path) -> str:
+    """The locator for a file inside JADX's output tree.
+
+    The path is relative to the directory JADX wrote into. An absolute path
+    would name the machine that ran the analysis rather than the analysis, and
+    a reader on another machine cannot follow it — the same file, at the same
+    place inside the tree, is what any run of the same JADX over the same APK
+    produces.
+    """
+    return f"jadx:{path.relative_to(output_dir).as_posix()}"
+
+
 class JadxBackend(Backend):
     """Wraps the ``jadx`` command-line decompiler."""
 
@@ -258,7 +270,7 @@ class JadxBackend(Backend):
                 ClassRef(
                     name=name,
                     kind=self._class_kind(text),
-                    provenance=[self.provenance(apk_sha256, f"jadx:{java_file.as_posix()}")],
+                    provenance=[self.provenance(apk_sha256, source_locator(output_dir, java_file))],
                     method_count=len(self._method_spans(text)),
                 )
             )
@@ -493,4 +505,4 @@ def read_text(path: Path) -> str | None:
         return None
 
 
-__all__ = ["ClassDecompilation", "JadxBackend", "read_text"]
+__all__ = ["ClassDecompilation", "JadxBackend", "read_text", "source_locator"]

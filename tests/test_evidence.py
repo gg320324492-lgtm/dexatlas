@@ -36,8 +36,12 @@ def _provenance(tool: str = "androguard") -> list[Provenance]:
     return [Provenance(tool=tool, tool_version="1.0", apk_sha256="b" * 64, locator=f"{tool}:x")]
 
 
-def _builder() -> EvidenceBuilder:
-    return EvidenceBuilder(project_id="apk_test", apk_sha256="b" * 64)
+def _builder(tool_versions: dict[str, str | None] | None = None) -> EvidenceBuilder:
+    return EvidenceBuilder(
+        project_id="apk_test",
+        tool_versions=tool_versions or {},
+        apk_sha256="b" * 64,
+    )
 
 
 def _method(name: str = "m", class_name: str = "com.a.C") -> MethodRef:
@@ -142,7 +146,65 @@ def test_exported_components_provenance_points_at_the_declaration() -> None:
 
     evidence = builder.items[0]
     assert len(evidence.detail["components"]) == 1
-    assert evidence.provenance[0].locator == "AndroidManifest.xml#/application"
+    assert evidence.provenance[0].locator == "apktool:AndroidManifest.xml#/application"
+
+
+# -- tool versions ----------------------------------------------------------
+
+
+def test_exported_components_carry_the_tool_version() -> None:
+    """The same tool, the same run, the same version.
+
+    A record that names apktool without a version is indistinguishable from a
+    record where nobody filled the version in, and a reader cannot reproduce
+    the one without the other.
+    """
+    builder = _builder(tool_versions={"apktool": "2.11.1"})
+
+    builder.add_exported_components(
+        [ManifestComponent(kind="activity", name="com.a.Main", exported=True)]
+    )
+
+    assert builder.items[0].provenance[0].tool_version == "2.11.1"
+
+
+def test_a_backend_error_carries_the_version_of_the_tool_that_failed() -> None:
+    """An error is evidence, so it is as reproducible as any other evidence.
+
+    The version tells the reader which build of the tool failed, which is
+    exactly what one needs to reproduce the failure.
+    """
+    builder = _builder(tool_versions={"jadx": "1.5.2"})
+    error = ToolError(tool="jadx", code=ToolErrorCode.TIMEOUT, message="timed out")
+
+    evidence = builder.add_error(error)
+
+    assert evidence.provenance[0].tool_version == "1.5.2"
+
+
+def test_a_tool_that_never_ran_has_no_version() -> None:
+    """A missing tool is not a missing version.
+
+    A tool that was never installed has no version to report, and saying so
+    honestly is different from leaving the field blank on a record whose tool
+    was there all along.
+    """
+    builder = _builder(tool_versions={"apktool": "2.11.1"})
+    error = ToolError(tool="jadx", code=ToolErrorCode.NOT_INSTALLED, message="not installed")
+
+    evidence = builder.add_error(error)
+
+    assert evidence.provenance[0].tool_version is None
+
+
+def test_the_error_locator_names_the_tool_that_failed() -> None:
+    """One convention for every locator: the tool, then the place."""
+    builder = _builder()
+    error = ToolError(tool="jadx", code=ToolErrorCode.NOT_INSTALLED, message="not installed")
+
+    evidence = builder.add_error(error)
+
+    assert evidence.provenance[0].locator == "jadx:error/not_installed"
 
 
 def test_no_exported_components_records_nothing() -> None:
