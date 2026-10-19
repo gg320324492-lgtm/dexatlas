@@ -51,10 +51,15 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 改完代码跑一次脚本即可，不必再手工同步——这条约束是第三次被手工同步打断之后
 才补上的（见 7 节第 5 条）。表里其余几行是当时的实测结论，不随代码漂移。
 
+**跑一次就够。** 报告里的数字决定 `tests/test_docs.py` 是否通过，所以「测量」与
+「写回」互相影响：报告过期时那几个自检测试会失败，脚本若把它们算进测量结果，
+写回去的就是「失败状态」的数字，还得再跑一次才收敛。脚本把这两类测试分开测，
+所以一次运行就能到达稳定状态（机制见 6 节）。
+
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->324<!--/fig-->（<!--fig:tests.fast-->245<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.4%<!--/fig-->**（<!--fig:coverage.covered-->1584<!--/fig-->/<!--fig:coverage.total-->1714<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->359<!--/fig-->（<!--fig:tests.fast-->276<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->92.5%<!--/fig-->**（<!--fig:coverage.covered-->1619<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
@@ -68,11 +73,11 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
-| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->157<!--/fig--> |
+| `cli/main.py` | <!--fig:coverage.file.cli/main.py.pct-->100.0%<!--/fig--> | <!--fig:coverage.file.cli/main.py.missed-->0<!--/fig--> / <!--fig:coverage.file.cli/main.py.statements-->159<!--/fig--> |
 | `tools/jadx/adapter.py` | <!--fig:coverage.file.tools/jadx/adapter.py.pct-->77.8%<!--/fig--> | <!--fig:coverage.file.tools/jadx/adapter.py.missed-->46<!--/fig--> / <!--fig:coverage.file.tools/jadx/adapter.py.statements-->207<!--/fig--> |
 | `cli/console.py` | <!--fig:coverage.file.cli/console.py.pct-->82.4%<!--/fig--> | <!--fig:coverage.file.cli/console.py.missed-->6<!--/fig--> / <!--fig:coverage.file.cli/console.py.statements-->34<!--/fig--> |
 | `api/app.py` | <!--fig:coverage.file.api/app.py.pct-->85.7%<!--/fig--> | <!--fig:coverage.file.api/app.py.missed-->21<!--/fig--> / <!--fig:coverage.file.api/app.py.statements-->147<!--/fig--> |
-| `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.5%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->174<!--/fig--> |
+| `tools/androguard/adapter.py` | <!--fig:coverage.file.tools/androguard/adapter.py.pct-->88.6%<!--/fig--> | <!--fig:coverage.file.tools/androguard/adapter.py.missed-->20<!--/fig--> / <!--fig:coverage.file.tools/androguard/adapter.py.statements-->175<!--/fig--> |
 | `reports/markdown.py` | <!--fig:coverage.file.reports/markdown.py.pct-->89.4%<!--/fig--> | <!--fig:coverage.file.reports/markdown.py.missed-->5<!--/fig--> / <!--fig:coverage.file.reports/markdown.py.statements-->47<!--/fig--> |
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
@@ -93,7 +98,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.4%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->92.5%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -101,9 +106,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->245<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->79<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->324<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->276<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->83<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->359<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -426,6 +431,8 @@ Phase 1 计划书 1.4 节给了一份 8 项验收清单。回头逐条核对，�
 而清单和它声称依据的事实之间，没有任何机制保证一致。
 所以 FIX-002 的重点不是"再补几个测试"，而是**让清单本身变成可验证的**。
 
+---
+
 ### 3.11 严重：方法 id 在两张表里拼写不同 🔴（v0.1.3 修复）
 
 这个缺陷是**分析覆盖度文档**的编写过程中发现的——让另一个 agent 去读代码并
@@ -492,57 +499,6 @@ xrefs.callee:        (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;   
 
 ## 4. 需要你重点审核的判断
 
-以下是我的主观决策，你可能有不同看法。
-
-### 4.1 「后端失败是值，不是异常」
-
-整个架构建立在这一条上：JADX/Apktool 对混淆代码失败是**常态**，
-所以失败必须是一等公民（`ToolError`），挂在受影响的结果上，而不是中断整个分析。
-
-**代价：** 错误处理代码明显增多，`Analyzer` 里有大量「记一笔然后继续」。
-**收益：** 一个 APK 即使完全骗过 JADX，仍然产出 manifest、符号索引和报告。
-
-**审核点：** 这个复杂度的取舍你认可吗？
-
-### 4.2 交叉引用靠遍历字节码，而非用库的 xref 缓存
-
-Androguard 4.x **移除了** xref 缓存（3.x 有）。所以调用边是从指令里扫出来的。
-
-**代价：** 这是最贵的操作（真实 APK 上占大部分时间），所以有 instruction limit。
-**收益：** 不依赖特定版本行为，跨版本稳定。
-
-**审核点：** 接受自己实现 xref，还是引入 Ghidra 等工具做符号解析？
-
-### 4.3 演示样本是自建的，不是抓来的第三方 APK
-
-本机没有 Android SDK，但我发现 **Apktool 自带 aapt2，可以从 smali 直接构建 APK**。
-所以 `examples/` 下的样本全是手写 smali 构建的真实应用，源码和重建脚本都在仓库里。
-FIX-002 之后是 5 个：`demo-app`（通用）、`multidex-app`（两个 dex）、
-`obfuscated-app`（单字母类名）、`strings-app`（字符串密集）、
-`wide-app`（接口与实现层次）。
-
-**代价：** 样本都很小（最大的不到 3 KB、5 个类），展示不出大型 APK 的表现。
-**收益：** 完全自有、可重建、无第三方许可问题；陌生人克隆后立刻能跑。
-
-### 4.4 我没有实现计划书里的部分内容
-
-计划书 Phase 1 提到「测试 APK 从上传到阅读 AI 分析报告的闭环」——
-**Phase 1 没有 AI**，这是计划书本身的设计（AI 在 Phase 2）。
-
-但我确认：**关闭所有大模型 API 后，底层分析完全正常**——这是路线图的第一原则，已达成。
-
-### 4.5 未做的部分（如实列出）
-
-- **Web 工作台 / MCP / Agent**：Phase 2，尚未开始
-- **大型 APK 压力测试**：5 个自建样本 + 2 个第三方样本覆盖了多 DEX、混淆、
-  字符串密集、接口继承等布局，但都**很小**——最大的自建样本不到 3 KB。
-  没有 10 万类以上的大型 APK 数据点，所以索引性能和指令上限从未被真实压测过
-- **混淆代码的对抗性测试**：`obfuscated-app` 覆盖了短类名和短方法名，
-  但它是**手写的**混淆，不是有控制流混淆的真实加固 APK
-- **第三方的混淆/加固样本**：仓库不含此类文件（安全边界），需要时靠
-  `scripts/fetch-fixtures.sh` 拉取
-
-Phase 1 计划里的 5 个自建测试 APK 已由 FIX-002 补齐（见 3.10 节）。
 
 ---
 
@@ -579,6 +535,20 @@ uv run python scripts/refresh-report-figures.py
 脚本会跑一遍完整套件（约 100 秒），把测量结果写回本文件里带标记的数字。
 想确认报告是不是最新，用 `--check`：它只比较、不写入，有出入就以非零码退出。
 
+**一次运行就够。** 报告里的数字决定 `tests/test_docs.py` 是否通过，所以「测量」和
+「写回」是互相影响的：报告过期时那几个自检测试会失败，脚本若把它们算进测量结果，
+写回去的就是「失败状态」的数字，还得再跑一次才收敛。脚本因此把两类测试分开测：
+
+* **代码测试**（报告自检以外的全部）：它们失败就是代码坏了。脚本会**按名字列出**
+  每一个失败项，并且**不写回任何数字**——报告里的数字描述的是一次全绿的运行，
+  这次不是，就不该拿它去发布。修好之后重跑即可。
+* **报告自检**（`tests/test_docs.py::test_execution_report_*`）：它们失败是报告过期。
+  脚本先在内存里造出一份「已经一致」的报告（放在临时文件里，不碰磁盘上那份），
+  用它测这些自检，再按测出来的结果重建候选报告，直到数字不再变化。
+
+所以跑一次脚本，报告就同时满足自检；紧接着再跑一次不会有任何改动。
+`--check` 走同一套测量，只比较、不写入。
+
 **在没有装后端、没拉样本的机器上，脚本测出来的覆盖率会更低**（跳过的测试不产生
 覆盖率）。这种情况下它**不会**改写覆盖率那几行——报告里的覆盖率必须对应一次完整
 测量——而是保留原值，并告诉你缺了什么。口径写在 1.3 节末尾。
@@ -586,10 +556,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->324<!--/fig--> 个：<!--fig:tests.fast-->245<!--/fig--> 快 + <!--fig:tests.slow-->79<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->359<!--/fig--> 个：<!--fig:tests.fast-->276<!--/fig--> 快 + <!--fig:tests.slow-->83<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.4%<!--/fig-->（<!--fig:coverage.covered-->1584<!--/fig-->/<!--fig:coverage.total-->1714<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->324<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->92.5%<!--/fig-->（<!--fig:coverage.covered-->1619<!--/fig-->/<!--fig:coverage.total-->1750<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->359<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字是那个 tag 当时的实测值，**不随本报告刷新**）：
@@ -707,21 +677,21 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "api/app.py": [147, 21],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [157, 0],
+      "cli/main.py": [159, 0],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
       "core/evidence.py": [36, 0],
       "core/ingest.py": [36, 2],
-      "core/models.py": [165, 3],
+      "core/models.py": [193, 4],
       "core/pipeline.py": [179, 5],
-      "core/storage.py": [163, 7],
+      "core/storage.py": [168, 7],
       "reports/__init__.py": [4, 0],
       "reports/json_report.py": [18, 0],
       "reports/markdown.py": [47, 5],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [174, 20],
+      "tools/androguard/adapter.py": [175, 20],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [157, 8],
       "tools/base.py": [101, 7],
@@ -729,19 +699,19 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/jadx/adapter.py": [207, 46],
       "tools/registry.py": [28, 0]
     },
-    "missing": 130,
-    "statements": 1714
+    "missing": 131,
+    "statements": 1750
   },
-  "schema": 1,
-  "source_fingerprint": "sha256:e4565a0f040ee3cc2b76f17c17dca46acdce4fdd1d936c891eebf85aed97bd40",
+  "schema": 2,
+  "source_fingerprint": "sha256:659139b26a991846033a0b4df2e99b272079ccec897f990f5edb7bd1b8ecc16c",
   "suite": {
-    "passed": 324,
+    "passed": 359,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 245,
-    "slow": 79,
-    "total": 324
+    "fast": 276,
+    "slow": 83,
+    "total": 359
   }
 }-->
