@@ -31,7 +31,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | 243（191 快 + 52 集成） | — |
+| 测试数 | 244（192 快 + 52 集成） | — |
 | 一方代码覆盖率 | **87.8%**（1484/1691 行，v0.1.0 时点） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -65,9 +65,9 @@ CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | 191 | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | 192 | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | 52 | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | 243 | |
+| 合计 | 244 | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -259,16 +259,43 @@ for root in sorted(smali_root.glob("smali*")):   # ← 却在这里面找 smali*
 
 ### 3.7 CI 反复失败暴露的问题
 
-CI 一共红了 **3 次**，每次都是真问题：
+CI 一共红了 **4 次**，每次都是真问题：
 
 | 次数 | 失败 job | 真实原因 |
 |------|----------|----------|
 | 1 | 5/6 | `uv sync --frozen` 缺 lock 文件；jadx 解压目录名假设错误；依赖审计 action 不存在；缺 `unzip` |
 | 2 | 4/6 | 覆盖率门禁偷偷用了 `-m "not slow"`，把该测的代码排除掉了，报告 70% 而非 82% |
 | 3 | 2/6 | 测试无条件 import Pillow，而 Pillow 在 CI 没装的 `demo` extra 里 |
+| 4 | 1/5 | Smali 回退的集成测试依赖「JADX 不可用」，而我是用「把 `jadx_path` 指向不存在的目录」实现的 |
 
 第 2 次尤其值得注意：**门禁本身是坏的**。它报告的 70% 和真实的 82% 都不是问题，
 问题是它测的东西和它声称测的东西不一样。
+
+第 4 次是本文档的价值的一个反面例子，值得写清楚：
+
+**它在我本机通过，在 CI 失败。** 原因是我以为「把配置路径指向不存在的目录」
+就等于「这个后端不可用」。实际上 `which_or_none` 在配置路径不存在时会**回退到
+`PATH` 查找**——CI 里 jadx 正在 `PATH` 上（`install-backends.sh` 会加进去），
+所以它照样被找到，测试的断言 `JADX must be unavailable` 直接失败。
+
+**一个只在别人机器上才失败的测试，比没有这个测试更糟**，因为它会让人怀疑
+CI 而不是怀疑测试。这条修正后的做法是直接 patch 后端的解析逻辑本身，
+不依赖机器上装了什么。本地两种环境（jadx 在 PATH 上 / 不在）都验证过。
+
+**顺带发现一个既有缺陷（不在本次修复范围，留待你裁决）：**
+`src/dexatlas/config/settings.py` 第 28 行的注释写着
+「Empty string disables that backend」，但实现做不到——
+`which_or_none` 对空串是 `if candidate:` 跳过，然后照样回退 `PATH`：
+
+```python
+>>> Settings(workspace="/tmp/w", jadx_path="").jadx_path
+''
+>>> JadxBackend(Settings(jadx_path="")).resolve()   # jadx 在 PATH 上
+PosixPath('/usr/local/bin/jadx')
+```
+
+也就是说，**没有任何办法通过配置禁用一个后端**。这不是 FIX-001 引入的，
+但它正是导致第 4 次 CI 失败的机制。建议作为独立 Issue 处理。
 
 ---
 
@@ -374,7 +401,7 @@ uv run pytest --cov=dexatlas --cov-report=term
 
 # 安装后端后跑完整套件
 bash scripts/install-backends.sh
-uv run pytest          # v0.1.0 时为 208；v0.1.1 起为 243
+uv run pytest          # v0.1.0 时为 208；v0.1.1 起为 244
 ```
 
 CI 记录：https://github.com/gg320324492-lgtm/dexatlas/actions

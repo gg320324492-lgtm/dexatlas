@@ -108,6 +108,28 @@ def test_apktool_argv_is_empty_when_missing(
     assert apktool._argv("d") == []
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "settings.py documents that an empty path disables the backend, but which_or_none "
+        "falls back to a PATH lookup, so an empty string does not disable anything. Found "
+        "while writing the Smali fallback integration test, which could not otherwise make "
+        "JADX unavailable. Not fixed here: it is outside FIX-001. See the execution report."
+    ),
+)
+def test_an_empty_path_disables_the_backend(
+    jadx: JadxBackend, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """An empty configured path is documented to mean "do not use this backend"."""
+    # Named jadx.bat so that `shutil.which` finds it on every platform the
+    # resolution code looks for.
+    _write_launcher(tmp_path / "bin" / "jadx.bat")
+    monkeypatch.setenv("PATH", str(tmp_path / "bin"))
+    jadx._settings.jadx_path = ""
+
+    assert jadx.resolve() is None
+
+
 def test_apktool_decode_without_the_tool_is_a_value_not_an_exception(
     apktool: ApktoolBackend, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

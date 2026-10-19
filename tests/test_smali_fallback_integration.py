@@ -13,6 +13,7 @@ is the only configuration in which the Smali fallback is actually the thing unde
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -32,16 +33,31 @@ pytestmark = [
 FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "apk"
 FIXTURE_APK = "multidex.apk"
 
-#: A path that cannot resolve, so JADX reports itself unavailable. Pointing the
-#: setting at something real would let the decompiler answer instead of the fallback.
-JADX_ABSENT = "no/such/directory/jadx"
-
 #: The fixture holds two dexes. Apktool decodes the first into ``smali/`` and the
 #: second into ``smali_classes2/`` — siblings, which is what the old code got wrong.
 MULTIDEX_CLASSES = [
     ("com.foobar.foo.Foobar", "smali", "somemethod"),
     ("com.blafoo.bar.Blafoo", "smali_classes2", "othermethod"),
 ]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def jadx_unavailable() -> Iterator[None]:
+    """Make JADX report itself unavailable for every test in this module.
+
+    Not done by pointing ``settings.jadx_path`` at a directory that does not exist.
+    ``which_or_none`` falls back to a ``PATH`` lookup when the configured path is
+    missing, so a JADX installed on ``PATH`` — which is exactly the case in CI —
+    would still be found, and the decompiler would answer instead of the fallback
+    being tested. The first version of this file made that mistake: it passed on a
+    developer machine and failed in CI for the same reason.
+
+    Patching the resolution itself is the only statement of intent that does not
+    depend on what happens to be installed on the machine running the tests.
+    """
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(JadxBackend, "resolve", lambda self: None)
+        yield
 
 
 @pytest.fixture(scope="module")
@@ -55,7 +71,7 @@ def decoded(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
         pytest.skip("fixture not present; run scripts/fetch-fixtures.sh")
 
     workspace = tmp_path_factory.mktemp("smali-fallback")
-    settings = Settings(workspace=workspace, jadx_path=JADX_ABSENT)
+    settings = Settings(workspace=workspace)
     analyzer = Analyzer(settings)
     result = analyzer.analyze(fixture)
 
