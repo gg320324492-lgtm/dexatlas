@@ -15,7 +15,8 @@ import subprocess
 import tempfile
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, Any
@@ -169,7 +170,7 @@ class Backend(ABC):
         logger.debug("%s: %s", self.name, " ".join(argv))
 
         try:
-            with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
+            with _temp_binary_file() as out_file, _temp_binary_file() as err_file:
                 try:
                     process = subprocess.Popen(
                         argv,
@@ -198,12 +199,8 @@ class Backend(ABC):
                     message = _timeout_message(self.name, timeout, _terminate_tree(process))
                     return fail(ToolErrorCode.TIMEOUT, message)
 
-                stdout = self._decode(
-                    _read_capped(out_file.file, self._settings.tool_max_output_bytes)
-                )
-                stderr = self._decode(
-                    _read_capped(err_file.file, self._settings.tool_max_output_bytes)
-                )
+                stdout = self._decode(_read_capped(out_file, self._settings.tool_max_output_bytes))
+                stderr = self._decode(_read_capped(err_file, self._settings.tool_max_output_bytes))
 
                 if process.returncode != 0:
                     return ToolOutcome(
@@ -378,6 +375,29 @@ def _reap(process: subprocess.Popen[bytes]) -> None:
             process.wait(timeout=_TERMINATION_GRACE_SECONDS)
         except subprocess.TimeoutExpired:
             logger.warning("a backend process did not exit after being killed")
+
+
+@contextmanager
+def _temp_binary_file() -> Iterator[IO[bytes]]:
+    """A temporary file as a plain binary file object, on every platform.
+
+    ``tempfile.TemporaryFile`` returns a plain file object on POSIX and a
+    wrapper carrying a ``.file`` attribute on Windows. Code that reaches for
+    ``.file`` therefore works on the machine it was written on and fails on
+    every other one — which is exactly what happened here, and why the capture
+    does not use ``TemporaryFile`` at all.
+
+    The file is created with ``mkstemp`` and handed to ``os.fdopen``, so what
+    the caller holds is the same kind of object on Linux and on Windows, and
+    the subprocess can inherit the descriptor from it on both.
+    """
+    descriptor, path = tempfile.mkstemp(prefix="dexatlas-backend-")
+    try:
+        with os.fdopen(descriptor, "w+b") as handle:
+            yield handle
+    finally:
+        with suppress(OSError):  # pragma: no cover - already gone
+            os.unlink(path)
 
 
 def _read_capped(handle: IO[bytes], limit: int) -> bytes:
