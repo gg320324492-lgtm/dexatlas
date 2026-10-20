@@ -67,6 +67,12 @@ class Backend(ABC):
 
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
+        # The version, asked for once per backend. Every symbol a backend
+        # indexes carries a provenance record, and every record names the
+        # version, so a backend that has to consult the package index to
+        # answer would do that once per symbol.
+        self._record_version: str | None = None
+        self._record_version_known = False
 
     # -- discovery ---------------------------------------------------------
 
@@ -203,10 +209,22 @@ class Backend(ABC):
         """Build the provenance record for anything this backend produced."""
         return Provenance(
             tool=self.name,
-            tool_version=self.version(),
+            tool_version=self._version_for_records(),
             apk_sha256=apk_sha256,
             locator=locator,
         )
+
+    def _version_for_records(self) -> str | None:
+        """The backend's version, asked for once per backend.
+
+        A version cannot change while an analysis runs, so the answer is
+        remembered: the cost of a symbol should be the cost of the symbol,
+        and not a question asked of the tool for every one of them.
+        """
+        if not self._record_version_known:
+            self._record_version_known = True
+            self._record_version = self.version()
+        return self._record_version
 
 
 def which_or_none(candidates: Sequence[str | None], *, names: Sequence[str] = ()) -> Path | None:

@@ -76,8 +76,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->483<!--/fig-->（<!--fig:tests.fast-->382<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.3%<!--/fig-->**（<!--fig:coverage.covered-->2087<!--/fig-->/<!--fig:coverage.total-->2213<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->495<!--/fig-->（<!--fig:tests.fast-->394<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.5%<!--/fig-->**（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -94,7 +94,6 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 |------|--------|------------------|
 | `cli/console.py` | 82.4% | 6 / 34 |
 | `tools/jadx/adapter.py` | 86.4% | 33 / 242 |
-| `tools/androguard/adapter.py` | 88.2% | 24 / 203 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
@@ -115,7 +114,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.3%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.5%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -123,9 +122,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->382<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->394<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->101<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->483<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->495<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -157,6 +156,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_model_claims.py` | 字段的文档说的取值，必须就是它真能产出的取值（v0.1.2 之后新增） |
 | `test_resources.py` | 资源表里的文本：解析、存储、检索、计数、CLI 与 API |
 | `test_source_provenance.py` | 源码表示的出处：Java 还是 Smali，跟着源码一起走 |
+| `test_truncation.py` | 触到上限时索引不完整这件事必须写进 `project.errors`；后端版本只查一次；三个上限是「一次分析」的预算 |
 
 ### 2.2 几类值得注意的测试
 
@@ -773,10 +773,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->483<!--/fig--> 个：<!--fig:tests.fast-->382<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->495<!--/fig--> 个：<!--fig:tests.fast-->394<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.3%<!--/fig-->（<!--fig:coverage.covered-->2087<!--/fig-->/<!--fig:coverage.total-->2213<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->483<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.5%<!--/fig-->（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->495<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -905,7 +905,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "core/evidence.py": [60, 0],
       "core/ingest.py": [36, 2],
       "core/models.py": [264, 4],
-      "core/pipeline.py": [274, 10],
+      "core/pipeline.py": [275, 10],
       "core/storage.py": [220, 7],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
@@ -913,16 +913,16 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "reports/markdown.py": [58, 2],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [203, 24],
+      "tools/androguard/adapter.py": [259, 23],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [221, 12],
-      "tools/base.py": [101, 7],
+      "tools/base.py": [108, 7],
       "tools/jadx/__init__.py": [3, 0],
       "tools/jadx/adapter.py": [242, 33],
       "tools/registry.py": [28, 0]
     },
-    "missing": 126,
-    "statements": 2213
+    "missing": 125,
+    "statements": 2277
   },
   "history": {
     "v0.1.0": {
@@ -936,15 +936,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 3,
-  "source_fingerprint": "sha256:32aba7eef96d5ef608e15aa4b19e6b0cff8cc7ea36e40829743cc0b899939ee1",
+  "source_fingerprint": "sha256:acc8c3e974133d0e8668da839d157a608019a5ae5365e10bb2524c40f89476af",
   "suite": {
-    "passed": 483,
+    "passed": 495,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 382,
+    "fast": 394,
     "slow": 101,
-    "total": 483
+    "total": 495
   }
 }-->

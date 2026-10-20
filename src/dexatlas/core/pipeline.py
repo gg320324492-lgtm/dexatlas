@@ -275,11 +275,16 @@ class Analyzer:
 
         if error is not None:
             builder.add_error(error)
-        else:
+        if error is None or error.code is ToolErrorCode.OUTPUT_TRUNCATED:
             # Conclusions before the index. A cross-reference says something about
             # the code; a class declaration only says the class exists. The
             # report's evidence table is capped, so what is recorded last is what
             # gets dropped.
+            #
+            # A truncated index still gets its evidence: the rows that were
+            # written were read out of the bytecode and they hold. A parse
+            # failure is a different thing — there the index may be wrong, and
+            # no conclusion is drawn from it.
             builder.add_cross_references(methods, references)
             builder.add_classes(classes[:MAX_EVIDENCE_CLASSES])
             if len(classes) > MAX_EVIDENCE_CLASSES:
