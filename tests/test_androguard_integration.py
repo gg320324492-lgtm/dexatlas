@@ -17,7 +17,7 @@ from typing import Any
 import pytest
 
 from dexatlas.config.settings import Settings
-from dexatlas.core.models import ClassKind, MethodReference
+from dexatlas.core.models import ClassKind, MethodReference, ToolErrorCode
 from dexatlas.tools.androguard.adapter import AndroguardBackend, androguard_available
 
 pytestmark = [
@@ -180,18 +180,28 @@ def test_method_limit_truncates_without_crashing(
 ) -> None:
     apk = _copy_fixture("TestActivity.apk", tmp_path)
 
-    classes, methods, *_ = backend.extract(apk, FIXTURE_APK, method_limit=10)
+    classes, methods, *_, error = backend.extract(apk, FIXTURE_APK, method_limit=10)
 
     assert len(methods) <= 10
     assert classes
+    # A shortened index is not a clean one: the error says the limit was hit
+    # and what it cost.
+    assert error is not None
+    assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
+    assert "method limit 10 reached" in error.message
+    assert "the index is incomplete" in error.message
 
 
 def test_string_limit_is_respected(backend: AndroguardBackend, tmp_path: Path) -> None:
     apk = _copy_fixture("TestActivity.apk", tmp_path)
 
-    _, _, _, _, strings, _ = backend.extract(apk, FIXTURE_APK, string_limit=5)
+    _, _, _, _, strings, error = backend.extract(apk, FIXTURE_APK, string_limit=5)
 
     assert len(strings) <= 5
+    assert error is not None
+    assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
+    assert "string limit 5 reached" in error.message
+    assert "the index is incomplete" in error.message
 
 
 def test_a_non_apk_is_reported_not_raised(backend: AndroguardBackend, tmp_path: Path) -> None:

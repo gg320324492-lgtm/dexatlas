@@ -55,8 +55,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 统一分析模型 + provenance | 完成 | 每个产物都有来源校验 |
 | 证据等级（verified/lead/insufficient） | 完成 | 反直觉输入的专门测试 |
 | SQLite + FTS5 存储与检索 | 完成 | 单元测试 + 注入测试 |
-| CLI（<!--fig:cli.commands-->10<!--/fig--> 个命令） | 完成 | 每个命令都被真实执行 |
-| REST API（<!--fig:api.endpoints-->15<!--/fig--> 个端点） | 完成 | httpx 测试客户端 |
+| CLI（<!--fig:cli.commands-->11<!--/fig--> 个命令） | 完成 | 每个命令都被真实执行 |
+| REST API（<!--fig:api.endpoints-->16<!--/fig--> 个端点） | 完成 | httpx 测试客户端 |
 | JSON / Markdown 报告导出 | 完成 | 快照式断言 |
 
 ### 1.2 工程指标
@@ -76,8 +76,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->444<!--/fig-->（<!--fig:tests.fast-->347<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.0%<!--/fig-->**（<!--fig:coverage.covered-->1857<!--/fig-->/<!--fig:coverage.total-->1975<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->495<!--/fig-->（<!--fig:tests.fast-->394<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.5%<!--/fig-->**（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -94,13 +94,11 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 |------|--------|------------------|
 | `cli/console.py` | 82.4% | 6 / 34 |
 | `tools/jadx/adapter.py` | 86.4% | 33 / 242 |
-| `api/app.py` | 87.1% | 19 / 147 |
-| `tools/androguard/adapter.py` | 88.2% | 24 / 203 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
-现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->94.9%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->8<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->157<!--/fig--> 未覆盖）**，已经离开这份清单。
+现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->94.6%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->12<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->221<!--/fig--> 未覆盖）**，已经离开这份清单。
 
 **未覆盖的是什么：** 主要是错误分支（后端超时/非零退出后的恢复路径）和一些
 CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块都在 90% 以上。
@@ -116,7 +114,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.0%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.5%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -124,9 +122,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->347<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->97<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->444<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->394<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->101<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->495<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -156,6 +154,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_provenance.py` | locator 的形状与可移植性、每条证据都带工具版本（v0.1.2 之后新增） |
 | `test_doc_citations.py` | 文档里的 `文件:行号` 引用必须仍指向它说的东西（v0.1.2 之后新增） |
 | `test_model_claims.py` | 字段的文档说的取值，必须就是它真能产出的取值（v0.1.2 之后新增） |
+| `test_resources.py` | 资源表里的文本：解析、存储、检索、计数、CLI 与 API |
+| `test_source_provenance.py` | 源码表示的出处：Java 还是 Smali，跟着源码一起走 |
+| `test_truncation.py` | 触到上限时索引不完整这件事必须写进 `project.errors`；后端版本只查一次；三个上限是「一次分析」的预算 |
 
 ### 2.2 几类值得注意的测试
 
@@ -772,10 +773,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->444<!--/fig--> 个：<!--fig:tests.fast-->347<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->495<!--/fig--> 个：<!--fig:tests.fast-->394<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.0%<!--/fig-->（<!--fig:coverage.covered-->1857<!--/fig-->/<!--fig:coverage.total-->1975<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->444<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.5%<!--/fig-->（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->495<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -886,42 +887,42 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
 
 <!--report-figures:{
   "code": {
-    "api_endpoints": 15,
-    "cli_commands": 10,
+    "api_endpoints": 16,
+    "cli_commands": 11,
     "sample_apks": 5
   },
   "coverage": {
     "files": {
       "__init__.py": [3, 0],
       "api/__init__.py": [3, 0],
-      "api/app.py": [147, 19],
+      "api/app.py": [166, 14],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [171, 0],
+      "cli/main.py": [211, 5],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
       "core/evidence.py": [60, 0],
       "core/ingest.py": [36, 2],
-      "core/models.py": [222, 4],
-      "core/pipeline.py": [228, 6],
-      "core/storage.py": [193, 4],
+      "core/models.py": [264, 4],
+      "core/pipeline.py": [275, 10],
+      "core/storage.py": [220, 7],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
       "reports/json_report.py": [19, 0],
-      "reports/markdown.py": [58, 5],
+      "reports/markdown.py": [58, 2],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [203, 24],
+      "tools/androguard/adapter.py": [259, 23],
       "tools/apktool/__init__.py": [3, 0],
-      "tools/apktool/adapter.py": [157, 8],
-      "tools/base.py": [101, 7],
+      "tools/apktool/adapter.py": [221, 12],
+      "tools/base.py": [108, 7],
       "tools/jadx/__init__.py": [3, 0],
       "tools/jadx/adapter.py": [242, 33],
       "tools/registry.py": [28, 0]
     },
-    "missing": 118,
-    "statements": 1975
+    "missing": 125,
+    "statements": 2277
   },
   "history": {
     "v0.1.0": {
@@ -935,15 +936,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 3,
-  "source_fingerprint": "sha256:ad4804af6e50dbdfa5450df9f0a6f1141c8acecbf76d908285b59febff24dfa4",
+  "source_fingerprint": "sha256:acc8c3e974133d0e8668da839d157a608019a5ae5365e10bb2524c40f89476af",
   "suite": {
-    "passed": 444,
+    "passed": 495,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 347,
-    "slow": 97,
-    "total": 444
+    "fast": 394,
+    "slow": 101,
+    "total": 495
   }
 }-->

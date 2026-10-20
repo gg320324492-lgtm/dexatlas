@@ -28,17 +28,19 @@ from dexatlas.core.models import (
     MethodReference,
     Project,
     ProjectStatus,
+    ResourceKind,
+    ResourceString,
     StringConstant,
     ToolError,
     canonical_descriptor,
     canonical_method_id,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 #: Tables cleared when a project is re-analysed. Content-addressed project ids mean a
 #: re-analysis replaces rather than accumulates.
-_SYMBOL_TABLES = ("classes", "methods", "fields", "xrefs", "strings", "search_index")
+_SYMBOL_TABLES = ("classes", "methods", "fields", "xrefs", "strings", "resources", "search_index")
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,9 +58,28 @@ class SymbolCounts:
     methods: int
     fields: int
     references: int
+    resources: int = 0
 
 
-_SCHEMA = """
+_RESOURCES_TABLE = """
+CREATE TABLE IF NOT EXISTS resources (
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    value      TEXT NOT NULL,
+    kind       TEXT NOT NULL DEFAULT 'string',
+    quantity   TEXT NOT NULL DEFAULT '',
+    qualifier  TEXT,
+    position   INTEGER NOT NULL DEFAULT 0,
+    file       TEXT NOT NULL,
+    provenance TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (project_id, file, name, kind, quantity, position)
+);
+"""
+
+#: The whole schema. The resource table is spliced in rather than written out
+#: twice: the migration below has to recreate it with the same statement.
+_SCHEMA = (
+    """
 CREATE TABLE IF NOT EXISTS schema_info (
     version INTEGER NOT NULL
 );
@@ -76,6 +97,7 @@ CREATE TABLE IF NOT EXISTS projects (
     method_count     INTEGER NOT NULL DEFAULT 0,
     reference_count  INTEGER NOT NULL DEFAULT 0,
     evidence_count   INTEGER NOT NULL DEFAULT 0,
+    resource_count   INTEGER NOT NULL DEFAULT 0,
     manifest         TEXT,
     workspace        TEXT
 );
@@ -132,6 +154,9 @@ CREATE TABLE IF NOT EXISTS strings (
     provenance  TEXT NOT NULL DEFAULT '[]'
 );
 
+"""
+    + _RESOURCES_TABLE
+    + """
 CREATE TABLE IF NOT EXISTS evidence (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     id         TEXT NOT NULL,
@@ -153,6 +178,8 @@ CREATE INDEX IF NOT EXISTS idx_refs_caller     ON xrefs(project_id, caller);
 CREATE INDEX IF NOT EXISTS idx_refs_callee_canonical
     ON xrefs(project_id, REPLACE(callee, ' ', ''));
 CREATE INDEX IF NOT EXISTS idx_strings_project ON strings(project_id);
+CREATE INDEX IF NOT EXISTS idx_resources_project ON resources(project_id);
+CREATE INDEX IF NOT EXISTS idx_resources_name ON resources(project_id, name);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     kind UNINDEXED,
@@ -162,13 +189,14 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     tokenize = 'unicode61 remove_diacritics 2'
 );
 """
+)
 
 _PROJECT_UPSERT = """
 INSERT INTO projects (
     id, apk_sha256, apk_path, apk_size_bytes, created_at, status,
     tool_versions, errors, class_count, method_count,
-    reference_count, evidence_count, manifest, workspace
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    reference_count, evidence_count, resource_count, manifest, workspace
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     apk_path      = excluded.apk_path,
     status        = excluded.status,
@@ -178,6 +206,7 @@ ON CONFLICT(id) DO UPDATE SET
     method_count  = excluded.method_count,
     reference_count = excluded.reference_count,
     evidence_count  = excluded.evidence_count,
+    resource_count  = excluded.resource_count,
     manifest      = excluded.manifest,
     workspace     = excluded.workspace
 """
@@ -211,6 +240,35 @@ def _escape_like(value: str) -> str:
     return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _migrate(connection: sqlite3.Connection) -> None:
+    """Bring an older workspace up to the current schema.
+
+    ``CREATE TABLE IF NOT EXISTS`` does not change a table that already exists,
+    so a workspace written before a column was added keeps the old shape and
+    every write that names the new column fails. The column is added here
+    instead: an existing row reads as zero, which is the truth about it — a
+    workspace analysed before the resource table was read holds no resources.
+
+    Additive only. A column that cannot be added without rewriting the table
+    would mean the old rows have to be migrated, and that is a different job.
+    """
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(projects)")}
+    if "resource_count" not in columns:
+        connection.execute(
+            "ALTER TABLE projects ADD COLUMN resource_count INTEGER NOT NULL DEFAULT 0"
+        )
+
+    resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
+    if resource_columns and "position" not in resource_columns:
+        # A workspace written by an earlier build of the resource table has no
+        # position, and its key lets one item of a ``<string-array>`` overwrite
+        # the next. The table is a cache of the analysis rather than a source
+        # of truth — the next analysis fills it again — so it is dropped and
+        # created empty rather than migrated row by row.
+        connection.execute("DROP TABLE resources")
+        connection.execute(_RESOURCES_TABLE)
+
+
 class Store:
     """Project and symbol persistence."""
 
@@ -223,6 +281,7 @@ class Store:
         store = cls(path)
         with store.transaction() as connection:
             connection.executescript(_SCHEMA)
+            _migrate(connection)
             connection.execute("DELETE FROM schema_info")
             connection.execute("INSERT INTO schema_info (version) VALUES (?)", (SCHEMA_VERSION,))
         return store
@@ -263,6 +322,7 @@ class Store:
                     project.method_count,
                     project.reference_count,
                     project.evidence_count,
+                    project.resource_count,
                     manifest.model_dump_json() if manifest else None,
                     str(workspace),
                 ),
@@ -326,6 +386,7 @@ class Store:
         fields: Iterable[FieldRef],
         references: Iterable[MethodReference],
         strings: Iterable[StringConstant],
+        resources: Iterable[ResourceString] = (),
     ) -> SymbolCounts:
         """Replace a project's symbol tables. Callers re-analyse, so this is idempotent.
 
@@ -354,6 +415,7 @@ class Store:
         field_list = list(fields)
         reference_list = list(references)
         string_list = list(strings)
+        resource_list = list(resources)
 
         with self.transaction() as connection:
             for table in _SYMBOL_TABLES:
@@ -432,8 +494,27 @@ class Store:
                 ],
             )
             connection.executemany(
+                "INSERT OR REPLACE INTO resources VALUES (?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        project_id,
+                        r.name,
+                        r.value,
+                        r.kind.value,
+                        r.quantity or "",
+                        r.qualifier,
+                        r.position,
+                        r.file,
+                        _dump_provenance(r),
+                    )
+                    for r in resource_list
+                ],
+            )
+            connection.executemany(
                 "INSERT INTO search_index (kind, qualified_name, project_id, body) VALUES (?,?,?,?)",
-                _search_rows(project_id, class_list, method_list, field_list, string_list),
+                _search_rows(
+                    project_id, class_list, method_list, field_list, string_list, resource_list
+                ),
             )
 
             return SymbolCounts(
@@ -441,6 +522,7 @@ class Store:
                 methods=_count_rows(connection, "methods", project_id),
                 fields=_count_rows(connection, "fields", project_id),
                 references=_count_rows(connection, "xrefs", project_id),
+                resources=_count_rows(connection, "resources", project_id),
             )
 
     def list_classes(self, project_id: str, *, prefix: str | None = None) -> list[ClassRef]:
@@ -492,6 +574,23 @@ class Store:
                 (project_id, canonical),
             ).fetchall()
         return [_row_to_reference(row) for row in rows]
+
+    def list_resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
+        """The resource strings indexed for a project.
+
+        ``name`` selects one resource by its exact name. The answer to "where is
+        ``app_name`` defined?" is several rows when the APK ships several
+        languages, and every one of them is a different declaration.
+        """
+        query = "SELECT * FROM resources WHERE project_id = ?"
+        params: list[Any] = [project_id]
+        if name:
+            query += " AND name = ?"
+            params.append(name)
+        query += " ORDER BY file, name, kind, quantity"
+        with self.transaction() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [_row_to_resource(row) for row in rows]
 
     def search(self, project_id: str, keyword: str, *, limit: int = 50) -> list[dict[str, Any]]:
         """Full-text search across indexed symbols.
@@ -615,6 +714,7 @@ def _row_to_project(row: sqlite3.Row) -> Project:
         method_count=row["method_count"],
         reference_count=row["reference_count"],
         evidence_count=row["evidence_count"],
+        resource_count=row["resource_count"],
     )
 
 
@@ -652,6 +752,19 @@ def _row_to_reference(row: sqlite3.Row) -> MethodReference:
     )
 
 
+def _row_to_resource(row: sqlite3.Row) -> ResourceString:
+    return ResourceString(
+        name=row["name"],
+        value=row["value"],
+        kind=ResourceKind(row["kind"]),
+        quantity=row["quantity"] or None,
+        qualifier=row["qualifier"],
+        position=row["position"],
+        file=row["file"],
+        provenance=json.loads(row["provenance"]),
+    )
+
+
 def _row_to_evidence(row: sqlite3.Row) -> Evidence:
     return Evidence(
         id=row["id"],
@@ -669,6 +782,7 @@ def _search_rows(
     methods: Iterable[MethodRef],
     fields: Iterable[FieldRef],
     strings: Iterable[StringConstant],
+    resources: Iterable[ResourceString] = (),
 ) -> list[tuple[str, str, str, str]]:
     rows: list[tuple[str, str, str, str]] = []
     for cls in classes:
@@ -691,6 +805,13 @@ def _search_rows(
             continue
         indexed.add(constant.value)
         rows.append(("string", constant.value[:200], project_id, constant.value))
+    # A resource string is a declaration site, not a use site: the same text in
+    # two languages is two declarations, and both are indexed. The name goes in
+    # with the value so that a search for either finds the row.
+    for resource in resources:
+        rows.append(
+            ("resource", resource.qualified_name, project_id, f"{resource.name} {resource.value}")
+        )
     return rows
 
 
