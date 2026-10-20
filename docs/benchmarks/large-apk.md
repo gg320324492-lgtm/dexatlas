@@ -318,8 +318,10 @@ and it hides in the one place a reader would look — the report.
 
 The fix belongs in the adapter: a limit that truncates the index should
 produce a `ToolError` on the project, the way every other backend failure
-does. The error already has a home; `ToolErrorCode.OUTPUT_TRUNCATED` exists
-and is unused.
+does. The error already has a home — `ToolErrorCode.OUTPUT_TRUNCATED` is
+defined at `src/dexatlas/core/models.py:41` and **used nowhere in the
+codebase**. It is the code for exactly this situation, and it has never been
+used for it.
 
 **Reproduction:**
 
@@ -467,3 +469,42 @@ DEXATLAS_LARGE_APK_REPORT=/tmp/measurement.json \
 The generator needs Apktool and a JDK; the tests need Androguard as well. On a
 machine with neither, the suite **skips** rather than fails — which is the
 configuration the Python 3.13 CI job runs in.
+
+---
+
+## 8. What this document asks the next person to do
+
+The three defects are all in `src/dexatlas/tools/androguard/adapter.py`, and
+none of them is fixed here — that file belongs to another agent, and a fix
+that lands without being measured is the kind of change this project is
+cautious about. What is asked for, in order of size:
+
+| # | Defect | The change | What it would buy |
+|---|---|---|---|
+| 1 | [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) | Cache the version, the way JADX and Apktool already do | A 164× faster index build. The `large` tier goes from ~25 minutes to ~10 seconds. |
+| 2 | [§5.1](#51-a-truncated-index-is-reported-as-a-clean-run) | Record a `ToolError` when a limit truncates the index | A report that can say "this APK was not fully indexed". |
+| 3 | [§5.2](#52-two-of-the-three-limits-are-per-dex-not-per-apk) | Count the string and instruction limits over the whole APK | A limit that means what its name says. |
+
+Each of the three has a test that names it, and each test is
+`xfail(strict=True)`: it fails today, and it turns into a failure the moment
+the defect is fixed. **Fixing a defect without removing its xfail marker
+turns the suite red** — which is the point. A fixed defect should announce
+itself.
+
+### Two small things found along the way
+
+- `docs/status.md` 4.4 names the instruction limit `MAX_INSTRUCTION_LIMIT`.
+  The constant is `DEFAULT_INSTRUCTION_LIMIT`
+  (`src/dexatlas/tools/androguard/adapter.py:51`). A reader who greps for
+  the name in the status page finds nothing.
+- `ToolErrorCode.OUTPUT_TRUNCATED`
+  (`src/dexatlas/core/models.py:41`) is defined and used nowhere. It is the
+  error code for "the output was cut short", and a truncated index is exactly
+  that.
+
+### One document that should point here
+
+`docs/status.md` 4.4 is the entry that records this work as outstanding. When
+the three defects above are fixed, that section should say what was measured
+and link to this document, rather than being deleted — the numbers in here
+are the ones a reader will want to check the fix against.
