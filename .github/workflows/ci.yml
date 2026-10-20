@@ -35,9 +35,7 @@ jobs:
       # a run that fails with no output and no jobs, and takes a while to tell
       # apart from a platform problem.
       - name: Workflow lint
-        uses: rhysd/actionlint@v1
-        with:
-          version: v1.7.12
+        uses: rhysd/actionlint@v1.7.12
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
