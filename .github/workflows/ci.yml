@@ -76,6 +76,12 @@ jobs:
         python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The version-claim check reads the tag list to learn what has been
+          # released, and the test that exercises it runs against this clone.
+          # A shallow checkout has no tags, and a check that found no tags
+          # would refuse to answer -- correctly. Fetch them.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -117,6 +123,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The version-claim check reads the tag list to learn what has been
+          # released, and the test that exercises it runs against this clone.
+          # A shallow checkout has no tags, and a check that found no tags
+          # would refuse to answer -- correctly. Fetch them.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true

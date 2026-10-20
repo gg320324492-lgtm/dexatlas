@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -26,6 +27,27 @@ import pytest
 REPO_ROOT = Path(__file__).parent.parent
 VERSION_SCRIPT = REPO_ROOT / "scripts" / "check-version-claims.py"
 CITATION_SCRIPT = REPO_ROOT / "scripts" / "check-doc-citations.py"
+
+
+def _has_release_tags() -> bool:
+    """Whether this clone can answer questions about the project's releases.
+
+    A clone without tags cannot: the checker refuses to report "nothing is
+    wrong" from one, because a green check that checked nothing is the worst
+    kind of answer. That refusal is right, so a test that needs the checker's
+    answer skips here rather than failing — a source archive has no tags, and
+    a failure there says nothing about the code.
+
+    CI checks out with the tags, so the test runs there.
+    """
+    result = subprocess.run(
+        ["git", "tag", "--list"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return bool(result.stdout.strip())
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -82,6 +104,9 @@ def test_the_version_claim_checker_answers_the_same_on_any_console(
     The exit code is the checker's answer, and it must not depend on what the
     console can encode.
     """
+    if not _has_release_tags():
+        pytest.skip("this clone has no tags, so the release state cannot be checked")
+
     checker = _checker()
 
     with_utf8 = checker.main(["--base", "HEAD"])
