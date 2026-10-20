@@ -659,5 +659,5 @@ are fixed. What is left is smaller, and none of it is a defect:
   it found, and says what was not measured. The `MAX_INSTRUCTION_LIMIT` it used
   to name — a constant that does not exist — is gone; the three limits the
   adapter actually enforces are `DEFAULT_METHOD_LIMIT`,
-  `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT`, at
+  `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT` at
   `src/dexatlas/tools/androguard/adapter.py:53-57`.
