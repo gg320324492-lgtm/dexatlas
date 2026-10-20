@@ -112,38 +112,47 @@ is not making one. (`xlarge` takes longer to build because it assembles
 
 ### 3.2 Indexing it
 
-`AndroguardBackend.extract()` on the sample, with the default limits:
+`AndroguardBackend.extract()` on the sample, with the default limits, and
+then the same call with the version lookup cached — both in one process, so
+the two numbers are directly comparable:
 
-| Scale | Classes | Methods | Fields | Cross-references | Strings | Time |
-|---|---|---|---|---|---|---|
-| `smoke` | 21 | 161 | 20 | 160 | 337 | 1.98 s |
-| `medium` | 301 | 12,001 | 300 | 12,000 | 24,049 | 108.42 s |
+| Scale | Symbols | Time, version probed per symbol | Time, version cached | Ratio | ms per symbol |
+|---|---|---|---|---|---|
+| `smoke` | 699 | 1.58 s | 0.02 s | 98.6× | 2.26 |
+| `medium` | 48,651 | 144.97 s | 0.77 s | **189.5×** | 2.98 |
+| `large` | 594,612 | 1,506.42 s | 13.42 s | **112.3×** | 2.53 |
 
-The counts are exact: the index holds every class, every method and every
-cross-reference the APK contains, with no limit reached. The strings are
-higher than the number of distinct values in the DEX, because
+The counts are exact — the index holds every class, every method and every
+cross-reference the APK contains, with no limit reached:
+
+| Scale | Classes | Methods | Fields | Cross-references | Strings |
+|---|---|---|---|---|---|
+| `smoke` | 21 | 161 | 20 | 160 | 337 |
+| `medium` | 301 | 12,001 | 300 | 12,000 | 24,049 |
+
+The strings are higher than the number of distinct values in the DEX, because
 `_index_strings` writes one row per **(value, use site)** pair — a literal
 loaded by 39 methods is 39 rows, and that is what makes it pointable.
 
+The `medium` sample makes that visible: its DEX holds 2,997 distinct
+strings, and the index holds 24,049 rows, because each class's marker is
+loaded by all 39 of that class's work methods.
+
 The **time** is the interesting column, and it has nothing to do with the
-analysis. See [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol).
+analysis. The DEX itself is parsed and walked in 0.77 s. Everything else is
+bookkeeping. See [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol).
 
-With the version lookup cached — one call instead of one per symbol — the same
-work takes:
-
-| Scale | Time, version probed per symbol | Time, version cached | Ratio |
-|---|---|---|---|
-| `smoke` | 1.98 s | 0.02 s | 99× |
-| `medium` | 108.42 s | 0.66 s | **164×** |
-
-The DEX itself is parsed and walked in 0.66 s. Everything else is bookkeeping.
+The cost per symbol is flat across the two sizes — 2.26 ms and 2.98 ms — so
+the overhead is **linear in the number of symbols**, and it grows with the
+APK. That is what makes it a cliff rather than a constant: there is no size
+at which it becomes affordable.
 
 ### 3.3 The full pipeline
 
 `Analyzer.analyze()` with Androguard only (no JADX, no Apktool), on `medium`:
 
 ```
-duration             114.08s
+duration             127.25s
 status               completed
 class_count          301
 method_count         12,001
@@ -153,6 +162,10 @@ rows classes         301
 rows methods         12,001
 search hit           1
 ```
+
+The generator wrote 301 classes, 12,001 methods and 12,000 references. The
+analysis reports 301, 12,001 and 12,000. The database holds 301 class rows
+and 12,001 method rows. The search finds the marker string.
 
 **The counts in the report and the rows in the database agree**, at every
 level. The report says 12,001 methods, the database holds 12,001 method rows,
@@ -198,15 +211,25 @@ pipeline (version cached): 28.3s
   rows:   classes=2,002 methods=200,001 xrefs=200,000
 ```
 
-**The limit was reached, 5,001 methods and 49 whole classes are missing from
+And the same run **without** the version cache — the way a user experiences
+it today:
+
+| | Time |
+|---|---|
+| `extract`, version probed per symbol | **1,506.42 s** (25 minutes) |
+| `extract`, version cached | 13.42 s |
+| `analyze()` pipeline, version probed per symbol | 1,855.86 s (31 minutes) |
+| `analyze()` pipeline, version cached | 28.34 s |
+
+**The limit was reached, 5,000 methods and 49 whole classes are missing from
 the index, and the run reports `COMPLETED` with no errors at all.**
 
 Two details are worth reading carefully:
 
 - **The count overshoots by one.** The limit is 200,000 and the index holds
-  200,001. The check is made at class granularity, before a class's methods
-  are added, so the last class can carry the count one past the line. That is
-  a rounding detail, not a defect.
+  200,001. The check is made at class granularity — before a class's methods
+  are added — so the count lands just past the line rather than exactly on
+  it. That is a rounding detail, not a defect.
 - **The two limits interact.** `classes4.dex` yielded 40,608 string rows
   rather than the 50,000 the other three files got, because the method limit
   stopped the walk before the string indexer had seen all of that file's
@@ -238,6 +261,8 @@ extract (version cached): 6.9s
   classes=574 methods=57,381 refs=57,380
   strings=50,000 error=None
 ```
+
+Uncached, the same run takes 452.30 s — 165,909 symbols at 2.73 ms each.
 
 The instruction limit truncated the walk: **57,381 of 60,001 methods** were
 indexed, 27 classes and their methods are missing, and the cross-reference
@@ -455,14 +480,13 @@ ncalls  tottime  cumtime  filename:lineno(function)
 **80 of the 82 seconds of that run are the version lookup.** The DEX parse and
 the instruction walk — the actual work — take about a second.
 
-The cost is linear in the symbol count, so it grows with the APK, and it
-grows at about 2.5 ms per symbol on this machine. Extrapolating the `medium`
-measurement to the `large` sample: 205,000 methods and 205,000
-cross-references is roughly 610,000 symbols, which at 2.5 ms each is about
-**25 minutes** of version lookups before any analysis happens.
+The cost is linear in the symbol count, so it grows with the APK. The three
+measured sizes agree on the per-symbol cost — 2.26 ms, 2.98 ms and 2.53 ms —
+and the `large` sample's 594,612 symbols come to **1,506 seconds, or 25
+minutes**, of which 13 seconds is the analysis.
 
 This is why the `large` tier is not in CI, and it is why the `medium` tier
-takes 5.5 minutes to run.
+takes minutes to run.
 
 **Reproduction:**
 
@@ -471,8 +495,8 @@ uv run pytest tests/test_large_apk_scale.py -k "probed_once" -q
 ```
 
 The fix is a cache in the adapter, exactly like the other two backends have.
-It is a two-line change and it turns a 25-minute analysis into a 30-second
-one.
+It is a two-line change, and it is the difference between a 25-minute
+analysis and a 13-second one.
 
 ---
 
@@ -497,13 +521,10 @@ spends its time on.
   index, the limits and the truncation are all exercised — but not through
   `Analyzer.analyze()` and into the database, so no pipeline timings or
   row counts are quoted for it.
-- **The `large` and `xlarge` tiers with the version lookup *not* cached.**
-  The timings in [§3.2](#32-indexing-it) and [§3.4](#34-large-the-method-limit-reached)
-  for those two tiers are with the cache in place, because the uncached run
-  of `large` did not finish on this machine. The uncached `medium` figure
-  (108.42 s against 0.66 s) is the measured ratio, and it is what the
-  extrapolation in [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol)
-  is built on.
+- **The `xlarge` tier with the version lookup *not* cached.** Its cached
+  timing is measured (6.86 s); its uncached timing is measured too
+  (452.30 s against 10.62 s cached), but it is not quoted in the tables
+  above because only the `large` tier is quoted uncached.
 - **Native libraries (`.so`).** Nothing in the index covers them; the APK
   metadata records that they are there, and that is all.
 - **Resource strings.** Whether a resource string is in the index is a
@@ -513,9 +534,10 @@ spends its time on.
   pipeline, but it was not measured systematically across the scales, so no
   memory numbers are quoted.
 - **CI timings on the runners.** The times here are from one machine. The
-  `smoke` scale — what CI runs — cost about 24 seconds here, and the
-  `medium` scale 5.5 minutes, which is why `medium` is opt-in. The runners
-  are faster and slower in ways this document does not measure.
+  `smoke` scale — what CI runs — costs 14.7 seconds for its own test file
+  here, and the `medium` scale 201 seconds, which is why `medium` is
+  opt-in. The runners are faster and slower in ways this document does not
+  measure.
 
 ---
 
@@ -551,7 +573,7 @@ cautious about. What is asked for, in order of size:
 
 | # | Defect | The change | What it would buy |
 |---|---|---|---|
-| 1 | [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) | Cache the version, the way JADX and Apktool already do | A 164× faster index build. The `large` tier goes from ~25 minutes to ~10 seconds. |
+| 1 | [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) | Cache the version, the way JADX and Apktool already do | A 112× faster index build. The `large` tier goes from 25 minutes to 13 seconds. |
 | 2 | [§5.1](#51-a-truncated-index-is-reported-as-a-clean-run) | Record a `ToolError` when a limit truncates the index | A report that can say "this APK was not fully indexed". |
 | 3 | [§5.2](#52-two-of-the-three-limits-are-per-dex-not-per-apk) | Count the string and instruction limits over the whole APK | A limit that means what its name says. |
 
