@@ -123,13 +123,14 @@ def test_the_version_claim_checker_answers_the_same_on_any_console(
 
 
 def test_the_citation_checker_finishes_on_a_console_that_cannot_encode_it(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """The citation checker quotes the line it drifted in, and that line may
     hold a character the console cannot write.
 
     The citation it is given here drifts, and the line it drifted in carries
-    the character — so the checker has to print it without dying.
+    the character — so the checker has to print it without dying, and answer
+    the same way it answers on a console that can.
     """
     checker = _citation_checker()
     document = tmp_path / "drifted.md"
@@ -139,11 +140,15 @@ def test_the_citation_checker_finishes_on_a_console_that_cannot_encode_it(
     )
     monkeypatch.setattr(checker, "DOCS", [document])
 
+    with_utf8 = checker.main()
+    capsys.readouterr()
+
     stream = _gbk_console()
     monkeypatch.setattr(sys, "stdout", stream)
-    assert checker.main() == 0
+    with_gbk = checker.main()
 
     written = _written(stream)
+    assert with_gbk == with_utf8
     assert "drifted: 1" in written
     assert "🔴" in written
     assert "Traceback" not in written
