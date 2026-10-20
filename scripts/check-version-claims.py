@@ -78,6 +78,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from urllib.parse import unquote
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -136,6 +137,29 @@ TESTS_STATED = re.compile(
 
 #: A number that belongs to the version before this one: "up from 89.2%".
 PREVIOUS_VERSION = re.compile(r"(?:up from|previously|before)\s+$", re.IGNORECASE)
+
+#: A badge that states a number:
+#: "https://img.shields.io/badge/tests-275%20passing-brightgreen.svg".
+#: The label and the number are picked out of the URL rather than matched
+#: against one form of it: the URL is percent-encoded, and a badge that says
+#: "coverage-89%25" says 89%, not "89%25".
+BADGE = re.compile(
+    r"img\.shields\.io/badge/(?P<label>[A-Za-z][A-Za-z0-9+._-]*?)"
+    r"-(?P<number>\d+(?:\.\d+)?)(?P<rest>[^/\"'\s]*?)\.svg"
+)
+
+#: The badges that state a number of this project. The numbers a badge may
+#: state are gathered per label, so the caller decides what would answer it.
+BADGES = ("tests", "test", "coverage")
+
+#: The rest of a badge's URL says what its number is about: "%20passing" for a
+#: count of tests, "%25" for a coverage. A badge whose text says something else
+#: — "failing", "remaining" — is not a count of anything, and is left alone.
+BADGE_TEXT = {"tests": ("passing",), "test": ("passing",), "coverage": ("%",)}
+
+#: How far a badge may be from the measured number. A badge states a whole
+#: percentage, and 89.2% is written "89%" on it.
+BADGE_TOLERANCE = 0.5
 
 #: Words that say a release has happened.
 RELEASED = re.compile(
@@ -690,9 +714,15 @@ def percentage(value: str) -> float | None:
 
 
 def check_stated_numbers(
-    path: str, text: str, offset: int, measured: dict[str, str], version: str
+    path: str, text: str, offset: int, expected: dict[str, str], version: str
 ) -> list[Finding]:
-    """The numbers a release document states, against the numbers measured."""
+    """The numbers a release document states, against the numbers measured.
+
+    ``expected`` holds the figures the release is measured by: the number of
+    tests the report measured at that release, and the coverage the report of
+    that release measured. A figure that is missing from it was never
+    measured, and nothing is claimed about it.
+    """
     findings: list[Finding] = []
     for number, line in enumerate(text.splitlines(), 1):
         # A number between the markers is generated, not written by hand.
@@ -701,12 +731,12 @@ def check_stated_numbers(
 
         for match in COVERAGE_STATED.finditer(spoken):
             stated = match.group("after") or match.group("before")
-            expected = measured.get("coverage.pct")
-            if stated is None or expected is None:
+            measured = expected.get("coverage.pct")
+            if stated is None or measured is None:
                 continue
             if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
                 continue
-            if percentage(stated) == percentage(expected):
+            if percentage(stated) == percentage(measured):
                 continue
             findings.append(
                 Finding(
@@ -715,7 +745,7 @@ def check_stated_numbers(
                     kind="release-coverage",
                     version=version,
                     message=(
-                        f"it says the coverage is {stated}%, the measured coverage is {expected}"
+                        f"it says the coverage is {stated}%, the measured coverage is {measured}"
                     ),
                     excerpt=excerpt,
                 )
@@ -724,55 +754,148 @@ def check_stated_numbers(
         for match in TESTS_STATED.finditer(spoken):
             if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
                 continue
-            for key, group in (
-                ("tests.total", "total"),
-                ("tests.fast", "fast"),
-                ("tests.slow", "slow"),
-            ):
-                stated = match.group(group)
-                expected = measured.get(key)
-                if stated is None or expected is None:
-                    continue
-                if stated == expected:
-                    continue
+            total = match.group("total")
+            fast = match.group("fast")
+            slow = match.group("slow")
+            measured = expected.get("tests.total")
+            if measured is not None and total != measured:
                 findings.append(
                     Finding(
                         path=path,
                         line=offset + number,
                         kind="release-tests",
                         version=version,
-                        message=(f"it says {key} is {stated}, the measured number is {expected}"),
+                        message=(
+                            f"it says the release had {total} tests, "
+                            f"the measured number is {measured}"
+                        ),
+                        excerpt=excerpt,
+                    )
+                )
+            if fast is not None and slow is not None and int(fast) + int(slow) != int(total):
+                findings.append(
+                    Finding(
+                        path=path,
+                        line=offset + number,
+                        kind="release-tests",
+                        version=version,
+                        message=(
+                            f"it says {fast} fast and {slow} integration, "
+                            f"which is not the {total} tests it states"
+                        ),
                         excerpt=excerpt,
                     )
                 )
     return findings
 
 
-def check_release_numbers(facts: Facts, documents: list[tuple[str, str]]) -> list[Finding]:
+def badge_figures(facts: Facts, report_figures: dict[str, str]) -> dict[str, list[str]]:
+    """The numbers a badge may state: the tree as it is now, and the last release.
+
+    A badge that says how many tests the project has is right when it names
+    the tree as it is now, and right when it names the release the project
+    last shipped. The badge that shipped with v0.1.2 named neither: it said
+    275, and the project had 444.
+    """
+    newest = facts.newest_tag
+    released = measured_figures(f"v{newest}") if newest else {}
+    return {
+        "tests": [report_figures.get("tests.total"), released.get("tests.total")],
+        "test": [report_figures.get("tests.total"), released.get("tests.total")],
+        "coverage": [report_figures.get("coverage.pct"), released.get("coverage.pct")],
+    }
+
+
+def check_release_numbers(
+    facts: Facts, documents: list[tuple[str, str]], notes: list[str] | None = None
+) -> list[Finding]:
     """The numbers the release documents state, against the numbers measured.
 
-    The release notes and the changelog say how many tests a release had and
-    how well the code was covered. Those are measurements, and the execution
-    report of the same release holds the measured ones — written there by
-    ``scripts/refresh-report-figures.py``. Comparing the two is a comparison
-    of two measurements, not a list of expected values.
+    Three comparisons, each between two measurements:
 
-    A release whose report predates the generated figures has nothing to
-    compare with, and is left alone.
+    * The **test count** a release document states is the number the report
+      measured at that release — the report's ``history.<tag>.tests``, taken
+      from an archive of the tag. It describes history, so it does not go
+      stale as the code grows.
+    * The **coverage** a release document states is the coverage the report of
+      that release measured. A release whose report predates the generated
+      figures has nothing to compare with: it is skipped, and the skip is
+      said out loud.
+    * The **badge** in the readme is compared with the current tree's figures,
+      because a badge is a claim about the project as it is now.
+
+    The release documents are read as they are now — that is the text a
+    reader sees — and the measurements come from the release they describe.
     """
     findings: list[Finding] = []
     by_path = dict(documents)
+    report_figures = dict(FIGURE.findall(by_path.get(REPORT_AT_TAG, "")))
     tags = sorted(
         (tag for tag in facts.tags if tag.startswith("v")),
         key=lambda tag: version_key(tag.lstrip("v")),
     )
     for tag in tags:
-        measured = measured_figures(tag)
-        if not measured:
-            continue
         version = tag.lstrip("v")
+        measured = measured_figures(tag)
+        expected = {
+            "tests.total": report_figures.get(f"history.{tag}.tests"),
+            "coverage.pct": measured.get("coverage.pct"),
+        }
+        if expected["coverage.pct"] is None and notes is not None:
+            notes.append(
+                f"{tag}: the report of that release has no measured coverage, "
+                f"so only its test count is checked"
+            )
         for path, text, offset in release_documents(tag, version, by_path):
-            findings.extend(check_stated_numbers(path, text, offset, measured, version))
+            findings.extend(check_stated_numbers(path, text, offset, expected, version))
+    return findings
+
+
+def check_badges(path: str, text: str, figures: dict[str, list[str]]) -> list[Finding]:
+    """The numbers the badges state, against the numbers that were measured.
+
+    A badge is the first thing a reader sees, and it looks as if a service
+    had generated it. A hand-written number in a URL drifts the moment the
+    code changes, and the drift is invisible: nothing about the URL says when
+    it was written. The URL cannot hold the report's markers, so the badge is
+    compared with the report's figures instead.
+
+    ``figures`` maps a badge's label to the numbers that would answer it: the
+    tree as it is now, and the release it last shipped. A badge that states
+    one of them is not wrong. The badge that shipped with v0.1.2 was never
+    moved on, and it told readers the project had 275 tests when it had 444.
+    """
+    findings: list[Finding] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        for match in BADGE.finditer(line):
+            label = match.group("label").lower()
+            if label not in BADGES:
+                continue
+            rest = unquote(match.group("rest"))
+            if not any(word in rest for word in BADGE_TEXT[label]):
+                continue
+            measured = [value for value in figures.get(label, []) if value]
+            if not measured:
+                continue
+            value = percentage(match.group("number"))
+            if value is None:
+                continue
+            numbers = [percentage(item) for item in measured]
+            if any(item is not None and abs(value - item) <= BADGE_TOLERANCE for item in numbers):
+                continue
+            findings.append(
+                Finding(
+                    path=path,
+                    line=number,
+                    kind="badge",
+                    version=label,
+                    message=(
+                        f"the {label} badge says {match.group('number')}, "
+                        f"the measured numbers are {', '.join(measured)}"
+                    ),
+                    excerpt=collapse(line)[:160],
+                )
+            )
     return findings
 
 
@@ -837,8 +960,12 @@ def main(argv: list[str] | None = None) -> int:
     findings = check_facts(facts)
 
     documents = documents_in_tree()
-    findings.extend(check_release_numbers(facts, documents))
+    notes: list[str] = []
+    findings.extend(check_release_numbers(facts, documents, notes))
+    report_figures = dict(FIGURE.findall(dict(documents).get(REPORT_AT_TAG, "")))
+    badges = badge_figures(facts, report_figures)
     for name, text in documents:
+        findings.extend(check_badges(name, text, badges))
         findings.extend(check_text(name, text, facts))
 
     base: str | None = None
@@ -849,9 +976,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"could not resolve the base commit {args.base!r}", file=sys.stderr)
             return 2
         base_documents = documents_at(base)
+        base_figures = dict(FIGURE.findall(dict(base_documents).get(REPORT_AT_TAG, "")))
+        base_badges = badge_figures(facts, base_figures)
         for finding in check_release_numbers(facts, base_documents):
             known.add(finding.key)
         for name, text in base_documents:
+            for finding in check_badges(name, text, base_badges):
+                known.add(finding.key)
             for finding in check_text(name, text, facts):
                 known.add(finding.key)
 
@@ -861,6 +992,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  changelog: {', '.join(facts.changelog_versions) or '(none)'}")
     print(f"  newest release: v{facts.newest_release or '(none)'}")
     print(f"documents read: {len(documents)}")
+    for note in notes:
+        print(f"  skipped: {note}")
 
     if base is None:
         failures = findings

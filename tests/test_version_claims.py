@@ -325,13 +325,10 @@ def test_a_rewritten_claim_is_a_new_finding() -> None:
 # -- the numbers a release document states ---------------------------------
 
 
-#: The figures the execution report of v0.1.3 carries, measured.
-MEASURED = {
-    "tests.total": "444",
-    "tests.fast": "347",
-    "tests.slow": "97",
-    "coverage.pct": "94.0%",
-}
+#: The figures a release is measured by: the number of tests the report
+#: measured at that release, and the coverage the report of that release
+#: measured.
+MEASURED = {"tests.total": "444", "coverage.pct": "94.0%"}
 
 
 def _stated(checker: ModuleType, text: str) -> list[object]:
@@ -351,6 +348,19 @@ def test_a_coverage_number_that_is_not_the_measured_one_is_a_finding() -> None:
 def test_a_coverage_number_that_is_the_measured_one_is_not_a_finding() -> None:
     checker = _checker()
     claims = _stated(checker, "First-party coverage is **94.0%** (1857/1975 lines).")
+    assert claims == []
+
+
+def test_a_release_without_a_measured_coverage_is_not_checked() -> None:
+    """The reports before the generated figures have no coverage to compare with."""
+    checker = _checker()
+    claims = checker.check_stated_numbers(
+        "docs/releases/v0.1.2.md",
+        "First-party coverage is **89.2%**.",
+        0,
+        {"tests.total": "275"},
+        "0.1.2",
+    )
     assert claims == []
 
 
@@ -375,10 +385,18 @@ def test_a_test_count_that_is_the_measured_one_is_not_a_finding() -> None:
 
 
 def test_a_test_count_that_was_copied_wrong_is_a_finding() -> None:
+    """The changelog's first release said 208 tests; that tag has 204."""
     checker = _checker()
-    claims = _stated(checker, "- 445 tests (347 fast, 97 integration), up from 275")
+    claims = _stated(checker, "- 208 tests")
     assert _kinds(claims) == ["release-tests"]
-    assert "445" in claims[0].message  # type: ignore[attr-defined]
+    assert "208" in claims[0].message  # type: ignore[attr-defined]
+
+
+def test_counts_that_do_not_add_up_are_a_finding() -> None:
+    """347 fast and 97 integration are 444 tests, and not 445."""
+    checker = _checker()
+    claims = _stated(checker, "- 444 tests (347 fast, 98 integration), up from 275")
+    assert _kinds(claims) == ["release-tests"]
 
 
 def test_a_passed_count_of_another_configuration_is_not_a_finding() -> None:
@@ -400,3 +418,85 @@ def test_the_line_of_a_stated_number_is_reported() -> None:
     checker = _checker()
     claims = _stated(checker, "First-party coverage is **93.9%**.")
     assert claims[0].line == 1  # type: ignore[attr-defined]
+
+
+# -- the numbers the badges state ------------------------------------------
+
+
+#: The numbers a badge may state: the tree as it is now, and the release it
+#: last shipped.
+CURRENT = {"tests": ["493", "444"], "coverage": ["94.0%", "94.0%"]}
+
+
+def _badges(checker: ModuleType, text: str) -> list[object]:
+    """The findings the checker reports for the numbers a badge states."""
+    return checker.check_badges("README.md", text, CURRENT)
+
+
+def test_a_badge_that_is_behind_the_measurement_is_a_finding() -> None:
+    """The readme's badge said 275 tests; the project had 444."""
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Tests](https://img.shields.io/badge/tests-275%20passing-brightgreen.svg)](tests)",
+    )
+    assert _kinds(claims) == ["badge"]
+    assert "275" in claims[0].message  # type: ignore[attr-defined]
+
+
+def test_a_badge_that_matches_the_tree_is_not_a_finding() -> None:
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Tests](https://img.shields.io/badge/tests-493%20passing-brightgreen.svg)](tests)",
+    )
+    assert claims == []
+
+
+def test_a_badge_that_matches_the_last_release_is_not_a_finding() -> None:
+    """A badge that states the release the project shipped is not wrong."""
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Tests](https://img.shields.io/badge/tests-444%20passing-brightgreen.svg)](tests)",
+    )
+    assert claims == []
+
+
+def test_a_coverage_badge_that_matches_the_measurement_is_not_a_finding() -> None:
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Coverage](https://img.shields.io/badge/coverage-94.0%25-brightgreen.svg)](pyproject.toml)",
+    )
+    assert claims == []
+
+
+def test_a_rounded_coverage_badge_is_not_a_finding() -> None:
+    """A badge states a whole percentage, and 89.2% is written "89%" on it."""
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Coverage](https://img.shields.io/badge/coverage-94%25-brightgreen.svg)](pyproject.toml)",
+    )
+    assert claims == []
+
+
+def test_a_badge_about_something_else_is_not_a_finding() -> None:
+    """A badge that states a version, or a licence, is not a count of tests."""
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)",
+    )
+    assert claims == []
+
+
+def test_a_badge_that_counts_failures_is_not_a_finding() -> None:
+    """A badge that says how many tests are failing is not a count of tests."""
+    checker = _checker()
+    claims = _badges(
+        checker,
+        "[![Tests](https://img.shields.io/badge/tests-0%20failing-brightgreen.svg)](tests)",
+    )
+    assert claims == []
