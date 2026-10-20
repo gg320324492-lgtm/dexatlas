@@ -166,6 +166,73 @@ def test_delete_project_removes_symbols(store: Store, tmp_path: Path) -> None:
 # -- symbols ----------------------------------------------------------------
 
 
+#: The two-argument method from the demo app, spelled the way Androguard
+#: renders it: a space after every argument separator. The canonical spelling
+#: packs the arguments together.
+SPACED_DESCRIPTOR = "(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+CANONICAL_DESCRIPTOR = "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+
+SPACED_CALLER = (
+    "com.example.demo.Crypto.sign(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;"
+)
+CANONICAL_CALLER = (
+    "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+)
+
+
+def test_the_stored_field_descriptor_is_canonical(store: Store, tmp_path: Path) -> None:
+    """The database is the durable contract, so it normalises on write.
+
+    The field table is the one place a descriptor is stored on its own rather
+    than as part of a method id, so it is the one place a spaced descriptor
+    could survive into the database. A descriptor that reaches the table in
+    two spellings makes a lookup that finds nothing look exactly like a
+    lookup that had nothing to find.
+
+    The model is built with ``model_construct``, which skips validation: this
+    asserts the storage layer's own normalisation, not the model's.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    field = FieldRef.model_construct(
+        class_name="com.example.demo.Crypto",
+        name="KEY",
+        descriptor=SPACED_DESCRIPTOR,
+    )
+
+    store.save_symbols(project.id, [], [], [field], [], [])
+
+    with store.transaction() as connection:
+        row = connection.execute(
+            "SELECT descriptor FROM fields WHERE project_id = ?", (project.id,)
+        ).fetchone()
+    assert row is not None
+    assert row["descriptor"] == CANONICAL_DESCRIPTOR
+
+
+def test_the_stored_xref_caller_is_canonical(store: Store, tmp_path: Path) -> None:
+    """The caller's id is normalised on write too, not only the callee's.
+
+    A cross-reference has two ends and both of them are method ids. The
+    callee was checked and the caller was not, so a spaced caller could reach
+    the table: the edge would then name a method the method table spells
+    differently, and a query for that method would find nothing.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    reference = MethodReference.model_construct(caller=SPACED_CALLER, callee=CANONICAL_CALLER)
+
+    store.save_symbols(project.id, [], [], [], [reference], [])
+
+    with store.transaction() as connection:
+        row = connection.execute(
+            "SELECT caller, callee FROM xrefs WHERE project_id = ?", (project.id,)
+        ).fetchone()
+    assert row is not None
+    assert row["caller"] == CANONICAL_CALLER
+    assert row["callee"] == CANONICAL_CALLER
+
+
 def test_save_and_read_classes(store: Store, tmp_path: Path) -> None:
     project = _project()
     store.save_project(project, tmp_path, manifest=None)

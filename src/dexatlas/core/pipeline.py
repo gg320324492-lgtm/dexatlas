@@ -298,8 +298,10 @@ class Analyzer:
         # classes of the DEX file that parsed really do exist, and the calls
         # really are in the bytecode.
         builder.add_cross_references(methods, references)
-        builder.add_classes(classes[:MAX_EVIDENCE_CLASSES])
+        builder.add_classes(classes, limit=MAX_EVIDENCE_CLASSES)
         if len(classes) > MAX_EVIDENCE_CLASSES:
+            # The operator gets the same news the reader does: the evidence
+            # holds a sample of the classes, and the report says so.
             logger.info(
                 "androguard: indexed %d classes; evidence covers the first %d",
                 len(classes),

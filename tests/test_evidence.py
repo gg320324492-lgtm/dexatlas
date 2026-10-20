@@ -1,35 +1,52 @@
 """Evidence construction and the evidence-level discipline.
 
 The level field is the mechanism that stops an unverified claim from being reported as a
-finding, so it gets tested directly.
+finding, so it gets tested directly. The mechanism is a validator on the model: a
+behaviour — a claim — may not be recorded as verified, whichever way the record is
+built.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
+import pytest
+from pydantic import ValidationError
+
+from dexatlas.config.settings import Settings
 from dexatlas.core.evidence import (
     MAX_EVIDENCE_CALLED_METHODS,
     MAX_LISTED_CALLERS,
     EvidenceBuilder,
 )
 from dexatlas.core.models import (
+    ApkMetadata,
     ClassKind,
     ClassRef,
+    Evidence,
     EvidenceKind,
     EvidenceLevel,
     ManifestComponent,
     MethodRef,
     MethodReference,
+    Project,
+    ProjectStatus,
     Provenance,
     ToolError,
     ToolErrorCode,
 )
 from dexatlas.core.pipeline import (
+    MAX_EVIDENCE_CLASSES,
+    AnalysisResult,
+    Analyzer,
     _extract_smali_method,
     _merge_classes,
     _merge_fields,
     _merge_methods,
     _smali_declares,
 )
+from dexatlas.reports.markdown import render_markdown
 
 
 def _provenance(tool: str = "androguard") -> list[Provenance]:
@@ -56,6 +73,19 @@ def _reference(caller: str, callee: str, locator: str = "androguard:x") -> Metho
         provenance=[
             Provenance(tool="androguard", tool_version="1.0", apk_sha256="b" * 64, locator=locator)
         ],
+    )
+
+
+def _analysis_result(evidence: list[Evidence]) -> AnalysisResult:
+    """An analysis result holding the given records, ready to be rendered."""
+    project = Project.create(ApkMetadata(sha256="b" * 64, size_bytes=2048, path=Path("demo.apk")))
+    project.status = ProjectStatus.COMPLETED
+    project.evidence_count = len(evidence)
+    return AnalysisResult(
+        project=project,
+        manifest=None,
+        evidence=evidence,
+        duration_seconds=1.0,
     )
 
 
@@ -107,6 +137,82 @@ def test_model_supplied_claims_are_leads_not_verified() -> None:
     )
 
     assert evidence.level == EvidenceLevel.LEAD
+
+
+def test_a_behaviour_cannot_be_recorded_as_verified() -> None:
+    """A claim is not a fact, and the model refuses to call it one.
+
+    The report renders every ``verified`` record as "deterministically
+    established by an analysis tool". A behaviour that carried that level
+    would put a false sentence in the report, and a reader who believed it
+    would act on a guess.
+
+    The rule is a validator on the model rather than a habit in the callers:
+    the promotion is refused however the record is built.
+    """
+    with pytest.raises(ValidationError):
+        Evidence(
+            id="E-0001",
+            kind=EvidenceKind.BEHAVIOUR,
+            level=EvidenceLevel.VERIFIED,
+            summary="this app sends the contacts list to a server",
+        )
+
+
+def test_the_builder_refuses_a_behaviour_recorded_as_verified() -> None:
+    """The builder writes through the model, so it cannot be talked out of it."""
+    builder = _builder()
+
+    with pytest.raises(ValidationError):
+        builder.add(
+            EvidenceKind.BEHAVIOUR,
+            EvidenceLevel.VERIFIED,
+            "this app sends the contacts list to a server",
+            [],
+        )
+
+
+def test_a_tool_established_fact_may_still_be_verified() -> None:
+    """The rule refuses the promotion of a claim, not the facts.
+
+    A declaration read out of the bytecode is a fact, and the validator must
+    not stand in the way of the records the analysis writes all day.
+    """
+    evidence = Evidence(
+        id="E-0001",
+        kind=EvidenceKind.DECLARATION,
+        level=EvidenceLevel.VERIFIED,
+        summary="Class com.a.C (class)",
+        provenance=_provenance(),
+    )
+
+    assert evidence.level == EvidenceLevel.VERIFIED
+
+
+def test_a_behaviour_is_rendered_as_a_lead_and_not_as_a_finding() -> None:
+    """What the report says about a record follows from the level it carries.
+
+    The rule above is what puts a model's output in the ``lead`` bucket; this
+    is what the reader sees. A row that said the claim was established by an
+    analysis tool would be a lie in the report itself.
+    """
+    evidence = Evidence(
+        id="E-0001",
+        kind=EvidenceKind.BEHAVIOUR,
+        level=EvidenceLevel.LEAD,
+        summary="model suggests this may exfiltrate data",
+        provenance=_provenance(),
+    )
+
+    report = render_markdown(_analysis_result([evidence]))
+
+    row = next(line for line in report.splitlines() if line.startswith("| `E-0001` |"))
+    assert "`lead`" in row
+    # The legend is where the report says what a level means, and the meaning
+    # of a lead is that it is not a finding.
+    legend = next(line for line in report.splitlines() if line.startswith("| `lead` |"))
+    assert "Not a confirmed issue" in legend
+    assert "Deterministically established" not in legend
 
 
 def test_level_is_never_inferred_from_the_wording() -> None:
@@ -354,6 +460,92 @@ def test_no_references_produces_no_record() -> None:
     builder.add_cross_references([_method()], [])
 
     assert builder.items == []
+
+
+# -- the caps say what they cost ---------------------------------------------
+
+
+def test_the_class_evidence_is_capped_and_the_cap_is_not_silent(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, minimal_apk: Path
+) -> None:
+    """More classes than the evidence table has room for must say so.
+
+    The cap used to be a slice and a log line: the report showed 500 class
+    declarations and nothing anywhere said the APK held thousands. A sample
+    that does not say it is a sample reads as the whole — which is the "hit
+    the limit, truncate quietly, report success anyway" shape this project has
+    been bitten by before.
+    """
+    analyzer = Analyzer(settings)
+    classes = [
+        ClassRef(name=f"com.example.C{index}", kind=ClassKind.CLASS, provenance=[])
+        for index in range(MAX_EVIDENCE_CLASSES + 10)
+    ]
+
+    def fake_extract(*args: Any, **kwargs: Any):
+        return classes, [], [], [], [], None
+
+    monkeypatch.setattr(analyzer._androguard, "extract", fake_extract)
+
+    result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
+
+    declarations = [item for item in result.evidence if item.kind == EvidenceKind.DECLARATION]
+    assert len(declarations) == MAX_EVIDENCE_CLASSES
+    truncations = [item for item in result.evidence if item.detail.get("truncated")]
+    assert len(truncations) == 1, "the class cap was reached and nothing said so"
+    assert truncations[0].detail["classes_covered"] == MAX_EVIDENCE_CLASSES
+    assert truncations[0].detail["classes_total"] == MAX_EVIDENCE_CLASSES + 10
+    assert "have no record" in truncations[0].summary
+
+
+def test_a_run_that_fits_the_class_cap_records_no_truncation(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, minimal_apk: Path
+) -> None:
+    """The limits are limits, not a permanent condition.
+
+    A record that says the evidence was cut short on every run is a record
+    nobody reads, so nothing is recorded when nothing was cut.
+    """
+    analyzer = Analyzer(settings)
+    classes = [
+        ClassRef(name=f"com.example.C{index}", kind=ClassKind.CLASS, provenance=[])
+        for index in range(3)
+    ]
+
+    def fake_extract(*args: Any, **kwargs: Any):
+        return classes, [], [], [], [], None
+
+    monkeypatch.setattr(analyzer._androguard, "extract", fake_extract)
+
+    result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
+
+    assert not [item for item in result.evidence if item.detail.get("truncated")]
+
+
+def test_the_report_shows_two_hundred_evidence_rows_and_says_how_many_it_left_out() -> None:
+    """The evidence table is capped, and the cap is stated.
+
+    A report that shows 200 rows and says nothing about the rest reads as a
+    report of 200 records. The number is written down here rather than read
+    out of the module: a cap that is only ever checked against itself is a
+    cap nobody watches, and the class declarations share the same table.
+    """
+    evidence = [
+        Evidence(
+            id=f"E-{index:04d}",
+            kind=EvidenceKind.OBSERVATION,
+            level=EvidenceLevel.VERIFIED,
+            summary=f"observation {index}",
+            provenance=_provenance(),
+        )
+        for index in range(1, 251)
+    ]
+
+    report = render_markdown(_analysis_result(evidence))
+
+    rows = [line for line in report.splitlines() if line.startswith("| `E-")]
+    assert len(rows) == 200
+    assert "50 further evidence records omitted" in report
 
 
 # -- merging definitions of one symbol --------------------------------------

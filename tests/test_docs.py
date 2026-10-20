@@ -480,11 +480,21 @@ def _collected(marker: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2))
 
 
+@pytest.fixture(scope="module")
+def collected() -> tuple[int, int]:
+    """How many tests the collector finds, and how many the suite holds.
+
+    The collection is asked for once and shared: it costs a pytest start-up
+    per call, and every check below needs the same answer.
+    """
+    return _collected("not slow")
+
+
 def test_execution_report_exists() -> None:
     assert REPORT.is_file(), "the Phase 1 execution report is missing"
 
 
-def test_execution_report_numbers_match_the_code() -> None:
+def test_execution_report_numbers_match_the_code(collected: tuple[int, int]) -> None:
     """Every number the report states about the code must be the number the code has.
 
     The old check looked for a literal such as ``| 196 |`` in the report. That
@@ -493,7 +503,7 @@ def test_execution_report_numbers_match_the_code() -> None:
     names the ones that disagree.
     """
     stated = _stated_figures()
-    fast, total = _collected("not slow")
+    fast, total = collected
     slow, _ = _collected("slow")
 
     cli = (REPO_ROOT / "src/dexatlas/cli/main.py").read_text(encoding="utf-8")
@@ -574,6 +584,132 @@ def test_execution_report_coverage_figures_describe_the_current_code() -> None:
     ]
     assert not wrong, "the execution report disagrees with its own measurement:\n" + "\n".join(
         wrong
+    )
+
+
+def test_execution_report_suite_figures_add_up_to_the_tests_that_exist(
+    collected: tuple[int, int],
+) -> None:
+    """The pass/skip split has to be the split of a suite that exists.
+
+    The number of tests in the tree is measured again here, so the report's
+    own numbers are checked against the suite rather than against the record
+    they were written next to. A record that says 999 tests passed when the
+    suite holds 718 is caught; before, the record only had to agree with
+    itself, and writing 999 into it changed nothing anybody could see.
+
+    Every test that ran has exactly one outcome, so the outcomes add up to
+    the number of tests. The failures are counted too: a measurement in
+    which a test failed still ran that test, and leaving the failure out of
+    the sum would make the sum smaller than the suite.
+    """
+    record = _recorded_measurement()
+    assert record, "the report carries no measurement record"
+
+    suite = record["suite"]
+    total = collected[1]
+    ran = (
+        suite["passed"]
+        + suite["skipped"]
+        + suite["xfailed"]
+        + suite.get("failed", 0)
+        + suite.get("xpassed", 0)
+    )
+
+    assert ran == total, (
+        f"the report says {suite['passed']} passed, {suite['skipped']} skipped, "
+        f"{suite['xfailed']} xfailed, {suite['failed']} failed and "
+        f"{suite['xpassed']} xpassed, which is {ran} of the {total} tests in the tree"
+    )
+
+
+def test_execution_report_recorded_skips_are_the_tests_the_record_names() -> None:
+    """A count and the names of the tests it counts have to agree.
+
+    The record says how many tests sat out and which ones. A count that does
+    not match the names is a count of nothing: it says a measurement was
+    partial without saying what was missing, which is the state in which an
+    incomplete measurement can be published as a complete one.
+    """
+    record = _recorded_measurement()
+    assert record, "the report carries no measurement record"
+
+    suite = record["suite"]
+    skipped_tests = suite.get("skipped_tests", [])
+    xfailed_tests = suite.get("xfailed_tests", [])
+    assert len(skipped_tests) == suite["skipped"], (
+        f"the record says {suite['skipped']} tests skipped and names {len(skipped_tests)} of them"
+    )
+    assert len(xfailed_tests) == suite["xfailed"], (
+        f"the record says {suite['xfailed']} tests xfailed and names {len(xfailed_tests)} of them"
+    )
+
+
+def test_execution_report_coverage_figures_describe_the_statements_in_the_tree() -> None:
+    """The coverage denominator has to be the one the tree has.
+
+    The number of statements is measured again here, with coverage's own
+    parser, so the report's coverage is checked against the code and not
+    against the record the last refresh wrote beside it. A record that
+    claims a different number of statements is caught.
+    """
+    script = _figure_script()
+    record = _recorded_measurement()
+    assert record, "the report carries no measurement record"
+
+    measured = script.source_statements()
+    recorded = record["coverage"]["files"]
+
+    assert set(recorded) == set(measured), (
+        "the measurement covers a different set of modules: "
+        f"only in the record: {sorted(set(recorded) - set(measured))}; "
+        f"only in the tree: {sorted(set(measured) - set(recorded))}"
+    )
+    wrong = {
+        module: (values[0], measured[module])
+        for module, values in recorded.items()
+        if values[0] != measured[module]
+    }
+    assert not wrong, "the recorded statement counts are not the tree's:\n" + "\n".join(
+        f"{module}: the record says {was}, the tree has {now}"
+        for module, (was, now) in sorted(wrong.items())
+    )
+    assert record["coverage"]["statements"] == sum(measured.values()), (
+        "the recorded total is not the sum of the tree's modules"
+    )
+
+
+def test_the_fingerprint_covers_the_code_and_the_suite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fingerprint has to describe everything the measurement describes.
+
+    The pass/skip split the report states is a property of the suite as much
+    as of the code: a test that is added changes the number of tests that
+    ran, and the number the report states has to change with it. A
+    fingerprint that covered only the code let a test be added without the
+    report noticing, and the report went on claiming a split nobody had run.
+    """
+    script = _figure_script()
+    source = tmp_path / "src"
+    tests = tmp_path / "tests"
+    source.mkdir()
+    tests.mkdir()
+    (source / "mod.py").write_bytes(b"def f():\n    return 1\n")
+    (tests / "test_mod.py").write_bytes(b"def test_f():\n    assert True\n")
+
+    monkeypatch.setattr(script, "SOURCE_ROOT", source)
+    monkeypatch.setattr(script, "TESTS_ROOT", tests)
+    monkeypatch.setattr(script, "REPO_ROOT", tmp_path)
+    before = script.source_fingerprint()
+
+    (tests / "test_mod.py").write_bytes(b"def test_f():\n    assert False\n")
+    after_a_test = script.source_fingerprint()
+    assert after_a_test != before, "a changed test did not make the figures stale"
+
+    (source / "mod.py").write_bytes(b"def f():\n    return 2\n")
+    assert script.source_fingerprint() != after_a_test, (
+        "a changed module did not make the figures stale"
     )
 
 
@@ -669,18 +805,26 @@ def test_execution_report_does_not_claim_unbuilt_features() -> None:
 FAKE_CHECKS = 8
 
 
-def _fake_report() -> str:
+def _fake_report(*, skipped: int = 0, skipped_tests: list[str] | None = None) -> str:
     """A report small enough to read, with the figures the refresh script owns.
 
     The record it carries describes an earlier measurement, so the script has
     something to keep when a new measurement turns out to be partial.
     """
     record = {
-        "schema": 2,
+        "schema": 4,
         "code": {"api_endpoints": 15, "cli_commands": 10, "sample_apks": 5},
         "coverage": {"files": {"cli/main.py": [100, 45]}, "missing": 45, "statements": 100},
         "source_fingerprint": "sha256:stale",
-        "suite": {"passed": 1, "skipped": 0, "xfailed": 0},
+        "suite": {
+            "passed": 1,
+            "skipped": skipped,
+            "xfailed": 0,
+            "failed": 0,
+            "xpassed": 0,
+            "skipped_tests": skipped_tests or [],
+            "xfailed_tests": [],
+        },
         "tests": {"fast": 1, "slow": 1, "total": 1},
     }
     return (
@@ -705,6 +849,8 @@ def _install_fake_measurements(
     slow: int = 83,
     code_failures: tuple[str, ...] = (),
     checks_failures: tuple[str, ...] = (),
+    skipped: int = 0,
+    skipped_tests: tuple[str, ...] = (),
 ) -> None:
     """Replace the script's slow measurements with instant ones.
 
@@ -721,13 +867,14 @@ def _install_fake_measurements(
     def measure_code_tests() -> Any:
         return script.Outcome(
             counts={
-                "passed": total - FAKE_CHECKS - len(code_failures),
+                "passed": total - FAKE_CHECKS - len(code_failures) - skipped,
                 "failed": len(code_failures),
-                "skipped": 0,
+                "skipped": skipped,
                 "xfailed": 0,
                 "deselected": 0,
             },
             failures=code_failures,
+            skipped=skipped_tests,
         )
 
     def measure_report_checks(candidate: str, report_path: Path) -> Any:
@@ -760,10 +907,19 @@ def _install_fake_measurements(
         # measurement does not provoke a disclosure warning.
         return script.Coverage(files={"cli/main.py": [100, 10]}, statements=100, missing=10)
 
+    def collected_at_tag(tag: str) -> int | None:
+        # The third slow measurement. Without this the refresh really did
+        # archive every released tag and really did run pytest's collector
+        # inside each of them: nineteen seconds a run, and a run that failed
+        # whenever the machine was busy. The real measurement has its own
+        # test, in ``test_execution_report_history_figures_match_the_released_tags``.
+        return 100
+
     monkeypatch.setattr(script, "collected_tests", collected_tests)
     monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
     monkeypatch.setattr(script, "measure_report_checks", measure_report_checks)
     monkeypatch.setattr(script, "read_coverage", read_coverage)
+    monkeypatch.setattr(script, "collected_at_tag", collected_at_tag)
 
 
 def test_the_refresh_script_corrects_a_wrong_figure_in_one_run(
@@ -891,6 +1047,7 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
         outcome = script.Outcome(
             counts={"passed": 340, "failed": 0, "skipped": 6, "xfailed": 0, "deselected": 8},
             failures=(),
+            skipped=tuple(f"tests.test_other::test_{index}" for index in range(6)),
         )
         return outcome
 
@@ -903,6 +1060,71 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
     # The coverage figures describe a complete measurement, so the previous
     # ones stay rather than the partial measurement's.
     assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")
+
+
+def test_the_refresh_script_refuses_a_measurement_that_skipped_a_different_set_of_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The same number of skips is not the same set of skips.
+
+    Skipping and passing are different states, so the question "is this
+    measurement complete" is about *which* tests sat out, not about how many.
+    A measurement that skipped a different set of tests measured a different
+    tree, and publishing its numbers as *the* numbers would be a small lie.
+
+    The comparison this replaces was between the counts, and a count of one
+    skip matched a count of one skip however different the two were.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(
+        _fake_report(skipped=1, skipped_tests=["tests.test_other::test_recorded"]),
+        encoding="utf-8",
+    )
+    _install_fake_measurements(
+        script,
+        monkeypatch,
+        skipped=1,
+        skipped_tests=("tests.test_other::test_measured",),
+    )
+
+    assert script.main(["--report", str(report)]) == 0
+
+    out = capsys.readouterr().out
+    assert "partial" in out, "a measurement that skipped a different set was taken as complete"
+    # The coverage figures describe a complete measurement, so the previous
+    # ones stay rather than the partial measurement's.
+    assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")
+
+
+def test_the_refresh_script_takes_a_measurement_that_skipped_the_same_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The same set of skips is the same measurement, and it is complete.
+
+    The rule above refuses a measurement that skipped a different set of
+    tests. A measurement that skipped the same ones is the same measurement,
+    and it must not be refused: a tree whose basis has not changed is still
+    a tree whose basis has not changed.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(
+        _fake_report(skipped=1, skipped_tests=["tests.test_other::test_recorded"]),
+        encoding="utf-8",
+    )
+    _install_fake_measurements(
+        script,
+        monkeypatch,
+        skipped=1,
+        skipped_tests=("tests.test_other::test_recorded",),
+    )
+
+    assert script.main(["--report", str(report)]) == 0
+
+    out = capsys.readouterr().out
+    assert "partial" not in out
+    assert "<!--fig:coverage.pct-->90.0%<!--/fig-->" in report.read_text(encoding="utf-8")
 
 
 def test_the_source_fingerprint_ignores_line_endings(
@@ -918,10 +1140,13 @@ def test_the_source_fingerprint_ignores_line_endings(
     """
     script = _figure_script()
     source_root = tmp_path / "pkg"
+    tests_root = tmp_path / "tests"
     source_root.mkdir()
+    tests_root.mkdir()
     (source_root / "mod.py").write_bytes(b"def f():\n    return 1\n")
 
     monkeypatch.setattr(script, "SOURCE_ROOT", source_root)
+    monkeypatch.setattr(script, "TESTS_ROOT", tests_root)
     # The fingerprint names files relative to the repository root, so the
     # stand-in root moves with the stand-in source.
     monkeypatch.setattr(script, "REPO_ROOT", tmp_path)
