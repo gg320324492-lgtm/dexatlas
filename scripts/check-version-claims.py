@@ -460,21 +460,39 @@ def facts_of(tags: tuple[str, ...], package: str, changelog: str) -> Facts:
 
 
 def read_facts() -> Facts:
-    """Ask the repository what its releases are."""
-    tags = tuple(sorted(git("tag", "--list").split()))
-    if not tags:
-        # A clone without tags cannot answer any of the questions this script
-        # asks. Reporting "nothing is wrong" from such a clone would be the
-        # worst kind of answer: a green check that checked nothing.
+    """Ask the repository what its releases are.
+
+    A source archive has no git at all, and the release state can still be
+    read out of the changelog: the versions it names are the versions that
+    were released. The tags are then unknown, and the check says so — it
+    checks the documents against the changelog, which is what a reader of
+    the archive has to go on.
+
+    A *clone* without tags is a different thing: it may be shallow, and a
+    shallow clone cannot say which versions exist. Reporting "nothing is
+    wrong" from one would be the worst kind of answer — a green check that
+    checked nothing.
+    """
+    package = (REPO / "src" / "dexatlas" / "__init__.py").read_text(encoding="utf-8")
+    changelog = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+    tags = git_optional("tag", "--list")
+    if tags is None:
+        # No git here at all: a source archive. The changelog names every
+        # version that was released, and that is what there is to check
+        # against — not only the newest one. A document that says "the work
+        # after v0.1.2 has not been released" is false once v0.1.3 is out, and
+        # the checker can only know that if it knows v0.1.2 was released too.
+        released = tuple(CHANGELOG_ENTRY.findall(changelog))
+        return facts_of(tuple(f"v{version}" for version in released), package, changelog)
+    tag_list = tuple(sorted(tags.split()))
+    if not tag_list:
         raise SystemExit(
             "this clone has no tags, so the release state cannot be checked.\n"
             "Fetch them and try again:\n"
             "  git fetch --tags\n"
             "(in CI: check out with fetch-depth: 0)"
         )
-    package = (REPO / "src" / "dexatlas" / "__init__.py").read_text(encoding="utf-8")
-    changelog = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
-    return facts_of(tags, package, changelog)
+    return facts_of(tag_list, package, changelog)
 
 
 def read_facts_at(ref: str) -> Facts:
@@ -1112,10 +1130,18 @@ def check_release_numbers(
             "coverage.pct": measured.get("coverage.pct"),
         }
         if expected["coverage.pct"] is None and notes is not None:
-            notes.append(
-                f"{tag}: the report of that release has no measured coverage, "
-                f"so only its test count is checked"
-            )
+            if git_optional("rev-parse", "--git-dir") is None:
+                # No git here: the report of that release cannot be read, so
+                # its coverage cannot be compared with anything.
+                notes.append(
+                    f"{tag}: this tree has no git, so the report of that release "
+                    f"cannot be read and only its test count is checked"
+                )
+            else:
+                notes.append(
+                    f"{tag}: the report of that release has no measured coverage, "
+                    f"so only its test count is checked"
+                )
         for path, text, offset in release_documents(tag, version, by_path):
             findings.extend(check_stated_numbers(path, text, offset, expected, version))
     return findings
@@ -1170,17 +1196,41 @@ def check_badges(path: str, text: str, figures: dict[str, list[str]]) -> list[Fi
 
 
 def documents_in_tree() -> list[tuple[str, str]]:
-    """The markdown files of the working tree, with their text."""
+    """The markdown files of the working tree, with their text.
+
+    A source archive has no git, and a checker that can only run in a
+    checkout is a checker that cannot be run by whoever downloaded the
+    source. So when git cannot list the files, the files are found by
+    walking the tree instead -- the same documents, found another way.
+    """
     documents: list[tuple[str, str]] = []
-    for name in git("ls-files", "*.md").splitlines():
-        name = name.strip()
-        if not name or name.startswith(HISTORY):
+    for name in _markdown_files():
+        if name.startswith(HISTORY):
             continue
         path = REPO / name
         if not path.is_file():
             continue
         documents.append((name, path.read_text(encoding="utf-8", errors="replace")))
     return documents
+
+
+#: Directories whose markdown files are not the project's own documents.
+_SKIP_DIRECTORIES = frozenset(
+    {".git", ".venv", "build", "dist", "node_modules", ".mypy_cache", ".pytest_cache"}
+)
+
+
+def _markdown_files() -> list[str]:
+    """The markdown files of the tree, by git when there is one, else by walking."""
+    listed = git_optional("ls-files", "*.md")
+    if listed is not None:
+        return [name.strip() for name in listed.splitlines() if name.strip()]
+    found: list[str] = []
+    for path in sorted(REPO.rglob("*.md")):
+        if _SKIP_DIRECTORIES & set(path.relative_to(REPO).parts):
+            continue
+        found.append(path.relative_to(REPO).as_posix())
+    return found
 
 
 def documents_at(ref: str) -> list[tuple[str, str]]:

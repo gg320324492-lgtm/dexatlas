@@ -186,8 +186,16 @@ def test_a_citation_that_names_a_lowercase_symbol_is_checked(
     """The names that are checked are not only the ones that start with a capital."""
     checker = _checker()
     document = tmp_path / "doc.md"
+    # The range is computed rather than written down: this test is about the
+    # rule that a cited range has to hold the symbol it names, and a range
+    # typed into the test would fail for a different reason every time the
+    # method moved -- which is not what the test is about.
+    source = REPO_ROOT / "src" / "dexatlas" / "core" / "evidence.py"
+    line = checker.definition_line(source, "add_exported_components")
+    assert line is not None, "the method this test cites is not in the file"
     document.write_text(
-        "The `add_exported_components` method is at `src/dexatlas/core/evidence.py:128-154`\n",
+        f"The `add_exported_components` method is at "
+        f"`src/dexatlas/core/evidence.py:{line}-{line}`\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(checker, "DOCS", [document])

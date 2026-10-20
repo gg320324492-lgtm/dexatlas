@@ -881,3 +881,64 @@ def test_a_claim_the_commit_made_false_is_a_failure(
     monkeypatch.setattr(checker, "REPO", repository)
 
     assert checker.main(["--base", "HEAD~1"]) == 1
+
+
+# -- a source archive has no git ---------------------------------------------
+
+
+def test_the_checker_answers_in_a_tree_that_has_no_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A source archive is not a clone, and the checker must tell the difference.
+
+    A clone without tags cannot say which versions exist — it may be shallow,
+    and a shallow clone cannot answer that question. A source archive has no
+    git at all, and the release state is in its changelog: the versions the
+    changelog names are the versions that were released.
+
+    The checker used to raise ``SystemExit`` on the first git command it ran,
+    so a downloader could not check the claims at all. A checker that only
+    runs in a checkout is a checker that only the author can run.
+    """
+    checker = _checker()
+    archive = tmp_path / "archive"
+    (archive / "src" / "dexatlas").mkdir(parents=True)
+    (archive / "src" / "dexatlas" / "__init__.py").write_text(
+        '__version__ = "0.1.3"\n', encoding="utf-8"
+    )
+    (archive / "docs").mkdir()
+    (archive / "docs" / "status.md").write_text(
+        "# Status\n\n**对应版本：** v0.1.3 之后的开发状态（尚未发布）\n",  # noqa: RUF001
+        encoding="utf-8",
+    )
+    _write_changelog(archive, ["0.1.3"])
+    monkeypatch.setattr(checker, "REPO", archive)
+
+    facts = checker.read_facts()
+
+    assert facts.versions == frozenset({"0.1.3"})
+    assert facts.newest_tag == "0.1.3"
+
+
+def test_the_checker_finds_a_claim_in_a_tree_that_has_no_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Not merely running: it still answers, and it still finds a false claim."""
+    checker = _checker()
+    archive = tmp_path / "archive"
+    (archive / "src" / "dexatlas").mkdir(parents=True)
+    (archive / "src" / "dexatlas" / "__init__.py").write_text(
+        '__version__ = "0.1.3"\n', encoding="utf-8"
+    )
+    (archive / "docs").mkdir()
+    (archive / "docs" / "status.md").write_text(
+        "# Status\n\n**对应版本：** v0.1.2 之后的开发状态（尚未发布）\n",  # noqa: RUF001
+        encoding="utf-8",
+    )
+    _write_changelog(archive, ["0.1.3", "0.1.2"])
+    monkeypatch.setattr(checker, "REPO", archive)
+
+    assert checker.main([]) == 1
+    written = capsys.readouterr().out
+    assert "findings:" in written
+    assert "Traceback" not in written
