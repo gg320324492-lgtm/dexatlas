@@ -421,6 +421,133 @@ def test_a_symbol_defined_twice_is_stored_once(store: Store, tmp_path: Path) -> 
     assert len(store.list_methods(project.id)) == 2
 
 
+# -- the counts a class row holds -------------------------------------------
+
+
+def _split_class_symbols() -> tuple[list[ClassRef], list[MethodRef], list[FieldRef]]:
+    """A class split across two dex files, as a multi-dex APK splits one.
+
+    Each dex file defines part of the class, so each backend view of it says
+    one method and one field — while the class has two of each. The views are
+    what the backends produce; the class is what the index has to report.
+    """
+    classes = [
+        ClassRef(
+            name="com.example.demo.Shared",
+            method_count=1,
+            field_count=1,
+            provenance=_provenance(),
+        ),
+        ClassRef(
+            name="com.example.demo.Shared",
+            method_count=1,
+            field_count=1,
+            provenance=_provenance(),
+        ),
+    ]
+    methods = [
+        MethodRef(
+            class_name="com.example.demo.Shared",
+            name="first",
+            descriptor="()V",
+            provenance=_provenance(),
+        ),
+        MethodRef(
+            class_name="com.example.demo.Shared",
+            name="second",
+            descriptor="()V",
+            provenance=_provenance(),
+        ),
+    ]
+    fields = [
+        FieldRef(
+            class_name="com.example.demo.Shared",
+            name="A",
+            descriptor="I",
+            provenance=_provenance(),
+        ),
+        FieldRef(
+            class_name="com.example.demo.Shared",
+            name="B",
+            descriptor="I",
+            provenance=_provenance(),
+        ),
+    ]
+    return classes, methods, fields
+
+
+def test_a_class_split_across_two_dexes_counts_the_rows_it_owns(
+    store: Store, tmp_path: Path
+) -> None:
+    """The class row must hold the class's real method count.
+
+    It used to hold the larger of the counts the backends reported, and a
+    backend that reads one dex file sees only that dex file's share of a
+    class. A class split across two dex files was counted once and stored
+    twice: the number in the row and the number a query returns disagreed.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields = _split_class_symbols()
+
+    store.save_symbols(project.id, classes, methods, fields, [], [])
+
+    stored = store.get_class(project.id, "com.example.demo.Shared")
+    assert stored is not None
+    assert stored.method_count == 2
+    assert stored.method_count == len(store.list_methods(project.id, "com.example.demo.Shared"))
+
+
+def test_a_class_split_across_two_dexes_counts_the_fields_it_owns(
+    store: Store, tmp_path: Path
+) -> None:
+    """The field count is the same two numbers, and has to be the real one."""
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields = _split_class_symbols()
+
+    store.save_symbols(project.id, classes, methods, fields, [], [])
+
+    stored = store.get_class(project.id, "com.example.demo.Shared")
+    assert stored is not None
+    assert stored.field_count == 2
+
+
+def test_the_class_row_counts_the_rows_and_not_the_view(store: Store, tmp_path: Path) -> None:
+    """Whatever a backend says about a class, the row holds the rows.
+
+    A view is what one backend saw. The row is the index's own count, and it
+    has to be the number a query against the method table returns — the
+    property the report's numbers rest on.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes, methods, fields = _split_class_symbols()
+    # A backend that miscounts. The index does not have to believe it.
+    classes = [cls.model_copy(update={"method_count": 99, "field_count": 99}) for cls in classes]
+
+    store.save_symbols(project.id, classes, methods, fields, [], [])
+
+    stored = store.get_class(project.id, "com.example.demo.Shared")
+    assert stored is not None
+    assert stored.method_count == 2
+    assert stored.field_count == 2
+
+
+def test_a_class_with_no_methods_counts_zero(store: Store, tmp_path: Path) -> None:
+    """A class nothing was indexed for has no methods, and says so."""
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+    classes = [ClassRef(name="com.example.demo.Empty", method_count=3, provenance=_provenance())]
+
+    store.save_symbols(project.id, classes, [], [], [], [])
+
+    stored = store.get_class(project.id, "com.example.demo.Empty")
+    assert stored is not None
+    assert stored.method_count == 0
+    assert stored.field_count == 0
+
+
 def test_a_generator_of_symbols_still_fills_the_search_index(store: Store, tmp_path: Path) -> None:
     """The search index reads the same symbols the tables do.
 

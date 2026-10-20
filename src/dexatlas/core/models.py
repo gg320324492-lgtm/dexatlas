@@ -203,7 +203,25 @@ class ClassRef(Sourced):
     interfaces: list[str] = Field(default_factory=list)
     access_flags: list[str] = Field(default_factory=list)
     method_count: int = 0
+    """How many methods the class has.
+
+    A backend reads one DEX file, so it sees one DEX file's share of a class:
+    a class split across two DEX files is two partial views, and each of
+    them counts only its own half. The value a backend produces is therefore
+    a *view* of the class, not the class's total.
+
+    The number the index stores is the total. It is counted from the rows the
+    ``methods`` table holds, so a class row and a method query always agree —
+    the storage layer overwrites the view with the count it measured.
+    """
+
     field_count: int = 0
+    """How many fields the class has — the same two numbers, and the same
+    split between a backend's view of the class and the class's real total.
+
+    The index stores the total, counted from the rows the ``fields`` table
+    holds.
+    """
 
     @property
     def package(self) -> str:
@@ -272,13 +290,55 @@ class FieldRef(Sourced):
         return f"{self.class_name}.{self.name}:{self.descriptor}"
 
 
+class InvocationKind(StrEnum):
+    """How a method is called, as the Dalvik instruction that carries the call says.
+
+    Dalvik has more than one way to invoke a method, and they are different
+    opcodes in the bytecode. A static call and a virtual call are not the same
+    thing, and the opcode is the only thing that says which one a call site is.
+    """
+
+    INVOKE = "invoke"
+    """A call edge whose opcode is not known.
+
+    The fallback for an edge that did not come out of a DEX instruction — a
+    hand-built reference, or a backend that does not read bytecode. It says
+    that a call happened and nothing more.
+    """
+
+    VIRTUAL = "virtual"
+    """``invoke-virtual``: a call on an instance, dispatched virtually."""
+
+    SUPER = "super"
+    """``invoke-super``: a call on the superclass of the current class."""
+
+    DIRECT = "direct"
+    """``invoke-direct``: a call on a private or constructor method."""
+
+    STATIC = "static"
+    """``invoke-static``: a call on a class method, with no instance."""
+
+    INTERFACE = "interface"
+    """``invoke-interface``: a call on an interface method."""
+
+
 class MethodReference(Sourced):
     """An edge: caller method invokes callee method."""
 
     caller: str
     callee: str
-    kind: str = "invoke"
-    """``invoke``, ``virtual``, ``direct``, ``interface`` or ``dynamic``."""
+    kind: InvocationKind = InvocationKind.INVOKE
+    """How the call is made.
+
+    The value is the kind of the Dalvik invocation opcode the edge was read
+    from. The values are ``invoke``, ``virtual``, ``super``, ``direct``,
+    ``static`` and ``interface`` — a static call and a virtual call are not
+    the same thing, and the cross-reference is the only place that difference
+    shows.
+
+    ``invoke`` is the fallback: it says a call happened without saying which
+    opcode it was, and is what an edge carries when the opcode is not known.
+    """
 
     @field_validator("caller", "callee")
     @classmethod
@@ -287,11 +347,28 @@ class MethodReference(Sourced):
 
 
 class StringConstant(Sourced):
-    """A string literal found in the DEX or resources."""
+    """An entry in the DEX string pool.
+
+    The pool holds more than literals. Type descriptors, member names and
+    source-file names are in it too, so this is the pool rather than the set
+    of string literals — in a small APK most of the entries are descriptors
+    and member names, not text a person wrote.
+
+    Resources are not covered: no backend reads the resource table, so a
+    string that exists only in a resource file is not here.
+
+    One row per use site. A constant used in two methods is two rows, one
+    per method, because each row has to point at one place in the code. A
+    pool entry that no instruction loads — a descriptor, a member name — has
+    no place to point at, and its row carries no location.
+    """
 
     value: str
     class_name: str | None = None
+    """The class whose bytecode uses this constant, when one does."""
+
     method_name: str | None = None
+    """The method whose bytecode uses this constant, when one does."""
 
 
 # ---------------------------------------------------------------------------

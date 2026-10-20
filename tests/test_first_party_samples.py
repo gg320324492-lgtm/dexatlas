@@ -17,6 +17,7 @@ pipeline that handles one layout look like a pipeline that handles them all:
 
 from __future__ import annotations
 
+import sqlite3
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,7 +25,12 @@ from pathlib import Path
 import pytest
 
 from dexatlas.config.settings import Settings
-from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel
+from dexatlas.core.models import (
+    Evidence,
+    EvidenceKind,
+    EvidenceLevel,
+    InvocationKind,
+)
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.jadx.adapter import JadxBackend
@@ -433,6 +439,36 @@ def test_the_reported_counts_are_the_rows_in_the_tables(samples: dict[str, objec
         assert project.reference_count == _row_count(analyzer, "xrefs", project_id), name
 
 
+def test_a_class_row_counts_the_rows_its_own_table_holds(samples: dict[str, object]) -> None:
+    """A class row and a method query must agree about the same class.
+
+    The row used to hold the larger of the counts the backends reported. A
+    backend reads one dex file, so a class split across two dex files is seen
+    partly by each of them, and neither view is the class's total — the
+    larger of the two is not either. A class that a query says has four
+    methods was reported as having three.
+    """
+    analyzer = _analyzer(samples)
+
+    for name in sorted(SAMPLE_APKS):
+        project_id = _project_id(samples, name)
+        with analyzer.store.transaction() as connection:
+            rows = connection.execute(
+                "SELECT c.name, c.method_count, c.field_count,"
+                " (SELECT COUNT(*) FROM methods m"
+                "  WHERE m.project_id = c.project_id AND m.class_name = c.name) methods,"
+                " (SELECT COUNT(*) FROM fields f"
+                "  WHERE f.project_id = c.project_id AND f.class_name = c.name) fields"
+                " FROM classes c WHERE c.project_id = ?",
+                (project_id,),
+            ).fetchall()
+
+        assert rows, name
+        for row in rows:
+            assert row["method_count"] == row["methods"], (name, row["name"])
+            assert row["field_count"] == row["fields"], (name, row["name"])
+
+
 def test_a_class_defined_in_two_dexes_is_one_method_with_two_sources(
     samples: dict[str, object],
 ) -> None:
@@ -456,6 +492,158 @@ def test_a_class_defined_in_two_dexes_is_one_method_with_two_sources(
         locators = {provenance.locator for provenance in method.provenance}
         assert any("classes.dex" in locator for locator in locators), method.qualified_name
         assert any("classes2.dex" in locator for locator in locators), method.qualified_name
+
+
+# -- a call says how it is made ---------------------------------------------
+
+
+def _xref_rows(analyzer: Analyzer, project_id: str) -> list[sqlite3.Row]:
+    with analyzer.store.transaction() as connection:
+        return connection.execute(
+            "SELECT caller, callee, kind FROM xrefs WHERE project_id = ?", (project_id,)
+        ).fetchall()
+
+
+def test_a_call_edge_says_how_the_call_is_made(samples: dict[str, object]) -> None:
+    """A static call and a virtual call are different opcodes, and the edge says which.
+
+    The kind used to be the same value on every row, so nothing in the index
+    could tell a static call from a virtual one — and the field's own
+    documentation promised a distinction it never made.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    rows = _xref_rows(analyzer, project_id)
+    kinds = {row["kind"] for row in rows}
+
+    assert "static" in kinds, "no static call was found in the demo app"
+    assert "virtual" in kinds, "no virtual call was found in the demo app"
+    assert "super" in kinds, "no super call was found in the demo app"
+
+    by_callee = {row["callee"]: row["kind"] for row in rows}
+    assert (
+        by_callee[
+            "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
+        ]
+        == "static"
+    )
+    assert by_callee["android.app.Activity.onCreate(Landroid/os/Bundle;)V"] == "super"
+
+
+def test_an_interface_call_is_an_interface_call(samples: dict[str, object]) -> None:
+    """The call site in the wide sample is an ``invoke-interface``.
+
+    The reference names the interface rather than either implementation —
+    that is how the DEX encodes it — and the edge has to say the call was an
+    interface call.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "wide-app")
+
+    rows = _xref_rows(analyzer, project_id)
+    by_callee = {row["callee"]: row["kind"] for row in rows}
+
+    assert by_callee["com.example.wide.Handler.handle(Ljava/lang/String;)Ljava/lang/String;"] == (
+        "interface"
+    )
+
+
+def test_every_stored_call_kind_is_one_the_model_knows(samples: dict[str, object]) -> None:
+    """The stored kinds and the model's vocabulary have to be the same list."""
+    analyzer = _analyzer(samples)
+    known = {kind.value for kind in InvocationKind}
+
+    for name in sorted(SAMPLE_APKS):
+        project_id = _project_id(samples, name)
+        for row in _xref_rows(analyzer, project_id):
+            assert row["kind"] in known, (name, row["kind"])
+
+
+# -- a string constant points at the code that uses it ----------------------
+
+
+def _string_rows(analyzer: Analyzer, project_id: str, value: str) -> list[sqlite3.Row]:
+    with analyzer.store.transaction() as connection:
+        return connection.execute(
+            "SELECT value, class_name, method_name FROM strings WHERE project_id = ? AND value = ?",
+            (project_id, value),
+        ).fetchall()
+
+
+def test_a_string_constant_points_at_the_method_that_uses_it(samples: dict[str, object]) -> None:
+    """A hardcoded key has to lead back to the code that reads it.
+
+    The index used to hold the string and nothing else, so a key found by a
+    search could not be traced to the method that uses it. The two fields
+    that were there to say so were never filled in.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    rows = _string_rows(analyzer, project_id, "sk_live_2f8a91c4e7b3")
+
+    assert rows, "the hardcoded key is not in the string index"
+    assert {(row["class_name"], row["method_name"]) for row in rows} == {
+        ("com.example.demo.MainActivity", "onCreate")
+    }
+
+
+def test_a_constant_used_in_two_methods_is_a_row_for_each(samples: dict[str, object]) -> None:
+    """A constant used in two places has two places to point at.
+
+    One row per use site: a row that names one method cannot stand for a
+    constant that two methods load.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "multidex-app")
+
+    rows = _string_rows(analyzer, project_id, "primary-dex")
+
+    assert len(rows) > 1, "the constant is used in two methods but was indexed once"
+    for row in rows:
+        assert row["class_name"] is not None
+        assert row["method_name"] is not None
+
+
+def test_a_pool_entry_no_method_loads_has_no_location(samples: dict[str, object]) -> None:
+    """A type descriptor is in the pool, and no method loads it.
+
+    The pool holds more than literals, and the row says so by having no
+    method to point at.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    rows = _string_rows(analyzer, project_id, "Landroid/app/Activity;")
+
+    assert rows, "the type descriptor is not in the string index"
+    for row in rows:
+        assert row["class_name"] is None
+        assert row["method_name"] is None
+
+
+def test_the_pool_holds_more_than_literals(samples: dict[str, object]) -> None:
+    """Most of the pool is descriptors and member names, not text.
+
+    This is why the model says "string pool" and not "string literal": in the
+    demo app the great majority of the entries are type descriptors, member
+    names and source-file names.
+    """
+    analyzer = _analyzer(samples)
+    project_id = _project_id(samples, "demo-app")
+
+    with analyzer.store.transaction() as connection:
+        total = connection.execute(
+            "SELECT COUNT(*) FROM strings WHERE project_id = ?", (project_id,)
+        ).fetchone()[0]
+        located = connection.execute(
+            "SELECT COUNT(*) FROM strings WHERE project_id = ? AND class_name IS NOT NULL",
+            (project_id,),
+        ).fetchone()[0]
+
+    assert total > 0
+    assert located < total, "every pool entry was claimed to be a literal in the code"
 
 
 # -- cross-references become evidence ---------------------------------------

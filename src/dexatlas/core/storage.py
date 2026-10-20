@@ -334,6 +334,12 @@ class Store:
         written here has to be the id the lookup below matches, whatever the caller
         handed in.
 
+        The class row's ``method_count`` and ``field_count`` are counted from the
+        rows this method writes, not taken from the class views it is handed. A
+        backend reads one dex file, so a class split across two dex files is seen
+        partly by each of them, and no view of it is the class's total. The rows
+        are: the count in the class row is the number of rows a query returns.
+
         Returns the number of rows each table ended up holding. The count is the
         one a query returns, which is the only count a report may state: the
         symbol tables key on the symbol, so two dex files that define the same
@@ -353,23 +359,8 @@ class Store:
             for table in _SYMBOL_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
 
-            connection.executemany(
-                "INSERT OR REPLACE INTO classes VALUES (?,?,?,?,?,?,?,?,?)",
-                [
-                    (
-                        project_id,
-                        c.name,
-                        c.kind.value,
-                        c.superclass,
-                        json.dumps(c.interfaces),
-                        json.dumps(c.access_flags),
-                        c.method_count,
-                        c.field_count,
-                        _dump_provenance(c),
-                    )
-                    for c in class_list
-                ],
-            )
+            # The methods and the fields go in first: the class row's counts are
+            # measured from them.
             connection.executemany(
                 "INSERT OR REPLACE INTO methods VALUES (?,?,?,?,?,?,?,?)",
                 [
@@ -401,6 +392,25 @@ class Store:
                     for f in field_list
                 ],
             )
+            method_counts = _counts_by_class(connection, "methods", project_id)
+            field_counts = _counts_by_class(connection, "fields", project_id)
+            connection.executemany(
+                "INSERT OR REPLACE INTO classes VALUES (?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        project_id,
+                        c.name,
+                        c.kind.value,
+                        c.superclass,
+                        json.dumps(c.interfaces),
+                        json.dumps(c.access_flags),
+                        method_counts.get(c.name, 0),
+                        field_counts.get(c.name, 0),
+                        _dump_provenance(c),
+                    )
+                    for c in class_list
+                ],
+            )
             connection.executemany(
                 "INSERT INTO xrefs VALUES (?,?,?,?,?)",
                 [
@@ -408,7 +418,7 @@ class Store:
                         project_id,
                         canonical_method_id(r.caller),
                         canonical_method_id(r.callee),
-                        r.kind,
+                        r.kind.value,
                         _dump_provenance(r),
                     )
                     for r in reference_list
@@ -563,6 +573,20 @@ def _count_rows(connection: sqlite3.Connection, table: str, project_id: str) -> 
     return int(row[0]) if row else 0
 
 
+def _counts_by_class(connection: sqlite3.Connection, table: str, project_id: str) -> dict[str, int]:
+    """How many rows of ``table`` each class owns.
+
+    This is what a class row's ``method_count`` and ``field_count`` hold. A
+    backend that read one dex file saw part of a class that was split across
+    two, so its count was part of the class; the rows are the class.
+    """
+    rows = connection.execute(
+        f"SELECT class_name, COUNT(*) FROM {table} WHERE project_id = ? GROUP BY class_name",
+        (project_id,),
+    ).fetchall()
+    return {row["class_name"]: int(row[1]) for row in rows}
+
+
 def _canonical_search_name(kind: str, name: str) -> str:
     """Canonicalise a search hit's name.
 
@@ -658,7 +682,14 @@ def _search_rows(
     for field in fields:
         body = f"{field.class_name} {field.name} {field.descriptor} {' '.join(field.access_flags)}"
         rows.append(("field", field.qualified_name, project_id, body))
+    # A string constant is one symbol, however many methods use it, so it is
+    # indexed once. The use sites live in the strings table; the search index
+    # answers "is this text in the APK", and it answers it once.
+    indexed: set[str] = set()
     for constant in strings:
+        if constant.value in indexed:
+            continue
+        indexed.add(constant.value)
         rows.append(("string", constant.value[:200], project_id, constant.value))
     return rows
 
