@@ -319,8 +319,33 @@ androguard: string limit 50000 reached; truncated
 
 and the run still reports `errors=[]`.
 
-**A limit that is per-file rather than per-APK is a limit that a large APK
-walks straight past.** The number of DEX files in an APK is not under the
+### 4.2 The overshoot is exactly the number of DEX files
+
+A sample built so that **each** DEX file wants more than the whole APK's
+budget makes the arithmetic unambiguous — 1,200 classes × 120 methods, in
+four DEX files, each wanting 73,448 string rows:
+
+```
+androguard: string limit 50000 reached; truncated     (×4, one per DEX file)
+
+  string rows          200,000
+  DEFAULT_STRING_LIMIT  50,000
+  overshoot               4.0x
+```
+
+**200,000 rows against a limit of 50,000, for a 4-DEX APK.** Not an
+approximation, not a rounding artefact: four times the budget, because the
+budget is applied four times.
+
+Nothing else about that run is clipped. The method limit is 200,000 and the
+sample holds 144,001 methods; the instruction limit is 5,000,000 and the
+sample holds well under it. The classes, methods and cross-references are
+all indexed in full — 1,201, 144,001 and 144,000, exactly what the generator
+wrote. **The only thing the overshoot touches is the string index**, and the
+only evidence of it is a log line.
+
+The same sample, with the same limits, in one DEX file instead of four, is
+inside the budget. The number of DEX files in an APK is not under the
 project's control — it is the app author's.
 
 ---
@@ -380,6 +405,14 @@ times on the `large` sample — once per DEX file that fills up.
 
 **Reproduction:** the same command as above, with
 `tests/test_large_apk_scale.py -k "string_limit or instruction_limit"`.
+
+The overshoot at the real limit, on a 4-DEX APK ([§4.2](#42-the-overshoot-is-exactly-the-number-of-dex-files)):
+
+```bash
+uv run python scripts/generate-large-apk.py --scale medium \
+  --classes 1200 --methods-per-class 120 --max-methods-per-dex 36000 \
+  --output-dir /tmp/overshoot
+```
 
 ### 5.3 The version of the backend is probed once per symbol
 
