@@ -350,6 +350,12 @@ def _merge_classes(classes: list[ClassRef]) -> list[ClassRef]:
 
     Backends disagree about a class's flags — Apktool knows the manifest declaration,
     Androguard the DEX definition. Both are kept; neither overwrites the other.
+
+    The method and field counts are *views*, not totals. A backend reads one dex
+    file, so a class split across two dex files is seen partly by each of them,
+    and neither view is the class's total — the largest of them is not either.
+    The number the index stores is counted from the rows it wrote; see
+    :meth:`dexatlas.core.storage.Store.save_symbols`.
     """
     merged: dict[str, ClassRef] = {}
     for cls in classes:

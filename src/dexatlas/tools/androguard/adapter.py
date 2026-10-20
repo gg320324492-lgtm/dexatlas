@@ -29,6 +29,7 @@ from dexatlas.core.models import (
     ClassKind,
     ClassRef,
     FieldRef,
+    InvocationKind,
     MethodRef,
     MethodReference,
     StringConstant,
@@ -49,21 +50,32 @@ DEFAULT_METHOD_LIMIT = 200_000
 DEFAULT_STRING_LIMIT = 50_000
 DEFAULT_INSTRUCTION_LIMIT = 5_000_000
 
+#: The Dalvik invocation opcodes, and the kind of call each one records. The
+#: target of an invoke opcode is its final operand, and the opcode's own name
+#: says how the call is made: a static call and a virtual call are different
+#: opcodes, and the edge is the only place that difference shows.
+#:
+#: The ``/range`` variants take their arguments in a register range instead of
+#: in the instruction, and are the same kind of call.
+INVOKE_KINDS: dict[str, InvocationKind] = {
+    "invoke-virtual": InvocationKind.VIRTUAL,
+    "invoke-super": InvocationKind.SUPER,
+    "invoke-direct": InvocationKind.DIRECT,
+    "invoke-static": InvocationKind.STATIC,
+    "invoke-interface": InvocationKind.INTERFACE,
+    "invoke-virtual/range": InvocationKind.VIRTUAL,
+    "invoke-super/range": InvocationKind.SUPER,
+    "invoke-direct/range": InvocationKind.DIRECT,
+    "invoke-static/range": InvocationKind.STATIC,
+    "invoke-interface/range": InvocationKind.INTERFACE,
+}
+
 #: Opcodes that reference a method. The target is the final operand.
-INVOKE_OPCODES = frozenset(
-    {
-        "invoke-virtual",
-        "invoke-super",
-        "invoke-direct",
-        "invoke-static",
-        "invoke-interface",
-        "invoke-virtual/range",
-        "invoke-super/range",
-        "invoke-direct/range",
-        "invoke-static/range",
-        "invoke-interface/range",
-    }
-)
+INVOKE_OPCODES = frozenset(INVOKE_KINDS)
+
+#: Opcodes that load a string constant. ``const-string/jumbo`` is the same
+#: instruction with a 32-bit pool index, for a pool larger than 65535 entries.
+CONST_STRING_OPCODES = frozenset({"const-string", "const-string/jumbo"})
 
 
 def androguard_available() -> bool:
@@ -208,7 +220,7 @@ class AndroguardBackend(Backend):
                     continue
 
                 try:
-                    self._index_dex(
+                    literal_sites = self._index_dex(
                         dex,
                         apk_sha256=apk_sha256,
                         dex_name=dex_name,
@@ -219,7 +231,9 @@ class AndroguardBackend(Backend):
                         method_limit=method_limit,
                         instruction_limit=instruction_limit,
                     )
-                    strings.extend(self._index_strings(dex, apk_sha256, locator, string_limit))
+                    strings.extend(
+                        self._index_strings(dex, apk_sha256, locator, string_limit, literal_sites)
+                    )
                 except Exception as exc:
                     logger.warning("androguard: indexing %s failed: %s", dex_name, exc)
                     error = error or ToolError(
@@ -251,9 +265,17 @@ class AndroguardBackend(Backend):
         references: list[MethodReference],
         method_limit: int,
         instruction_limit: int,
-    ) -> None:
+    ) -> dict[str, list[tuple[str, str]]]:
+        """Index one DEX file, and report where its string constants are used.
+
+        Returns the use sites of the string constants: a map from a constant to
+        the ``(class, method)`` pairs whose bytecode loads it. A constant used
+        in two methods has two entries, because each of them is a place in the
+        code that a reader can be sent to.
+        """
         locator_base = f"androguard:{dex_name}"
         instructions_seen = 0
+        literal_sites: dict[str, list[tuple[str, str]]] = {}
 
         for cls in dex.get_classes():
             class_name = _to_dotted(cls.get_name())
@@ -268,6 +290,10 @@ class AndroguardBackend(Backend):
                     superclass=_to_dotted(superclass) if superclass else None,
                     interfaces=[_to_dotted(i) for i in cls.get_interfaces()],
                     access_flags=sorted(cls.get_access_flags_string().split()),
+                    # What this dex file holds, not what the class holds: a class
+                    # split across two dex files is seen partly by each. The
+                    # storage layer counts the class's real total from the rows
+                    # it wrote.
                     method_count=len(class_methods),
                     field_count=len(cls.get_fields()),
                     provenance=[self.provenance(apk_sha256, class_locator)],
@@ -293,7 +319,7 @@ class AndroguardBackend(Backend):
                     method_limit,
                     dex_name,
                 )
-                return
+                return literal_sites
 
             for method in class_methods:
                 # Androguard renders a descriptor for human reading, with a space
@@ -322,63 +348,138 @@ class AndroguardBackend(Backend):
                         "androguard: instruction limit %d reached; xref index is truncated",
                         instruction_limit,
                     )
-                    return
-                instructions_seen, calls = self._calls_in(method, instructions_seen)
-                for callee in calls:
+                    return literal_sites
+                instructions_seen, calls, literals = self._scan(method, instructions_seen)
+                for callee, kind in calls:
                     references.append(
                         MethodReference(
                             caller=qualified,
                             callee=callee,
-                            kind="invoke",
+                            kind=kind,
                             provenance=[
                                 self.provenance(apk_sha256, f"{locator_base}#{qualified}->{callee}")
                             ],
                         )
                     )
+                for literal in literals:
+                    literal_sites.setdefault(literal, []).append((class_name, method.get_name()))
 
-    def _calls_in(self, method: Any, instructions_seen: int) -> tuple[int, list[str]]:
-        """Method targets invoked by ``method``, read from its bytecode.
+        return literal_sites
 
-        The target is the last operand of an invoke opcode and arrives as a Dalvik
-        reference such as ``Ljava/io/PrintStream;->println(Ljava/lang/String;)V``.
+    def _scan(
+        self, method: Any, instructions_seen: int
+    ) -> tuple[int, list[tuple[str, InvocationKind]], list[str]]:
+        """The calls and the string constants in ``method``'s bytecode.
+
+        Both come out of the same walk. A call is the final operand of an
+        invoke opcode, and it arrives as a Dalvik reference such as
+        ``Ljava/io/PrintStream;->println(Ljava/lang/String;)V``; the opcode's
+        own name says how the call is made. A string constant is the operand
+        of a const-string opcode. The walk was already happening for the call
+        edges, so the constants cost one set lookup per instruction.
         """
-        calls: list[str] = []
+        calls: list[tuple[str, InvocationKind]] = []
+        literals: list[str] = []
         if not method.get_code():
-            return instructions_seen, calls
+            return instructions_seen, calls, literals
 
         try:
             for instruction in method.get_instructions():
                 instructions_seen += 1
-                if instruction.get_name() not in INVOKE_OPCODES:
-                    continue
-                target = instruction.get_output().rsplit(", ", 1)[-1].strip()
-                qualified = _parse_dalvik_reference(target)
-                if qualified is not None:
-                    calls.append(qualified)
+                name = instruction.get_name()
+                if name in INVOKE_KINDS:
+                    target = instruction.get_output().rsplit(", ", 1)[-1].strip()
+                    qualified = _parse_dalvik_reference(target)
+                    if qualified is not None:
+                        calls.append((qualified, INVOKE_KINDS[name]))
+                elif name in CONST_STRING_OPCODES:
+                    value = _string_operand(instruction)
+                    if value:
+                        literals.append(value)
         except Exception as exc:
             logger.debug("androguard: decoding %s failed: %s", method.get_name(), exc)
-        return instructions_seen, calls
+        # A method that loads the same constant twice is still one place, so
+        # the constant is one entry.
+        return instructions_seen, calls, list(dict.fromkeys(literals))
 
     def _index_strings(
-        self, dex: DEX, apk_sha256: str, locator: str, limit: int
+        self,
+        dex: DEX,
+        apk_sha256: str,
+        locator: str,
+        limit: int,
+        sites: dict[str, list[tuple[str, str]]],
     ) -> list[StringConstant]:
+        """The DEX string pool, and where each of its entries is used.
+
+        The pool is every string the DEX holds. A use site is the method whose
+        bytecode loads one of them, and it is what turns a constant into
+        something a reader can be sent to: a hardcoded key that no method is
+        known to use is a value; one that a method uses is a place.
+
+        A constant used in two methods is two rows, one per method, because a
+        row has to point at one place. A pool entry that no instruction loads —
+        a type descriptor, a member name — has no place to point at, and its
+        row carries no location.
+        """
         constants: list[StringConstant] = []
         try:
             for value in dex.get_strings():
                 if not isinstance(value, str) or not value:
                     continue
-                constants.append(
-                    StringConstant(
-                        value=value,
-                        provenance=[self.provenance(apk_sha256, f"{locator}#str/{value[:64]}")],
+                uses = sites.get(value, [])
+                if not uses:
+                    constants.append(
+                        StringConstant(
+                            value=value,
+                            provenance=[self.provenance(apk_sha256, f"{locator}#str/{value[:64]}")],
+                        )
                     )
-                )
+                else:
+                    for class_name, method_name in uses:
+                        constants.append(
+                            StringConstant(
+                                value=value,
+                                class_name=class_name,
+                                method_name=method_name,
+                                provenance=[
+                                    self.provenance(
+                                        apk_sha256,
+                                        f"{locator}#{class_name}.{method_name}#str/{value[:64]}",
+                                    )
+                                ],
+                            )
+                        )
                 if len(constants) >= limit:
                     logger.warning("androguard: string limit %d reached; truncated", limit)
                     break
         except Exception as exc:
             logger.debug("androguard: string extraction failed: %s", exc)
         return constants
+
+
+def _string_operand(instruction: Any) -> str | None:
+    """The value a const-string instruction loads.
+
+    Androguard renders the operand as a triple: the kind of the reference, the
+    index into the DEX string pool, and the value itself. The pool index is
+    the one ``DEX.get_strings()`` lists, so the value can be matched against a
+    pool entry by value.
+
+    The rendered instruction output is not used: it quotes the value and
+    escapes it, and a string with a quote in it comes back changed.
+    """
+    try:
+        operands = instruction.get_operands()
+    except Exception:  # pragma: no cover - androguard raises on malformed bytecode
+        return None
+    if not operands:
+        return None
+    last = operands[-1]
+    if len(last) < 3:
+        return None
+    value = last[2]
+    return value if isinstance(value, str) else None
 
 
 def _parse_dalvik_reference(reference: str) -> str | None:
@@ -443,4 +544,10 @@ def _class_kind(cls: Any) -> ClassKind:
     return ClassKind.CLASS
 
 
-__all__ = ["INVOKE_OPCODES", "AndroguardBackend", "androguard_available"]
+__all__ = [
+    "CONST_STRING_OPCODES",
+    "INVOKE_KINDS",
+    "INVOKE_OPCODES",
+    "AndroguardBackend",
+    "androguard_available",
+]
