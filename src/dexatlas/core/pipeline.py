@@ -31,6 +31,7 @@ from dexatlas.core.models import (
     Project,
     ProjectStatus,
     Provenance,
+    ResourceString,
     StringConstant,
     ToolError,
     ToolErrorCode,
@@ -128,12 +129,16 @@ class Analyzer:
         fields: list[FieldRef] = []
         references: list[MethodReference] = []
         strings: list[StringConstant] = []
+        resources: list[ResourceString] = []
 
         if include_apktool:
-            manifest, apktool_classes, error = self._run_apktool(project, workspace, builder)
+            manifest, apktool_classes, apktool_resources, errors = self._run_apktool(
+                project, workspace, builder
+            )
             classes.extend(apktool_classes)
-            if error is not None:
-                project.errors.append(error)
+            resources.extend(apktool_resources)
+            for apktool_error in errors:
+                project.errors.append(apktool_error)
             if manifest is not None:
                 # The manifest's findings come before the code's index: an
                 # exported component is a conclusion, and the report's evidence
@@ -169,7 +174,9 @@ class Analyzer:
             )
 
         classes = _merge_classes(classes)
-        counts = self._store.save_symbols(project.id, classes, methods, fields, references, strings)
+        counts = self._store.save_symbols(
+            project.id, classes, methods, fields, references, strings, resources
+        )
 
         evidence = builder.build()
         project.evidence_count = self._store.save_evidence(project.id, evidence)
@@ -181,6 +188,7 @@ class Analyzer:
         project.class_count = counts.classes
         project.method_count = counts.methods
         project.reference_count = counts.references
+        project.resource_count = counts.resources
         project.status = (
             ProjectStatus.FAILED if not classes and not manifest else ProjectStatus.COMPLETED
         )
@@ -199,22 +207,31 @@ class Analyzer:
 
     def _run_apktool(
         self, project: Project, workspace: Path, builder: EvidenceBuilder
-    ) -> tuple[ManifestInfo | None, list[ClassRef], ToolError | None]:
+    ) -> tuple[ManifestInfo | None, list[ClassRef], list[ResourceString], list[ToolError]]:
         backend = self._apktool
         if not backend.available():
             error = backend.missing_error()
             builder.add_error(error)
-            return None, [], error
+            return None, [], [], [error]
 
         output_dir = workspace / "apktool"
         outcome = backend.decode(project.apk.path, output_dir)
         manifest, parse_error = backend.read_manifest(output_dir)
+        resources, resource_errors = backend.read_resources(output_dir, project.apk.sha256)
 
         classes: list[ClassRef] = []
+        errors: list[ToolError] = []
         if outcome.error is not None:
             builder.add_error(outcome.error)
+            errors.append(outcome.error)
         if parse_error is not None:
             builder.add_error(parse_error)
+            errors.append(parse_error)
+        for error in resource_errors:
+            # A resource table that could not be read is a gap in the index, and
+            # a gap that is not recorded reads like an absence of resources.
+            builder.add_error(error)
+            errors.append(error)
         if manifest is not None:
             builder.add(
                 kind=EvidenceKind.DECLARATION,
@@ -231,7 +248,7 @@ class Analyzer:
                 },
             )
 
-        return manifest, classes, outcome.error or parse_error
+        return manifest, classes, resources, errors
 
     def _run_androguard(
         self, apk: Path, project: Project, builder: EvidenceBuilder
@@ -322,6 +339,10 @@ class Analyzer:
 
     def search(self, project_id: str, keyword: str, limit: int = 50) -> list[dict[str, object]]:
         return self._store.search(project_id, keyword, limit=limit)
+
+    def resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
+        """The resource strings indexed for a project."""
+        return self._store.list_resources(project_id, name=name)
 
 
 def _extract_smali_method(smali: str, method_name: str) -> str | None:

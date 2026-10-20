@@ -354,8 +354,9 @@ class StringConstant(Sourced):
     of string literals — in a small APK most of the entries are descriptors
     and member names, not text a person wrote.
 
-    Resources are not covered: no backend reads the resource table, so a
-    string that exists only in a resource file is not here.
+    The resource table is a different thing, and is indexed separately: see
+    :class:`ResourceString`, which is read out of Apktool's decoded ``res/``
+    tree. This model is the DEX string pool and nothing else.
 
     One row per use site. A constant used in two methods is two rows, one
     per method, because each row has to point at one place in the code. A
@@ -496,6 +497,13 @@ class Project(BaseModel):
     method_count: int = 0
     reference_count: int = 0
     evidence_count: int = 0
+    resource_count: int = 0
+    """How many resource strings the resource table held.
+
+    Counted from the rows the ``resources`` table holds, the same way the
+    other counts are: a number taken from the list that was handed in is a
+    number the database cannot produce.
+    """
 
     @classmethod
     def new_id(cls, sha256: str) -> str:
@@ -519,3 +527,89 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
         while chunk := handle.read(chunk_size):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Resource strings
+# ---------------------------------------------------------------------------
+
+
+class ResourceKind(StrEnum):
+    """What kind of resource declaration a string came from.
+
+    The kind matters because the three are declared differently and mean
+    different things: a ``<string>`` is one named piece of text, the items of a
+    ``<string-array>`` share a name and differ only by position, and the items
+    of a ``<plurals>`` differ by the quantity they answer.
+    """
+
+    STRING = "string"
+    """A ``<string>`` element — one named piece of text."""
+
+    STRING_ARRAY = "string_array"
+    """One ``<item>`` of a ``<string-array>`` — text with no name of its own."""
+
+    PLURAL = "plural"
+    """One ``<item>`` of a ``<plurals>`` — the text for one quantity."""
+
+
+class ResourceString(Sourced):
+    """A string declared in the APK's resource table.
+
+    The DEX string pool and the resource table are two different things, and
+    they are indexed as two different things. A pool entry is a symbol the code
+    loads; a resource is a declaration a person wrote, which the code may
+    reference by id and never by value. A hard-coded key that lives in
+    ``strings.xml`` is in neither the pool nor the code, and until the resource
+    table was read it was in no index at all.
+
+    One row per declaration site. The same text in two languages is two rows,
+    because they are two declarations, and each points at its own file.
+    """
+
+    name: str
+    """The resource name, e.g. ``app_name``."""
+
+    value: str
+    """The text itself."""
+
+    kind: ResourceKind = ResourceKind.STRING
+    """Which element the text was declared in."""
+
+    quantity: str | None = None
+    """The plural quantity this text answers, e.g. ``other``.
+
+    Set only for the items of a ``<plurals>``; every other kind leaves it
+    empty.
+    """
+
+    position: int = 0
+    """Where the text sits inside its declaration, counting from zero.
+
+    The items of a ``<string-array>`` share a name and differ only by
+    position, so the position is part of what makes a row a distinct row: two
+    items of the same array are two declarations, not one declaration read
+    twice. Every kind that is not an array or a plural leaves it at zero.
+    """
+
+    qualifier: str | None = None
+    """The values-directory qualifier, e.g. ``zh`` for ``res/values-zh/``.
+
+    ``None`` for the unqualified ``res/values/`` directory. A qualifier is
+    part of a resource's identity: the same name in two languages is two
+    resources, and only one of them is the default.
+    """
+
+    file: str = ""
+    """The file the text was declared in, relative to Apktool's output tree.
+
+    The same path the provenance locator names, without the ``apktool:``
+    prefix — a locator is a pointer, this is the place it points at.
+    """
+
+    @property
+    def qualified_name(self) -> str:
+        """The resource name, qualified when it is not the default one."""
+        if self.qualifier:
+            return f"{self.name} ({self.qualifier})"
+        return self.name

@@ -96,6 +96,7 @@ class ProjectResponse(BaseModel):
     method_count: int
     reference_count: int
     evidence_count: int
+    resource_count: int
     tool_versions: dict[str, str | None]
     errors: list[ErrorResponse]
 
@@ -256,6 +257,26 @@ def list_methods(
     }
 
 
+@app.get("/projects/{project_id}/resources", tags=["analysis"])
+def list_resources(
+    project_id: str,
+    analyzer: AnalyzerDep,
+    name: Annotated[str | None, Query(description="Show one resource, by its exact name.")] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> dict[str, Any]:
+    """The resource strings the APK's resource table declares.
+
+    Each row names the file it was declared in and carries the provenance of
+    that file, so a value found here can be traced back to its declaration.
+    """
+    resources = analyzer.resources(project_id, name=name)
+    return {
+        "project_id": project_id,
+        "total": len(resources),
+        "resources": [r.model_dump(mode="json") for r in resources[:limit]],
+    }
+
+
 @app.get("/projects/{project_id}/classes/{class_name:path}/source", tags=["analysis"])
 def get_class_source(project_id: str, class_name: str, analyzer: AnalyzerDep) -> PlainTextResponse:
     """A class as decompiled Java, falling back to Smali when JADX could not."""
@@ -356,6 +377,7 @@ def _project_response(project: Any) -> ProjectResponse:
         method_count=project.method_count,
         reference_count=project.reference_count,
         evidence_count=project.evidence_count,
+        resource_count=project.resource_count,
         tool_versions=project.tool_versions,
         errors=[ErrorResponse.model_validate(e.model_dump()) for e in project.errors],
     )

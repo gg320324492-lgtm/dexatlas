@@ -19,7 +19,7 @@ from dexatlas import __version__
 from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
-from dexatlas.core.models import canonical_method_id
+from dexatlas.core.models import ResourceKind, canonical_method_id
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -42,6 +42,11 @@ ELLIPSIS = "…"
 def _more(count: int, singular: str, plural: str | None = None) -> str:
     """``1 more source`` / ``2 more sources`` — a count and the noun that fits it."""
     return f"{count} more {singular if count == 1 else (plural or singular + 's')}"
+
+
+def _resource_word(count: int) -> str:
+    """``resource string`` or ``resource strings``, to fit the count."""
+    return "resource string" if count == 1 else "resource strings"
 
 
 @app.callback()
@@ -122,7 +127,8 @@ def analyze(
     console.print(
         f"[bold green]{mark(OK)}[/bold green] {project.id} {mark(DASH)} "
         f"{project.class_count:,} classes, {project.method_count:,} methods, "
-        f"{project.reference_count:,} cross-references "
+        f"{project.reference_count:,} cross-references, "
+        f"{project.resource_count:,} {_resource_word(project.resource_count)} "
         f"([dim]{result.duration_seconds:.1f}s[/dim])"
     )
 
@@ -284,6 +290,55 @@ def source(
         )
         raise ExitCode(code=1)
     console.print(text, markup=False, highlight=False)
+
+
+@app.command()
+def resources(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    name: Annotated[
+        str | None, typer.Option("--name", help="Show one resource, by its exact name.")
+    ] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum resources to list.")] = 100,
+) -> None:
+    """List the resource strings indexed for a project.
+
+    These are the strings the APK's resource table declares — the ones in
+    ``res/values/strings.xml`` and its siblings. Each row names the file it was
+    declared in, so a value found here can be traced back to its declaration.
+    """
+    analyzer = Analyzer()
+    rows = analyzer.resources(project_id, name=name)
+    if not rows:
+        err_console.print(
+            "[yellow]No resources matched.[/yellow] "
+            "The Apktool backend reads them; it may not have been installed."
+        )
+        raise ExitCode(code=1)
+
+    table = Table(header_style="bold")
+    table.add_column("Resource")
+    table.add_column("Value")
+    table.add_column("Kind")
+    table.add_column("File")
+    table.add_column("Source")
+    for row in rows[:limit]:
+        label = row.qualified_name
+        if row.quantity:
+            label = f"{label} [{row.quantity}]"
+        elif row.kind is ResourceKind.STRING_ARRAY:
+            # The items of one array share a name; the position is what tells
+            # them apart.
+            label = f"{label} [{row.position}]"
+        source = row.provenance[0].ref() if row.provenance else "-"
+        table.add_row(label, row.value, row.kind.value, row.file, f"[dim]{source}[/dim]")
+    console.print(table)
+
+    hidden = len(rows) - len(rows[:limit])
+    if hidden > 0:
+        console.print(
+            f"[dim]{mark(ELLIPSIS)} {_more(hidden, 'resource')} not shown "
+            f"(use --limit to see more)[/dim]"
+        )
 
 
 @app.command()
