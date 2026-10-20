@@ -20,21 +20,22 @@ multi-megabyte binary in ``git clone``.
 
 The size is chosen by the ``DEXATLAS_LARGE_APK_SCALE`` environment variable and
 defaults to ``smoke``, which is small enough for every CI job. The bigger tiers
-are opt-in, because they take minutes:
+are opt-in:
 
     smoke    20 classes x 8 methods      — the CI default
     medium   300 classes x 40 methods
     large    2,050 classes x 100 methods — more methods than the method limit
     xlarge   600 classes x 100 methods   — more instructions than the instruction limit
 
-Four of the assertions here are marked ``xfail(strict=True)``. They describe how
-the code *should* behave and does not: a truncated index has to say so, the
-three limits have to bound the whole APK rather than each DEX file in it, and a
-backend's version has to be probed once rather than once per symbol. They are
-not skipped, and they are not quietly rewritten to match today's behaviour —
-``strict=True`` turns a fixed defect into a failure that asks for the marker to
-be removed. ``docs/benchmarks/large-apk.md`` has the measurements and the
-reproduction for each one.
+**Three of the assertions here were written as ``xfail(strict=True)``**, each
+naming a defect this module found: a truncated index that did not say it was
+truncated, three limits that meant three different things, and a backend whose
+version was asked for once per indexed symbol. All three defects were fixed
+(see ``docs/benchmarks/large-apk.md``), the markers are gone, and the
+assertions now hold in their own right. They are kept as ordinary tests
+because the behaviour they pin is what a reader of a report relies on: that a
+short index says so, that a limit means the same thing whatever the APK's
+layout, and that indexing a symbol costs what a symbol should cost.
 """
 
 from __future__ import annotations
@@ -235,16 +236,21 @@ def _limits_reached(truth: dict[str, Any]) -> dict[str, bool]:
     """Which of the three limits this sample is big enough to reach.
 
     The answer is computed from the ground truth rather than from the scale
-    name, so a tier that is retuned still gets the right answer. The method
-    limit counts the whole APK; the other two count one DEX file at a time, so
-    they are compared against the largest DEX file in the sample.
+    name, so a tier that is retuned still gets the right answer. All three
+    limits are one budget per APK now, so each is compared against the whole
+    sample: the method budget against the method count, the string budget
+    against the string rows, the instruction budget against the instructions.
+
+    The string rows are summed over the DEX files because the string index
+    writes one row per (value, use site) pair and the pool is spread across
+    the files.
     """
     dex_files = truth["dex_files"]
     return {
         "method": truth["method_count"] > DEFAULT_METHOD_LIMIT,
-        "string": max((f["string_rows"] for f in dex_files), default=0) > DEFAULT_STRING_LIMIT,
+        "string": sum(f["string_rows"] for f in dex_files) > DEFAULT_STRING_LIMIT,
         "instruction": (
-            max((f["instruction_count"] for f in dex_files), default=0) > DEFAULT_INSTRUCTION_LIMIT
+            sum(f["instruction_count"] for f in dex_files) > DEFAULT_INSTRUCTION_LIMIT
         ),
     }
 
@@ -252,29 +258,51 @@ def _limits_reached(truth: dict[str, Any]) -> dict[str, bool]:
 # -- the run completes ------------------------------------------------------
 
 
-def test_the_large_sample_is_analysed_completely(analysis: dict[str, Any]) -> None:
-    """A large sample must not fall over.
+def test_the_large_sample_is_analysed_completely(
+    analysis: dict[str, Any], sample: dict[str, Any]
+) -> None:
+    """A large sample must not fall over, and must say what it could not read.
 
     The pipeline is built so that no backend can abort a run, so a sample that
     produces symbols at all is a success by construction. What this pins is
     that a *large* sample takes the same path as a small one: the project
     reaches COMPLETED rather than FAILED.
 
-    An error is only acceptable when it says a backend is not installed. The
-    CI job that installs Apktool but not JADX has to pass this suite, and in
-    that configuration the missing decompiler is recorded as an error — which
-    is the pipeline behaving correctly, not a failure of the analysis.
+    An error is only acceptable when it says a backend is not installed, or
+    when it says the index was cut short. The CI job that installs Apktool
+    but not JADX has to pass this suite, and in that configuration the
+    missing decompiler is recorded as an error — which is the pipeline
+    behaving correctly, not a failure of the analysis.
+
+    A truncation is not a failure either: a partial result is not a wrong
+    result. But it has to be visible, and it is.
     """
     project = analysis["project"]
+    reached = _limits_reached(sample)
 
     assert project.status == ProjectStatus.COMPLETED
     assert project.class_count > 0
     assert project.method_count > 0
 
     unexpected = [
-        error for error in project.errors if error.code is not ToolErrorCode.NOT_INSTALLED
+        error
+        for error in project.errors
+        if error.code not in (ToolErrorCode.NOT_INSTALLED, ToolErrorCode.OUTPUT_TRUNCATED)
     ]
     assert not unexpected, f"the run recorded errors: {unexpected}"
+
+    truncations = [
+        error for error in project.errors if error.code is ToolErrorCode.OUTPUT_TRUNCATED
+    ]
+    if any(reached.values()):
+        assert truncations, (
+            "the sample is big enough to reach a limit, and the run recorded "
+            "no truncation: the index is short and says nothing about it"
+        )
+        for error in truncations:
+            assert "the index is incomplete" in error.message
+    else:
+        assert not truncations, f"the run recorded a truncation it did not need: {truncations}"
 
 
 def test_the_index_holds_every_class_the_apk_contains(
@@ -295,15 +323,15 @@ def test_the_index_holds_every_class_the_apk_contains(
     indexed = {cls.name for cls in analysis["analyzer"].store.list_classes(project.id)}
     reached = _limits_reached(sample)
 
-    if not reached["method"]:
+    if not any(reached.values()):
         assert len(indexed) == sample["class_count"]
         assert "com.example.large.Helper" in indexed
         for name in sample["classes"][:5]:
             assert name in indexed
     else:
-        # The method limit stopped the walk, so the index is short. What must
-        # hold is that it is short and not wrong: the classes that are there
-        # are the ones the APK declares.
+        # A limit stopped the walk, so the index is short. What must hold is
+        # that it is short and not wrong: the classes that are there are the
+        # ones the APK declares, and the run says how much is missing.
         assert 0 < len(indexed) <= sample["class_count"]
         assert "com.example.large.C00000" in indexed
 
@@ -317,7 +345,7 @@ def test_the_index_holds_every_method_the_apk_contains(
     names = {method.qualified_name for method in methods}
     reached = _limits_reached(sample)
 
-    if not reached["method"]:
+    if not any(reached.values()):
         assert len(methods) == sample["method_count"]
     else:
         assert 0 < len(methods) <= sample["method_count"]
@@ -453,26 +481,49 @@ def test_a_search_finds_a_string_the_sample_actually_contains(
     The marker string belongs to exactly one generated class, so a hit is that
     class's string and not merely a word that appears in many places. A search
     that returned nothing would be a search that quietly stopped working.
+
+    A sample whose string index was cut short by the string budget is a
+    different question: the string may simply not be in the index any more,
+    and the run says so. The class it belongs to is still findable, because
+    the class table is not clipped — that is the next test.
     """
     project = analysis["project"]
     marker = sample["marker_sample"]
     hits = analysis["analyzer"].search(project.id, marker)
+    reached = _limits_reached(sample)
 
-    assert hits, f"search found nothing for {marker!r}"
-    assert any(marker in str(hit["name"]) for hit in hits), (
-        f"the hits do not include the string that was searched for: {hits}"
+    if reached["string"]:
+        # The string index was cut short. The marker may or may not have
+        # survived, but the run has to say that the index is incomplete.
+        truncations = [
+            error
+            for error in project.errors
+            if error.code is ToolErrorCode.OUTPUT_TRUNCATED
+        ]
+        assert truncations, "the string index was cut short and the run said nothing"
+        assert any("string limit" in error.message for error in truncations)
+    else:
+        assert hits, f"search found nothing for {marker!r}"
+        assert any(marker in str(hit["name"]) for hit in hits), (
+            f"the hits do not include the string that was searched for: {hits}"
     )
 
 
 def test_a_search_finds_a_class_by_its_name(
     analysis: dict[str, Any], sample: dict[str, Any]
 ) -> None:
-    """The class itself must be findable, not only the string inside it."""
+    """The class itself must be findable, not only the string inside it.
+
+    ``C00000`` is the first class the generator wrote, so it is the first one
+    the walk reaches and the last one a truncated walk can lose. Finding it by
+    name is a statement about the class table, which is not clipped by the
+    string budget.
+    """
     project = analysis["project"]
-    hits = analysis["analyzer"].search(project.id, "com.example.large.C00001")
+    hits = analysis["analyzer"].search(project.id, "com.example.large.C00000")
 
     assert hits
-    assert any(str(hit["name"]) == "com.example.large.C00001" for hit in hits)
+    assert any(str(hit["name"]) == "com.example.large.C00000" for hit in hits)
 
 
 # -- the limits -------------------------------------------------------------
@@ -483,10 +534,14 @@ def test_the_method_limit_bounds_the_method_index(
 ) -> None:
     """The method limit must bound the method index of the whole APK.
 
-    This one holds today — the method limit is counted across the whole APK,
-    and the DEX files in the sample are walked one after another against the
-    same counter. It is here as the control: it is the limit the other two are
-    expected to behave like.
+    The method limit is counted across the whole APK, and the DEX files in the
+    sample are walked one after another against the same counter. It is here
+    as the control: it is the limit the other two are expected to behave like,
+    and it is the one they were brought into line with.
+
+    The bound is not exact, and does not need to be: the check is made at class
+    granularity, so the class the walk stops in is indexed whole. The slack
+    here is one class's worth of methods.
     """
     backend = AndroguardBackend(settings)
     limit = 30
@@ -499,28 +554,43 @@ def test_the_method_limit_bounds_the_method_index(
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "The string limit is applied to each DEX file separately, so an APK with N "
-        "DEX files is allowed N times the budget. The method limit, counted over "
-        "the whole APK, is the control. See docs/benchmarks/large-apk.md."
-    ),
-)
+def test_a_stopped_walk_does_not_walk_the_dex_files_after_it(
+    multi_dex_sample: dict[str, Any], settings: Settings
+) -> None:
+    """A budget that is spent stops the walk, and the files after it are not read.
+
+    A limit that is spent stays spent. Once the method budget is gone, walking
+    the next DEX file would only produce rows that cannot be stored, so the
+    walk stops — and the error says that the files after it were not walked,
+    so a reader knows that the gap is bigger than the rows that are missing
+    from this one file.
+
+    This matters for the shape of the truncation: without it, a four-DEX APK
+    would report the same gap four times, once per file.
+    """
+    backend = AndroguardBackend(settings)
+    _, methods, _, _, _, error = backend.extract(
+        multi_dex_sample["apk"], multi_dex_sample["apk_sha256"], method_limit=5
+    )
+
+    assert error is not None
+    assert "the DEX files after it were not walked" in error.message, error.message
+
+
 def test_the_string_limit_bounds_the_string_index(
     multi_dex_sample: dict[str, Any], settings: Settings
 ) -> None:
     """The string limit must bound the string index of the whole APK.
 
-    ``DEFAULT_STRING_LIMIT`` is one number for one APK, the way
-    ``DEFAULT_METHOD_LIMIT`` is — and the method limit is counted across every
-    DEX file the APK holds. The string limit is counted per DEX file, so an APK
-    with ten DEX files is allowed ten times the budget.
+    ``DEFAULT_STRING_LIMIT`` is one number for one APK, and it has to mean
+    that whatever the APK's layout. The sample here is small and split into
+    several DEX files on purpose: a limit that resets per DEX file is visible
+    on a sample that costs a fraction of a second to build, and invisible on
+    one that costs twenty minutes.
 
-    The sample here is small and split into several DEX files on purpose: the
-    difference between the two behaviours is visible on a sample that costs a
-    fraction of a second to build, and invisible on a sample that costs
-    twenty minutes.
+    This was a defect. The limit used to be counted per DEX file, so a
+    ten-DEX APK was allowed ten times the budget. The fix counts it across
+    the whole APK.
     """
     backend = AndroguardBackend(settings)
     limit = 100
@@ -534,23 +604,14 @@ def test_the_string_limit_bounds_the_string_index(
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "The instruction limit is applied to each DEX file separately, so an APK "
-        "with N DEX files is allowed N times the budget. The method limit, "
-        "counted over the whole APK, is the control. "
-        "See docs/benchmarks/large-apk.md."
-    ),
-)
 def test_the_instruction_limit_bounds_the_cross_reference_index(
     multi_dex_sample: dict[str, Any], settings: Settings
 ) -> None:
     """The instruction limit must bound the cross-reference index of the whole APK.
 
-    The counter that tracks walked instructions is reset for every DEX file, so
-    a ten-DEX APK gets ten times the instruction budget. The method limit,
-    counted across the whole APK, is the control.
+    The counter that tracks walked instructions used to be reset for every DEX
+    file, so a ten-DEX APK got ten times the instruction budget. It is now one
+    budget per analysis, like the method limit.
     """
     backend = AndroguardBackend(settings)
     limit = 30
@@ -564,27 +625,20 @@ def test_the_instruction_limit_bounds_the_cross_reference_index(
     )
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Reaching a limit logs a warning and truncates; it does not record a "
-        "ToolError, so the run reports a clean success over a partial index. "
-        "See docs/benchmarks/large-apk.md."
-    ),
-)
 def test_reaching_a_limit_is_recorded_as_an_error(
     multi_dex_sample: dict[str, Any], settings: Settings
 ) -> None:
     """A truncated index has to say that it is truncated.
 
-    The adapter logs a warning when it reaches a limit and then returns what it
-    has so far. The warning goes to the log; the run carries on; the project
-    is COMPLETED; the report states a class count and a method count that are
-    true of the rows in the database and silent about the rows that are not
-    there. A reader cannot tell a fully indexed APK from a clipped one.
+    The contract is that a run which stopped early says so, in the place a
+    reader looks: as a recorded error on the project. The error has to name
+    the limit, say that the index is incomplete, and say how much is missing —
+    "the index is incomplete" and "the index is missing 5,001 methods" are
+    different facts for a reader.
 
-    The contract this asserts is that a run which stopped early says so, in
-    the place a reader looks: as a recorded error on the project.
+    This was a defect. The run used to log one warning line and go on, so the
+    report showed an index thousands of methods short and said nothing about
+    it.
     """
     backend = AndroguardBackend(settings)
     _, methods, _, _, _, error = backend.extract(
@@ -593,56 +647,64 @@ def test_reaching_a_limit_is_recorded_as_an_error(
 
     assert methods, "the limit produced nothing at all"
     assert error is not None, "the index was truncated and the run recorded nothing"
-    assert "limit" in error.message.lower(), f"the error does not name the limit: {error}"
+    assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
+    assert "method limit 30" in error.message
+    assert "the index is incomplete" in error.message
+    # How much is missing is stated, not merely that something is.
+    assert "were not indexed" in error.message
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "A clipped index is reported as a clean run: the project completes with "
-        "no errors, so a report cannot tell a fully indexed APK from a partial "
-        "one. See docs/benchmarks/large-apk.md."
-    ),
-)
 def test_a_truncated_run_is_not_reported_as_a_clean_one(
-    multi_dex_sample: dict[str, Any], settings: Settings
+    multi_dex_sample: dict[str, Any], settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A project whose index was clipped must not look identical to a clean one.
 
     This is the same defect seen from the outside: the report's counts match
-    the database, so nothing in the report is wrong. What is missing is any
+    the database, so nothing in the report is wrong. What was missing was any
     statement that the APK was not fully indexed.
+
+    The limit is lowered so that the smoke-sized sample really does reach it.
+    The default limits are far above anything a 20-class sample holds, and a
+    test that cannot reach the state it is about is a test of nothing. The
+    budget is a parameter of the backend, so lowering it is the same lever the
+    adapter's own callers pull.
     """
     analyzer = Analyzer(settings)
+    original = analyzer._androguard.extract
+
+    def limited(apk: Path, apk_sha256: str, **kwargs: Any):
+        kwargs["method_limit"] = 5
+        return original(apk, apk_sha256, **kwargs)
+
+    monkeypatch.setattr(analyzer._androguard, "extract", limited)
     result = analyzer.analyze(multi_dex_sample["apk"], include_jadx=False, include_apktool=False)
     project = result.project
 
+    # A partial result is not a failure, so the run still finishes.
     assert project.status == ProjectStatus.COMPLETED
+    # But the gap is recorded, and a reader of the report can see it.
     assert project.errors, "a clipped index was reported as a clean run"
+    assert project.errors[0].code is ToolErrorCode.OUTPUT_TRUNCATED
+    summaries = " ".join(item.summary for item in result.evidence)
+    assert "the index is incomplete" in summaries
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "The Androguard adapter re-reads its own version once per indexed "
-        "symbol, and the lookup rescans the installed distributions every time. "
-        "JADX and Apktool both cache theirs. See docs/benchmarks/large-apk.md."
-    ),
-)
 def test_the_backend_version_is_probed_once_not_once_per_symbol(
     multi_dex_sample: dict[str, Any], settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The backend's version must be probed once, not once per indexed symbol.
 
-    JADX and Apktool both cache theirs. The Androguard adapter does not: it
-    calls ``importlib.metadata.version("androguard")`` for every symbol it
-    indexes, and that call re-scans the installed distributions every time. On
-    a sample with twelve thousand methods the scan is the overwhelming majority
-    of the run — the DEX itself is parsed and walked in a fraction of a second.
+    Every symbol the backend indexes carries a provenance record, and every
+    record names the version. Asking the package index once per symbol makes a
+    run over a large APK a run dominated by bookkeeping — the version lookup
+    was 80 of the 82 seconds of a 12,000-method run.
 
     The assertion is about the number of probes, not about a duration: a
     duration would be a statement about the machine, and this is a statement
     about the code.
+
+    This was a defect. The Androguard adapter re-read its own version for
+    every symbol, while JADX and Apktool cached theirs.
     """
     probes = 0
     original = AndroguardBackend.version
