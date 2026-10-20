@@ -57,11 +57,21 @@ jobs:
       - name: Version claims
         env:
           # The commit the push started from, so a push of several commits is
-          # compared as a whole. A pull request has no "before", and falls
-          # back to the commit the branch left the mainline at.
+          # compared as a whole. A pull request does not use it: see below.
           BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
-          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+          if [ "$EVENT" = "pull_request" ]; then
+            # A pull request's "before" is the head the branch had before
+            # the last push -- measured on Actions, on a synchronize event
+            # it is that head and not the point the branch left the
+            # mainline at. A claim an earlier push introduced is in that
+            # head already, so the check would call it drift that is on its
+            # way out and pass. The merge base with the mainline is what a
+            # pull request wants: every claim the branch introduced is a
+            # claim it added, however many times it has been pushed.
+            uv run python scripts/check-version-claims.py --base auto
+          elif git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             uv run python scripts/check-version-claims.py --base "$BEFORE"
           else
             uv run python scripts/check-version-claims.py --base auto
