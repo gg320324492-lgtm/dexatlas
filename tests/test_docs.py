@@ -1216,3 +1216,27 @@ def test_a_badge_with_no_measurement_keeps_its_number() -> None:
 
     for values in ({}, {"tests.passing": "", "coverage.pct": ""}):
         assert script.apply_badges(readme, values) == readme
+
+
+def test_the_badge_states_the_numbers_the_report_states() -> None:
+    """The badge and the report are one measurement, not two copies of it.
+
+    The badge is written from the same values the report is written from --
+    the same function, the same record -- so they cannot disagree. An earlier
+    version read a key the record does not have, and every refresh wrote a
+    badge with no coverage number in it: an empty number says nothing at all,
+    which is worse than a stale one, because a stale number can be checked.
+    """
+    script = _figure_script()
+    report = REPORT.read_text(encoding="utf-8")
+    record = json.loads(script.RECORD.findall(report)[0])
+    values = script.render_figures(record)
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    stated = script.apply_badges(
+        readme,
+        {"tests.passing": values["suite.passed"], "coverage.pct": values["coverage.pct"]},
+    )
+
+    assert f"badge/tests-{values['suite.passed']}%20passing" in stated
+    assert f"badge/coverage-{values['coverage.pct'].rstrip('%')}%25" in stated

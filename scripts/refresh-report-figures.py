@@ -1135,21 +1135,21 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # The readme badges state the same two figures, and their numbers were
-    # written by hand. They are written here from the same measurement the
-    # report is written from -- the same values, not a second calculation of
-    # them -- so a badge cannot drift away from the report it summarises.
+    # written by hand. They are written here from the same values the report
+    # is written from -- the same measurement, not a second calculation of it
+    # -- so a badge cannot drift away from the report it summarises.
+    #
+    # When the measurement is partial, the record keeps the previous suite and
+    # coverage, so the badge keeps them too: the numbers it would state are
+    # the numbers of a run that did not run everything.
     #
     # The test badge says "passing", so it states the number that passed, not
-    # the number the collector found. A partial run measured neither of them
-    # for the whole suite, so a badge is not written from one: the figures it
-    # would state are figures of a run that did not run everything.
-    badge_values: dict[str, str] = {}
-    if complete:
-        measured_values = render_figures(record)
-        badge_values = {
-            "tests.passing": measured_values["suite.passed"],
-            "coverage.pct": measured_values["coverage.pct"],
-        }
+    # the number the collector found.
+    measured_values = render_figures(record)
+    badge_values = {
+        "tests.passing": measured_values.get("suite.passed", ""),
+        "coverage.pct": measured_values.get("coverage.pct", ""),
+    }
     readmes: list[tuple[Path, str, str]] = []
     for readme in README_PATHS:
         if not readme.is_file():
