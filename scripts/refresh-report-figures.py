@@ -78,6 +78,13 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+#: The status page states the same figures as the report — the test counts and
+#: the coverage — and it is the first thing a reader looks at, so a number
+#: that has gone stale there is worth catching. It is refreshed together with
+#: the report it summarises; pointing the script at another document refreshes
+#: only that document, because the test suite refreshes copies of the report
+#: and must not write to the real status page while it does so.
+STATUS_PATH = REPO_ROOT / "docs" / "status.md"
 SOURCE_ROOT = REPO_ROOT / "src" / "dexatlas"
 EXAMPLES_ROOT = REPO_ROOT / "examples"
 
@@ -90,7 +97,7 @@ WEAK_MODULE_PERCENT = 90.0
 #: The released versions the report compares its own figures against. Their test
 #: counts belong to those tags, not to the current tree, so they are measured
 #: where they live -- in an archive of the tag itself.
-HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2")
+HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2", "v0.1.3")
 
 #: ``<!--fig:key-->value<!--/fig-->`` — everything between the markers is generated.
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
@@ -113,6 +120,12 @@ OUTCOMES = ("passed", "failed", "skipped", "xfailed", "xpassed", "error", "desel
 #: its own job to fix, the second belongs to the reader.
 REPORT_CHECK = "test_execution_report"
 
+#: The self-checks of the status page share this name, for the same reason:
+#: they read the status page's generated numbers, so a status page that has
+#: gone stale makes them fail, and that is the refresh's own problem rather
+#: than a broken tree.
+STATUS_CHECK = "test_status_page"
+
 #: How many times the refresh may re-measure the self-checks before it gives up.
 MAX_ROUNDS = 3
 
@@ -120,6 +133,10 @@ MAX_ROUNDS = 3
 #: points it at a candidate copy, so a self-check never sees a half-written
 #: report and the report on disk is only ever replaced whole.
 REPORT_PATH_ENV = "DEXATLAS_REPORT_PATH"
+
+#: The environment variable the status page's self-checks read the page from.
+#: The refresh points it at a candidate copy, for the same reason.
+STATUS_PATH_ENV = "DEXATLAS_STATUS_PATH"
 
 #: pytest's short summary: "FAILED tests/test_x.py::test_y - AssertionError: ...".
 FAILED_LINE = re.compile(r"^(?:FAILED|ERROR) (\S+)(?: - (.*))?$", re.MULTILINE)
@@ -159,6 +176,8 @@ class Refresh:
     checks: Outcome
     converged: bool
     rounds: int
+    status_text: str | None = None
+    status_checks: Outcome = Outcome(counts={})
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -257,7 +276,7 @@ def measure_code_tests() -> Outcome:
         "--cov=dexatlas",
         "--cov-report=term",
         "-k",
-        f"not {REPORT_CHECK}",
+        f"not {REPORT_CHECK} and not {STATUS_CHECK}",
     )
     return read_outcome(result.stdout)
 
@@ -283,6 +302,36 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
             "--cov-append",
             "-k",
             REPORT_CHECK,
+            env=env,
+        )
+    return read_outcome(result.stdout)
+
+
+def measure_status_checks(
+    report_candidate: str, status_candidate: str, report_path: Path, status_path: Path
+) -> Outcome:
+    """Measure the status page's self-checks against the candidate documents.
+
+    The status page states the same figures as the report, so its checks are
+    measured against both candidates: a page that has fallen out of step with
+    the report is exactly what they are there to notice.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        report_copy = Path(directory) / report_path.name
+        status_copy = Path(directory) / status_path.name
+        report_copy.write_text(report_candidate, encoding="utf-8")
+        status_copy.write_text(status_candidate, encoding="utf-8")
+        env = dict(os.environ)
+        env[REPORT_PATH_ENV] = str(report_copy)
+        env[STATUS_PATH_ENV] = str(status_copy)
+        result = run(
+            sys.executable,
+            "-m",
+            "pytest",
+            "--cov=dexatlas",
+            "--cov-append",
+            "-k",
+            STATUS_CHECK,
             env=env,
         )
     return read_outcome(result.stdout)
@@ -535,6 +584,28 @@ def apply_figures(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
     return FIGURE.sub(replace, text), unknown
 
 
+def render_status(record: dict[str, Any], text: str) -> str:
+    """Write the measured figures into the status page.
+
+    The status page states the same figures as the report, so it gets the same
+    values: the number in the page and the number in the report are one
+    measurement, not two copies of it. The page carries no record of its own —
+    the report holds the measurement, and the page's own checks compare it
+    with the report.
+
+    A figure this script does not know how to fill in is a figure nobody can
+    check, and guessing at one would put a number in the page that nothing
+    stands behind. Better to stop and say which one it is.
+    """
+    updated, unknown = apply_figures(text, render_figures(record))
+    if unknown:
+        raise SystemExit(
+            "the status page refers to figures this script does not know how to fill in: "
+            + ", ".join(sorted(set(unknown)))
+        )
+    return updated
+
+
 def apply_record(text: str, record: dict[str, Any]) -> str:
     """Write the record into the report, replacing the previous one."""
     block = "<!--report-figures:" + render_record(record) + "-->"
@@ -628,6 +699,8 @@ def converge(
     slow: int,
     total: int,
     history: dict[str, Any] | None = None,
+    status_text: str | None = None,
+    status_path: Path | None = None,
 ) -> Refresh:
     """Bring the report and its self-checks into agreement, within one run.
 
@@ -638,6 +711,10 @@ def converge(
     measured against a candidate report, and the candidate is rebuilt until the
     two stop moving.
 
+    The status page is measured the same way, against candidates of both
+    documents: its checks compare it with the report, so they need the report
+    the page is being compared to.
+
     The loop ends when a candidate is measured and nothing about it changes the
     measurement — at that point the report the refresh leaves behind is one the
     self-checks pass.
@@ -645,12 +722,18 @@ def converge(
     suite = dict(code.counts)
     record = build_record(coverage, suite, fast, slow, total, history)
     candidate = render_or_fail(text, record)
+    status_candidate = render_status(record, status_text) if status_text is not None else None
 
     checks = Outcome(counts={})
+    status_checks = Outcome(counts={})
     for round_number in range(1, MAX_ROUNDS + 1):
         checks = measure_report_checks(candidate, report_path)
+        if status_candidate is not None and status_path is not None:
+            status_checks = measure_status_checks(
+                candidate, status_candidate, report_path, status_path
+            )
         new_coverage = read_coverage()
-        new_suite = add_counts(code.counts, checks.counts)
+        new_suite = add_counts(add_counts(code.counts, checks.counts), status_checks.counts)
         if new_suite == suite and new_coverage == coverage:
             return Refresh(
                 text=candidate,
@@ -658,10 +741,13 @@ def converge(
                 checks=checks,
                 converged=True,
                 rounds=round_number,
+                status_text=status_candidate,
+                status_checks=status_checks,
             )
         suite, coverage = new_suite, new_coverage
         record = build_record(coverage, suite, fast, slow, total, history)
         candidate = render_or_fail(text, record)
+        status_candidate = render_status(record, status_text) if status_text is not None else None
 
     return Refresh(
         text=candidate,
@@ -669,6 +755,8 @@ def converge(
         checks=checks,
         converged=False,
         rounds=MAX_ROUNDS,
+        status_text=status_candidate,
+        status_checks=status_checks,
     )
 
 
@@ -725,6 +813,13 @@ def main(argv: list[str] | None = None) -> int:
     text = report_path.read_text(encoding="utf-8")
     previous = read_record(text)
 
+    # The status page states the same figures as the report and is refreshed
+    # with it. Pointing the script at another document refreshes only that
+    # document: the test suite refreshes copies of the report, and it must not
+    # write to the real status page while it does so.
+    status_path = STATUS_PATH if report_path == REPORT_PATH and STATUS_PATH.is_file() else None
+    status_text = status_path.read_text(encoding="utf-8") if status_path else None
+
     print("Collecting the test suite...")
     fast, total = collected_tests("not slow")
     slow, _ = collected_tests("slow")
@@ -759,10 +854,23 @@ def main(argv: list[str] | None = None) -> int:
 
     if complete:
         print("Measuring the report's self-checks against a candidate report...")
-        refresh = converge(text, report_path, code, coverage, fast, slow, total, history)
+        refresh = converge(
+            text,
+            report_path,
+            code,
+            coverage,
+            fast,
+            slow,
+            total,
+            history,
+            status_text,
+            status_path,
+        )
         record = refresh.record
         updated = refresh.text
         checks = refresh.checks
+        status_updated = refresh.status_text
+        status_checks = refresh.status_checks
         if refresh.converged:
             print(
                 f"  the self-checks agree with the refreshed report "
@@ -773,6 +881,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"  the self-checks and the report did not settle after "
                 f"{refresh.rounds} rounds ({checks.describe()})"
             )
+        if status_path is not None:
+            print(f"  the status page's self-checks: {status_checks.describe()}")
     else:
         if not previous.get("coverage") or not previous.get("suite"):
             raise SystemExit(
@@ -791,7 +901,9 @@ def main(argv: list[str] | None = None) -> int:
         record["suite"] = previous["suite"]
         record["source_fingerprint"] = previous["source_fingerprint"]
         updated = render_or_fail(text, record)
+        status_updated = render_status(record, status_text) if status_text is not None else None
         checks = Outcome(counts={})
+        status_checks = Outcome(counts={})
 
     hidden = undisclosed_modules(record, updated)
     if hidden:
@@ -801,20 +913,25 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     changes = figure_changes(text, record)
+    if status_text is not None:
+        changes.extend(figure_changes(status_text, record))
 
     if not complete:
         warn_partial(code)
 
+    status_matched = status_updated is None or status_updated == status_text
     if args.check:
-        if updated == text:
+        if updated == text and status_matched:
             print("The report matches a fresh measurement.")
         else:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
             print("The report does not match a fresh measurement.")
-        matched = updated == text
+        matched = updated == text and status_matched
     else:
         report_path.write_bytes(updated.encode("utf-8"))
+        if status_path is not None and status_updated is not None:
+            status_path.write_bytes(status_updated.encode("utf-8"))
         if changes:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
@@ -822,6 +939,8 @@ def main(argv: list[str] | None = None) -> int:
             print("The report was already up to date.")
         else:
             print(f"Updated {display_path(report_path)}.")
+        if status_path is not None and status_updated is not None and not status_matched:
+            print(f"Updated {display_path(status_path)}.")
         matched = True
 
     if checks.failures:
@@ -829,6 +948,13 @@ def main(argv: list[str] | None = None) -> int:
             "The report's self-checks still fail against the refreshed report, so this "
             "one needs a hand rather than another refresh:",
             checks.failures,
+        )
+        return 1
+    if status_checks.failures:
+        report_failures(
+            "The status page's self-checks still fail against the refreshed documents, "
+            "so this one needs a hand rather than another refresh:",
+            status_checks.failures,
         )
         return 1
     return 0 if matched else 1

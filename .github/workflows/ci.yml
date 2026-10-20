@@ -18,7 +18,13 @@ jobs:
     name: Lint and format
     runs-on: ubuntu-latest
     steps:
+      # The whole history and the tags. The version-claim check below reads
+      # the tag list to learn what has been released, and compares the
+      # documents with another commit; a shallow checkout has neither, and a
+      # checker that found no tags would report nothing and pass.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -36,6 +42,30 @@ jobs:
       # apart from a platform problem.
       - name: Workflow lint
         uses: rhysd/actionlint@v1.7.12
+      # The documents say which versions have been released, and a version is
+      # not a line number: check-doc-citations.py cannot see a release claim
+      # that has gone stale. This check reads the facts out of the repository
+      # — the tags, the package version, the changelog — and reports the
+      # claims that contradict them.
+      #
+      # Only the claims this commit *adds* are failures. The ones the base
+      # commit already had are drift that is on its way out, and a check that
+      # went red over them would be ignored. "Already fixed" is a fact about
+      # the repository: once the fix lands, the base no longer has the finding
+      # and the finding stops being reported, with no list of exceptions
+      # anywhere.
+      - name: Version claims
+        env:
+          # The commit the push started from, so a push of several commits is
+          # compared as a whole. A pull request has no "before", and falls
+          # back to the commit the branch left the mainline at.
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
+            uv run python scripts/check-version-claims.py --base "$BEFORE"
+          else
+            uv run python scripts/check-version-claims.py --base auto
+          fi
 
   test:
     name: Tests (Python ${{ matrix.python-version }})

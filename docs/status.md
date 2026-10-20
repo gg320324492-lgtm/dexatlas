@@ -16,8 +16,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | 444 个（347 快 + 97 集成） |
-| 一方代码覆盖率 | 94.0% |
+| 测试 | <!--fig:tests.total-->497<!--/fig--> 个（<!--fig:tests.fast-->400<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->94.0%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 

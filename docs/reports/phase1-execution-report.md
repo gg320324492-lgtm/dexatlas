@@ -157,6 +157,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_resources.py` | 资源表里的文本：解析、存储、检索、计数、CLI 与 API |
 | `test_source_provenance.py` | 源码表示的出处：Java 还是 Smali，跟着源码一起走 |
 | `test_truncation.py` | 触到上限时索引不完整这件事必须写进 `project.errors`；后端版本只查一次；三个上限是「一次分析」的预算 |
+| `test_version_claims.py` | 文档里的版本状态陈述，必须与仓库实际的发布状态一致（v0.1.3 之后新增） |
+| `test_status_figures.py` | 状态页上的数字必须由脚本生成，且与执行报告一致（v0.1.3 之后新增） |
+| `test_console_output.py` | 检查器在不能编码输出的控制台上也必须跑完，并给出同样的退出码（v0.1.3 之后新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -787,9 +790,10 @@ uv run pytest --cov=dexatlas --cov-report=term
 git checkout v0.1.0    # <!--fig:history.v0.1.0.tests-->204<!--/fig--> 个测试
 git checkout v0.1.1    # <!--fig:history.v0.1.1.tests-->244<!--/fig--> 个测试
 git checkout v0.1.2    # <!--fig:history.v0.1.2.tests-->275<!--/fig--> 个测试
+git checkout v0.1.3    # <!--fig:history.v0.1.3.tests-->444<!--/fig--> 个测试
 ```
 
-在装齐后端和样本的完整环境里，这三个 tag 的套件都是全绿的；v0.1.1 和 v0.1.2 各带
+在装齐后端和样本的完整环境里，这四个 tag 的套件都是全绿的；v0.1.1 和 v0.1.2 各带
 1 个 `xfail`——`test_an_empty_path_disables_the_backend`，那个缺陷在 v0.1.2 之后修好了，
 标记随之摘掉。
 
@@ -933,6 +937,9 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     },
     "v0.1.2": {
       "tests": 275
+    },
+    "v0.1.3": {
+      "tests": 444
     }
   },
   "schema": 3,

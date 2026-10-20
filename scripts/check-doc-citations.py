@@ -72,7 +72,29 @@ def symbol_lines(path: pathlib.Path, symbol: str) -> list[int]:
     return sorted(lines)
 
 
+def use_utf8_output() -> None:
+    """Make the output independent of the console's encoding.
+
+    A drifted citation is reported with the line it drifted in, and that line
+    may hold a character the console cannot encode — the execution report
+    marks its findings with 🔴. A console that cannot write it (GBK, cp1252)
+    would kill the script halfway through its report, and the exit code it
+    managed to give would be the one a crash gives. The report has to finish
+    on every machine, so the output is UTF-8 and a character that cannot be
+    written is replaced rather than raised.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            continue
+
+
 def main() -> int:
+    use_utf8_output()
     checked = 0
     drifted: list[str] = []
     unknown: list[str] = []
