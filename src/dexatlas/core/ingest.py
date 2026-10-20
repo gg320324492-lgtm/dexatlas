@@ -4,9 +4,16 @@ Runs before any backend does, using only the standard library. If this rejects a
 no backend needs to be trusted with it.
 
 The archive is inspected through its *central directory* — the table of contents a ZIP
-carries — rather than by decompressing it. The sizes the directory declares are enough
-to refuse an archive that is a bomb, and reading them costs nothing, where expanding the
-contents to look at them costs whatever the archive asks for.
+carries — for the sizes it declares. Nothing is expanded to read them, so an archive
+that is a bomb is refused before a single byte of it is decompressed, and reading the
+sizes costs nothing where expanding the contents to look at them costs whatever the
+archive asks for.
+
+Reading the contents is a different matter. Verifying an entry's checksum means
+decompressing it, so that step does read the archive — up to a budget of
+``MAX_VERIFIED_BYTES`` of decompressed data, across every entry. Past the budget the
+archive is accepted on the strength of its structure alone: the entries beyond it are
+not decompressed, so a corruption in one of them is not noticed.
 """
 
 from __future__ import annotations
@@ -51,8 +58,14 @@ MAX_APK_EXPANSION_RATIO = 100
 #:
 #: Reading an entry is what verifies its checksum, and the size of an archive is
 #: not known until it has been read, so this is a budget rather than a complete
-#: check. It is above the size of every archive an ordinary analysis sees, and
-#: the limits above have already refused the ones that would run past it.
+#: check. It is above the size of every archive an ordinary analysis sees. An
+#: archive whose contents are larger than this is read only in part: the entries
+#: past the budget are not decompressed, so a corruption in one of them is not
+#: noticed.
+#:
+#: The budget is its own. It bounds what ingestion reads out of the APK; the cap
+#: on a backend's output bounds a different thing — what a tool writes back. One
+#: is not a share of the other, and reaching one does not raise the other.
 MAX_VERIFIED_BYTES = 256 * 1024 * 1024
 
 

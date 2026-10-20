@@ -140,7 +140,7 @@ uv run dexatlas backends              # what is installed, at what version
 uv run dexatlas analyze app.apk -o report.md --json report.json
 uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
-uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
+uv run dexatlas xrefs    <project-id> "com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;"
 ```
 
 The REST API is the same analysis core over HTTP:

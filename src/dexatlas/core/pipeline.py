@@ -140,10 +140,7 @@ class Analyzer:
         resources: list[ResourceString] = []
 
         if include_apktool:
-            manifest, apktool_classes, apktool_resources, errors = self._run_apktool(
-                project, workspace, builder
-            )
-            classes.extend(apktool_classes)
+            manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)
             resources.extend(apktool_resources)
             for apktool_error in errors:
                 project.errors.append(apktool_error)
@@ -215,19 +212,26 @@ class Analyzer:
 
     def _run_apktool(
         self, project: Project, workspace: Path, builder: EvidenceBuilder
-    ) -> tuple[ManifestInfo | None, list[ClassRef], list[ResourceString], list[ToolError]]:
+    ) -> tuple[ManifestInfo | None, list[ResourceString], list[ToolError]]:
+        """Apktool's share of the run: the manifest, the resources and the Smali.
+
+        No classes come back, and that is the truth about the backend rather
+        than an omission: Apktool reads the manifest, the resource table and
+        the disassembled bytecode, and the classes in the index are described
+        by Androguard and JADX. The Smali is read on demand, when a caller
+        asks for source the decompiler did not produce.
+        """
         backend = self._apktool
         if not backend.available():
             error = backend.missing_error()
             builder.add_error(error)
-            return None, [], [], [error]
+            return None, [], [error]
 
         output_dir = workspace / "apktool"
         outcome = backend.decode(project.apk.path, output_dir)
         manifest, parse_error = backend.read_manifest(output_dir)
         resources, resource_errors = backend.read_resources(output_dir, project.apk.sha256)
 
-        classes: list[ClassRef] = []
         errors: list[ToolError] = []
         if outcome.error is not None:
             builder.add_error(outcome.error)
@@ -256,7 +260,7 @@ class Analyzer:
                 },
             )
 
-        return manifest, classes, resources, errors
+        return manifest, resources, errors
 
     def _run_androguard(
         self, apk: Path, project: Project, builder: EvidenceBuilder
@@ -496,8 +500,16 @@ def _smali_declares(header: str, method_name: str) -> bool:
 def _merge_classes(classes: list[ClassRef]) -> list[ClassRef]:
     """Combine per-backend class views into one index, keeping every provenance entry.
 
-    Backends disagree about a class's flags — Apktool knows the manifest declaration,
-    Androguard the DEX definition. Both are kept; neither overwrites the other.
+    Two backends produce class definitions, and both of them are kept: Androguard
+    reads the DEX definition, and JADX reads the class it decompiled. Apktool
+    produces no class rows at all — it reads the manifest, the resources and the
+    Smali, and the Smali is read on demand rather than indexed.
+
+    They do not disagree about a class's flags, because only one of them reports
+    them: Androguard's access flags, superclass and interfaces are kept as they
+    are, and what JADX adds is the kind, its own provenance, and a method count of
+    its own. Where the two disagree about the kind, the one that is not a plain
+    class wins — a class JADX could not classify is still what Androguard read.
 
     The method and field counts are *views*, not totals. A backend reads one dex
     file, so a class split across two dex files is seen partly by each of them,

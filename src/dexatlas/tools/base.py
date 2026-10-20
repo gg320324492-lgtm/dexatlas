@@ -1,8 +1,8 @@
 """The analysis backend interface.
 
-Backends are subprocess wrappers, never links. Invoking JADX as a separate process keeps
-its parsing bugs and license obligations out of our process, and lets a crashing or
-hangs engine degrade one step instead of the whole run.
+The rule is that a backend parses untrusted input in a process of its own: the engines
+are invoked, never linked. Androguard is the exception — a Python library, so it runs
+in-process, each step wrapped: a malformed DEX is a ToolError, not the end of the run.
 """
 
 from __future__ import annotations

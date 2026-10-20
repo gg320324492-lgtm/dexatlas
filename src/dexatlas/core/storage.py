@@ -275,8 +275,20 @@ def _migrate(connection: sqlite3.Connection) -> None:
     instead: an existing row reads as zero, which is the truth about it — a
     workspace analysed before the resource table was read holds no resources.
 
-    Additive only. A column that cannot be added without rewriting the table
-    would mean the old rows have to be migrated, and that is a different job.
+    Two kinds of change live here, and only one of them is additive.
+
+    A *column* is added in place, and the rows keep their values. A column
+    that could not be added without rewriting the table would mean the old
+    rows had to be migrated, and that is a different job.
+
+    A *table* is rebuilt, and its rows do not survive the rebuild. The
+    resource table's key changed when ``<string-array>`` entries were given a
+    position, and under the old key one item of an array overwrites the next;
+    SQLite cannot change a primary key in place, so the table is dropped and
+    created empty. Losing the rows is affordable because the table is a cache
+    of an analysis rather than a source of truth: the next analysis fills it
+    again. These two changes are the whole of what this function does — the
+    schema version is recorded by the caller.
     """
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(projects)")}
     if "resource_count" not in columns:
