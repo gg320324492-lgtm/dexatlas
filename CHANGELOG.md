@@ -11,9 +11,46 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **A status page** — `docs/status.md` says where the project stands and what is left:
   the released versions, the acceptance status of Phase 1, and the gaps that remain.
-  It is written in Chinese, like the analysis coverage document.
+  It is written in Chinese, like the analysis coverage document. Its test count and
+  coverage are now written by the same script that writes the execution report's, so
+  the page cannot drift away from the measurement it summarises.
+- **The APK's resource table is in the index.** Apktool decoded `res/` into the
+  workspace and nothing read it: the demo app's `DexAtlas Demo` — a string that
+  exists only in `res/values/strings.xml` — was in no index at all, and a key written
+  only in a resource file could not be found. The text declarations in `res/values*/`
+  are read now, each row carrying the provenance of the file that declared it, and
+  they are queryable through `dexatlas resources` and `GET /projects/{id}/resources`.
+  Text hard-coded in a layout is still not covered, and the document says so.
+- **A source says which backend produced it.** `class_source` returned Smali or Java
+  with nothing to tell the two apart, so a caller could not know the difference
+  without inspecting the workspace. `class_source_document` and `method_source_document`
+  return the text together with its kind, its provenance and the version of the tool
+  that wrote it; the REST API reports the same in response headers. The plain-text
+  response body is unchanged.
+- **The version claims in the documentation are checked.** `check-doc-citations.py`
+  proves that a `file:line` citation still points at what it names, but a sentence
+  like "the newest tag is v0.1.2" is not a line number and nothing could see it go
+  stale. `scripts/check-version-claims.py` reads the tags, the package version, the
+  changelog and the generated figures out of the repository and reports the claims
+  that contradict them. It runs in CI, and it runs there too.
 
 ### Fixed
+
+- **The backend's version was read once per indexed symbol.** Every class, method,
+  field and cross-reference carries a provenance record, and every record asked the
+  backend for its version — a query that scans the installed distributions. On a
+  12,000-method APK, 80 of the 82 seconds of the run went on that. The version is
+  now asked once.
+- **Reaching a limit truncated the index silently.** The three limits in the
+  Androguard adapter stopped the walk and logged a warning; the project then reported
+  `completed` with no errors, and the report's counts matched the rows in the
+  database exactly — because both faithfully recorded an index that had been cut
+  short. A limit now records an `output_truncated` error that names the limit and
+  says what was missed, so the gap is stated beside the numbers instead of hidden
+  inside them.
+- **Two of the three limits were counted per DEX file.** A four-dex APK got four
+  times the allowance, so the largest APKs got the most headroom — the opposite of
+  what a limit is for. All three are now one budget per analysis.
 
 - **The documentation names the release that shipped each fix.** The Phase 1 execution
   report's opening, the headings of its sections 3.11 – 3.15, and the opening of
