@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->565<!--/fig-->（<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.5%<!--/fig-->**（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->577<!--/fig-->（<!--fig:tests.fast-->459<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.6%<!--/fig-->**（<!--fig:coverage.covered-->2172<!--/fig-->/<!--fig:coverage.total-->2297<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -111,7 +111,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.5%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.6%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -119,9 +119,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->447<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->459<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->118<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->565<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->577<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -158,6 +158,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_status_figures.py` | 状态页上的数字必须由脚本生成，且与执行报告一致（v0.1.3 之后新增） |
 | `test_console_output.py` | 检查器在不能编码输出的控制台上也必须跑完，并给出同样的退出码（v0.1.3 之后新增） |
 | `test_large_apk_scale.py` | 大规模样本上的行为：索引与生成器的事实一致、触到上限会被记录、报告的计数等于查询的结果（v0.1.3 之后新增） |
+| `test_partial_backend_failure.py` | 后端只在部分输入上失败时：读到了的那部分的证据照常生成、索引不完整这件事要写进报告；重分析不得留下上一轮的证据 |
 
 ### 2.2 几类值得注意的测试
 
@@ -774,10 +775,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->565<!--/fig--> 个：<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->577<!--/fig--> 个：<!--fig:tests.fast-->459<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.5%<!--/fig-->（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->565<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.6%<!--/fig-->（<!--fig:coverage.covered-->2172<!--/fig-->/<!--fig:coverage.total-->2297<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->577<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -906,16 +907,16 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "core/__init__.py": [3, 0],
       "core/evidence.py": [60, 0],
       "core/ingest.py": [36, 2],
-      "core/models.py": [264, 4],
-      "core/pipeline.py": [275, 10],
-      "core/storage.py": [220, 7],
+      "core/models.py": [267, 4],
+      "core/pipeline.py": [274, 10],
+      "core/storage.py": [221, 7],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
-      "reports/json_report.py": [19, 0],
-      "reports/markdown.py": [58, 2],
+      "reports/json_report.py": [20, 0],
+      "reports/markdown.py": [68, 2],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [259, 23],
+      "tools/androguard/adapter.py": [265, 23],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [221, 12],
       "tools/base.py": [108, 7],
@@ -924,7 +925,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/registry.py": [28, 0]
     },
     "missing": 125,
-    "statements": 2277
+    "statements": 2297
   },
   "history": {
     "v0.1.0": {
@@ -941,15 +942,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 3,
-  "source_fingerprint": "sha256:acc8c3e974133d0e8668da839d157a608019a5ae5365e10bb2524c40f89476af",
+  "source_fingerprint": "sha256:936e6079ff9d3c4a13f8c0ac68c35e167738cd3d02e6ae0b81099ce6aac23fc2",
   "suite": {
-    "passed": 565,
+    "passed": 577,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 447,
+    "fast": 459,
     "slow": 118,
-    "total": 565
+    "total": 577
   }
 }-->

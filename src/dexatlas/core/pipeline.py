@@ -275,24 +275,31 @@ class Analyzer:
 
         if error is not None:
             builder.add_error(error)
-        if error is None or error.code is ToolErrorCode.OUTPUT_TRUNCATED:
-            # Conclusions before the index. A cross-reference says something about
-            # the code; a class declaration only says the class exists. The
-            # report's evidence table is capped, so what is recorded last is what
-            # gets dropped.
-            #
-            # A truncated index still gets its evidence: the rows that were
-            # written were read out of the bytecode and they hold. A parse
-            # failure is a different thing — there the index may be wrong, and
-            # no conclusion is drawn from it.
-            builder.add_cross_references(methods, references)
-            builder.add_classes(classes[:MAX_EVIDENCE_CLASSES])
-            if len(classes) > MAX_EVIDENCE_CLASSES:
-                logger.info(
-                    "androguard: indexed %d classes; evidence covers the first %d",
-                    len(classes),
-                    MAX_EVIDENCE_CLASSES,
-                )
+        # Conclusions before the index. A cross-reference says something about
+        # the code; a class declaration only says the class exists. The
+        # report's evidence table is capped, so what is recorded last is what
+        # gets dropped.
+        #
+        # The evidence is built from what came back, whether or not something
+        # went wrong. Every one of those rows was read out of the bytecode, so
+        # it holds — a row that was read is a fact, whatever else failed.
+        #
+        # A DEX file that could not be parsed contributes nothing at all: it
+        # was skipped, so its classes and its call edges are *missing* from the
+        # index rather than wrong in it. That is a gap, and the report says so
+        # — but it is not a reason to withhold the evidence of the DEX files
+        # that were read. Treating one broken DEX file as a reason to draw no
+        # conclusion from the whole APK threw away facts that were true: the
+        # classes of the DEX file that parsed really do exist, and the calls
+        # really are in the bytecode.
+        builder.add_cross_references(methods, references)
+        builder.add_classes(classes[:MAX_EVIDENCE_CLASSES])
+        if len(classes) > MAX_EVIDENCE_CLASSES:
+            logger.info(
+                "androguard: indexed %d classes; evidence covers the first %d",
+                len(classes),
+                MAX_EVIDENCE_CLASSES,
+            )
         return classes, methods, fields, references, strings, error
 
     def _run_jadx(

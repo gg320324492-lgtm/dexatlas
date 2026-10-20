@@ -14,6 +14,7 @@ from dexatlas.core.models import (
     EvidenceLevel,
     ManifestInfo,
     Project,
+    index_gaps,
 )
 from dexatlas.core.pipeline import AnalysisResult
 from dexatlas.reports.coverage import decompilation_coverage
@@ -33,11 +34,19 @@ _XREF_NOTE = (
     "evidence: they say something about the JDK, not about this app."
 )
 
+#: What an incomplete index means for the numbers beside it.
+_INDEX_GAP_NOTE = [
+    "> **This index is incomplete.** The counts above cover the parts of the APK that",
+    "> could be read, not the whole of it. Read them as counts of what was indexed,",
+    "> not as counts of what the APK holds.",
+]
+
 
 def render_markdown(result: AnalysisResult) -> str:
     """Render an analysis as a Markdown report."""
     project = result.project
     metrics: list[tuple[str, str]] = [
+        ("Index completeness", _index_completeness(project)),
         ("Classes indexed", f"{project.class_count:,}"),
         ("Methods indexed", f"{project.method_count:,}"),
     ]
@@ -77,7 +86,9 @@ def render_markdown(result: AnalysisResult) -> str:
         "| Metric | Value |",
         "| --- | ---: |",
     ]
-    lines += [f"| {name} | {value} |" for name, value in metrics]
+    lines += [f"| {name} | {_cell(value)} |" for name, value in metrics]
+    if index_gaps(project.errors):
+        lines += ["", *_INDEX_GAP_NOTE]
     lines += [
         "",
         "## Evidence levels",
@@ -128,6 +139,32 @@ def _tool_line(project: Project) -> str:
         f"{name} {version or 'not installed'}"
         for name, version in sorted(project.tool_versions.items())
     )
+
+
+def _index_completeness(project: Project) -> str:
+    """Whether the index covers the whole APK, and what is missing from it.
+
+    A count of what was indexed reads as a count of what the APK holds unless
+    the reader is told otherwise. "2 classes" and "2 classes, because one of
+    the DEX files could not be parsed" are different claims, and the report
+    has to make the second one — otherwise a reader takes the numbers as
+    totals and concludes, for instance, that an APK has no internal calls.
+
+    The reason is the error that was already recorded. The gap is not recorded
+    a second time; it is pointed at.
+    """
+    gaps = index_gaps(project.errors)
+    if not gaps:
+        return "complete"
+    return "incomplete: " + "; ".join(gap.message for gap in gaps)
+
+
+def _cell(value: str) -> str:
+    """A metric value, escaped for a Markdown table cell.
+
+    An unescaped pipe ends the cell early and shifts every column after it.
+    """
+    return value.replace("|", "\\|")
 
 
 def _manifest_section(manifest: ManifestInfo) -> list[str]:

@@ -40,7 +40,23 @@ SCHEMA_VERSION = 2
 
 #: Tables cleared when a project is re-analysed. Content-addressed project ids mean a
 #: re-analysis replaces rather than accumulates.
-_SYMBOL_TABLES = ("classes", "methods", "fields", "xrefs", "strings", "resources", "search_index")
+#:
+#: The evidence table belongs here for the same reason the symbol tables do: it is
+#: written afresh by every analysis, and a table that is not cleared keeps the rows
+#: of the earlier run. The ids are assigned in sequence, so a record left behind
+#: keeps an id that the new run has already given to a different record — and the
+#: database ends up holding rows that the report does not mention, which is the
+#: opposite of what an evidence table is for.
+_PROJECT_TABLES = (
+    "classes",
+    "methods",
+    "fields",
+    "xrefs",
+    "strings",
+    "resources",
+    "search_index",
+    "evidence",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,7 +388,7 @@ class Store:
     def delete_project(self, project_id: str) -> bool:
         with self.transaction() as connection:
             cursor = connection.execute("DELETE FROM projects WHERE id = ?", (project_id,))
-            for table in _SYMBOL_TABLES:
+            for table in _PROJECT_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
         return cursor.rowcount > 0
 
@@ -389,6 +405,11 @@ class Store:
         resources: Iterable[ResourceString] = (),
     ) -> SymbolCounts:
         """Replace a project's symbol tables. Callers re-analyse, so this is idempotent.
+
+        The project's evidence is cleared here too, in the same transaction as
+        the symbols: the analysis that follows writes a fresh set of it, and a
+        reader of the database must never find the records of an earlier run
+        beside the symbols of this one.
 
         Descriptors and method ids are stored in their canonical spelling. The models
         already normalise them, but the database is the durable contract: an id
@@ -418,7 +439,7 @@ class Store:
         resource_list = list(resources)
 
         with self.transaction() as connection:
-            for table in _SYMBOL_TABLES:
+            for table in _PROJECT_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
 
             # The methods and the fields go in first: the class row's counts are
@@ -623,8 +644,24 @@ class Store:
     # -- evidence ----------------------------------------------------------
 
     def save_evidence(self, project_id: str, evidence: Iterable[Evidence]) -> int:
+        """Replace a project's evidence. Callers re-analyse, so this is idempotent.
+
+        The rows of the earlier run are removed first. The evidence ids are
+        assigned in sequence, so a record left behind keeps an id that this
+        run has already given to a different record — and a report that cites
+        ``E-0007`` would send a reader to the wrong row. The table and the
+        report have to hold the same records, or the ids in one do not mean
+        what the ids in the other mean.
+
+        The project's own evidence is cleared a second time by
+        :meth:`save_symbols`, in the same transaction that clears the symbol
+        tables: a query that ran between the two writes would otherwise see
+        the new symbols beside the old evidence, which is worse than seeing
+        neither.
+        """
         items = list(evidence)
         with self.transaction() as connection:
+            connection.execute("DELETE FROM evidence WHERE project_id = ?", (project_id,))
             connection.executemany(
                 "INSERT OR REPLACE INTO evidence VALUES (?,?,?,?,?,?,?)",
                 [

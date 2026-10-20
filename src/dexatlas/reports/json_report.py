@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from dexatlas.core.models import Evidence, EvidenceKind, Project
+from dexatlas.core.models import Evidence, EvidenceKind, Project, index_gaps
 from dexatlas.core.pipeline import AnalysisResult
 from dexatlas.reports.coverage import decompilation_coverage
 
@@ -51,6 +51,7 @@ def _project_block(project: Project) -> dict[str, Any]:
 
 
 def _summary_block(result: AnalysisResult) -> dict[str, Any]:
+    gaps = index_gaps(result.project.errors)
     return {
         "classes": result.project.class_count,
         "methods": result.project.method_count,
@@ -69,6 +70,13 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
         # How much of the indexed code the decompiler turned into Java. It is
         # what the ``decompiled`` flag on a method means, counted.
         "decompilation": decompilation_coverage(result.evidence),
+        # Whether the index covers the whole APK. Every count above is a count
+        # of what was indexed; a reader who does not know the index is short
+        # reads them as counts of what the APK holds.
+        "index_complete": not gaps,
+        "index_gaps": [
+            {"tool": gap.tool, "code": gap.code.value, "message": gap.message} for gap in gaps
+        ],
         "duration_seconds": round(result.duration_seconds, 2),
         "backends_with_errors": sorted({e.tool for e in result.project.errors}),
     }
