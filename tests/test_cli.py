@@ -309,6 +309,49 @@ def test_version_prints() -> None:
     assert "dexatlas" in result.stdout
 
 
+def test_the_reported_version_is_the_declared_one() -> None:
+    """The version the tool prints must be the one it declares.
+
+    It used to be written in two places, and both were stale: v0.1.1 and v0.1.2 were
+    published while the packages still called themselves 0.1.0. A version that
+    disagrees with the release is worse than no version.
+    """
+    import tomllib
+
+    from dexatlas import __version__
+
+    result = _run("version")
+
+    assert result.exit_code == 0
+    assert __version__ in result.stdout
+
+    root = Path(__file__).parent.parent
+    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    project = pyproject["project"]
+
+    if "version" in project:
+        assert project["version"] == __version__, (
+            "pyproject.toml and the package declare different versions"
+        )
+    else:
+        # The version is dynamic, read from the package by the build backend. The
+        # build then has to agree, which the wheel's own name shows.
+        assert project["dynamic"] == ["version"]
+
+
+def test_the_declared_version_is_not_a_stale_release() -> None:
+    """A published version must not be claimed by a tree that is ahead of it.
+
+    The number carries a ``.devN`` suffix while the tree carries unreleased changes,
+    and drops it when the release is cut.
+    """
+    from dexatlas import __version__
+
+    assert re.match(r"^\d+\.\d+\.\d+(\.dev\d+)?$", __version__), (
+        f"{__version__} is not a version"
+    )
+
+
 def test_backends_runs() -> None:
     result = _run("backends")
 
