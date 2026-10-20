@@ -27,15 +27,15 @@ are opt-in:
     large    2,050 classes x 100 methods — more methods than the method limit
     xlarge   600 classes x 100 methods   — more instructions than the instruction limit
 
-**Three of the assertions here were written as ``xfail(strict=True)``**, each
+**Five of the assertions here were written as ``xfail(strict=True)``**, each
 naming a defect this module found: a truncated index that did not say it was
 truncated, three limits that meant three different things, and a backend whose
-version was asked for once per indexed symbol. All three defects were fixed
-(see ``docs/benchmarks/large-apk.md``), the markers are gone, and the
-assertions now hold in their own right. They are kept as ordinary tests
-because the behaviour they pin is what a reader of a report relies on: that a
-short index says so, that a limit means the same thing whatever the APK's
-layout, and that indexing a symbol costs what a symbol should cost.
+version was asked for once per indexed symbol. All of them were fixed (see
+``docs/benchmarks/large-apk.md``), the markers are gone, and the assertions now
+hold in their own right. They are kept as ordinary tests because the behaviour
+they pin is what a reader of a report relies on: that a short index says so,
+that a limit means the same thing whatever the APK's layout, and that indexing a
+symbol costs what a symbol should cost.
 """
 
 from __future__ import annotations
@@ -80,8 +80,9 @@ REPORT_ENV_VAR = "DEXATLAS_LARGE_APK_REPORT"
 #: the wall clock of a test that is about the symbol index.
 JADX_METHOD_CEILING = 50_000
 
-#: The method limit is applied per APK; the other two are applied per DEX file.
-#: The test uses this many DEX files to tell the two apart.
+#: All three limits are one budget per APK. The test uses this many methods in
+#: a DEX file to produce an APK with many DEX files, because a limit that reset
+#: per DEX file is only visible on a sample with more than one of them.
 MULTIDEX_METHODS_PER_DEX = 20
 
 
@@ -159,10 +160,9 @@ def multi_dex_sample(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]
 
     A DEX file may hold far fewer methods than the format allows, so a small
     sample can be split into many small ones at no cost. That matters because
-    the adapter's three limits are not applied to the same thing: the method
-    limit is counted across the whole APK, while the string and instruction
-    limits are counted per DEX file. Only an APK with more than one DEX file can
-    tell the two apart.
+    the adapter's three limits are budgets for the whole APK: a limit that
+    reset per DEX file would give a ten-DEX APK ten times the allowance, and
+    only an APK with more than one DEX file can tell the two apart.
 
     The size is fixed rather than taken from the environment: this sample is
     about the number of DEX files, not about the number of symbols.
@@ -249,9 +249,7 @@ def _limits_reached(truth: dict[str, Any]) -> dict[str, bool]:
     return {
         "method": truth["method_count"] > DEFAULT_METHOD_LIMIT,
         "string": sum(f["string_rows"] for f in dex_files) > DEFAULT_STRING_LIMIT,
-        "instruction": (
-            sum(f["instruction_count"] for f in dex_files) > DEFAULT_INSTRUCTION_LIMIT
-        ),
+        "instruction": (sum(f["instruction_count"] for f in dex_files) > DEFAULT_INSTRUCTION_LIMIT),
     }
 
 
@@ -496,9 +494,7 @@ def test_a_search_finds_a_string_the_sample_actually_contains(
         # The string index was cut short. The marker may or may not have
         # survived, but the run has to say that the index is incomplete.
         truncations = [
-            error
-            for error in project.errors
-            if error.code is ToolErrorCode.OUTPUT_TRUNCATED
+            error for error in project.errors if error.code is ToolErrorCode.OUTPUT_TRUNCATED
         ]
         assert truncations, "the string index was cut short and the run said nothing"
         assert any("string limit" in error.message for error in truncations)
@@ -506,7 +502,7 @@ def test_a_search_finds_a_string_the_sample_actually_contains(
         assert hits, f"search found nothing for {marker!r}"
         assert any(marker in str(hit["name"]) for hit in hits), (
             f"the hits do not include the string that was searched for: {hits}"
-    )
+        )
 
 
 def test_a_search_finds_a_class_by_its_name(
@@ -536,8 +532,8 @@ def test_the_method_limit_bounds_the_method_index(
 
     The method limit is counted across the whole APK, and the DEX files in the
     sample are walked one after another against the same counter. It is here
-    as the control: it is the limit the other two are expected to behave like,
-    and it is the one they were brought into line with.
+    as the control: the string and instruction budgets were brought into line
+    with this one, and this is the behaviour they were brought into line with.
 
     The bound is not exact, and does not need to be: the check is made at class
     granularity, so the class the walk stops in is indexed whole. The slack
@@ -569,12 +565,23 @@ def test_a_stopped_walk_does_not_walk_the_dex_files_after_it(
     would report the same gap four times, once per file.
     """
     backend = AndroguardBackend(settings)
-    _, methods, _, _, _, error = backend.extract(
+    classes, methods, _, _, _, error = backend.extract(
         multi_dex_sample["apk"], multi_dex_sample["apk_sha256"], method_limit=5
     )
 
     assert error is not None
     assert "the DEX files after it were not walked" in error.message, error.message
+    # The walk really stopped. A tenth of the sample's methods and a tenth of
+    # its classes were indexed; the DEX files after the first were never read,
+    # so the gap is larger than the rows missing from the file it stopped in.
+    assert len(classes) < multi_dex_sample["class_count"], (
+        f"{len(classes)} classes were indexed out of "
+        f"{multi_dex_sample['class_count']}; the walk did not stop"
+    )
+    assert len(methods) < multi_dex_sample["method_count"], (
+        f"{len(methods)} methods were indexed out of "
+        f"{multi_dex_sample['method_count']}; the walk did not stop"
+    )
 
 
 def test_the_string_limit_bounds_the_string_index(
