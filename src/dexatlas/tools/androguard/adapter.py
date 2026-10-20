@@ -221,7 +221,7 @@ class AndroguardBackend(Backend):
         fields: list[FieldRef] = []
         references: list[MethodReference] = []
         strings: list[StringConstant] = []
-        error: ToolError | None = None
+        failures: list[ToolError] = []
         truncations: list[ToolError] = []
         dex_count = 0
         # The three budgets are one budget per analysis, not one per DEX file.
@@ -246,11 +246,13 @@ class AndroguardBackend(Backend):
                     dex = DEX(blob)
                 except Exception as exc:
                     logger.warning("androguard: %s could not be parsed: %s", dex_name, exc)
-                    error = error or ToolError(
-                        tool=self.name,
-                        code=ToolErrorCode.PARSE_ERROR,
-                        message=f"androguard could not parse {dex_name}",
-                        detail=f"{type(exc).__name__}: {exc}"[:2000],
+                    failures.append(
+                        ToolError(
+                            tool=self.name,
+                            code=ToolErrorCode.PARSE_ERROR,
+                            message=f"androguard could not parse {dex_name}",
+                            detail=f"{type(exc).__name__}: {exc}"[:2000],
+                        )
                     )
                     continue
 
@@ -289,19 +291,23 @@ class AndroguardBackend(Backend):
                         break
                 except Exception as exc:
                     logger.warning("androguard: indexing %s failed: %s", dex_name, exc)
-                    error = error or ToolError(
-                        tool=self.name,
-                        code=ToolErrorCode.PARSE_ERROR,
-                        message=f"androguard could not fully index {dex_name}",
-                        detail=f"{type(exc).__name__}: {exc}"[:2000],
+                    failures.append(
+                        ToolError(
+                            tool=self.name,
+                            code=ToolErrorCode.PARSE_ERROR,
+                            message=f"androguard could not fully index {dex_name}",
+                            detail=f"{type(exc).__name__}: {exc}"[:2000],
+                        )
                     )
         except Exception as exc:
             logger.warning("androguard: analysis of %s failed: %s", apk.name, exc)
-            error = error or ToolError(
-                tool=self.name,
-                code=ToolErrorCode.PARSE_ERROR,
-                message=f"androguard could not fully parse {apk.name}",
-                detail=f"{type(exc).__name__}: {exc}"[:2000],
+            failures.append(
+                ToolError(
+                    tool=self.name,
+                    code=ToolErrorCode.PARSE_ERROR,
+                    message=f"androguard could not fully parse {apk.name}",
+                    detail=f"{type(exc).__name__}: {exc}"[:2000],
+                )
             )
 
         if truncations:
@@ -311,9 +317,16 @@ class AndroguardBackend(Backend):
                 fields,
                 references,
                 strings,
-                _truncation_error(truncations, error),
+                _truncation_error(truncations, _combine_failures(failures)),
             )
-        return classes, methods, fields, references, strings, error or _no_dex_error(apk, dex_count)
+        return (
+            classes,
+            methods,
+            fields,
+            references,
+            strings,
+            _combine_failures(failures) or _no_dex_error(apk, dex_count),
+        )
 
     def _index_dex(
         self,
@@ -729,6 +742,29 @@ def _methods_in(classes: Iterator[Any]) -> int:
         except Exception:  # pragma: no cover - androguard raises on malformed bytecode
             continue
     return total
+
+
+def _combine_failures(failures: list[ToolError]) -> ToolError | None:
+    """One error for a set of failures that are all the same kind of failure.
+
+    Two DEX files that could not be parsed are two gaps in the index, and the
+    reader has to know about both of them: naming only the first would make
+    the index look more complete than it is — and a report that says "the index
+    is incomplete" has to be able to say how much of it is missing.
+
+    The messages are joined rather than replaced, so each gap keeps its own
+    name. The details are joined the same way.
+    """
+    if not failures:
+        return None
+    if len(failures) == 1:
+        return failures[0]
+    return ToolError(
+        tool=failures[0].tool,
+        code=failures[0].code,
+        message="; ".join(failure.message for failure in failures),
+        detail="; ".join(failure.detail for failure in failures if failure.detail) or None,
+    )
 
 
 def _record_truncation(truncations: list[ToolError], error: ToolError) -> None:

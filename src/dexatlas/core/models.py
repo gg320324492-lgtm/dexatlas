@@ -60,6 +60,29 @@ class ToolError(BaseModel):
         return f"[{self.tool}/{self.code}] {self.message}{suffix}"
 
 
+#: The tool that owns the DEX symbol index.
+#:
+#: Every class, method, field, cross-reference and string constant in the index
+#: was read out of the APK's DEX files by this backend, so a failure of this
+#: one leaves the index short of the APK. A failure of the decompiler or of the
+#: resource reader does not: those contribute a second view of the code and the
+#: resource table, and the symbol index is whole without them.
+INDEX_TOOL = "androguard"
+
+
+def index_gaps(errors: list[ToolError]) -> list[ToolError]:
+    """The failures that leave the symbol index short of the whole APK.
+
+    A gap is not the same thing as an error. A decompiler that is not installed
+    is an error and not a gap: the index was still built, in full, by the
+    reader of the bytecode. A DEX file that could not be parsed is both — the
+    index is missing whatever that file held, and every count in a report has
+    to be read as a count of *what was indexed* rather than of what the APK
+    contains.
+    """
+    return [error for error in errors if error.tool == INDEX_TOOL]
+
+
 #: A locator written before the JADX output tree became a relative path. The old
 #: form was ``jadx:<absolute path>``, and that path ran through the project
 #: workspace on the machine that ran the analysis. Only the tail after the

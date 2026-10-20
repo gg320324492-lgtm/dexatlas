@@ -649,3 +649,43 @@ def test_evidence_roundtrip_preserves_provenance(store: Store, tmp_path: Path) -
     assert loaded[0].level == EvidenceLevel.VERIFIED
     assert loaded[0].provenance[0].tool == "androguard"
     assert loaded[0].provenance[0].locator.endswith("#run")
+
+
+def test_saving_evidence_again_replaces_the_earlier_records(store: Store, tmp_path: Path) -> None:
+    """A re-analysis replaces the evidence of the earlier run rather than adding to it.
+
+    The ids are assigned in sequence, so a record left behind by an earlier run
+    keeps an id that the new run has already given to a different record. A
+    report that cites ``E-0007`` would then send a reader to the wrong row —
+    and the table would hold records the report does not mention, which is the
+    opposite of what an evidence table is for.
+    """
+    project = _project()
+    store.save_project(project, tmp_path, manifest=None)
+
+    first = [
+        Evidence(
+            id=f"E-{index:04d}",
+            kind=EvidenceKind.OBSERVATION,
+            level=EvidenceLevel.VERIFIED,
+            summary=f"observation {index}",
+            provenance=_provenance(),
+        )
+        for index in range(1, 4)
+    ]
+    store.save_evidence(project.id, first)
+
+    second = [
+        Evidence(
+            id="E-0001",
+            kind=EvidenceKind.OBSERVATION,
+            level=EvidenceLevel.VERIFIED,
+            summary="the only observation of this run",
+            provenance=_provenance(),
+        )
+    ]
+    store.save_evidence(project.id, second)
+
+    loaded = store.list_evidence(project.id)
+    assert len(loaded) == 1, "the records of the earlier run were kept"
+    assert loaded[0].summary == "the only observation of this run"
