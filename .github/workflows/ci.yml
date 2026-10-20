@@ -101,17 +101,19 @@ jobs:
           distribution: temurin
           java-version: "21"
 
-      # The versions are pinned in one place for every job that needs a backend.
+      # Only Apktool is installed: this job exists to test the configuration where
+      # the decompiler is absent, and downloading 100 MB of JADX in order to delete
+      # it again would be a slow way of saying "not installed". The version pins
+      # still live in the one script, so they cannot drift from the other jobs.
       - name: Install analysis backends
+        env:
+          BACKENDS: apktool
         run: bash scripts/install-backends.sh
 
-      # JADX is taken away again, and the job checks that it really is gone.
-      #
-      # "JADX is not installed" has to be true in every sense: the variable that
-      # pins it, the directory it lives in, and the PATH entry that would find
-      # it. The install script sets all three, so each is undone here — and an
-      # empty value disables the backend outright, with no PATH lookup and no
-      # "stale pin" fallback.
+      # "JADX is not installed" has to be true in every sense, and the job checks
+      # that before it trusts its own name. The install script puts nothing on PATH
+      # for a backend it did not install, and an empty value disables the backend
+      # outright, with no PATH lookup and no "stale pin" fallback.
       #
       # This configuration is the one the Smali fallback exists for: Apktool is
       # there, the code is still readable, and the decompiler is not. The other
@@ -121,10 +123,8 @@ jobs:
       - name: Run tests without JADX
         run: |
           export DEXATLAS_JADX_PATH=""
-          rm -rf "${INSTALL_ROOT}/jadx"
-          export PATH="$(printf '%s' "${PATH}" | tr ':' '\n' | grep -v '/jadx/bin' | paste -sd ':' - || true)"
           if command -v jadx >/dev/null 2>&1; then
-            echo "jadx is still on PATH; this job would test the wrong configuration" >&2
+            echo "jadx is on PATH; this job would test the wrong configuration" >&2
             exit 1
           fi
           # The tool's own view is the one that counts: the configuration under
