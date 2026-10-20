@@ -4,13 +4,15 @@ What happens when DexAtlas is pointed at an APK that is big enough to reach the
 limits in the Androguard adapter.
 
 `docs/status.md` 4.4 recorded this as an open item: the committed samples are
-under 3 KB, the three limits in
-`src/dexatlas/tools/androguard/adapter.py:49-51` had never been pressed against
-a real file, and what would happen on a large APK was a guess.
+under 3 KB, the three limits in the Androguard adapter had never been pressed
+against a real file, and what would happen on a large APK was a guess.
 
-This document is the measurement. **Every number below was produced by running
-the code on this machine**, and the command that produced it is given. Nothing
-here is estimated.
+**This document is the measurement, and it is also a record of a causal chain.**
+The stress test found three defects in the adapter. All three are fixed, and
+this document says what each one cost, because a fix that nobody can compare
+against a measurement is a fix nobody can check. Every number below was
+produced by running the code on this machine, against the fixed code, and the
+command that produced it is given. Nothing here is estimated.
 
 ---
 
@@ -35,18 +37,26 @@ file and later forgot to update.
 
 The generated code is first-party: one class per generated file, each with a
 constructor and a set of work methods, each work method loading a class marker
-and a pooled literal, calling a shared helper, and returning. The cross-references
-it produces point at a method the APK really defines, so they can be resolved
-against the symbol table.
+and a pooled literal, calling a shared helper, and returning. The
+cross-references it produces point at a method the APK really defines, so they
+can be resolved against the symbol table.
 
 ### The scales
+
+The three budgets the adapter enforces, and where they live:
+
+| Constant | Value | Definition |
+|---|---|---|
+| `DEFAULT_METHOD_LIMIT` | 200,000 | `src/dexatlas/tools/androguard/adapter.py:53` |
+| `DEFAULT_STRING_LIMIT` | 50,000 | `src/dexatlas/tools/androguard/adapter.py:55` |
+| `DEFAULT_INSTRUCTION_LIMIT` | 5,000,000 | `src/dexatlas/tools/androguard/adapter.py:57` |
 
 | Scale | Classes | Methods/class | Instructions/method | DEX files | Purpose |
 |---|---|---|---|---|---|
 | `smoke` | 20 | 8 | 6 | 1 | The CI default. Fast, and below every limit. |
 | `medium` | 300 | 40 | 12 | 1 | Comfortably inside every limit. Shows what the pipeline does when nothing is clipped. |
-| `large` | 2,050 | 100 | 12 | 4 | **More methods than `DEFAULT_METHOD_LIMIT`** (200,000). The method limit is reached by a real APK rather than by a lowered threshold. |
-| `xlarge` | 600 | 100 | 88 | 1 | **More instructions than `DEFAULT_INSTRUCTION_LIMIT`** (5,000,000) inside a *single* DEX file. |
+| `large` | 2,050 | 100 | 12 | 4 | **More methods than the method limit** (200,000). The method limit is reached by a real APK rather than by a lowered threshold. |
+| `xlarge` | 600 | 100 | 88 | 1 | **More instructions than the instruction limit** (5,000,000) inside a *single* DEX file. |
 
 The scale is an environment variable, so a CI job picks one without rewriting
 a command line:
@@ -69,18 +79,40 @@ code.
 | Python | CPython 3.12.13 (uv-managed) |
 | Androguard | 4.1.4 |
 | Apktool | 2.11.1 |
+| JADX | 1.5.2 |
 | JDK | OpenJDK 21.0.12.1 (LTS) |
 | Filesystem | NTFS, local disk |
 
-The filesystem matters for one of the findings: the version lookup in
-[§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) stats every
-installed distribution on every call, and that is much more expensive on NTFS
-than on a Linux CI runner. The *shape* of the finding is not machine-specific;
-the magnitude is.
+The filesystem matters for one part of the story: the version lookup
+([§5.3](#53-the-version-of-the-backend-was-probed-once-per-symbol)) stats
+every installed distribution on every call, and that is much more expensive on
+NTFS than on a Linux CI runner. The *shape* of that finding was not
+machine-specific; the magnitude was. The fix removed the per-symbol cost
+entirely, so the remaining per-run cost is one probe.
+
+**Timings depend on what else the machine is doing.** The build times in
+§3.1 and the test-file times in §7 were measured with nothing else running,
+and are the median of three runs where a run was repeated. A run under load
+is slower — the same `large` build took 2.5 s to 2.7 s in a quiet window and
+noticeably longer when three other analyses were running beside it. The
+counts do not depend on the load; only the times do.
 
 ---
 
 ## 3. The measurements
+
+Every number in this section comes out of the committed test file, which writes
+its own measurement to the path `DEXATLAS_LARGE_APK_REPORT` names:
+
+```bash
+DEXATLAS_LARGE_APK_SCALE=large \
+DEXATLAS_LARGE_APK_REPORT=/tmp/large.json \
+  uv run pytest tests/test_large_apk_scale.py -q
+```
+
+The dump holds the scale, the APK's size and DEX count, the generator's
+ground truth, what the index actually holds, which limits were reached, the
+timings, and the errors the run recorded. The tables below are that file.
 
 ### 3.1 Building the sample
 
@@ -100,72 +132,87 @@ built in       1.08s
 
 | Scale | APK size | DEX files | Build time |
 |---|---|---|---|
-| `smoke` | 3,435 bytes | 1 | 0.49 s |
-| `medium` | 104,673 bytes | 1 | 1.08 s |
-| `large` | 1,512,275 bytes | 4 | 3.14 s |
-| `xlarge` | 557,189 bytes | 1 | 7.03 s |
+| `smoke` | 3,435 bytes | 1 | 0.66 s |
+| `medium` | 104,673 bytes | 1 | 1.0 s |
+| `large` | 1,512,275 bytes | 4 | 2.6 s |
+| `xlarge` | 557,189 bytes | 1 | 6.0 s |
 
 Building is fast. Apktool assembles 205,000 methods into four DEX files in
-about three seconds, which is worth knowing: the expensive part of a large APK
-is not making one. (`xlarge` takes longer to build because it assembles
-5.2 million instructions, and instruction count is what the assembler costs.)
+about two and a half seconds, which is worth knowing: the expensive part of a
+large APK is not making one. (`xlarge` takes longer to build because it
+assembles 5.2 million instructions, and instruction count is what the assembler
+costs.)
 
 ### 3.2 Indexing it
 
-`AndroguardBackend.extract()` on the sample, with the default limits, and
-then the same call with the version lookup cached — both in one process, so
-the two numbers are directly comparable:
+`AndroguardBackend.extract()` on the sample, with the default limits. The
+"extract" column below is that call; the "pipeline" column is
+`Analyzer.analyze()`, which also runs the other backends and writes the result
+into the database. JADX is skipped above 50,000 methods, which is why the two
+big rows cost less than their size suggests.
 
-| Scale | Symbols | Time, version probed per symbol | Time, version cached | Ratio | ms per symbol |
-|---|---|---|---|---|---|
-| `smoke` | 699 | 1.58 s | 0.02 s | 98.6× | 2.26 |
-| `medium` | 48,651 | 144.97 s | 0.77 s | **189.5×** | 2.98 |
-| `large` | 594,612 | 1,506.42 s | 13.42 s | **112.3×** | 2.53 |
+| Scale | APK size | DEX | Extract | Pipeline | Classes | Methods | Cross-references | Strings |
+|---|---|---|---|---|---|---|---|---|
+| `smoke` | 3,435 B | 1 | 0.02 s | 2.64 s | 21 | 161 | 160 | 337 |
+| `medium` | 104,673 B | 1 | 0.62 s | 7.64 s | 301 | 12,001 | 12,000 | 24,049 |
+| `large` | 1,512,275 B | 4 | 10.22 s | 26.62 s | 2,002 | 200,001 | 200,000 | 50,000 |
+| `xlarge` | 557,189 B | 1 | 7.38 s | 12.48 s | 574 | 57,380 | 57,380 | 50,000 |
 
-The counts are exact — the index holds every class, every method and every
-cross-reference the APK contains, with no limit reached:
+The `large` and `xlarge` rows are short, and on purpose: those two samples are
+big enough to reach a limit. [§3.4](#34-large-the-method-limit-reached) and
+[§3.5](#35-xlarge-the-instruction-limit-reached) say what is missing and why.
 
-| Scale | Classes | Methods | Fields | Cross-references | Strings |
-|---|---|---|---|---|---|
-| `smoke` | 21 | 161 | 20 | 160 | 337 |
-| `medium` | 301 | 12,001 | 300 | 12,000 | 24,049 |
+The two rows that reach no limit are complete, and the generator's ground truth
+is the check:
+
+| Scale | Truth: classes / methods / refs | Indexed | Agreement |
+|---|---|---|---|
+| `smoke` | 21 / 161 / 160 | 21 / 161 / 160 | exact |
+| `medium` | 301 / 12,001 / 12,000 | 301 / 12,001 / 12,000 | exact |
 
 The strings are higher than the number of distinct values in the DEX, because
-`_index_strings` writes one row per **(value, use site)** pair — a literal
-loaded by 39 methods is 39 rows, and that is what makes it pointable.
+the string index writes one row per **(value, use site)** pair — a literal
+loaded by 39 methods is 39 rows, and that is what makes it pointable. Counted
+directly from the DEX:
 
-The `medium` sample makes that visible: its DEX holds 2,997 distinct
-strings, and the index holds 24,049 rows, because each class's marker is
-loaded by all 39 of that class's work methods.
+```
+  medium:
+    pool entries          2,997
+    distinct values used  2,348
+    use sites             23,400
+    pool entries unused     649
+    rows the index writes 24,049      <- 23,400 + 649
+```
 
-The **time** is the interesting column, and it has nothing to do with the
-analysis. The DEX itself is parsed and walked in 0.77 s. Everything else is
-bookkeeping. See [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol).
+and the index holds 24,049 rows. The `smoke` sample decomposes the same way:
+141 pool entries, 280 use sites, 57 entries nothing loads, 280 + 57 = **337
+rows**, and the index holds 337.
 
-The cost per symbol is flat across the two sizes — 2.26 ms and 2.98 ms — so
-the overhead is **linear in the number of symbols**, and it grows with the
-APK. That is what makes it a cliff rather than a constant: there is no size
-at which it becomes affordable.
+One caveat about the ground truth, because a reader will compare the two: the
+generator's own model of the string rows (25,448 for `medium`, against the
+24,049 actually written) is an over-estimate. It counts one row per distinct
+loaded pool value *plus* one row per use site, where a value used k times
+yields k rows and a value nothing loads yields one. The difference is exactly
+the 2,048 loaded pool values the generator counts against the 649 pool entries
+nothing loads. The test only uses that number to decide *whether* a limit was
+reached, and it over-estimates in the safe direction.
 
 ### 3.3 The full pipeline
 
-`Analyzer.analyze()` with Androguard only (no JADX, no Apktool), on `medium`:
+`Analyzer.analyze()` on `medium`, with every backend:
 
 ```
-duration             127.25s
+duration             7.64s
 status               completed
 class_count          301
 method_count         12,001
 reference_count      12,000
 errors               []
-rows classes         301
-rows methods         12,001
-search hit           1
 ```
 
 The generator wrote 301 classes, 12,001 methods and 12,000 references. The
-analysis reports 301, 12,001 and 12,000. The database holds 301 class rows
-and 12,001 method rows. The search finds the marker string.
+analysis reports 301, 12,001 and 12,000. The database holds 301 class rows and
+12,001 method rows. The search finds the marker string.
 
 **The counts in the report and the rows in the database agree**, at every
 level. The report says 12,001 methods, the database holds 12,001 method rows,
@@ -177,261 +224,255 @@ there. This is the check the project got wrong once (execution report 3.12:
 
 ### 3.4 `large`: the method limit, reached
 
-`large` holds 205,000 methods against `DEFAULT_METHOD_LIMIT = 200,000`. The
+`large` holds 205,001 methods against `DEFAULT_METHOD_LIMIT` (200,000). The
 limit is reached during the walk, and this is what the run reports.
 
-The method limit is checked **across the whole APK**: the counter is the
+The method limit is counted **across the whole APK**: the counter is the
 accumulated method list, not a per-file one. So a 4-DEX APK gets one budget of
 200,000, not four.
 
 The APK is built with 2,051 classes over four DEX files, and the walk was
-traced per file:
+traced per file. The index holds 2,002 of those classes and 200,001 of the
+205,001 methods:
 
-| DEX file | Methods in it | Methods walked | String rows |
+| DEX file | Methods in it | Methods walked | Instructions walked (cumulative) |
 |---|---|---|---|
-| `classes.dex` | 60,001 | 60,001 | 50,000 |
-| `classes2.dex` | 60,000 | 60,000 | 50,000 |
-| `classes3.dex` | 60,000 | 60,000 | 50,000 |
-| `classes4.dex` | 25,000 | **20,000** | 40,608 |
-| **Total** | **205,001** | **200,001** | **190,608** |
+| `classes.dex` | 60,001 | 60,001 | 714,001 |
+| `classes2.dex` | 60,000 | 60,000 | 1,428,001 |
+| `classes3.dex` | 60,000 | 60,000 | 2,142,001 |
+| `classes4.dex` | 25,000 | **20,000** | 2,380,001 |
+| **Total** | **205,001** | **200,001** | **2,380,001** |
 
-What the run reports:
-
-```
-total methods  = 200,001   (limit 200,000)
-total strings  = 190,608   (limit 50,000 per DEX file)
-total classes  = 2,002     (the APK holds 2,051)
-error          = None
-```
+What the run reports — this is the whole `project.errors[0]`, verbatim:
 
 ```
-pipeline (version cached): 28.3s
-  status=completed errors=[]
-  report: classes=2,002 methods=200,001 refs=200,000
-  rows:   classes=2,002 methods=200,001 xrefs=200,000
+code    output_truncated
+message string limit 50000 reached: the index is incomplete — 1449 entries of this
+        DEX file's string pool were not indexed, and no DEX file after it
+        contributed any string; method limit 200000 reached while indexing
+        classes4.dex: the index is incomplete — 5000 methods in this file were
+        not indexed, and the DEX files after it were not walked
 ```
 
-And the same run **without** the version cache — the way a user experiences
-it today:
+The status is still `completed`, and that is the right answer: a partial
+result is not a wrong result. But the run **says** that the index is short,
+says which limit was reached, says how much is missing, and says that the DEX
+files after the one it stopped in were not walked at all. A reader of the
+report can tell a fully indexed APK from a clipped one.
 
-| | Time |
-|---|---|
-| `extract`, version probed per symbol | **1,506.42 s** (25 minutes) |
-| `extract`, version cached | 13.42 s |
-| `analyze()` pipeline, version probed per symbol | 1,855.86 s (31 minutes) |
-| `analyze()` pipeline, version cached | 28.34 s |
+Three details are worth reading carefully:
 
-**The limit was reached, 5,000 methods and 49 whole classes are missing from
-the index, and the run reports `COMPLETED` with no errors at all.**
-
-Two details are worth reading carefully:
-
-- **The count overshoots by one.** The limit is 200,000 and the index holds
-  200,001. The check is made at class granularity — before a class's methods
-  are added — so the count lands just past the line rather than exactly on
-  it. That is a rounding detail, not a defect.
-- **The two limits interact.** `classes4.dex` yielded 40,608 string rows
-  rather than the 50,000 the other three files got, because the method limit
-  stopped the walk before the string indexer had seen all of that file's
-  literal use sites. A clipped method index quietly clips the string index
-  too.
-
-The counts in the report and the rows in the database still agree exactly —
-2,002 class rows, 200,001 method rows, 200,000 cross-reference rows, and the
-report says the same three numbers. The database is not wrong. **It is a
-faithful record of an index that was cut short**, and nothing in the report,
-the project record or the CLI says so.
+- **The count overshoots the limit.** The limit is 200,000 and the index holds
+  200,001. The check is made at class granularity — at the top of the class
+  loop, before that class's methods are added — so the count can land up to one
+  class past the line. Here it landed one method past, because the classes in
+  this sample hold 100 methods each. That is a rounding detail, not a defect.
+- **The two limits interact.** The string index stopped at 50,000 rows while
+  `classes.dex` was being read, so the string budget was already spent by the
+  time the walk reached `classes4.dex`; the 1,449 pool entries that error
+  names are `classes.dex`'s own, not `classes4.dex`'s. A clipped method index
+  quietly clips the string index too.
+- **The counts in the report and the rows in the database still agree
+  exactly** — 2,002 class rows, 200,001 method rows, 200,000 cross-reference
+  rows, and the report says the same three numbers. The database is not wrong.
+  It is a faithful record of an index that was cut short, and now it says so.
 
 ### 3.5 `xlarge`: the instruction limit, reached
 
 `xlarge` puts 5,228,401 instructions in a **single** DEX file, against
-`DEFAULT_INSTRUCTION_LIMIT = 5,000,000`. The limit is therefore reached
-without the per-file multiplication of [§4](#4-the-three-limits-what-they-actually-bound)
-playing any part — the file is over the limit on its own.
-
-```
-androguard: instruction limit 5000000 reached; xref index is truncated
-androguard: string limit 50000 reached; truncated
-```
+`DEFAULT_INSTRUCTION_LIMIT` (5,000,000). The limit is therefore reached
+without any per-file multiplication playing a part — the file is over the limit
+on its own.
 
 ```
 apk: 557,189 bytes, 1 dex file
 truth: 601 classes, 60,001 methods, 60,000 refs, 5,228,401 instructions
-extract (version cached): 6.9s
-  classes=574 methods=57,381 refs=57,380
-  strings=50,000 error=None
+extract: 7.38s
+  classes=574 methods=57,380 refs=57,380
+  strings=50,000
 ```
 
-Uncached, the same run takes 452.30 s — 165,909 symbols at 2.73 ms each.
+```
+code    output_truncated
+message instruction limit 5000000 reached while indexing classes.dex: the index
+        is incomplete — 2621 methods in this file were not indexed, their
+        cross-references were not scanned, and the DEX files after it were not
+        walked; string limit 50000 reached: the index is incomplete — 1299
+        entries of this DEX file's string pool were not indexed, and no DEX file
+        after it contributed any string
+```
 
-The instruction limit truncated the walk: **57,381 of 60,001 methods** were
-indexed, 27 classes and their methods are missing, and the cross-reference
-index stopped with it. The string limit fired in the same file, for the same
-reason it fires three times on `large`.
+The instruction limit truncated the walk: **57,380 of 60,001 methods** were
+indexed, and the cross-reference index stopped with it. The method table and
+the cross-reference table are short by the same 2,621 methods — 60,001 − 2,621
+= 57,380, exactly what the error says. The classes are short by 27 of 601,
+because the walk stops in the middle of a class: the class it stops in is in
+the index but only partly filled, and the 27 classes after it are not in the
+index at all.
 
-And `error=None`. The run recorded no error, because a limit that truncates
-the index does not produce one.
-
-The instruction limit truncates the walk, and the truncation reaches further
-than the cross-reference index. **57,381 of 60,001 methods** were indexed and
-**574 of 601 classes** — the walk stops partway through a class's methods, so
-the classes after that point are not in the index either. The method table
-and the cross-reference table are short by the same 2,620 methods.
-
-The one-method difference between the two counts (57,381 against 57,380) is
-the method the limit stopped *on*: it is appended to the method table before
-the limit is checked, and its body is never walked, so it has no calls.
+The string limit fired in the same file, for the same reason it fires on
+`large`: the pool is bigger than the budget.
 
 ---
 
-## 4. The three limits: what they actually bound
+## 4. The three limits are one budget per APK
 
-The three constants in `src/dexatlas/tools/androguard/adapter.py:49-51` are
-named as one group and read as one budget. **They are not one budget.** Two of
-them are applied to each DEX file separately, so an APK with N DEX files is
-allowed N times the limit.
+The three constants in the Androguard adapter — `DEFAULT_METHOD_LIMIT`,
+`DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT` — are named as one
+group and read as one budget. **They are now one budget.** All three are
+counted across the whole APK, and a DEX file that comes after the one that
+spent the budget is not walked at all.
 
 Measured by applying the same limit to the same content in one DEX file and in
 ten:
 
 | Limit | 1 DEX file | 10 DEX files | Ratio |
 |---|---|---|---|
-| `DEFAULT_METHOD_LIMIT` | 16 methods | 16 methods | **1.0×** |
-| `DEFAULT_STRING_LIMIT` | 10 strings | 100 strings | **10.0×** |
-| `DEFAULT_INSTRUCTION_LIMIT` | 3 cross-references | 30 cross-references | **10.0×** |
+| `DEFAULT_METHOD_LIMIT` (16) | 16 methods | 16 methods | **1.0×** |
+| `DEFAULT_STRING_LIMIT` (10) | 10 strings | 10 strings | **1.0×** |
+| `DEFAULT_INSTRUCTION_LIMIT` (3) | 2 cross-references | 2 cross-references | **1.0×** |
 
-The method limit is the control: it is counted over the whole APK, so
-splitting the APK into more DEX files does not buy a bigger budget. The other
-two are counted per DEX file, so it does.
+The ten-DEX sample is the same smoke content with `--max-methods-per-dex 20`,
+which splits 161 methods into ten files. Splitting an APK does not buy it a
+bigger budget, which is the point: the number of DEX files in an APK is the app
+author's decision, not the tool's, and a ceiling that the app author could
+raise was not a ceiling.
 
-The code says the same thing. The method limit is checked against
-`len(methods)`, the accumulated list every DEX file appends to
-(`src/dexatlas/tools/androguard/adapter.py:326`). The instruction limit is
-checked against `instructions_seen`, which is reset to zero at the top of
-`_index_dex` — once per DEX file
-(`src/dexatlas/tools/androguard/adapter.py:287`). The string limit is checked
-against `len(constants)`, a list built fresh for each DEX file
-(`src/dexatlas/tools/androguard/adapter.py:466`).
-
-The practical consequence: a 4-DEX APK is allowed 200,000 strings against a
-stated limit of 50,000, and 20,000,000 instructions against a stated limit of
-5,000,000. A 16-DEX APK is allowed 800,000 strings.
-
-This is not a hypothetical. The samples under `examples/` include a
-multi-DEX one, and every real APK that uses `classes2.dex` has at least two.
-
-### 4.1 The `large` sample shows it at scale
-
-The `large` sample has four DEX files, and the string index it produces is
-**190,608 rows against a stated limit of 50,000** — 3.8× the limit. The
-per-file breakdown shows where it comes from:
-
-| DEX file | String rows | The limit for that file |
-|---|---|---|
-| `classes.dex` | 50,000 | 50,000 |
-| `classes2.dex` | 50,000 | 50,000 |
-| `classes3.dex` | 50,000 | 50,000 |
-| `classes4.dex` | 40,608 | 50,000 (not reached — see [§3.4](#34-large-the-method-limit-reached)) |
-| **Total** | **190,608** | **50,000** |
-
-Three DEX files each hit the limit exactly, and the log says so three times:
-
-```
-androguard: string limit 50000 reached; truncated
-androguard: string limit 50000 reached; truncated
-androguard: string limit 50000 reached; truncated
-```
-
-and the run still reports `errors=[]`.
-
-### 4.2 The overshoot is exactly the number of DEX files
+### 4.1 The overshoot sample, before and after
 
 A sample built so that **each** DEX file wants more than the whole APK's
-budget makes the arithmetic unambiguous — 1,200 classes × 120 methods, in
-four DEX files, each wanting 73,448 string rows:
+budget makes the arithmetic unambiguous — 1,200 classes × 120 methods, in four
+DEX files, each wanting 73,448 string rows: 293,792 between them, against a
+budget of 50,000 for the whole APK.
+
+Before the fix, that sample produced:
 
 ```
-androguard: string limit 50000 reached; truncated     (×4, one per DEX file)
-
   string rows          200,000
   DEFAULT_STRING_LIMIT  50,000
   overshoot               4.0x
 ```
 
-**200,000 rows against a limit of 50,000, for a 4-DEX APK.** Not an
-approximation, not a rounding artefact: four times the budget, because the
-budget is applied four times.
+Four times the budget, because the budget was applied four times, and the only
+evidence of it was a log line — the run reported `errors=[]`.
 
-Nothing else about that run is clipped. The method limit is 200,000 and the
-sample holds 144,001 methods; the instruction limit is 5,000,000 and the
-sample holds well under it. The classes, methods and cross-references are
+After the fix, the same sample produces:
+
+```
+  classes 1,201   methods 144,001   references 144,000
+  strings          50,000
+  error: string limit 50000 reached: the index is incomplete — 185 entries of
+         this DEX file's string pool were not indexed, and no DEX file after it
+         contributed any string
+```
+
+**Exactly 50,000 rows against a limit of 50,000**, and the shortfall is on the
+record. Nothing else about that run is clipped: the method limit is 200,000
+and the sample holds 144,001 methods; the instruction limit is 5,000,000 and
+the sample holds well under it. The classes, methods and cross-references are
 all indexed in full — 1,201, 144,001 and 144,000, exactly what the generator
-wrote. **The only thing the overshoot touches is the string index**, and the
-only evidence of it is a log line.
+wrote.
 
-The same sample, with the same limits, in one DEX file instead of four, is
-inside the budget. The number of DEX files in an APK is not under the
-project's control — it is the app author's.
+### 4.2 A spent budget stops the walk
+
+Once a budget is spent, the DEX files after the one that spent it are not
+walked at all. Walking them would produce rows that cannot be stored, and it
+would also produce a second and third copy of the same gap in the report.
+
+On the ten-DEX sample with the method limit lowered to 5:
+
+```
+  the APK: 10 DEX files, 161 methods
+  DEX file          methods walked  stopped here?
+  classes.dex                    8  YES
+  classes2.dex          not walked
+  classes3.dex          not walked
+  ...
+  classes10.dex         not walked
+  indexed: classes=2 methods=8 refs=8 strings=43
+  error  : method limit 5 reached while indexing classes.dex: the index is
+           incomplete — 9 methods in this file were not indexed, and the DEX
+           files after it were not walked
+```
+
+And on the `large` sample with the method limit lowered to 100,000, so that
+the stop lands in the second of four files:
+
+```
+  the APK: 4 DEX files, 205,001 methods
+  DEX file          methods walked  stopped here?
+  classes.dex               60,001  no
+  classes2.dex              40,000  YES
+  classes3.dex          not walked
+  classes4.dex          not walked
+  indexed: classes=1,002 methods=100,001 refs=100,000 strings=50,000
+```
+
+This is the behaviour that makes the error message meaningful. "The DEX files
+after it were not walked" is not a caveat — it is the larger half of the gap.
+The `large` sample's own run stops in its *last* DEX file, so the message
+names a gap of zero there; the two runs above are what make the rule visible.
 
 ---
 
-## 5. The defects this found
+## 5. The three defects this found, and what fixed them
 
-Three real defects. **None of them is fixed in this branch** — the adapter is
-`src/`, and that belongs to another agent. Each one has a test that names it,
-and each test is marked `xfail(strict=True)`: it fails today, and it turns
-into a failure the moment somebody fixes the defect, so it cannot be quietly
-forgotten.
+The stress test found three real defects. **All three are fixed**, in
+`src/dexatlas/tools/androguard/adapter.py` and `src/dexatlas/tools/base.py`.
+Each one has a test that names it, and each of those tests was an
+`xfail(strict=True)` marker until the fix landed: a strict xfail turns into a
+failure the moment the defect is fixed, so a fix could not land without
+someone removing the marker and saying so. The markers are gone. The
+assertions are ordinary tests now, and they hold in their own right.
 
 ### 5.1 A truncated index is reported as a clean run
 
-`src/dexatlas/tools/androguard/adapter.py:326-332` and `:356-361` log a
-warning when a limit is reached and then return what they have so far. The
-warning goes to the log. **Nothing is recorded on the project.**
+**Found by:** the `large` and `xlarge` samples, whose indexes were thousands
+of methods short while the project reported `COMPLETED` and
+`project.errors` was empty. The adapter logged a warning and returned what it
+had. Nothing was recorded on the project, so a reader could not tell a fully
+indexed APK from a clipped one — in the one place a reader would look.
 
-```
-androguard: method limit 30 reached on classes2.dex; index is truncated
-androguard: method limit 30 reached on classes3.dex; index is truncated
-...
-```
+**Fixed by:** a limit that truncates the index now produces a `ToolError` whose
+code is `OUTPUT_TRUNCATED` — the code `ToolErrorCode` had defined for exactly
+this and used for nothing (`src/dexatlas/core/models.py:33-41`). The error is
+written into `project.errors`, it appears in the report's "Backend errors"
+section, and it appears in the evidence table as
+`androguard:error/output_truncated`. The project status stays `completed`,
+because a partial result is not a wrong result.
 
-The run continues. The project reaches `COMPLETED`. The report states a class
-count and a method count that are *true of the rows in the database* and
-silent about the rows that are not there. `project.errors` is empty.
-
-A reader cannot tell a fully indexed APK from a clipped one. That is the
-defect class this project exists to prevent: it does not make the test red,
-and it hides in the one place a reader would look — the report.
-
-The fix belongs in the adapter: a limit that truncates the index should
-produce a `ToolError` on the project, the way every other backend failure
-does. The error already has a home — `ToolErrorCode.OUTPUT_TRUNCATED` is
-defined at `src/dexatlas/core/models.py:41` and **used nowhere in the
-codebase**. It is the code for exactly this situation, and it has never been
-used for it.
+**What it cost:** before the fix, `large` reported 200,001 methods and no
+error. After it, the same run reports 200,001 methods *and* the error, and the
+error says how much is missing.
 
 **Reproduction:**
 
 ```bash
-uv run python scripts/generate-large-apk.py --scale smoke \
-  --max-methods-per-dex 20 --output-dir /tmp/multi
-uv run pytest tests/test_large_apk_scale.py -k "truncated_run" -q
+uv run python scripts/generate-large-apk.py --scale large --output-dir /tmp/large
+DEXATLAS_LARGE_APK_SCALE=large uv run pytest tests/test_large_apk_scale.py -q
 ```
 
-### 5.2 Two of the three limits are per-DEX, not per-APK
+### 5.2 Two of the three limits were per-DEX, not per-APK
 
-Measured in [§4](#4-the-three-limits-what-they-actually-bound). The method
-limit is counted over the whole APK; the string and instruction limits are
-counted per DEX file.
+**Found by:** the same content in one DEX file and in ten, against the same
+limits, giving ten times the budget for the string and instruction limits
+([§4](#4-the-three-limits-are-one-budget-per-apk)). The overshoot sample made
+it exact: 200,000 string rows against a stated limit of 50,000, with
+`errors=[]`.
 
-The string limit's own log path is at
-`src/dexatlas/tools/androguard/adapter.py:466-470`, and it is reached three
-times on the `large` sample — once per DEX file that fills up.
+**Fixed by:** all three budgets are counted across the whole APK, and a spent
+budget stops the walk. `instructions_seen` is no longer reset per DEX file,
+and the string budget is measured against the whole APK rather than against
+one file's pool.
+
+**What it allowed:** a 4-DEX APK was allowed 200,000 strings against a stated
+limit of 50,000, and 20,000,000 instructions against a stated limit of
+5,000,000. A 16-DEX APK was allowed 800,000 strings. Now every APK gets one
+budget of 50,000 strings and one budget of 5,000,000 instructions.
 
 **Reproduction:** the same command as above, with
-`tests/test_large_apk_scale.py -k "string_limit or instruction_limit"`.
-
-The overshoot at the real limit, on a 4-DEX APK ([§4.2](#42-the-overshoot-is-exactly-the-number-of-dex-files)):
+`tests/test_large_apk_scale.py -k "string_limit or instruction_limit"`, and
+the overshoot sample:
 
 ```bash
 uv run python scripts/generate-large-apk.py --scale medium \
@@ -439,34 +480,16 @@ uv run python scripts/generate-large-apk.py --scale medium \
   --output-dir /tmp/overshoot
 ```
 
-### 5.3 The version of the backend is probed once per symbol
+### 5.3 The version of the backend was probed once per symbol
 
-This is the performance cliff, and it is the largest effect in this document.
+**Found by:** profiling a `medium` run. `Backend.provenance()` built every
+symbol's provenance record, and it asked the backend for its version to do it.
+The Androguard adapter's `version()` was not cached, so the answer came from
+`importlib.metadata.version("androguard")` — which walks the installed
+distributions and stats every one of them — once per indexed symbol. JADX and
+Apktool both cached theirs; Androguard was the only backend that did not.
 
-`Backend.provenance()` (`src/dexatlas/tools/base.py:202-211`) builds every
-symbol's provenance record, and it calls `self.version()` to do it. The
-Androguard adapter's `version()`
-(`src/dexatlas/tools/androguard/adapter.py:136-154`) calls
-`importlib.metadata.version("androguard")`, which is **not cached** — it
-walks the installed distributions and stats every one of them, on every call.
-
-JADX and Apktool both cache theirs (`self._version_probed`). Androguard is
-the only backend that does not.
-
-Measured in isolation:
-
-```
-importlib.metadata.version('androguard'): 1.945 ms/call (2000 calls in 3.89s)
-AndroguardBackend.version():            2.555 ms/call (2000 calls in 5.11s)
-```
-
-And the number of calls is one per indexed symbol. On the `medium` sample:
-
-```
-provenance() calls: 36,951
-```
-
-for 48,651 symbols. The profile of a `medium` run:
+The profile of a `medium` run, before the fix:
 
 ```
 ncalls  tottime  cumtime  filename:lineno(function)
@@ -477,26 +500,36 @@ ncalls  tottime  cumtime  filename:lineno(function)
   259307   45.882    45.882  {built-in method nt.stat}
 ```
 
-**80 of the 82 seconds of that run are the version lookup.** The DEX parse and
-the instruction walk — the actual work — take about a second.
+**80 of the 82 seconds of that run were the version lookup.** The DEX parse
+and the instruction walk — the actual work — took about a second.
 
-The cost is linear in the symbol count, so it grows with the APK. The three
-measured sizes agree on the per-symbol cost — 2.26 ms, 2.98 ms and 2.53 ms —
-and the `large` sample's 594,612 symbols come to **1,506 seconds, or 25
-minutes**, of which 13 seconds is the analysis.
+**Fixed by:** two changes. The adapter's `version()` now probes once and
+remembers the answer (`src/dexatlas/tools/androguard/adapter.py:144-172`), and
+the `Provenance` record now takes its version from a single probe per backend
+rather than one per record (`src/dexatlas/tools/base.py:208-227`).
 
-This is why the `large` tier is not in CI, and it is why the `medium` tier
-takes minutes to run.
+**What it cost, measured:** the same `medium` sample, the same limits, the
+pre-fix source tree extracted from git against the current one, in two
+processes:
 
-**Reproduction:**
+```
+  symbols indexed : 48,651
+  pre-fix (5566073)  : 122.20 s   (2.51 ms per symbol)
+  current (fixed)    :   0.98 s   (0.02 ms per symbol)
+```
+
+**124.7×.** The cost was linear in the number of symbols, so it grew with the
+APK: there was no size at which it became affordable. The per-symbol cost is
+now flat at a rounding error, and the whole index build is a function of the
+DEX rather than of the bookkeeping around it.
+
+**Reproduction:** the test that pins it is the one that counts the probes
+rather than the seconds, because a duration is a statement about the machine
+and a probe count is a statement about the code:
 
 ```bash
 uv run pytest tests/test_large_apk_scale.py -k "probed_once" -q
 ```
-
-The fix is a cache in the adapter, exactly like the other two backends have.
-It is a two-line change, and it is the difference between a 25-minute
-analysis and a 13-second one.
 
 ---
 
@@ -511,86 +544,77 @@ spends its time on.
   app rather than by the generator. The *counts* would be different; the
   *behaviour* of the limits would not, because the limits are applied to
   whatever the DEX holds.
-- **JADX and Apktool at scale.** The pipeline measurements above run Androguard
-  only. JADX decompiling 205,000 methods is a different measurement, and it
-  is not one this document claims anything about. The test skips the
-  decompiler above 50,000 methods for that reason
-  (`JADX_METHOD_CEILING`).
-- **The `xlarge` tier through the full pipeline.** The tier is measured at the
-  backend level ([§3.5](#35-xlarge-the-instruction-limit-reached)) — the
-  index, the limits and the truncation are all exercised — but not through
-  `Analyzer.analyze()` and into the database, so no pipeline timings or
-  row counts are quoted for it.
-- **The `xlarge` tier with the version lookup *not* cached.** Its cached
-  timing is measured (6.86 s); its uncached timing is measured too
-  (452.30 s against 10.62 s cached), but it is not quoted in the tables
-  above because only the `large` tier is quoted uncached.
+- **JADX and Apktool at scale.** The `large` and `xlarge` measurements run
+  Androguard only, and the test skips the decompiler above 50,000 methods for
+  that reason (`JADX_METHOD_CEILING`). JADX decompiling 205,000 methods is a
+  different measurement, and this document does not claim anything about it.
+- **The `xlarge` tier with the version lookup *not* cached.** Its uncached
+  timing is not quoted, because only the `medium` and `large` tiers are
+  measured both ways.
 - **Native libraries (`.so`).** Nothing in the index covers them; the APK
   metadata records that they are there, and that is all.
 - **Resource strings.** Whether a resource string is in the index is a
   separate question, answered by the resource-coverage work. This document
   does not depend on the answer.
-- **Memory.** Peak RSS was observed to reach ~1.3 GB during the `large`
+- **Memory.** Peak RSS was observed to reach ~1.3 GB during a `large`
   pipeline, but it was not measured systematically across the scales, so no
   memory numbers are quoted.
 - **CI timings on the runners.** The times here are from one machine. The
-  `smoke` scale — what CI runs — costs 14.7 seconds for its own test file
-  here, and the `medium` scale 201 seconds, which is why `medium` is
-  opt-in. The runners are faster and slower in ways this document does not
-  measure.
+  runners are faster and slower in ways this document does not measure.
+- **The APK's own byte-for-byte reproducibility.** The generator assembles
+  through Apktool, and the archive carries timestamps, so two runs of the
+  same scale produce the same *content* and different bytes — and a different
+  SHA-256. Every measurement here is against a freshly generated APK, and the
+  counts do not depend on the bytes.
 
 ---
 
-## 6a. What this costs CI
+## 7. What this costs CI
 
 The suite is marked `slow`, so it runs in the two CI jobs that have the
 backends. The scale is `smoke` by default, and nothing in CI sets
 `DEXATLAS_LARGE_APK_SCALE`.
 
+The cost of the test file, per scale, on this machine:
+
+| Scale | Test file, all backends | Test file, Apktool only | Notes |
+|---|---|---|---|
+| `smoke` (the CI default) | 6.45 s | 2.85 s | Below every limit, so nothing is clipped. |
+| `medium` | 12.24 s | 7.27 s | Below every limit, and JADX has 12,001 methods to decompile. |
+| `large` | 67.89 s | — | Reaches the method limit. JADX is skipped. |
+| `xlarge` | 35.81 s | — | Reaches the instruction limit. JADX is skipped. |
+
 | CI job | Backends | What the new tests do | Cost |
 |---|---|---|---|
-| Tests (Python 3.12) | all three | Run at the `smoke` scale | ~15 s (5.8 s with the version cached) |
-| Tests (Python 3.13) | **none** | **Skip** — no Apktool, no JRE, no Androguard | 0 s |
-| Tests (Apktool only, no JADX) | Apktool + Androguard | Run at the `smoke` scale; the missing decompiler is recorded as a `NOT_INSTALLED` error, which the test allows | ~15 s |
+| Tests (Python 3.12) | all three | Run at the `smoke` scale | ~6 s |
+| Tests (Python 3.13) | no JRE, no Apktool, no JADX | **Skip** — the module needs a JRE to assemble the sample | 0 s |
+| Tests (Apktool only, no JADX) | Apktool + Androguard | Run at the `smoke` scale; the missing decompiler is recorded as a `NOT_INSTALLED` error, which the test allows | ~3 s |
 
 **The Python 3.13 job skips rather than fails**, because the module's
 `skipif` conditions cover all three ways this machine can be missing what the
 tests need: Androguard not installed, Apktool not locatable, and no `java` on
-`PATH`. The skip is not silent — pytest reports all 16 tests as skipped.
+`PATH`. The 3.13 job is the second of those — it installs the Python extras
+but no Java — and the skip is not silent: pytest reports all 17 tests as
+skipped.
 
-The two jobs that do run it pay about 15 seconds each, against a slow-suite
-runtime of 105 seconds. The generator itself is not in the picture for CI
-beyond the samples it builds: two of them (the `smoke` sample and the
-multi-DEX one) are built once per module and shared by the tests.
+**What the fix changed here.** Before it, the `medium` tier cost 201 s, and
+the reason was the defect in
+[§5.3](#53-the-version-of-the-backend-was-probed-once-per-symbol): the
+144.97-second extract was the bulk of it, and 0.77 of those seconds was the
+analysis. The same file now takes **12.24 s**, and a `medium` tier would fit
+in CI comfortably. The two jobs that run the suite pay about six seconds each
+against a slow-suite runtime of a little over a hundred seconds.
 
-**The `medium` and larger scales are not for CI.** At `medium` the test file
-takes 201 seconds, and the reason is the defect in
-[§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol): the
-144.97-second extract is the bulk of it, and 0.77 of those seconds is the
-analysis.
-
-**With the version cached, the same file takes 14.39 seconds.** That was
-measured, not estimated — the same suite, the same machine, the same
-`medium` sample, with the version lookup made once instead of once per
-symbol:
-
-```
-DEXATLAS_LARGE_APK_SCALE=medium pytest tests/test_large_apk_scale.py -q
-  -> 11 passed, 5 xfailed in 201.16s        (today)
-
-DEXATLAS_LARGE_APK_SCALE=medium pytest tests/test_large_apk_scale.py -q
-   with the version cached
-  -> 11 passed, 5 xfailed in 14.39s         (what the fix would buy)
-```
-
-A 14-second `medium` tier would fit in CI comfortably. **The fix in
-[§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) is what
-makes the larger scales affordable at all**, which is why it is first in the
-list.
+**The bigger tiers are still not for CI**, but the reason changed. `large` is
+67.89 s and `xlarge` is 35.81 s, and the cost is now the DEX parse and the
+walk rather than the bookkeeping — the index build itself is 10.22 s and
+7.38 s. A tier that reaches a limit is worth running in CI; whether it is
+worth 70 seconds of every push is a question for the person who owns the CI
+budget, and this document does not answer it for them.
 
 ---
 
-## 7. Reproducing this
+## 8. Reproducing this
 
 ```bash
 # The samples, at each scale.
@@ -613,39 +637,27 @@ configuration the Python 3.13 CI job runs in.
 
 ---
 
-## 8. What this document asks the next person to do
+## 9. What this document asks the next person to do
 
-The three defects are all in `src/dexatlas/tools/androguard/adapter.py`, and
-none of them is fixed here — that file belongs to another agent, and a fix
-that lands without being measured is the kind of change this project is
-cautious about. What is asked for, in order of size:
+The three defects in [§5](#5-the-three-defects-this-found-and-what-fixed-them)
+are fixed. What is left is smaller, and none of it is a defect:
 
-| # | Defect | The change | What it would buy |
-|---|---|---|---|
-| 1 | [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) | Cache the version, the way JADX and Apktool already do | A 112× faster index build. The `large` tier goes from 25 minutes to 13 seconds. |
-| 2 | [§5.1](#51-a-truncated-index-is-reported-as-a-clean-run) | Record a `ToolError` when a limit truncates the index | A report that can say "this APK was not fully indexed". |
-| 3 | [§5.2](#52-two-of-the-three-limits-are-per-dex-not-per-apk) | Count the string and instruction limits over the whole APK | A limit that means what its name says. |
-
-Each of the three has a test that names it, and each test is
-`xfail(strict=True)`: it fails today, and it turns into a failure the moment
-the defect is fixed. **Fixing a defect without removing its xfail marker
-turns the suite red** — which is the point. A fixed defect should announce
-itself.
-
-### Two small things found along the way
-
-- `docs/status.md` 4.4 names the instruction limit `MAX_INSTRUCTION_LIMIT`.
-  The constant is `DEFAULT_INSTRUCTION_LIMIT`
-  (`src/dexatlas/tools/androguard/adapter.py:51`). A reader who greps for
-  the name in the status page finds nothing.
-- `ToolErrorCode.OUTPUT_TRUNCATED`
-  (`src/dexatlas/core/models.py:41`) is defined and used nowhere. It is the
-  error code for "the output was cut short", and a truncated index is exactly
-  that.
-
-### One document that should point here
-
-`docs/status.md` 4.4 is the entry that records this work as outstanding. When
-the three defects above are fixed, that section should say what was measured
-and link to this document, rather than being deleted — the numbers in here
-are the ones a reader will want to check the fix against.
+- **The string budget is the one that bites first.** On a 1.5 MB APK, the
+  string index is full at 50,000 rows while the method index still has
+  150,000 rows of room. Whether a report's search results can be trusted
+  therefore depends on the string budget more than on the others, and the
+  error says so — but the *number* of strings a real APK wants is not
+  measured here.
+- **A truncated index is a completed analysis.** The status is `completed`
+  and the error is on the project, which is the right contract, and the CLI
+  prints the error as a warning. But the CLI's exit code is 0 and the summary
+  line counts only what was indexed, so a caller that reads the exit code — or
+  a reader of the summary line alone — still cannot tell a clipped run from a
+  whole one. Nothing in this document claims otherwise.
+- **`docs/status.md` now points at this document.** The status page's §4
+  records that the large-APK pressure test is closed, names the three defects
+  it found, and says what was not measured. The `MAX_INSTRUCTION_LIMIT` it used
+  to name — a constant that does not exist — is gone; the three limits the
+  adapter actually enforces are `DEFAULT_METHOD_LIMIT`,
+  `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT`, at
+  `src/dexatlas/tools/androguard/adapter.py:53-57`.
