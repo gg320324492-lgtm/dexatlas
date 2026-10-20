@@ -8,6 +8,7 @@ supplement, never a prerequisite.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
@@ -207,6 +208,15 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
 """
 )
 
+#: The tables the schema declares.
+#:
+#: Read out of the schema itself rather than written out here, so that a table
+#: added to the schema is one this list already knows about. If the pattern
+#: ever stops matching, the list is empty and the comparison below degrades to
+#: the schema version alone — which is the condition that decides an upgrade,
+#: so a new table still reaches an existing workspace when the version moves.
+_SCHEMA_TABLES = frozenset(re.findall(r"CREATE (?:VIRTUAL )?TABLE IF NOT EXISTS (\w+)", _SCHEMA))
+
 _PROJECT_UPSERT = """
 INSERT INTO projects (
     id, apk_sha256, apk_path, apk_size_bytes, created_at, status,
@@ -285,6 +295,25 @@ def _migrate(connection: sqlite3.Connection) -> None:
         connection.execute(_RESOURCES_TABLE)
 
 
+def _table_names(connection: sqlite3.Connection) -> set[str]:
+    """The tables the database holds."""
+    rows = connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+    return {row[0] for row in rows}
+
+
+def _recorded_version(connection: sqlite3.Connection, tables: set[str]) -> int | None:
+    """The schema version the database records, or ``None`` if it records none.
+
+    A database that has never been written has no ``schema_info`` table, and one
+    whose table is empty records no version. Both mean the same thing: this
+    workspace has no schema yet.
+    """
+    if "schema_info" not in tables:
+        return None
+    row = connection.execute("SELECT version FROM schema_info LIMIT 1").fetchone()
+    return int(row[0]) if row is not None else None
+
+
 class Store:
     """Project and symbol persistence."""
 
@@ -293,13 +322,49 @@ class Store:
 
     @classmethod
     def open(cls, path: Path) -> Self:
+        """Open the workspace database, creating or upgrading it if it needs it.
+
+        Opening a workspace that is already at the current schema version reads
+        the database and writes nothing. That matters more than it sounds:
+        SQLite allows one writer at a time, so a write taken on every open
+        makes every other writer — including the analysis that is running —
+        wait for it, and the wait ends in ``database is locked`` once the
+        timeout runs out. A liveness probe that opens the workspace on every
+        request is enough to lock a busy deployment out of its own database.
+
+        A workspace that records a different version is upgraded: the schema is
+        written out, the migration runs, and the new version is recorded. So is
+        a workspace whose tables are missing, whatever version it claims.
+
+        The recorded version is therefore what says the schema has changed, and
+        a change to the schema has to come with a change to the version — an
+        existing workspace is only rewritten when the version moves.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
         store = cls(path)
         with store.transaction() as connection:
-            connection.executescript(_SCHEMA)
+            tables = _table_names(connection)
+            version = _recorded_version(connection, tables)
+            if version != SCHEMA_VERSION or not _SCHEMA_TABLES.issubset(tables):
+                # The workspace does not hold this schema: it is new, it was
+                # written by an older build, or a table is missing from it.
+                # The statements are idempotent, so writing them over a
+                # workspace that already has most of them changes nothing.
+                connection.executescript(_SCHEMA)
+
+            # The migration is never skipped. It writes only when it has a
+            # change to make, and it needs the tables to be there to look at.
             _migrate(connection)
-            connection.execute("DELETE FROM schema_info")
-            connection.execute("INSERT INTO schema_info (version) VALUES (?)", (SCHEMA_VERSION,))
+
+            if version != SCHEMA_VERSION:
+                # The recorded version is what the next open compares against,
+                # so it is written when it is wrong and left alone when it is
+                # right. Writing it when it is right is what used to make
+                # every open a write.
+                connection.execute("DELETE FROM schema_info")
+                connection.execute(
+                    "INSERT INTO schema_info (version) VALUES (?)", (SCHEMA_VERSION,)
+                )
         return store
 
     @contextmanager

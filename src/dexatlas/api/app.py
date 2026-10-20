@@ -39,6 +39,7 @@ from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
+from dexatlas.tools.registry import BackendRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,23 @@ def get_analyzer(settings: SettingsDep) -> Analyzer:
 
 
 AnalyzerDep = Annotated[Analyzer, Depends(get_analyzer)]
+
+
+def get_backends(settings: SettingsDep) -> BackendRegistry:
+    """FastAPI dependency for the analysis backends.
+
+    The backends are built from the settings alone. An :class:`Analyzer` would
+    answer the same question, but building one opens the workspace database —
+    and a liveness probe that opens the database takes the write lock SQLite
+    allows only one of, so a probe can lock the analysis out of its own
+    workspace and be locked out itself. Which backends are installed is a fact
+    about the machine, not about the database, so the dependency does not open
+    one.
+    """
+    return BackendRegistry(settings)
+
+
+BackendRegistryDep = Annotated[BackendRegistry, Depends(get_backends)]
 
 app = FastAPI(
     title="DexAtlas",
@@ -236,22 +254,22 @@ _SOURCE_RESPONSES: dict[int | str, dict[str, Any]] = {
 
 
 @app.get("/health", response_model=HealthResponse, tags=["meta"])
-def health(settings: SettingsDep, analyzer: AnalyzerDep) -> HealthResponse:
+def health(backends: BackendRegistryDep) -> HealthResponse:
     """Liveness plus which backends this deployment can actually use."""
     return HealthResponse(
         status="ok",
         version=__version__,
-        backends={b.name: b.version() if b.available() else None for b in analyzer.backends.all()},
+        backends={b.name: b.version() if b.available() else None for b in backends.all()},
     )
 
 
 @app.get("/backends", tags=["meta"])
-def list_backends(analyzer: AnalyzerDep) -> dict[str, Any]:
+def list_backends(backends: BackendRegistryDep) -> dict[str, Any]:
     """Which analysis backends are installed, and at what version."""
     return {
-        "available": [b.name for b in analyzer.backends.available()],
-        "missing": [b.name for b in analyzer.backends.missing()],
-        "versions": analyzer.backends.versions(),
+        "available": [b.name for b in backends.available()],
+        "missing": [b.name for b in backends.missing()],
+        "versions": backends.versions(),
     }
 
 
