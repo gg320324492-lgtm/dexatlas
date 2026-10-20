@@ -30,6 +30,14 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy
         run: uv run mypy
+      # actionlint checks the workflow files themselves. Without it, a mistake in
+      # this file makes GitHub refuse to schedule a single job — which shows up as
+      # a run that fails with no output and no jobs, and takes a while to tell
+      # apart from a platform problem.
+      - name: Workflow lint
+        uses: rhysd/actionlint@v1
+        with:
+          version: v1.7.12
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
@@ -57,6 +65,7 @@ jobs:
       # Running only the fast tests leaves the JADX and Apktool adapters untested and
       # drops coverage from 82% to 70%, which would make the threshold below a fiction.
       # 3.13 runs without backends to confirm the suite still passes when they are absent.
+      # The third configuration — Apktool present, JADX absent — has its own job below.
       - uses: actions/setup-java@v4
         if: matrix.python-version == '3.12'
         with:
@@ -70,6 +79,72 @@ jobs:
       - name: Run tests
         run: uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term
 
+      - name: Enforce coverage threshold
+        run: uv run coverage report --fail-under=80
+
+  test-partial-backends:
+    name: Tests (Apktool only, no JADX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --frozen
+
+      - name: Fetch test fixtures
+        env:
+          # The script uses the gh API, which needs a token even for public content.
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch-fixtures.sh
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # Only Apktool is installed: this job exists to test the configuration where
+      # the decompiler is absent, and downloading 100 MB of JADX in order to delete
+      # it again would be a slow way of saying "not installed". The version pins
+      # still live in the one script, so they cannot drift from the other jobs.
+      - name: Install analysis backends
+        env:
+          BACKENDS: apktool
+        run: bash scripts/install-backends.sh
+
+      # "JADX is not installed" has to be true in every sense, and the job checks
+      # that before it trusts its own name. The install script puts nothing on PATH
+      # for a backend it did not install, and an empty value disables the backend
+      # outright, with no PATH lookup and no "stale pin" fallback.
+      #
+      # This configuration is the one the Smali fallback exists for: Apktool is
+      # there, the code is still readable, and the decompiler is not. The other
+      # two jobs have every backend and no backend at all, and neither of them
+      # is this one — which is how two tests that assumed JADX were installed
+      # stayed green in CI for as long as they did.
+      - name: Run tests without JADX
+        run: |
+          export DEXATLAS_JADX_PATH=""
+          if command -v jadx >/dev/null 2>&1; then
+            echo "jadx is on PATH; this job would test the wrong configuration" >&2
+            exit 1
+          fi
+          # The tool's own view is the one that counts: the configuration under
+          # test is what DexAtlas sees, not what the shell happens to find.
+          DEXATLAS_WORKSPACE="${RUNNER_TEMP}/dexatlas-check" uv run dexatlas backends \
+            | grep -qE 'jadx.*not installed' || {
+              echo "DexAtlas still reports jadx as available" >&2
+              exit 1
+            }
+          uv run pytest --cov=dexatlas --cov-report=xml --cov-report=term
+
+      # The same gate as the other jobs, and it is a real one here: this
+      # configuration measures above 90%, with the decompiler's own subprocess
+      # code being the part it cannot reach. The three jobs therefore measure
+      # the same thing under three different conditions, rather than one of
+      # them measuring nothing at all.
       - name: Enforce coverage threshold
         run: uv run coverage report --fail-under=80
 

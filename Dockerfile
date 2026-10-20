@@ -25,7 +25,12 @@ WORKDIR /app
 
 # Dependency layer first so source edits do not invalidate the dependency cache.
 # uv.lock is committed, so --frozen installs exactly the reviewed set.
+#
+# The version file is copied in as well, and only it: the build backend reads the
+# version from there, so the install cannot work without it. One file does not
+# invalidate the layer when the rest of the source changes.
 COPY pyproject.toml uv.lock README.md LICENSE ./
+COPY src/dexatlas/__init__.py ./src/dexatlas/
 RUN uv sync --no-dev --extra analysis --frozen
 
 COPY src/ ./src/
