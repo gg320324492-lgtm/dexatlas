@@ -14,6 +14,7 @@ even when the tool happens to be installed.
 from __future__ import annotations
 
 import os
+import re
 import stat
 from pathlib import Path
 
@@ -303,3 +304,27 @@ def test_an_empty_environment_variable_reaches_the_settings(
     monkeypatch.setenv("DEXATLAS_JADX_PATH", "")
 
     assert Settings(workspace=tmp_path / "workspace").jadx_path == ""
+
+
+def test_every_backend_reports_a_bare_version_number(settings) -> None:
+    """The version column has to read the same way for every backend.
+
+    JADX and Apktool print their own version, so they report a bare number.
+    Androguard used to prefix its name, which made one entry in a list of versions
+    read differently from the rest — and a reader comparing "4.1.4" with
+    "androguard 4.1.4" has to know which is which.
+    """
+    from dexatlas.tools.androguard.adapter import AndroguardBackend, androguard_available
+
+    reported = {
+        "jadx": JadxBackend(settings).version(),
+        "apktool": ApktoolBackend(settings).version(),
+    }
+    if androguard_available():
+        reported["androguard"] = AndroguardBackend(settings).version()
+
+    for name, value in reported.items():
+        if value is None:
+            continue  # not installed here; nothing to compare
+        assert not value.startswith(name), f"{name} reports {value!r}, not a bare version"
+        assert re.match(r"^\d", value), f"{name} reports {value!r}, which is not a version"

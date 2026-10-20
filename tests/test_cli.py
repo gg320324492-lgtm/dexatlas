@@ -233,13 +233,13 @@ def multi_source_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> st
     provenance = [
         Provenance(
             tool="androguard",
-            tool_version="androguard 4.1.4",
+            tool_version="4.1.4",
             apk_sha256=SEEDED_SHA256,
             locator="androguard:classes.dex#com.example.demo.SharedConfig",
         ),
         Provenance(
             tool="androguard",
-            tool_version="androguard 4.1.4",
+            tool_version="4.1.4",
             apk_sha256=SEEDED_SHA256,
             locator="androguard:classes2.dex#com.example.demo.SharedConfig",
         ),

@@ -122,14 +122,24 @@ class AndroguardBackend(Backend):
         return Path(location) if location else Path("androguard")
 
     def version(self) -> str | None:
+        """The installed Androguard version, as a bare version number.
+
+        The same shape the other two backends report: JADX prints its own version and
+        Apktool prints its own, so a reader comparing them is comparing version
+        numbers. Androguard used to prefix its own name, which made one entry in a
+        list of versions read differently from the rest.
+
+        ``None`` means the version is not known — the package is installed without
+        metadata, which is rare but not a reason to invent one.
+        """
         if not androguard_available():
             return None
         from importlib.metadata import PackageNotFoundError, version
 
         try:
-            return f"androguard {version('androguard')}"
+            return version("androguard")
         except PackageNotFoundError:  # pragma: no cover - installed without metadata
-            return "androguard"
+            return None
 
     # -- extraction --------------------------------------------------------
 
