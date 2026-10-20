@@ -179,8 +179,7 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     tracked_bad = [
         name
         for name in result.stdout.splitlines()
-        if Path(name).suffix.lower() in _ANALYSIS_ARTIFACT_SUFFIXES
-        and name not in allowed
+        if Path(name).suffix.lower() in _ANALYSIS_ARTIFACT_SUFFIXES and name not in allowed
     ]
     assert not tracked_bad, f"third-party analysis artifacts are tracked: {tracked_bad}"
 

@@ -20,9 +20,9 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 
 | 结论类型 | 产出后端 | 落在哪里 | 代码位置 |
 |---|---|---|---|
-| APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:51-77` |
+| APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:191-200` |
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:129-223` |
-| manifest 的版本号 / SDK（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:443-474` |
+| manifest 的版本号 / SDK（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:417-448` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:369-383` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:323-428` |
 | 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:462-474` |
@@ -859,7 +859,7 @@ com.example.demo.SyncService class
   （`core/pipeline.py:342-428`），CLI 和 REST API 用的都是这两个（见 3.3）。
 
 - **manifest 的版本号和 SDK 版本不在 manifest 里。** Apktool 解码时把它们挪进
-  `apktool.yml`（`tools/apktool/adapter.py:183-186`、`tools/apktool/adapter.py:443-474`）。
+  `apktool.yml`（`tools/apktool/adapter.py:183-186`、`tools/apktool/adapter.py:417-448`）。
   只读 `AndroidManifest.xml` 会得到空值，所以实现里从 `apktool.yml` 补齐
   （manifest 自身的值优先）。**这意味着 manifest 结论的证据链其实跨了两个文件**，
   而 provenance 只写了 `apktool:AndroidManifest.xml` 一个。
