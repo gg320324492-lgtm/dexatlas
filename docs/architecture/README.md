@@ -124,7 +124,20 @@ Treated input and untrusted tools, concretely:
 - **Local-first.** Nothing leaves the machine in Phase 1. Phase 2's model integration
   requires explicit per-request authorization.
 - **Workspace scoping.** Extracted artifacts are written under the project workspace
-  only, and the API redacts server paths from error messages.
+  only. The API publishes the *name* of each analysed file and redacts the server's
+  own directories from its error messages, so a response describes the analysis
+  rather than the machine it came from.
+- **Untrusted names stay inside the tree.** A class name becomes a path to read,
+  and class names come from an analysed APK or from a request. Both backends check
+  every part of the name before it becomes a path; a name that fails the check is
+  "no such class", not an error page.
+- **Bounded inputs.** An upload over the size limit is refused while it streams,
+  so it is never held in memory and never written in full. An archive whose
+  declared contents are too large is refused from its central directory, before a
+  byte of it is decompressed.
+- **Bounded backends.** A backend that outlives its timeout takes its whole tree
+  down with it — the launcher and the tool it started — so a hung decompiler
+  cannot outlive the call that started it.
 
 See [SECURITY.md](../../SECURITY.md) for the reporting process.
 

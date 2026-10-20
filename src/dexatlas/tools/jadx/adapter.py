@@ -28,6 +28,7 @@ from pathlib import Path
 
 from dexatlas.config.settings import Settings
 from dexatlas.core.models import ClassKind, ClassRef, ToolError
+from dexatlas.core.paths import class_to_relative_path, is_inside
 from dexatlas.tools.base import Backend, ToolInvocation, ToolOutcome, which_or_none
 
 logger = logging.getLogger(__name__)
@@ -280,14 +281,29 @@ class JadxBackend(Backend):
     # -- source access -----------------------------------------------------
 
     def class_source_path(self, class_name: str, output_dir: Path) -> Path | None:
-        """Map a dotted class name back to JADX's output file."""
+        """Map a dotted class name back to JADX's output file.
+
+        The name arrives from an HTTP request or from an analysed APK, so it
+        is untrusted input, and it is joined onto the output directory to
+        make a path. Every part of it has to be a single path component
+        before that happens: a name that is already a path — absolute, with a
+        drive letter, with a UNC prefix, with a ``..`` in it — is refused
+        rather than normalised, because normalising would quietly change
+        which file is read.
+
+        A refused name is not an error. It is the same answer as "there is no
+        such class", and the caller cannot tell the two apart.
+        """
         sources = output_dir / "sources"
-        candidate = sources / Path(class_name.replace(".", "/") + ".java")
-        if candidate.is_file():
-            return candidate
-        # Nested and anonymous classes share their outer class's file.
-        candidate = sources / Path(class_name.partition("$")[0].replace(".", "/") + ".java")
-        return candidate if candidate.is_file() else None
+        for relative in _java_candidates(class_name):
+            candidate = sources / relative
+            if not candidate.is_file():
+                continue
+            # The name was checked, but the file could still be a link out of
+            # the tree. The last check is that the file really is inside it.
+            if is_inside(sources, candidate):
+                return candidate
+        return None
 
     def read_class_source(self, class_name: str, output_dir: Path) -> str | None:
         path = self.class_source_path(class_name, output_dir)
@@ -496,6 +512,28 @@ def _body_from(text: str, start: int) -> str | None:
     if close_index is None:
         return None
     return text[start : close_index + 1]
+
+
+def _java_candidates(class_name: str) -> list[Path]:
+    """The JADX output files a class name could name.
+
+    A nested or anonymous class shares its outer class's file, so the outer
+    name is the second candidate. Both are checked as class names: a name
+    whose parts are not single path components yields no candidate at all,
+    and the caller then finds no file — which is the right answer for a name
+    that was never a class name.
+    """
+    names = [class_name]
+    outer = class_name.partition("$")[0]
+    if outer != class_name:
+        names.append(outer)
+
+    candidates: list[Path] = []
+    for name in names:
+        relative = class_to_relative_path(name, ".java")
+        if relative is not None:
+            candidates.append(relative)
+    return candidates
 
 
 def read_text(path: Path) -> str | None:

@@ -113,30 +113,30 @@ def test_a_name_with_an_empty_or_dot_segment_is_not_a_class_name(
 
 
 def test_empty_segments_are_rejected_before_the_component_check() -> None:
-    """``_is_single_component`` never sees an empty or dot-only segment.
+    """``is_single_component`` never sees an empty or dot-only segment.
 
     It does not test for them itself — that guard lives in
-    ``_class_to_relative_path``. If this contract ever breaks, a segment like ``..``
+    ``class_to_relative_path``. If this contract ever breaks, a segment like ``..``
     reaches the path join and the traversal protection is gone, so the assumption is
     pinned here rather than left implicit in a comment.
     """
-    from dexatlas.tools.apktool import adapter
+    from dexatlas.core import paths
 
     seen: list[str] = []
-    original = adapter._is_single_component
+    original = paths.is_single_component
 
     def spy(part: str) -> bool:
         seen.append(part)
         return original(part)
 
-    adapter._is_single_component = spy
+    paths.is_single_component = spy
     try:
         # A valid name is included so the spy is provably wired up; without it an
         # empty `seen` would pass the assertion below for the wrong reason.
         for name in ("com.foo.Bar", "", ".", "..", "com..foo.Bar", "com.foo.", ".com.foo", "a...b"):
-            adapter._class_to_relative_path(name)
+            paths.class_to_relative_path(name, ".smali")
     finally:
-        adapter._is_single_component = original
+        paths.is_single_component = original
 
     assert seen, "the spy was never called; the contract is not being exercised"
     assert all(part and part not in {".", ".."} for part in seen), (
@@ -275,3 +275,24 @@ def test_absolute_path_as_class_name_cannot_read_an_absolute_path(
 
     assert apktool.smali_path(str(secret), tmp_path) is None
     assert apktool.read_smali(str(secret), tmp_path) is None
+
+
+def test_a_link_out_of_the_tree_is_not_followed(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """The name was checked; the file could still be a link out of the tree.
+
+    The JADX backend refuses the same thing, and the two backends resolve a
+    class name the same way — so they have to refuse the same files.
+    """
+    secret = tmp_path / "outside.secret"
+    secret.write_text("should never be read", encoding="utf-8")
+
+    smali_dir = tmp_path / "smali" / "com" / "foobar" / "foo"
+    smali_dir.mkdir(parents=True)
+    link = smali_dir / "Foobar.smali"
+    try:
+        link.symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform cannot make a symbolic link")
+
+    assert apktool.smali_path("com.foobar.foo.Foobar", tmp_path) is None
+    assert apktool.read_smali("com.foobar.foo.Foobar", tmp_path) is None

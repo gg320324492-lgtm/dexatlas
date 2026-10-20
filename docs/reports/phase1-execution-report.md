@@ -158,6 +158,11 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_status_figures.py` | 状态页上的数字必须由脚本生成，且与执行报告一致（v0.1.3 之后新增） |
 | `test_console_output.py` | 检查器在不能编码输出的控制台上也必须跑完，并给出同样的退出码（v0.1.3 之后新增） |
 | `test_large_apk_scale.py` | 大规模样本上的行为：索引与生成器的事实一致、触到上限会被记录、报告的计数等于查询的结果（v0.1.3 之后新增） |
+| `test_jadx_source_paths.py` | JADX 侧把类名变成路径时的越界防护：恶意类名一律「没有这个类」，不是 500 |
+| `test_api_redaction.py` | API 不泄露服务器自己的路径：项目字段、JSON 报告、错误详情 |
+| `test_upload_limits.py` | 上传大小上限、zip bomb 在解压前被拒、同一份 APK 只读一次 |
+| `test_backend_timeout.py` | 后端超时时整棵进程树一起死，包括它启动的那个 |
+| `test_deployment_boundary.py` | 部署默认只对本机开放：端口映射绑回环，容器内仍绑 0.0.0.0 |
 
 ### 2.2 几类值得注意的测试
 

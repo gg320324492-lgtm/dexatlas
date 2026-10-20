@@ -20,6 +20,7 @@ from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
 from dexatlas.core.models import (
     DECOMPILATION_DETAIL,
+    ApkMetadata,
     ClassRef,
     Evidence,
     EvidenceKind,
@@ -98,6 +99,7 @@ class Analyzer:
         self,
         apk_path: Path,
         *,
+        metadata: ApkMetadata | None = None,
         include_jadx: bool = True,
         include_apktool: bool = True,
         include_androguard: bool = True,
@@ -106,9 +108,12 @@ class Analyzer:
 
         Raises :class:`ApkValidationError` only when the input is not an APK at all.
         Every later failure is recorded on the project instead of raised.
+
+        ``metadata`` is an inspection the caller has already done, so an APK that
+        was inspected twice is not inspected twice.
         """
         started = time.monotonic()
-        apk = inspect_apk(apk_path)
+        apk = metadata if metadata is not None else inspect_apk(apk_path)
         project = Project.create(apk)
         workspace = self._settings.projects_dir / project.id
 
