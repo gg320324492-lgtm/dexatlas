@@ -1,6 +1,6 @@
 # DexAtlas 当前状态
 
-**最后更新：** 2026-10-20 · **对应提交：** `622a8c6`（v0.1.3）
+**最后更新：** 2026-10-20 · **对应版本：** v0.1.3 之后的开发状态（尚未发布）
 
 这份文档回答两个问题：**现在在哪**，**还剩什么**。
 
@@ -144,8 +144,9 @@ uv run python scripts/refresh-report-figures.py --check   # 只比对不写入
 
 ### 文档的行号引用会漂
 
-`scripts/check-doc-citations.py` 校验文档里 82 处 `文件:行号` 引用
-是否仍指向它说的东西。改了 `src/` 之后跑一次：
+`scripts/check-doc-citations.py` 校验文档里每一处 `文件:行号` 引用
+是否仍指向它说的东西。它会打印校验了多少处、漂移了几处——**那个数不要手抄到这里**，
+抄的数会漂（这份文档上一版写着 82，下一版就是别的数了）。改了 `src/` 之后跑一次：
 
 ```bash
 uv run python scripts/check-doc-citations.py

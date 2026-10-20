@@ -160,6 +160,8 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 - **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
+- **[大型 APK 基准](docs/benchmarks/large-apk.md)** —— 20 万个方法的 APK 上分析会变成什么样，
+  它拒绝声称什么，以及它没有测量什么
 
 Phase 1 剩余工作（源码评审，以及由评审结论写出的任务清单）见
 [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1)。
