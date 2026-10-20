@@ -115,14 +115,42 @@ class EvidenceBuilder:
             detail={"error": error.model_dump(mode="json")},
         )
 
-    def add_classes(self, classes: Sequence[ClassRef]) -> None:
-        for cls in classes:
+    def add_classes(self, classes: Sequence[ClassRef], limit: int | None = None) -> None:
+        """Record one evidence row per class, up to a limit.
+
+        An APK can hold hundreds of thousands of classes, and the evidence table
+        has room for a sample of them. A sample that does not say it is a sample
+        reads as the whole: a reader who sees 500 class declarations concludes
+        the APK has 500 classes. So when the limit bites, one more row says how
+        many classes there were and how many got a row of their own.
+
+        That row is about the analysis rather than about a place in the code, so
+        it carries no locator: there is no file the reader could open to see the
+        classes that were left out.
+        """
+        covered = classes if limit is None else classes[:limit]
+        for cls in covered:
             self.add_sourced(
                 kind=EvidenceKind.DECLARATION,
                 level=EvidenceLevel.VERIFIED,
                 summary=f"Class {cls.name} ({cls.kind})",
                 source=cls,
                 detail={"superclass": cls.superclass, "interfaces": cls.interfaces},
+            )
+        if len(covered) < len(classes):
+            self.add(
+                kind=EvidenceKind.OBSERVATION,
+                level=EvidenceLevel.VERIFIED,
+                summary=(
+                    f"evidence covers {len(covered)} of {len(classes)} classes; "
+                    f"the other {len(classes) - len(covered)} have no record"
+                ),
+                provenance=[],
+                detail={
+                    "truncated": True,
+                    "classes_covered": len(covered),
+                    "classes_total": len(classes),
+                },
             )
 
     def add_exported_components(self, components: Sequence[ManifestComponent]) -> None:

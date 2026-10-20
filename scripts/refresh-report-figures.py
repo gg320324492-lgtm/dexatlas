@@ -28,9 +28,14 @@ Two rules keep the report honest:
   knows what to install before trying to reproduce one.
 
 The record of the last measurement is written into the report as well, in a
-machine-readable comment. It carries the fingerprint of the source tree the
-coverage numbers describe, which is what lets the test suite notice that the
+machine-readable comment. It carries the fingerprint of the tree the coverage
+numbers describe -- the code, the suite that measured it, and the configuration
+of the tools that did -- which is what lets the test suite notice that the
 figures have gone stale.
+
+The record also carries *which* tests sat out, not only how many. A count says
+how many; the identities say which, and "the same number of tests skipped" is
+not the same fact as "the same tests skipped".
 
 Why the measurement is split in two
 -----------------------------------
@@ -71,6 +76,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import xml.etree.ElementTree as ET
+from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
@@ -86,7 +93,15 @@ REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
 #: and must not write to the real status page while it does so.
 STATUS_PATH = REPO_ROOT / "docs" / "status.md"
 SOURCE_ROOT = REPO_ROOT / "src" / "dexatlas"
+#: The suite that measures the code. The pass/skip split the report states is
+#: a property of this tree, so a change to it makes the numbers stale too.
+TESTS_ROOT = REPO_ROOT / "tests"
 EXAMPLES_ROOT = REPO_ROOT / "examples"
+
+#: The files that decide how the measurement comes out, besides the code and
+#: the suite: the configuration of the tools that measure it, and the script
+#: that asks them. A change to any of them changes what the numbers mean.
+FINGERPRINT_FILES = ("pyproject.toml", "scripts/refresh-report-figures.py")
 
 #: Coverage is measured on the package, so module paths are relative to it.
 SOURCE_PREFIX = "src/dexatlas/"
@@ -127,7 +142,12 @@ REPORT_CHECK = "test_execution_report"
 STATUS_CHECK = "test_status_page"
 
 #: How many times the refresh may re-measure the self-checks before it gives up.
-MAX_ROUNDS = 3
+#:
+#: The first candidate carries the code tests' counts alone, so a self-check
+#: that compares the suite against the number of tests in the tree cannot
+#: pass against it. Each round moves the numbers one step closer, and the
+#: fourth is the one that settles them.
+MAX_ROUNDS = 4
 
 #: The environment variable the self-checks read the report from. The refresh
 #: points it at a candidate copy, so a self-check never sees a half-written
@@ -148,6 +168,17 @@ class Outcome:
 
     counts: dict[str, int]
     failures: tuple[str, ...] = ()
+    skipped: tuple[str, ...] = ()
+    """The identities of the tests that did not run.
+
+    A count says how many tests skipped; the identities say which. "The same
+    number of skips" is not the same fact as "the same skips" — a measurement
+    that skipped a different set of tests measured a different tree, and
+    publishing its numbers as *the* numbers would be a small lie.
+    """
+
+    xfailed: tuple[str, ...] = ()
+    """The identities of the tests that failed as they were expected to."""
 
     def describe(self) -> str:
         parts = [
@@ -260,6 +291,50 @@ def read_coverage() -> Coverage:
     )
 
 
+def read_junit_outcomes(path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The identities of the tests that did not run, and of the ones that failed
+    as they were expected to.
+
+    pytest's own report names every test it ran, so the identities come from
+    the tool rather than from a count. The names are pytest's node identities
+    -- a dotted module name and a test name -- so they are the same on every
+    platform, which a path would not be.
+    """
+    if not path.is_file():
+        return (), ()
+    skipped: list[str] = []
+    xfailed: list[str] = []
+    for case in ET.parse(path).iter("testcase"):
+        element = case.find("skipped")
+        if element is None:
+            continue
+        identity = f"{case.get('classname')}::{case.get('name')}"
+        if element.get("type") == "pytest.xfail":
+            xfailed.append(identity)
+        else:
+            skipped.append(identity)
+    return tuple(sorted(skipped)), tuple(sorted(xfailed))
+
+
+def measure_tests(args: list[str], env: dict[str, str] | None = None) -> Outcome:
+    """Run a set of tests and read both what they said and which ones sat out.
+
+    The run's own report is asked for as well as its summary line: the summary
+    says how many tests skipped, the report says which.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        junit = Path(directory) / "outcomes.xml"
+        result = run(sys.executable, "-m", "pytest", *args, f"--junitxml={junit}", env=env)
+        skipped, xfailed = read_junit_outcomes(junit)
+    outcome = read_outcome(result.stdout)
+    return Outcome(
+        counts=outcome.counts,
+        failures=outcome.failures,
+        skipped=skipped,
+        xfailed=xfailed,
+    )
+
+
 def measure_code_tests() -> Outcome:
     """Run the whole suite, except the report's own self-checks, with coverage.
 
@@ -269,16 +344,14 @@ def measure_code_tests() -> Outcome:
     are measured on their own afterwards, against a report that is already
     consistent, and the two results are added up.
     """
-    result = run(
-        sys.executable,
-        "-m",
-        "pytest",
-        "--cov=dexatlas",
-        "--cov-report=term",
-        "-k",
-        f"not {REPORT_CHECK} and not {STATUS_CHECK}",
+    return measure_tests(
+        [
+            "--cov=dexatlas",
+            "--cov-report=term",
+            "-k",
+            f"not {REPORT_CHECK} and not {STATUS_CHECK}",
+        ]
     )
-    return read_outcome(result.stdout)
 
 
 def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
@@ -294,17 +367,10 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
         path.write_text(candidate, encoding="utf-8")
         env = dict(os.environ)
         env[REPORT_PATH_ENV] = str(path)
-        result = run(
-            sys.executable,
-            "-m",
-            "pytest",
-            "--cov=dexatlas",
-            "--cov-append",
-            "-k",
-            REPORT_CHECK,
+        return measure_tests(
+            ["--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
             env=env,
         )
-    return read_outcome(result.stdout)
 
 
 def measure_status_checks(
@@ -324,17 +390,10 @@ def measure_status_checks(
         env = dict(os.environ)
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
-        result = run(
-            sys.executable,
-            "-m",
-            "pytest",
-            "--cov=dexatlas",
-            "--cov-append",
-            "-k",
-            STATUS_CHECK,
+        return measure_tests(
+            ["--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
             env=env,
         )
-    return read_outcome(result.stdout)
 
 
 def add_counts(first: dict[str, int], second: dict[str, int]) -> dict[str, int]:
@@ -347,12 +406,40 @@ def add_counts(first: dict[str, int], second: dict[str, int]) -> dict[str, int]:
     return {name: first.get(name, 0) + second.get(name, 0) for name in names}
 
 
+def fingerprint_files() -> list[Path]:
+    """Every file whose content the measurement depends on.
+
+    The code under test, the suite that measures it, the configuration of the
+    tools that do the measuring, and the script that asks them. A change to
+    any of them changes what the numbers mean, so any of them makes the
+    figures stale.
+
+    The order is the same on every platform: the paths are compared as the
+    POSIX paths they are written as, not as the platform's own spelling.
+    """
+    files: list[Path] = []
+    for root in (SOURCE_ROOT, TESTS_ROOT):
+        if root.is_dir():
+            files.extend(root.rglob("*.py"))
+    for name in FINGERPRINT_FILES:
+        path = REPO_ROOT / name
+        if path.is_file():
+            files.append(path)
+    return sorted(set(files), key=lambda path: path.relative_to(REPO_ROOT).as_posix())
+
+
 def source_fingerprint() -> str:
-    """A hash of the source tree the coverage figures describe.
+    """A hash of the tree the measurement describes.
 
     When the code changes, the coverage number in the report stops being true. A
     fingerprint makes that visible without re-measuring: the test suite recomputes
     it and asks for a refresh.
+
+    The suite is part of what is hashed. The pass/skip split the report states is
+    a property of the tree, so adding a test makes those numbers stale as surely
+    as changing a line of the code does. Hashing only the code meant a test could
+    be added without the report noticing, and the report went on claiming a
+    pass/skip split that described a suite nobody had run.
 
     Line endings are normalised before hashing. Git checks out CRLF on Windows and
     LF on Linux, so hashing the raw bytes would give the same source two different
@@ -361,12 +448,33 @@ def source_fingerprint() -> str:
     not "is this the same byte sequence?".
     """
     digest = hashlib.sha256()
-    for path in sorted(SOURCE_ROOT.rglob("*.py")):
+    for path in fingerprint_files():
         digest.update(path.relative_to(REPO_ROOT).as_posix().encode("utf-8"))
         digest.update(b"\0")
         digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
         digest.update(b"\0")
     return "sha256:" + digest.hexdigest()
+
+
+def source_statements() -> dict[str, int]:
+    """How many statements each module of the package holds.
+
+    The count comes from coverage's own parser, so it is the number the
+    coverage run reports -- but it is measured from the tree, not read out of
+    the record the last refresh left behind. That is the difference: a record
+    that says something else about the code is caught here, and a record that
+    agrees with itself is not.
+    """
+    import coverage
+    from coverage.python import PythonFileReporter
+
+    settings = coverage.Coverage(config_file=True)
+    counts: dict[str, int] = {}
+    paths = sorted(SOURCE_ROOT.rglob("*.py"), key=lambda path: path.as_posix())
+    for path in paths:
+        relative = path.relative_to(SOURCE_ROOT).as_posix()
+        counts[relative] = len(PythonFileReporter(str(path), coverage=settings).lines())
+    return counts
 
 
 def code_facts() -> dict[str, int]:
@@ -459,6 +567,11 @@ def history_figures(text: str, previous: dict[str, Any]) -> dict[str, Any]:
     return history
 
 
+def union_ids(*groups: Iterable[str]) -> tuple[str, ...]:
+    """Every identity, once, in a stable order."""
+    return tuple(sorted({identity for group in groups for identity in group}))
+
+
 def build_record(
     coverage: Coverage,
     suite: dict[str, int],
@@ -466,10 +579,12 @@ def build_record(
     slow: int,
     total: int,
     history: dict[str, Any] | None = None,
+    skipped_tests: tuple[str, ...] = (),
+    xfailed_tests: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """The record of one measurement: everything the report can state."""
     return {
-        "schema": 3,
+        "schema": 4,
         "code": code_facts(),
         "coverage": {
             "files": coverage.files,
@@ -482,6 +597,17 @@ def build_record(
             "passed": suite.get("passed", 0),
             "skipped": suite.get("skipped", 0),
             "xfailed": suite.get("xfailed", 0),
+            # The outcomes the report does not state. A complete measurement
+            # has none of them, and the record says so: every test that ran
+            # has exactly one outcome, so these counts add up to the number
+            # of tests in the tree.
+            "failed": suite.get("failed", 0),
+            "xpassed": suite.get("xpassed", 0),
+            # Which tests sat out, not only how many. A count cannot tell a
+            # measurement that skipped the same tests from one that skipped a
+            # different set of the same size.
+            "skipped_tests": list(skipped_tests),
+            "xfailed_tests": list(xfailed_tests),
         },
         "tests": {"fast": fast, "slow": slow, "total": total},
     }
@@ -720,7 +846,9 @@ def converge(
     self-checks pass.
     """
     suite = dict(code.counts)
-    record = build_record(coverage, suite, fast, slow, total, history)
+    skipped_tests = code.skipped
+    xfailed_tests = code.xfailed
+    record = build_record(coverage, suite, fast, slow, total, history, skipped_tests, xfailed_tests)
     candidate = render_or_fail(text, record)
     status_candidate = render_status(record, status_text) if status_text is not None else None
 
@@ -734,7 +862,14 @@ def converge(
             )
         new_coverage = read_coverage()
         new_suite = add_counts(add_counts(code.counts, checks.counts), status_checks.counts)
-        if new_suite == suite and new_coverage == coverage:
+        new_skipped = union_ids(code.skipped, checks.skipped, status_checks.skipped)
+        new_xfailed = union_ids(code.xfailed, checks.xfailed, status_checks.xfailed)
+        if (
+            new_suite == suite
+            and new_coverage == coverage
+            and new_skipped == skipped_tests
+            and new_xfailed == xfailed_tests
+        ):
             return Refresh(
                 text=candidate,
                 record=record,
@@ -745,7 +880,10 @@ def converge(
                 status_checks=status_checks,
             )
         suite, coverage = new_suite, new_coverage
-        record = build_record(coverage, suite, fast, slow, total, history)
+        skipped_tests, xfailed_tests = new_skipped, new_xfailed
+        record = build_record(
+            coverage, suite, fast, slow, total, history, skipped_tests, xfailed_tests
+        )
         candidate = render_or_fail(text, record)
         status_candidate = render_status(record, status_text) if status_text is not None else None
 
@@ -813,6 +951,19 @@ def main(argv: list[str] | None = None) -> int:
     text = report_path.read_text(encoding="utf-8")
     previous = read_record(text)
 
+    # The report's figures describe one tree. A tree that has changed since
+    # they were measured makes them stale, whether or not this machine can
+    # measure the new one.
+    previous_fingerprint = previous.get("source_fingerprint")
+    current_fingerprint = source_fingerprint()
+    tree_changed = bool(previous_fingerprint) and previous_fingerprint != current_fingerprint
+    if tree_changed:
+        print(
+            "The tree has changed since the report was measured:\n"
+            f"  {previous_fingerprint}\n  -> {current_fingerprint}\n"
+            "The report's figures describe the tree as it was."
+        )
+
     # The status page states the same figures as the report and is refreshed
     # with it. Pointing the script at another document refreshes only that
     # document: the test suite refreshes copies of the report, and it must not
@@ -836,6 +987,18 @@ def main(argv: list[str] | None = None) -> int:
     coverage = read_coverage()
     print(f"  {code.describe()} (the report's own self-checks are measured separately)")
 
+    # The measurement has to describe the tree it ran on. A module the run
+    # reported that the tree does not have -- or one the tree has that the run
+    # did not report -- means the numbers are about something else.
+    measured = set(coverage.files)
+    in_tree = set(source_statements())
+    if measured != in_tree:
+        print(
+            "The coverage run and the tree disagree about the modules: "
+            f"only in the run: {sorted(measured - in_tree)}; "
+            f"only in the tree: {sorted(in_tree - measured)}"
+        )
+
     if code.failures:
         report_failures("The tree does not pass its own tests:", code.failures)
         print(
@@ -845,12 +1008,20 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     # A measurement is complete when it ran the same set of tests the recorded one
-    # ran. The canonical basis skips nothing; a tree that has grown a test which
-    # always skips is still a tree whose basis has not changed. The self-checks
-    # never skip, so the code tests alone decide this.
-    recorded_skips = previous.get("suite", {}).get("skipped")
+    # ran. Skipping and passing are different states, so what is compared is the
+    # *identities* of the tests that did not run, not the number of them: the
+    # same number of skips can be a different set of skips, and a measurement
+    # that skipped a different set of tests measured a different tree. The
+    # self-checks never skip, so the code tests alone decide this.
+    recorded_tests = previous.get("suite", {}).get("skipped_tests")
     skipped = code.counts.get("skipped", 0)
-    complete = skipped == recorded_skips if recorded_skips is not None else skipped == 0
+    if recorded_tests is None:
+        # A record from before the identities were kept: the counts are all
+        # there is, so they are what is compared.
+        recorded_skips = previous.get("suite", {}).get("skipped")
+        complete = skipped == recorded_skips if recorded_skips is not None else skipped == 0
+    else:
+        complete = set(code.skipped) == set(recorded_tests)
 
     if complete:
         print("Measuring the report's self-checks against a candidate report...")
@@ -896,7 +1067,9 @@ def main(argv: list[str] | None = None) -> int:
             )
         # The coverage and the pass/skip split of a partial run describe a
         # different tree, so the previous measurement of them is kept.
-        record = build_record(coverage, code.counts, fast, slow, total, history)
+        record = build_record(
+            coverage, code.counts, fast, slow, total, history, code.skipped, code.xfailed
+        )
         record["coverage"] = previous["coverage"]
         record["suite"] = previous["suite"]
         record["source_fingerprint"] = previous["source_fingerprint"]
@@ -921,13 +1094,15 @@ def main(argv: list[str] | None = None) -> int:
 
     status_matched = status_updated is None or status_updated == status_text
     if args.check:
-        if updated == text and status_matched:
+        if updated == text and status_matched and not tree_changed:
             print("The report matches a fresh measurement.")
         else:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
+            if tree_changed:
+                print(f"source fingerprint: {previous_fingerprint} -> {current_fingerprint}")
             print("The report does not match a fresh measurement.")
-        matched = updated == text and status_matched
+        matched = updated == text and status_matched and not tree_changed
     else:
         report_path.write_bytes(updated.encode("utf-8"))
         if status_path is not None and status_updated is not None:

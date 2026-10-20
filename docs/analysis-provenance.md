@@ -213,7 +213,7 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
   （`core/pipeline.py:323-340`）为了不破坏既有契约，仍然返回裸字符串，
   **返回值本身说不出这是 Apktool 的输出**。带出处的形式是
   `class_source_document` / `method_source_document`（`core/pipeline.py:342-428`），
-  它们返回 `SourceDocument`（`models.py:661-679`）：文本、表示形式（Java 还是 Smali）、
+  它们返回 `SourceDocument`（`models.py:722-740`）：文本、表示形式（Java 还是 Smali）、
   以及 provenance 一起来。**只调旧接口的调用方仍然只能靠「工作区里有没有 jadx 目录」推断。**
 - **同一产物的多个来源之间没有主次标记。** `provenance` 是一个扁平的列表，
   顺序即合并顺序（Androguard 在前，JADX 在后），但这个顺序**不表达可信度**。
@@ -406,7 +406,7 @@ $ python -c "import sqlite3; c=sqlite3.connect(r'C:/Users/admin/AppData/Local/Te
 
 **管道里产出三种 `kind`：** `declaration`（类、manifest、导出组件）、
 `cross_reference`（这个 APK 自己的方法被谁调用）和 `observation`（后端失败，
-以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:454-460`），
+以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:485-490`），
 `behaviour` 和 `code_located` **一次都不会出现**——它们是给 Phase 2 的模型输出准备的。
 
 **`cross_reference` 的粒度是「被调用的方法」，不是「调用」**：一个被五十处调用的方法

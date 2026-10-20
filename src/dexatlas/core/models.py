@@ -23,7 +23,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ---------------------------------------------------------------------------
 # Errors and provenance
@@ -405,16 +405,47 @@ class ManifestPermission(BaseModel):
     protection_level: str | None = None
 
 
+#: The tags AndroidManifest.xml declares a component with.
+#:
+#: The model holds no others: a component of a kind nobody has heard of is not
+#: a component this reader knows how to talk about. The set is enforced on the
+#: way in rather than described in prose, so the documentation and the code
+#: cannot drift apart.
+MANIFEST_COMPONENT_KINDS = (
+    "activity",
+    "activity-alias",
+    "service",
+    "receiver",
+    "provider",
+    "application",
+)
+
+
 class ManifestComponent(BaseModel):
     """A declared component from AndroidManifest.xml."""
 
     kind: str
-    """``activity``, ``service``, ``receiver``, ``provider``, ``application``..."""
+    """The tag the component was declared with.
+
+    The values are ``activity``, ``activity-alias``, ``service``, ``receiver``,
+    ``provider`` and ``application`` — the tags AndroidManifest.xml uses, and
+    the only ones the model holds.
+    """
 
     name: str
     exported: bool | None = None
     permission: str | None = None
     intent_filters: list[str] = Field(default_factory=list)
+
+    @field_validator("kind")
+    @classmethod
+    def _known_component_kind(cls, value: str) -> str:
+        if value not in MANIFEST_COMPONENT_KINDS:
+            raise ValueError(
+                f"{value!r} is not a component kind; the known kinds are "
+                + ", ".join(MANIFEST_COMPONENT_KINDS)
+            )
+        return value
 
 
 class ManifestInfo(BaseModel):
@@ -462,8 +493,16 @@ class EvidenceKind(StrEnum):
 class EvidenceLevel(StrEnum):
     """How much weight a finding carries.
 
-    Model output is never promoted past :attr:`LEAD` without grounding. This is the
-    mechanism behind "an LLM thinking code looks risky is not a finding".
+    Model output is never promoted past :attr:`LEAD`. The mechanism is in
+    :class:`Evidence`: a ``BEHAVIOUR`` record may not carry :attr:`VERIFIED`,
+    so a claim that no tool established cannot be rendered as a finding.
+
+    ``VERIFIED`` is what a deterministic tool established, with a locatable
+    code location. ``LEAD`` is what a model or a heuristic suspects. Nothing
+    DexAtlas writes today is a suspicion -- every record it writes was read
+    out of a tool's output -- so the level a record carries is ``VERIFIED``.
+    The other two are the ceiling for the claims that are not facts, and the
+    rule above is what keeps them there.
     """
 
     VERIFIED = "verified"
@@ -484,6 +523,28 @@ class Evidence(Sourced):
     level: EvidenceLevel
     summary: str
     detail: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _a_behaviour_is_never_verified(self) -> Self:
+        """A behaviour is a claim; only a tool establishes a fact.
+
+        The report renders every ``verified`` record as "deterministically
+        established by an analysis tool", so a behaviour that carried that
+        level would put a false sentence in the report -- and a reader who
+        believed it would act on a guess.
+
+        The rule is on the kind rather than on the level, so a model's output
+        can still be a ``lead``, which is what it is written as; what it can
+        never become is a finding. A claim that a tool later confirms is not
+        that claim promoted: it is the tool's own record, and the two say
+        different things.
+        """
+        if self.kind is EvidenceKind.BEHAVIOUR and self.level is EvidenceLevel.VERIFIED:
+            raise ValueError(
+                "a behaviour claim may not be verified: only a tool can establish a fact. "
+                "Record the tool's confirmation as its own evidence."
+            )
+        return self
 
 
 #: The key under which an evidence record's detail carries the decompilation
