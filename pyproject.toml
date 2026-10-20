@@ -1,6 +1,9 @@
 [project]
 name = "dexatlas"
-version = "0.1.0"
+# The version lives in src/dexatlas/__init__.py and is read from there — see
+# [tool.hatch.version] below. Writing it in both places let the published packages
+# claim a version they were not.
+dynamic = ["version"]
 description = "Evidence-first, AI-ready Android reverse engineering and analysis platform"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -76,6 +79,9 @@ Roadmap = "https://github.com/gg320324492-lgtm/dexatlas/blob/main/docs/roadmap/R
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/dexatlas/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dexatlas"]
