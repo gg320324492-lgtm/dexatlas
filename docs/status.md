@@ -16,8 +16,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->548<!--/fig--> 个（<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->101<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->94.6%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->565<!--/fig--> 个（<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->94.5%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 
@@ -26,7 +26,7 @@
 | Job | 覆盖什么 |
 |---|---|
 | Tests (Python 3.12) | 全部后端 |
-| Tests (Python 3.13) | **一个后端都不装** |
+| Tests (Python 3.13) | **两个外部后端都不在**——JADX 和 Apktool 需要 Java，Androguard 是 Python 包，还在 |
 | Tests (Apktool only, no JADX) | **Apktool 在、JADX 不在**——Smali 回退存在的理由 |
 | Docker image builds | 镜像里三个后端真的能跑 |
 | Dependency audit | 锁文件的已知漏洞 |
@@ -98,6 +98,13 @@ Phase 2 的准入条件——**Phase 2 的任务清单应当在审核结论之�
 真实的 APK（不是合成的）、JADX 与 Apktool 在规模下的表现、
 native 库、内存。这些要等下一个手里有真实样本的人。
 
+### 4.4 被截断的运行，退出码仍然是 0
+
+索引触到上限时，项目状态仍是 `completed`——部分成功不是失败——
+错误记在 `project.errors` 里，报告有「Backend errors」段，CLI 也会把它
+当警告打出来。**但 CLI 的退出码是 0**：只看退出码的调用方分不出
+「被截断的运行」和「完整的运行」。要看项目记录才知道。
+
 ---
 
 ### 这一轮关掉的
@@ -164,9 +171,29 @@ uv run python scripts/check-doc-citations.py
 
 ### 后端在 CI 上的三种配置
 
-本地要复现「部分后端」那一种：
+CI 里跑的是三种**不同**的组合——JADX 和 Apktool 是外部程序，Androguard 是
+Python 包，所以「装没装后端」要分开说：
+
+| 配置 | JADX | Apktool | Androguard | 对应 job |
+|---|---|---|---|---|
+| 全装 | 有 | 有 | 有 | Tests (Python 3.12) |
+| **两个外部后端都不在** | 无（没 Java） | 无（没 Java） | **有** | Tests (Python 3.13) |
+| 只装 Apktool | 无 | 有 | 有 | Tests (Apktool only, no JADX) |
+
+**注意第二行**：3.13 那个 job 装的是 `--extra analysis`，而 `analysis` extra
+装的就是 Androguard——它是 Python 包，不需要 Java。所以那个 job 不是
+「一个后端都不装」，而是「两个外部后端都装不了」。三种配置都要跑。
+
+本地复现：
 
 ```bash
+# 全装（默认）
+uv run pytest
+
+# 两个外部后端都不在：去掉路径配置，并让 java 不在 PATH 上
+env -u DEXATLAS_JADX_PATH -u DEXATLAS_APKTOOL_JAR uv run pytest
+
+# 只装 Apktool
 env -u DEXATLAS_JADX_PATH uv run pytest
 ```
 

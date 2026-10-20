@@ -33,6 +33,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   stale. `scripts/check-version-claims.py` reads the tags, the package version, the
   changelog and the generated figures out of the repository and reports the claims
   that contradict them. It runs in CI, and it runs there too.
+- **A benchmark for APKs large enough to reach the limits.** The committed samples
+  are under 3 KB, so the three limits in the Androguard adapter had never been
+  pressed against a real file and what would happen on a large APK was a guess.
+  `scripts/generate-large-apk.py` writes a synthetic APK of a chosen size and a
+  ground-truth manifest of what it wrote; `docs/benchmarks/large-apk.md` is the
+  measurement, and it says what it did not measure. The pressure test found three
+  real defects, all fixed — see below.
 
 ### Fixed
 

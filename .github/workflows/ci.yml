@@ -92,7 +92,9 @@ jobs:
       # The full suite, slow tests included, is what the coverage gate measures.
       # Running only the fast tests leaves the JADX and Apktool adapters untested and
       # drops coverage from 82% to 70%, which would make the threshold below a fiction.
-      # 3.13 runs without backends to confirm the suite still passes when they are absent.
+      # 3.13 runs without the external backends — no Java, so no JADX and no Apktool.
+      # Androguard is a Python package and the `analysis` extra installs it, so it is
+      # still there; saying "no backends" would be false.
       # The third configuration — Apktool present, JADX absent — has its own job below.
       - uses: actions/setup-java@v4
         if: matrix.python-version == '3.12'
