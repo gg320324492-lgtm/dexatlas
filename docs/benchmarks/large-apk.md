@@ -46,10 +46,7 @@ against the symbol table.
 | `smoke` | 20 | 8 | 6 | 1 | The CI default. Fast, and below every limit. |
 | `medium` | 300 | 40 | 12 | 1 | Comfortably inside every limit. Shows what the pipeline does when nothing is clipped. |
 | `large` | 2,050 | 100 | 12 | 4 | **More methods than `DEFAULT_METHOD_LIMIT`** (200,000). The method limit is reached by a real APK rather than by a lowered threshold. |
-
-A fourth scale, `xlarge` (600 classes × 100 methods × 88 instructions, one DEX
-file), is defined in the script for pressing the *instruction* limit: 5.28
-million instructions in a single DEX file, against a limit of 5,000,000.
+| `xlarge` | 600 | 100 | 88 | 1 | **More instructions than `DEFAULT_INSTRUCTION_LIMIT`** (5,000,000) inside a *single* DEX file. |
 
 The scale is an environment variable, so a CI job picks one without rewriting
 a command line:
@@ -106,10 +103,12 @@ built in       1.08s
 | `smoke` | 3,435 bytes | 1 | 0.49 s |
 | `medium` | 104,673 bytes | 1 | 1.08 s |
 | `large` | 1,512,275 bytes | 4 | 3.14 s |
+| `xlarge` | 557,189 bytes | 1 | 7.03 s |
 
 Building is fast. Apktool assembles 205,000 methods into four DEX files in
 about three seconds, which is worth knowing: the expensive part of a large APK
-is not making one.
+is not making one. (`xlarge` takes longer to build because it assembles
+5.2 million instructions, and instruction count is what the assembler costs.)
 
 ### 3.2 Indexing it
 
@@ -219,6 +218,44 @@ The counts in the report and the rows in the database still agree exactly —
 report says the same three numbers. The database is not wrong. **It is a
 faithful record of an index that was cut short**, and nothing in the report,
 the project record or the CLI says so.
+
+### 3.5 `xlarge`: the instruction limit, reached
+
+`xlarge` puts 5,228,401 instructions in a **single** DEX file, against
+`DEFAULT_INSTRUCTION_LIMIT = 5,000,000`. The limit is therefore reached
+without the per-file multiplication of [§4](#4-the-three-limits-what-they-actually-bound)
+playing any part — the file is over the limit on its own.
+
+```
+androguard: instruction limit 5000000 reached; xref index is truncated
+androguard: string limit 50000 reached; truncated
+```
+
+```
+apk: 557,189 bytes, 1 dex file
+truth: 601 classes, 60,001 methods, 60,000 refs, 5,228,401 instructions
+extract (version cached): 6.9s
+  classes=574 methods=57,381 refs=57,380
+  strings=50,000 error=None
+```
+
+The instruction limit truncated the walk: **57,381 of 60,001 methods** were
+indexed, 27 classes and their methods are missing, and the cross-reference
+index stopped with it. The string limit fired in the same file, for the same
+reason it fires three times on `large`.
+
+And `error=None`. The run recorded no error, because a limit that truncates
+the index does not produce one.
+
+The instruction limit truncates the walk, and the truncation reaches further
+than the cross-reference index. **57,381 of 60,001 methods** were indexed and
+**574 of 601 classes** — the walk stops partway through a class's methods, so
+the classes after that point are not in the index either. The method table
+and the cross-reference table are short by the same 2,620 methods.
+
+The one-method difference between the two counts (57,381 against 57,380) is
+the method the limit stopped *on*: it is appended to the method table before
+the limit is checked, and its body is never walked, so it has no calls.
 
 ---
 
@@ -422,18 +459,18 @@ spends its time on.
   is not one this document claims anything about. The test skips the
   decompiler above 50,000 methods for that reason
   (`JADX_METHOD_CEILING`).
-- **The `xlarge` tier end to end.** The scale is implemented and the script
-  builds it in about 6.5 seconds, but the full run was not completed on this
-  machine, so no numbers from it appear above. The instruction-limit
-  *behaviour* is covered by the per-DEX measurement in
-  [§4](#4-the-three-limits-what-they-actually-bound), which is the same code
-  path at a smaller scale.
-- **The instruction limit reached by the default limit on a single DEX file.**
-  The `large` sample has 2.44 million instructions spread over four DEX
-  files, so no single file reaches 5,000,000 and the instruction limit does
-  not fire there. The `xlarge` scale is built for exactly that and was not
-  run to completion. What *is* measured is that the limit is per-DEX file,
-  which is the part that decides what happens when it does fire.
+- **The `xlarge` tier through the full pipeline.** The tier is measured at the
+  backend level ([§3.5](#35-xlarge-the-instruction-limit-reached)) — the
+  index, the limits and the truncation are all exercised — but not through
+  `Analyzer.analyze()` and into the database, so no pipeline timings or
+  row counts are quoted for it.
+- **The `large` and `xlarge` tiers with the version lookup *not* cached.**
+  The timings in [§3.2](#32-indexing-it) and [§3.4](#34-large-the-method-limit-reached)
+  for those two tiers are with the cache in place, because the uncached run
+  of `large` did not finish on this machine. The uncached `medium` figure
+  (108.42 s against 0.66 s) is the measured ratio, and it is what the
+  extrapolation in [§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol)
+  is built on.
 - **Native libraries (`.so`).** Nothing in the index covers them; the APK
   metadata records that they are there, and that is all.
 - **Resource strings.** Whether a resource string is in the index is a
