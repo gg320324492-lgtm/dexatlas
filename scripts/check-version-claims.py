@@ -129,14 +129,53 @@ COVERAGE_STATED = re.compile(
     r"|(?P<before>\d+(?:\.\d+)?)\s*%[^%\n]{0,20}?(?:coverage|覆盖率)"
 )
 
+#: A percentage a text states, with or without a word attached to it:
+#: "93.9%" and "93.9 %" are the same number.
+PERCENTAGE = re.compile(r"(?<![\d.])(?P<number>\d+(?:\.\d+)?)\s*%")
+
 #: A test count a text states: "444 tests (347 fast, 97 integration)".
 TESTS_STATED = re.compile(
     r"(?P<total>\d+)\s+tests\b"
     r"(?:\s*\(\s*(?P<fast>\d+)\s+fast\s*,\s*(?P<slow>\d+)\s+(?:integration|slow)\s*\))?"
 )
 
-#: A number that belongs to the version before this one: "up from 89.2%".
-PREVIOUS_VERSION = re.compile(r"(?:up from|previously|before)\s+$", re.IGNORECASE)
+#: A number that belongs to the version before this one: "up from 89.2%",
+#: "the previous release had 89.2% coverage". The marker may stand before
+#: the number or after it, and it refers to the nearest percentage.
+#:
+#: "up from" is on its own: it always introduces the number that follows
+#: it, so it never says anything about a number it stands behind.
+PREVIOUS_UP_FROM = re.compile(r"up\s+from", re.IGNORECASE)
+
+#: A marker that says the nearest number belongs to an earlier release:
+#: "previously", "the previous release", "上一版".
+PREVIOUS_VERSION = re.compile(
+    r"previously|previous|prior|last\s+(?:release|version)|上一(?:版|个版本|版本)|以前",
+    re.IGNORECASE,
+)
+
+#: "before" and "earlier" are words about time as well, so they only count
+#: when they sit right next to the number.
+PREVIOUS_VERSION_NEAR = re.compile(r"before|earlier|之前", re.IGNORECASE)
+
+#: How far a previous-version marker may be from the number it speaks about.
+#: "the previous release had 89.2% coverage" puts thirteen characters
+#: between them, so the window has to be wider than a word.
+PREVIOUS_WINDOW = 60
+PREVIOUS_WINDOW_NEAR = 12
+
+#: What may not lie between a previous-version marker and the number it
+#: speaks about: another stated figure (that one is the previous number),
+#: the end of a sentence, or a conjunction (which starts a claim of its
+#: own).
+BREAKS = re.compile(
+    r"\d+(?:\.\d+)?\s*%|\d+\s+tests\b|[;；。！!？?]|\.(?=\s|$)|\band\b|\bbut\b|而|但"  # noqa: RUF001
+)
+
+#: The same, for a marker that follows the number: a clause boundary
+#: breaks it too, because "94.0% coverage, up from 89.2%" introduces a
+#: second number and the marker is about that one.
+BREAKS_FORWARD = re.compile(BREAKS.pattern + r"|[,，、:：]")  # noqa: RUF001
 
 #: A badge that states a number:
 #: "https://img.shields.io/badge/tests-275%20passing-brightgreen.svg".
@@ -187,6 +226,15 @@ LATEST = re.compile(
     r"(?:is|was|are|were|=|:)\s*"
 )
 
+#: "the newest is v0.1.2", "最新的是 v0.1.2" — the same claim without the
+#: noun. Without a noun there is no way to tell a claim about the newest
+#: *tag* from a claim about the newest *release*, so the claim is only
+#: wrong when the number is wrong under both readings.
+LATEST_NOUN = re.compile(
+    r"(?:最新|最近的|当前|现行)\s*(?:的\s*)?(?:是|为|＝|=|:|：)\s*"  # noqa: RUF001
+    r"|(?:latest|most recent|current|newest)\s+(?:is|was|are|were)\s*"
+)
+
 #: A version that stands where a release is named: "the v0.1.4 release",
 #: "版本 v0.1.4".
 RELEASE_NOUN = re.compile(
@@ -201,7 +249,23 @@ SINCE_AFTER = re.compile(r"\s*(?:之后|以后|以来|起)")
 SINCE_BEFORE = re.compile(r"(?:after|since|following|post-)\s+$", re.IGNORECASE)
 
 #: Quotation marks. A phrase inside them is what another document said.
-QUOTED = re.compile(r"「[^」]*」|『[^』]*』|“[^”]*”|‘[^’]*’|\"[^\"\n]*\"")  # noqa: RUF001
+#: These are the marks this repository uses: 「」 in the Chinese documents,
+#: and the curly marks in the English ones.
+QUOTED = re.compile(r"「[^」]*」|『[^』]*』|“[^”]*”|‘[^’]*’")  # noqa: RUF001
+
+#: An ASCII-quoted phrase. This repository does not use the ASCII double
+#: quote as a quotation mark — the convention is 「」 and the backtick — so
+#: an ASCII-quoted phrase is prose, and a claim inside one is a claim. The
+#: one exception is an example: see EXAMPLE.
+ASCII_QUOTED = re.compile(r"\"[^\"\n]*\"")
+
+#: What introduces an example: a sentence like "the newest tag is v0.1.2".
+#: An example is not a claim about the project, and the repository's own
+#: changelog quotes the checker's own subject this way.
+EXAMPLE = re.compile(
+    r"(?:like|such as|for\s+example|e\.g\.|例如|比如)[,，]?\s*$",  # noqa: RUF001
+    re.IGNORECASE,
+)
 
 #: A fenced code block. Its content is a listing, not a statement.
 CODE_FENCE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
@@ -246,6 +310,23 @@ class Facts:
             known.append(self.pending)
         return max(known, key=version_key) if known else None
 
+    @property
+    def series(self) -> frozenset[tuple[str, str]]:
+        """The major.minor pairs this project's own releases live in.
+
+        "0.1" for a project whose releases are 0.1.0, 0.1.1 and so on. A
+        bare number in one of those series is a version of this project even
+        when the repository has never heard of it — "0.1.4 has been
+        released" is a claim about this project whatever the tags say — while
+        a bare number in no series of this project belongs to a tool:
+        Apktool 2.11.1, JADX 1.5.2, Androguard 4.1.4.
+        """
+        known = set(self.versions)
+        if self.pending is not None:
+            known.add(self.pending)
+        pairs = {series_of(version) for version in known}
+        return frozenset(pair for pair in pairs if pair is not None)
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -288,6 +369,18 @@ def base_version(version: str) -> str:
     """The release a version belongs to: "0.1.4.dev1" is a development build
     of 0.1.4."""
     return version.split(".dev", 1)[0]
+
+
+def series_of(version: str) -> tuple[str, str] | None:
+    """The major.minor pair a version belongs to: ("0", "1") for "0.1.4".
+
+    ``None`` for anything that is not three numbers, because a version
+    without a series cannot be placed in one.
+    """
+    parts = version.lstrip("v").split(".")
+    if len(parts) != 3 or not all(part.isdigit() for part in parts):
+        return None
+    return (parts[0], parts[1])
 
 
 def git(*args: str) -> str:
@@ -341,28 +434,14 @@ def git_optional(*args: str) -> str | None:
     return result.stdout
 
 
-def read_facts() -> Facts:
-    """Ask the repository what its releases are."""
-    tags = tuple(sorted(git("tag", "--list").split()))
-    if not tags:
-        # A clone without tags cannot answer any of the questions this script
-        # asks. Reporting "nothing is wrong" from such a clone would be the
-        # worst kind of answer: a green check that checked nothing.
-        raise SystemExit(
-            "this clone has no tags, so the release state cannot be checked.\n"
-            "Fetch them and try again:\n"
-            "  git fetch --tags\n"
-            "(in CI: check out with fetch-depth: 0)"
-        )
+def facts_of(tags: tuple[str, ...], package: str, changelog: str) -> Facts:
+    """The facts a set of tags, a package version and a changelog describe."""
     versions = frozenset(tag.lstrip("v") for tag in tags if tag.startswith("v"))
     newest_tag = max(versions, key=version_key) if versions else None
 
-    package = PACKAGE_VERSION.search(
-        (REPO / "src" / "dexatlas" / "__init__.py").read_text(encoding="utf-8")
-    )
-    package_version = package.group("value") if package else ""
+    package_match = PACKAGE_VERSION.search(package)
+    package_version = package_match.group("value") if package_match else ""
 
-    changelog = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
     changelog_versions = tuple(CHANGELOG_ENTRY.findall(changelog))
     changelog_newest = max(changelog_versions, key=version_key) if changelog_versions else None
 
@@ -378,6 +457,48 @@ def read_facts() -> Facts:
         changelog_newest=changelog_newest,
         unreleased_link=unreleased_link,
     )
+
+
+def read_facts() -> Facts:
+    """Ask the repository what its releases are."""
+    tags = tuple(sorted(git("tag", "--list").split()))
+    if not tags:
+        # A clone without tags cannot answer any of the questions this script
+        # asks. Reporting "nothing is wrong" from such a clone would be the
+        # worst kind of answer: a green check that checked nothing.
+        raise SystemExit(
+            "this clone has no tags, so the release state cannot be checked.\n"
+            "Fetch them and try again:\n"
+            "  git fetch --tags\n"
+            "(in CI: check out with fetch-depth: 0)"
+        )
+    package = (REPO / "src" / "dexatlas" / "__init__.py").read_text(encoding="utf-8")
+    changelog = (REPO / "CHANGELOG.md").read_text(encoding="utf-8")
+    return facts_of(tags, package, changelog)
+
+
+def read_facts_at(ref: str) -> Facts:
+    """What the repository said about its releases at another commit.
+
+    The base commit's *own* facts, not this tree's. The base's documents are
+    read against what the base believed: a claim that this commit made false
+    — by releasing a new version, say — is not drift the base already had,
+    and reading the base against this tree's facts would say that it was.
+
+    The tags are the ones the base can reach, so a tag this commit pushed is
+    not among them, and the package version and the changelog are the ones
+    that commit carried.
+    """
+    tags = tuple(sorted(git("tag", "--merged", ref).split()))
+    if not tags:
+        # A base that predates the project's first release has no tags of
+        # its own. Reading it as "nothing has ever been released" would make
+        # every release claim in its documents a finding, and exempt far
+        # more than it should.
+        tags = tuple(sorted(git("tag", "--list").split()))
+    package = git_optional("show", f"{ref}:src/dexatlas/__init__.py") or ""
+    changelog = git_optional("show", f"{ref}:CHANGELOG.md") or ""
+    return facts_of(tags, package, changelog)
 
 
 def check_facts(facts: Facts) -> list[Finding]:
@@ -466,7 +587,27 @@ def mask(text: str) -> str:
     keeps their length, so a line number still points at the right line.
     """
     masked = CODE_FENCE.sub(lambda match: blank(match.group(0)), text)
-    return QUOTED.sub(lambda match: blank(match.group(0)), masked)
+    masked = QUOTED.sub(lambda match: blank(match.group(0)), masked)
+    return mask_examples(masked)
+
+
+def mask_examples(text: str) -> str:
+    """Blank the ASCII-quoted phrases that are examples.
+
+    An ASCII double quote is not one of this repository's quotation marks,
+    so an ASCII-quoted phrase is prose and a claim inside it is checked like
+    any other. An example is the exception: a sentence like "the newest tag
+    is v0.1.2" is not a claim about the project, and the repository's own
+    changelog quotes the checker's subject that way.
+    """
+
+    def blank_if_example(match: re.Match[str]) -> str:
+        before = text[max(0, match.start() - 40) : match.start()]
+        if EXAMPLE.search(before):
+            return blank(match.group(0))
+        return match.group(0)
+
+    return ASCII_QUOTED.sub(blank_if_example, text)
 
 
 def clause_of(text: str, position: int) -> tuple[int, int]:
@@ -487,20 +628,25 @@ def collapse(text: str) -> str:
     return " ".join(text.split())
 
 
-def is_project_version(match: re.Match[str], facts: Facts) -> bool:
+def is_project_version(raw: str, facts: Facts) -> bool:
     """Whether a version token is a version of *this* project.
 
     A token with the ``v`` prefix is one: the project writes its own versions
-    that way. A bare number is one only when it is a version the repository
-    knows about. A bare number that is neither is a tool's version — Apktool
-    2.11.1, JADX 1.5.2 — and reading it as a release of this project would be
-    a false report.
+    that way. A bare number is one when the repository knows it, and one when
+    it belongs to the series this project's releases live in: "0.1.4" is a
+    version of this project even before it is tagged, and "0.1.4 has been
+    released" is a claim about this project whatever the tags say. A bare
+    number in no series of this project is a tool's version — Apktool 2.11.1,
+    JADX 1.5.2 — and reading it as a release of this project would be a
+    false report.
     """
-    raw = match.group("raw")
     if raw.startswith("v"):
         return True
     name = raw.lstrip("v")
-    return name in facts.versions or name == facts.pending
+    if name in facts.versions or name == facts.pending:
+        return True
+    pair = series_of(name)
+    return pair is not None and pair in facts.series
 
 
 def gap_between(first: re.Match[str], second: re.Match[str]) -> int:
@@ -525,14 +671,15 @@ def versions_for(
     inside = [
         match
         for match in versions
-        if clause[0] <= match.start() < clause[1] and is_project_version(match, facts)
+        if clause[0] <= match.start() < clause[1] and is_project_version(match.group("raw"), facts)
     ]
     if inside:
         return inside
     nearby = [
         match
         for match in versions
-        if is_project_version(match, facts) and gap_between(match, predicate) <= BIND_LIMIT
+        if is_project_version(match.group("raw"), facts)
+        and gap_between(match, predicate) <= BIND_LIMIT
     ]
     if not nearby:
         return []
@@ -573,6 +720,8 @@ def check_text(path: str, text: str, facts: Facts) -> list[Finding]:
             found = VERSION.search(line, match.end())
             if not found:
                 continue
+            if not is_project_version(found.group("raw"), facts):
+                continue
             version = found.group("raw").lstrip("v")
             noun = match.group("noun") or match.group("noun2") or ""
             target = facts.newest_tag if noun in {"tag", "标签"} else facts.newest_release
@@ -584,6 +733,28 @@ def check_text(path: str, text: str, facts: Facts) -> list[Finding]:
                     version,
                     f"it says the newest {noun or 'version'} is v{version}, "
                     f"but the newest is v{target}",
+                )
+            )
+
+        # -- "the newest is X" — no noun, so no way to tell a tag from a
+        #    release. It is only wrong when the number is wrong under both
+        #    readings.
+        for match in LATEST_NOUN.finditer(line):
+            found = VERSION.search(line, match.end())
+            if not found:
+                continue
+            if not is_project_version(found.group("raw"), facts):
+                continue
+            version = found.group("raw").lstrip("v")
+            targets = {target for target in (facts.newest_tag, facts.newest_release) if target}
+            if not targets or version in targets:
+                continue
+            newest = max(targets, key=version_key)
+            claimed.append(
+                (
+                    "latest",
+                    version,
+                    f"it says the newest version is v{version}, but the newest is v{newest}",
                 )
             )
 
@@ -641,11 +812,11 @@ def check_text(path: str, text: str, facts: Facts) -> list[Finding]:
             raw = match.group("first") or match.group("second")
             if not raw:
                 continue
+            if not is_project_version(raw, facts):
+                continue  # a bare number in no series of this project is a tool's
             name = raw.lstrip("v")
             if name in facts.versions or name == facts.pending:
                 continue
-            if not raw.startswith("v"):
-                continue  # a bare number is a tool's version until proven otherwise
             claimed.append(
                 (
                     "unknown-version",
@@ -713,6 +884,86 @@ def percentage(value: str) -> float | None:
         return None
 
 
+@dataclass(frozen=True)
+class Percentage:
+    """A percentage a document states."""
+
+    value: str
+    start: int
+    end: int
+    labelled: bool
+    """Whether the word "coverage" is attached to it."""
+
+
+def stated_percentages(line: str) -> list[Percentage]:
+    """The percentages a line states.
+
+    A percentage the word "coverage" is attached to is a coverage claim
+    whatever else the line says. One with no word attached to it is a number
+    that may or may not be a coverage, and the caller decides.
+    """
+    found: list[Percentage] = []
+    starts: dict[int, str] = {}
+    for match in COVERAGE_STATED.finditer(line):
+        value = match.group("after") or match.group("before")
+        if value is None:
+            continue
+        start = match.start("after") if match.group("after") else match.start("before")
+        starts[start] = value
+        found.append(Percentage(value=value, start=start, end=start + len(value), labelled=True))
+    for match in PERCENTAGE.finditer(line):
+        if match.start() in starts:
+            continue
+        value = match.group("number")
+        found.append(
+            Percentage(
+                value=value, start=match.start(), end=match.start() + len(value), labelled=False
+            )
+        )
+    found.sort(key=lambda item: item.start)
+    return found
+
+
+def belongs_to_previous_version(
+    line: str, start: int, end: int, *, backward_only: bool = False
+) -> bool:
+    """Whether a number is a number from an earlier release.
+
+    "up from 89.2%" and "the previous release had 89.2% coverage" both state
+    what the version before this one measured, and neither number is this
+    release's own coverage. The marker may stand before the number or after
+    it; what may not lie between them is another stated figure, the end of a
+    sentence, or a conjunction.
+
+    A marker behind the number and a marker in front of it are not judged
+    the same way. A marker in front qualifies the number it introduces — a
+    comma may sit inside the noun phrase between them ("the previous
+    release, 89.2%"). A marker behind qualifies the number it follows only
+    when no clause boundary lies between them: "94.0% coverage, up from
+    89.2%" introduces a second number, and the marker is about that one.
+    """
+    for pattern, window, behind in (
+        (PREVIOUS_UP_FROM, PREVIOUS_WINDOW, False),
+        (PREVIOUS_VERSION, PREVIOUS_WINDOW, True),
+        (PREVIOUS_VERSION_NEAR, PREVIOUS_WINDOW_NEAR, True),
+    ):
+        for match in pattern.finditer(line):
+            if match.end() <= start:
+                gap = line[match.end() : start]
+                distance = start - match.end()
+                broken = BREAKS.search(gap)
+            elif behind and not backward_only and match.start() >= end:
+                gap = line[end : match.start()]
+                distance = match.start() - end
+                broken = BREAKS_FORWARD.search(gap)
+            else:
+                continue
+            if distance > window or broken:
+                continue
+            return True
+    return False
+
+
 def check_stated_numbers(
     path: str, text: str, offset: int, expected: dict[str, str], version: str
 ) -> list[Finding]:
@@ -722,21 +973,37 @@ def check_stated_numbers(
     tests the report measured at that release, and the coverage the report of
     that release measured. A figure that is missing from it was never
     measured, and nothing is claimed about it.
+
+    A percentage the word "coverage" is attached to is a coverage claim. A
+    percentage with no word attached to it is one only when the document
+    states no other percentage: a document with several of them is stating
+    several different things — the coverage of this release, of the one
+    before it, of a module — and the checker cannot tell which is which. A
+    percentage that belongs to an earlier release is not a claim about this
+    one and is not checked against it.
     """
     findings: list[Finding] = []
-    for number, line in enumerate(text.splitlines(), 1):
-        # A number between the markers is generated, not written by hand.
-        spoken = FIGURE.sub(lambda match: " " * len(match.group(0)), line)
+    measured = expected.get("coverage.pct")
+    lines = text.splitlines()
+    # A number between the markers is generated, not written by hand.
+    spoken_lines = [FIGURE.sub(lambda match: " " * len(match.group(0)), line) for line in lines]
+    stated = [stated_percentages(line) for line in spoken_lines]
+    labelled = any(item.labelled for items in stated for item in items)
+    only_one = sum(len(items) for items in stated) == 1
+    bare_is_coverage = not labelled and only_one
+
+    for number, line in enumerate(lines, 1):
+        spoken = spoken_lines[number - 1]
         excerpt = collapse(line)[:160]
 
-        for match in COVERAGE_STATED.finditer(spoken):
-            stated = match.group("after") or match.group("before")
-            measured = expected.get("coverage.pct")
-            if stated is None or measured is None:
+        for item in stated[number - 1]:
+            if not item.labelled and not bare_is_coverage:
                 continue
-            if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
+            if measured is None:
                 continue
-            if percentage(stated) == percentage(measured):
+            if belongs_to_previous_version(spoken, item.start, item.end):
+                continue
+            if percentage(item.value) == percentage(measured):
                 continue
             findings.append(
                 Finding(
@@ -745,20 +1012,23 @@ def check_stated_numbers(
                     kind="release-coverage",
                     version=version,
                     message=(
-                        f"it says the coverage is {stated}%, the measured coverage is {measured}"
+                        f"it says the coverage is {item.value}%, "
+                        f"the measured coverage is {measured}"
                     ),
                     excerpt=excerpt,
                 )
             )
 
         for match in TESTS_STATED.finditer(spoken):
-            if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
-                continue
             total = match.group("total")
             fast = match.group("fast")
             slow = match.group("slow")
-            measured = expected.get("tests.total")
-            if measured is not None and total != measured:
+            if belongs_to_previous_version(
+                spoken, match.start("total"), match.end("total"), backward_only=True
+            ):
+                continue
+            measured_tests = expected.get("tests.total")
+            if measured_tests is not None and total != measured_tests:
                 findings.append(
                     Finding(
                         path=path,
@@ -767,7 +1037,7 @@ def check_stated_numbers(
                         version=version,
                         message=(
                             f"it says the release had {total} tests, "
-                            f"the measured number is {measured}"
+                            f"the measured number is {measured_tests}"
                         ),
                         excerpt=excerpt,
                     )
@@ -997,15 +1267,21 @@ def main(argv: list[str] | None = None) -> int:
         if base is None or not git_succeeds("rev-parse", "--verify", f"{base}^{{commit}}"):
             print(f"could not resolve the base commit {args.base!r}", file=sys.stderr)
             return 2
+        # The base's own facts. The base's documents are read against what
+        # the base believed, so that a claim this commit made false — by
+        # releasing a version, say — is a new finding rather than drift the
+        # base already had. Reading the base against this tree's facts would
+        # have said the opposite, and the check would have passed.
+        base_facts = read_facts_at(base)
         base_documents = documents_at(base)
         base_figures = dict(FIGURE.findall(dict(base_documents).get(REPORT_AT_TAG, "")))
-        base_badges = badge_figures(facts, base_figures)
-        for finding in check_release_numbers(facts, base_documents):
+        base_badges = badge_figures(base_facts, base_figures)
+        for finding in check_release_numbers(base_facts, base_documents):
             known.add(finding.key)
         for name, text in base_documents:
             for finding in check_badges(name, text, base_badges):
                 known.add(finding.key)
-            for finding in check_text(name, text, facts):
+            for finding in check_text(name, text, base_facts):
                 known.add(finding.key)
 
     print("facts:")
