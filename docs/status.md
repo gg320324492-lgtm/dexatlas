@@ -100,8 +100,11 @@ Apktool 会把 `res/` 解码到工作区，`src/` 里却没有任何代码读它
 
 ### 4.4 大型 APK 的性能压测
 
-现有样本最大不到 3 KB。索引性能和 `MAX_INSTRUCTION_LIMIT`
+现有样本最大不到 3 KB。索引性能和 Androguard 遍历的三个上限
+`DEFAULT_METHOD_LIMIT`（200_000）、`DEFAULT_STRING_LIMIT`（50_000）、
+`DEFAULT_INSTRUCTION_LIMIT`（5_000_000）
 **从未被真实压过**——大 APK 上会发生什么，目前只有推测。
+这三个上限定义在 `src/dexatlas/tools/androguard/adapter.py`。
 
 ### 4.5 真实加固 APK
 

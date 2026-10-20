@@ -22,9 +22,10 @@ researchers and engineers analysing applications they own or are authorized to a
 
 > [!IMPORTANT]
 > **Status: early development (Phase 1 — Foundation).** The CLI, analysis core and report
-> pipeline are being built now. Agent orchestration, MCP and the web workbench are *planned*,
-> not shipped — see the [Roadmap](#roadmap). Nothing on this page claims a feature that does
-> not yet run.
+> pipeline shipped in `v0.1.0` and have been released in every version since; what is
+> outstanding is the Phase 1 source review. Agent orchestration, MCP and the web workbench
+> are *planned*, not shipped — see the [Roadmap](#roadmap). Nothing on this page claims a
+> feature that does not yet run.
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas analysing a bundled demo APK: backend discovery, the analysis summary, exported components from the manifest, and the evidence levels in the report" width="900">
@@ -186,7 +187,9 @@ in [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
 ## Contributing
 
 Issues, bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
-Start with the `v0.1.0` milestone; the eight Phase 1 issues are the current work backlog.
+The eight tasks that planned Phase 1 are archived under
+[`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/), each carrying the
+design decisions behind it; the live work is the Phase 1 source review.
 
 Please do not open a pull request that includes an APK, decompiled source, or any code from
 an application you are not authorized to analyse. See [SECURITY.md](SECURITY.md).

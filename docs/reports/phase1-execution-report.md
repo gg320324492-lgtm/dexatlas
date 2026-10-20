@@ -17,9 +17,15 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 >
 > **v0.1.3 补充（已发布）**
 >
+> 报告 3.11 ~ 3.15 节记录的五处修复，外加一份新的分析覆盖度文档
+> （[`docs/analysis-provenance.md`](../analysis-provenance.md)）——那份文档的第 6 节
+> 还记着另外两处修复（locator 的可移植性、每条证据都带工具版本）——
+> **都随 v0.1.3 一同发布**。
 > v0.1.3「证据能指回原处」把交叉引用变成了证据、让 locator 随报告迁移、
 > 让字符串常量知道自己被用在哪里，并给文档的行号引用加上了自动核对。
 > v0.1.3 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.3
+> 发布说明见 [`docs/releases/v0.1.3.md`](../releases/v0.1.3.md)，
+> 所以下面几节的标题写的是「v0.1.3 修复」。
 >
 > **v0.1.2 补充（已发布）**
 >
@@ -30,15 +36,6 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 > 本报告中的测试数、覆盖率已随 v0.1.2 同步过一次；现在这些数字改由脚本自动生成
 > （见 1.2 节与 6 节），每次刷新都会与当前代码对齐。
 >
-> **v0.1.2 之后的补充（尚未发布）**
->
-> 报告 3.11 ~ 3.15 节记录了 v0.1.2 之后在 `main` 分支上做的五处修复，
-> 外加一份新的分析覆盖度文档（[`docs/analysis-provenance.md`](../analysis-provenance.md)）——
-> 那份文档的第 6 节还记着另外两处修复（locator 的可移植性、每条证据都带工具版本）。
-> **这些修复还没有发布**：仓库里目前最新的 tag 是 `v0.1.2`，
-> `CHANGELOG.md` 的 `[Unreleased]` 段记录着尚未发布的内容。
-> 下一个版本号由发布时决定，**本报告不预先写死它是哪个版本**——
-> 所以下面几节的标题写的是「v0.1.2 之后修复，待发布」，而不是某个已经存在的版本号。
 
 ---
 
@@ -153,9 +150,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_first_party_samples.py` | 5 个自建样本的导入、索引、搜索与交叉引用（FIX-002 新增） |
 | `test_method_ids.py` | 方法 id 的唯一拼写：模型层、存储层、查询层（3.11 节新增） |
 | `test_decompilation.py` | `decompiled` 标志的判定：占位符、构造器、警告不算失败（3.14 节新增） |
-| `test_provenance.py` | locator 的形状与可移植性、每条证据都带工具版本（v0.1.2 之后新增） |
-| `test_doc_citations.py` | 文档里的 `文件:行号` 引用必须仍指向它说的东西（v0.1.2 之后新增） |
-| `test_model_claims.py` | 字段的文档说的取值，必须就是它真能产出的取值（v0.1.2 之后新增） |
+| `test_provenance.py` | locator 的形状与可移植性、每条证据都带工具版本（v0.1.3 新增） |
+| `test_doc_citations.py` | 文档里的 `文件:行号` 引用必须仍指向它说的东西（v0.1.3 新增） |
+| `test_model_claims.py` | 字段的文档说的取值，必须就是它真能产出的取值（v0.1.3 新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -231,7 +228,7 @@ def test_rejects_entity_declaration():
 变成了规范形式，但**方法表那一侧没动**——所以断裂没有消失，只是从
 「所有查询都返回空」变成了「多参数方法的查询返回空」。
 
-**补上的修复（v0.1.2 之后，待发布）：** 见 3.11 节。现在方法 id 在模型层、存储层、查询层
+**补上的修复（v0.1.3）：** 见 3.11 节。现在方法 id 在模型层、存储层、查询层
 三处都只有一个拼写。
 
 **新增测试：** 断言「任何 call target 不得含空白」+「必须有 target 能在符号索引中解析到」
@@ -409,7 +406,7 @@ PosixPath('/usr/local/bin/jadx')
 如果哪天它被修好了，这个测试会**失败**，强制有人回来摘掉标记——
 这样它既不会被遗忘，也不会把一个 bug 固化成期望行为。
 
-**它后来被修好了（v0.1.2 之后，待发布）。** 配置值现在有三态：`None` 表示未配置、
+**它后来被修好了（v0.1.3）。** 配置值现在有三态：`None` 表示未配置、
 照旧在 `PATH` 上找；**空字符串表示显式禁用**，不查 `PATH`；
 一个存在的路径直接用。那个 `xfail` 已经摘掉，变成普通断言测试。
 
@@ -494,7 +491,7 @@ Phase 1 计划书 1.4 节给了一份 8 项验收清单。回头逐条核对，�
 
 ---
 
-### 3.11 严重：方法 id 在两张表里拼写不同 🔴（v0.1.2 之后修复，待发布）
+### 3.11 严重：方法 id 在两张表里拼写不同 🔴（v0.1.3 修复）
 
 这个缺陷是**分析覆盖度文档**的编写过程中发现的——让另一个 agent 去读代码并
 实测每个后端实际产出什么，结果它发现了一个我在 v0.1.0 就宣称修好的问题还剩一半。
@@ -554,7 +551,7 @@ method_id = "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)L
 **新增测试：** 26 个方法 id 的测试，核心是那条端到端的：
 从 `list_methods` 拿到的 `qualified_name` 拿去查 `get_method_references`，必须能查到调用方。
 
-### 3.12 严重：报告里的数字和数据库里的行数对不上 🔴（v0.1.2 之后修复，待发布）
+### 3.12 严重：报告里的数字和数据库里的行数对不上 🔴（v0.1.3 修复）
 
 **现象：** 分析多 dex 样本，报告说 14 个方法：
 
@@ -590,7 +587,7 @@ $ dexatlas analyze examples/multidex-app/multidex.apk
 `tests/test_first_party_samples.py`（`the reported counts are the rows in the tables`、
 `a class defined in two dexes is one method with two sources`）。
 
-### 3.13 严重：交叉引用从不产生证据 🔴（v0.1.2 之后修复，待发布）
+### 3.13 严重：交叉引用从不产生证据 🔴（v0.1.3 修复）
 
 **现象：** 分析完一个 APK，报告里**一条 `cross_reference` 证据都没有**。
 
@@ -622,7 +619,7 @@ provenance 指向调用点、排序、上限、截断时仍报出调用数）、
 `a cross-reference record names the caller`）、
 `tests/test_reports.py`（报告分清「索引里的条数」和「有证据的条数」）。
 
-### 3.14 中等：`decompiled` 这个字段名和它的值对不上 🟡（v0.1.2 之后修复，待发布）
+### 3.14 中等：`decompiled` 这个字段名和它的值对不上 🟡（v0.1.3 修复）
 
 **现象：** 方法表里有一个 `decompiled` 字段。读代码发现它的值来自 Androguard 的
 `bool(method.get_code())`——**「这个方法在 DEX 里有字节码」**。
@@ -683,7 +680,7 @@ API 的输出字段名有外部消费者，改名就是破坏它们。既有工�
 `tests/test_first_party_samples.py`（索引里哪些方法被反编译了、覆盖度记录）、
 `tests/test_reports.py`（报告里的那一行，以及没有反编译器时这一行整个不出现）。
 
-### 3.15 中等：CLI 只显示前两条 provenance，却不说 🟡（v0.1.2 之后修复，待发布）
+### 3.15 中等：CLI 只显示前两条 provenance，却不说 🟡（v0.1.3 修复）
 
 **现象：** `dexatlas classes` 里是硬编码的 `for source in cls.provenance[:2]:`。
 REST API 返回的是**完整**的 provenance，所以 **CLI 看到的比 API 看到的少**。
@@ -789,7 +786,7 @@ git checkout v0.1.2    # <!--fig:history.v0.1.2.tests-->275<!--/fig--> 个测试
 ```
 
 在装齐后端和样本的完整环境里，这三个 tag 的套件都是全绿的；v0.1.1 和 v0.1.2 各带
-1 个 `xfail`——`test_an_empty_path_disables_the_backend`，那个缺陷在 v0.1.2 之后修好了，
+1 个 `xfail`——`test_an_empty_path_disables_the_backend`，那个缺陷在 v0.1.3 修好了，
 标记随之摘掉。
 
 从零复现一次完整测量：
