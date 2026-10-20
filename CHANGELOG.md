@@ -7,7 +7,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+### Added
+
+- **A status page** — `docs/status.md` says where the project stands and what is left:
+  the released versions, the acceptance status of Phase 1, and the gaps that remain.
+  It is written in Chinese, like the analysis coverage document.
+
+### Fixed
+
+- **The documentation names the release that shipped each fix.** The Phase 1 execution
+  report's opening, the headings of its sections 3.11 – 3.15, and the opening of
+  section 6 of the analysis coverage document all described work that had already
+  shipped. They now name v0.1.3, which shipped it.
+- **The status page named a constant that does not exist.** It referred to a
+  `MAX_INSTRUCTION_LIMIT`; the limits the code actually enforces are
+  `DEFAULT_METHOD_LIMIT`, `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT`.
+- **The READMEs pointed at finished work as the current backlog.** The eight tasks that
+  planned Phase 1 are archived under `.github/issues/v0.1.0/planned/`; what is
+  outstanding is the Phase 1 source review.
 
 ## [0.1.3] — 2026-10-20
 
