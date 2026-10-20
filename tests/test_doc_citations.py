@@ -1,10 +1,10 @@
 """The documentation's citations have to keep up with the code.
 
 Both the execution report and the provenance document cite specific lines of
-specific files. A citation that has drifted is a small lie, and this project has
-collected enough of them: the cross-reference fix was described with the reason
-backwards, a version was quoted in the wrong shape, and a test name belonged to
-a different test.
+specific files, and so does the large-APK benchmark. A citation that has drifted
+is a small lie, and this project has collected enough of them: the
+cross-reference fix was described with the reason backwards, a version was
+quoted in the wrong shape, and a test name belonged to a different test.
 
 The check is exact rather than heuristic. When a sentence names a symbol and
 cites a line range, the symbol's own definition — or the call that constructs

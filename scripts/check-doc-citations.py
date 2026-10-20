@@ -4,8 +4,9 @@ Run it directly to see the drift, or let the test suite run it:
 
     uv run python scripts/check-doc-citations.py
 
-The report and the provenance document cite specific lines. A citation that has
-drifted is a small lie, and there have been enough of them to be worth a tool.
+The report, the provenance document and the large-APK benchmark cite specific
+lines. A citation that has drifted is a small lie, and there have been enough
+of them to be worth a tool.
 
 The check is precise rather than heuristic: when a sentence names a symbol and
 cites a line range, the symbol's own definition (or its construction) has to fall
@@ -21,6 +22,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 DOCS = [
     REPO / "docs" / "analysis-provenance.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
+    REPO / "docs" / "benchmarks" / "large-apk.md",
 ]
 
 #: path:line or path:start-end
