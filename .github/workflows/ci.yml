@@ -31,9 +31,9 @@ jobs:
           echo "PROBE head=$(git rev-parse HEAD)"
           echo "PROBE origin/main=$(git rev-parse origin/main)"
           echo "PROBE merge-base=$(git merge-base HEAD origin/main)"
-          uv run python scripts/check-version-claims.py --base auto
+          python3 scripts/check-version-claims.py --base auto
           echo "PROBE auto exit: $?"
-          uv run python scripts/check-version-claims.py --base "$BEFORE"
+          python3 scripts/check-version-claims.py --base "$BEFORE"
           echo "PROBE before exit: $?"
           exit 0
   lint:
@@ -84,9 +84,9 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: |
           if git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
-            uv run python scripts/check-version-claims.py --base "$BEFORE"
+            python3 scripts/check-version-claims.py --base "$BEFORE"
           else
-            uv run python scripts/check-version-claims.py --base auto
+            python3 scripts/check-version-claims.py --base auto
           fi
 
   test:
