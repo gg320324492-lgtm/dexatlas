@@ -1160,3 +1160,45 @@ def test_the_source_fingerprint_ignores_line_endings(
     # And a real change still moves the fingerprint, which is the whole point.
     (source_root / "mod.py").write_bytes(b"def f():\n    return 2\n")
     assert script.source_fingerprint() != lf_fingerprint
+
+
+# -- the readme badges --------------------------------------------------------
+
+
+def test_the_readme_badge_states_the_measured_numbers() -> None:
+    """The badge is a measurement, not a number someone typed.
+
+    A badge is a URL, so it cannot hold the report's markers -- and the
+    number in it was written by hand, which is why the badge that shipped
+    with v0.1.2 said 275 tests when the project had 444. The number is
+    written from the same measurement the report is written from, so the
+    two cannot drift apart.
+    """
+    script = _figure_script()
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    stated = script.apply_badges(readme, {"tests.total": "801", "coverage.pct": "94.2%"})
+
+    assert "badge/tests-801%20passing" in stated
+    # The percent sign is spelled "%25" in a URL, and only once: a badge
+    # that says "%%25" shows two percent signs.
+    assert "badge/coverage-94.2%25-brightgreen" in stated
+    assert "%%25" not in stated
+
+
+def test_writing_the_badge_again_changes_nothing() -> None:
+    """Refreshing a badge that is already right must leave it alone."""
+    script = _figure_script()
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    values = {"tests.total": "801", "coverage.pct": "94.2%"}
+
+    once = script.apply_badges(readme, values)
+
+    assert script.apply_badges(once, values) == once
+
+
+def test_a_readme_without_the_badge_is_left_alone() -> None:
+    """Not every readme carries a badge, and one that does not is not stale."""
+    script = _figure_script()
+    text = "# A readme\n\nNo badge here.\n"
+
+    assert script.apply_badges(text, {"tests.total": "801", "coverage.pct": "94.2%"}) == text

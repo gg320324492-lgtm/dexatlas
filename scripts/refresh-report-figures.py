@@ -92,6 +92,12 @@ REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
 #: only that document, because the test suite refreshes copies of the report
 #: and must not write to the real status page while it does so.
 STATUS_PATH = REPO_ROOT / "docs" / "status.md"
+#: The readmes carry the same two figures as a badge, and a badge is a URL:
+#: it cannot hold the report's markers, so its number was written by hand --
+#: and a hand-written number drifts the moment the code changes. The number
+#: is measured here and written into the URL, so the badge is a measurement
+#: too. A readme without the badge is left alone.
+README_PATHS = (REPO_ROOT / "README.md", REPO_ROOT / "README.zh-CN.md")
 SOURCE_ROOT = REPO_ROOT / "src" / "dexatlas"
 #: The suite that measures the code. The pass/skip split the report states is
 #: a property of this tree, so a change to it makes the numbers stale too.
@@ -710,6 +716,45 @@ def apply_figures(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
     return FIGURE.sub(replace, text), unknown
 
 
+#: The badge of the test count: ``.../badge/tests-444%20passing-brightgreen.svg``.
+#: The number is URL-escaped in the badge and written by hand; this is the
+#: pattern that finds it.
+BADGE_TESTS = re.compile(r"(?P<head>badge/tests-)(?P<number>[\d.]+)(?P<tail>%20passing)")
+
+#: The badge of the coverage: ``.../badge/coverage-94.0%25-brightgreen.svg``.
+BADGE_COVERAGE = re.compile(r"(?P<head>badge/coverage-)(?P<number>[\d.]+)(?P<tail>%25)")
+
+
+def apply_badges(text: str, values: dict[str, str]) -> str:
+    """Write the measured figures into the readme badges.
+
+    A badge is a URL, and a URL cannot hold the report's markers -- so the
+    number in it was typed by hand. A hand-written number drifts: the badge
+    that shipped with v0.1.2 said 275 tests when the project had 444, and
+    nothing about the URL said when it was written. The number is measured
+    here and written in, so the badge is a measurement like every other.
+
+    A readme without the badge is left alone: not every readme has one, and
+    one that does not is not a document with a stale number.
+    """
+    tests = values.get("tests.total")
+    coverage = values.get("coverage.pct")
+    if tests is not None:
+        text = BADGE_TESTS.sub(
+            lambda match: f"{match.group('head')}{tests}{match.group('tail')}", text
+        )
+    if coverage is not None:
+        # The value carries the percent sign ("94.2%") and the badge is a
+        # URL: the tail of the pattern already spells the percent sign as
+        # "%25", so the number goes in without one. Writing the value as it
+        # stands would spell it twice.
+        number = coverage.rstrip("%")
+        text = BADGE_COVERAGE.sub(
+            lambda match: f"{match.group('head')}{number}{match.group('tail')}", text
+        )
+    return text
+
+
 def render_status(record: dict[str, Any], text: str) -> str:
     """Write the measured figures into the status page.
 
@@ -1085,16 +1130,45 @@ def main(argv: list[str] | None = None) -> int:
             f"{WEAK_MODULE_PERCENT}% but the report does not list them: " + ", ".join(hidden)
         )
 
+    # The readme badges state the same two figures, and their numbers were
+    # written by hand. They are written here from the same measurement, so a
+    # badge cannot drift away from the report it summarises.
+    badge_values = {
+        "tests.total": str(total),
+        "coverage.pct": record.get("coverage", {}).get("pct", ""),
+    }
+    readmes: list[tuple[Path, str, str]] = []
+    for readme in README_PATHS:
+        if not readme.is_file():
+            continue
+        original = readme.read_text(encoding="utf-8")
+        refreshed = apply_badges(original, badge_values)
+        if refreshed != original:
+            readmes.append((readme, original, refreshed))
+
     changes = figure_changes(text, record)
     if status_text is not None:
         changes.extend(figure_changes(status_text, record))
+    for readme, original, refreshed in readmes:
+        for badge in (BADGE_TESTS, BADGE_COVERAGE):
+            before = badge.search(original)
+            after = badge.search(refreshed)
+            if before and after and before.group("number") != after.group("number"):
+                changes.append(
+                    (
+                        f"{readme.name} badge {badge.pattern.split('-')[0].split('/')[-1]}",
+                        before.group("number"),
+                        after.group("number"),
+                    )
+                )
 
     if not complete:
         warn_partial(code)
 
     status_matched = status_updated is None or status_updated == status_text
+    badges_matched = not readmes
     if args.check:
-        if updated == text and status_matched and not tree_changed:
+        if updated == text and status_matched and badges_matched and not tree_changed:
             print("The report matches a fresh measurement.")
         else:
             for key, old, new in changes:
@@ -1102,11 +1176,13 @@ def main(argv: list[str] | None = None) -> int:
             if tree_changed:
                 print(f"source fingerprint: {previous_fingerprint} -> {current_fingerprint}")
             print("The report does not match a fresh measurement.")
-        matched = updated == text and status_matched and not tree_changed
+        matched = updated == text and status_matched and badges_matched and not tree_changed
     else:
         report_path.write_bytes(updated.encode("utf-8"))
         if status_path is not None and status_updated is not None:
             status_path.write_bytes(status_updated.encode("utf-8"))
+        for readme, _original, refreshed in readmes:
+            readme.write_bytes(refreshed.encode("utf-8"))
         if changes:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
@@ -1116,6 +1192,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Updated {display_path(report_path)}.")
         if status_path is not None and status_updated is not None and not status_matched:
             print(f"Updated {display_path(status_path)}.")
+        for readme, _original, _refreshed in readmes:
+            print(f"Updated the badge in {display_path(readme)}.")
         matched = True
 
     if checks.failures:
