@@ -25,6 +25,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The READMEs pointed at finished work as the current backlog.** The eight tasks that
   planned Phase 1 are archived under `.github/issues/v0.1.0/planned/`; what is
   outstanding is the Phase 1 source review.
+- **The v0.1.3 release notes quoted a hand-copied coverage figure.** They said 93.9%,
+  which belonged to an earlier tree; the release's own generated report measured
+  94.0% (1857/1975 lines) from the tree it was cut from. They now state the
+  measured figure.
 
 ## [0.1.3] — 2026-10-20
 
@@ -150,7 +154,7 @@ conclusion — this release makes that true of more things than it used to be.
 ### Engineering
 
 - 444 tests (347 fast, 97 integration), up from 275
-- First-party coverage 93.9%, up from 89.2%
+- First-party coverage 94.0% (1857/1975 lines), up from 89.2%
 - `mypy` strict, `ruff` lint and format; the CI workflow covers Python 3.12 and
   3.13, a configuration with one backend deliberately absent, a Docker build, a
   dependency audit, the lint job and a workflow lint
