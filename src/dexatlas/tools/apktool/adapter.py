@@ -23,6 +23,8 @@ from dexatlas.core.models import (
     ManifestComponent,
     ManifestInfo,
     ManifestPermission,
+    ResourceKind,
+    ResourceString,
     ToolError,
     ToolErrorCode,
 )
@@ -34,6 +36,31 @@ ANDROID_NS = "http://schemas.android.com/apk/res/android"
 ANDROID = f"{{{ANDROID_NS}}}"
 
 _COMPONENT_TAGS = ("activity", "activity-alias", "service", "receiver", "provider")
+
+#: Resource files that will not parse are recorded as errors. A hostile APK can
+#: carry a resource table no parser can read, and a reader has to be able to
+#: tell "the resource table was empty" from "the resource table was unreadable".
+#: The number of files is capped so one broken APK cannot fill the report with
+#: thousands of near-identical rows.
+MAX_RESOURCE_ERRORS = 10
+
+#: The resource elements that hold text a person reads. The other elements in a
+#: values file — colours, dimensions, booleans, integers, styles — describe
+#: how the app looks, not what it says, and a "string index" full of them would
+#: answer no question a reader asked.
+_TEXT_ELEMENTS = ("string", "string-array", "plurals")
+
+
+def source_locator(output_dir: Path, path: Path) -> str:
+    """The locator for a file inside Apktool's output tree.
+
+    The path is relative to the directory Apktool wrote into, for the same
+    reason JADX's is: an absolute path names the machine that ran the analysis
+    rather than the analysis itself, and a reader on another machine cannot
+    follow it. The same file, at the same place inside the tree, is what any
+    run of the same Apktool over the same APK produces.
+    """
+    return f"apktool:{path.relative_to(output_dir).as_posix()}"
 
 
 class ApktoolBackend(Backend):
@@ -195,6 +222,133 @@ class ApktoolBackend(Backend):
 
         return info, None
 
+    # -- resources ---------------------------------------------------------
+
+    def read_resources(
+        self, output_dir: Path, apk_sha256: str
+    ) -> tuple[list[ResourceString], list[ToolError]]:
+        """Read the text resources Apktool decoded into ``res/``.
+
+        The resource table comes out of an untrusted APK, so the XML is parsed
+        with ``defusedxml`` for the same reason the manifest is: a plain parser
+        would honour entity declarations and external references, which is a
+        denial-of-service waiting to happen.
+
+        Only the values directories are read. A layout or a drawable is a
+        different kind of file — one describes a screen, the other is a picture —
+        and neither is a declaration of text. See the module docstring of
+        :mod:`dexatlas.core.models` for what a row here means.
+
+        A file that will not parse is recorded as an error and the rest are
+        still read: one broken file in a hostile APK must not cost the whole
+        resource table.
+        """
+        res_dir = output_dir / "res"
+        if not res_dir.is_dir():
+            return [], []
+
+        found: list[ResourceString] = []
+        errors: list[ToolError] = []
+        for values_dir in sorted(p for p in res_dir.glob("values*") if p.is_dir()):
+            qualifier = _values_qualifier(values_dir.name)
+            for xml_file in sorted(values_dir.glob("*.xml")):
+                rows, error = self._read_resource_file(xml_file, output_dir, apk_sha256, qualifier)
+                found.extend(rows)
+                if error is not None:
+                    errors.append(error)
+
+        if len(errors) > MAX_RESOURCE_ERRORS:
+            hidden = len(errors) - MAX_RESOURCE_ERRORS
+            errors = errors[:MAX_RESOURCE_ERRORS]
+            errors.append(
+                ToolError(
+                    tool=self.name,
+                    code=ToolErrorCode.PARSE_ERROR,
+                    message=f"{hidden} further resource file(s) could not be parsed",
+                )
+            )
+        return found, errors
+
+    def _read_resource_file(
+        self,
+        path: Path,
+        output_dir: Path,
+        apk_sha256: str,
+        qualifier: str | None,
+    ) -> tuple[list[ResourceString], ToolError | None]:
+        """Read one values file: the text it declares, and where it was declared."""
+        relative = _relative_to(path, output_dir)
+        try:
+            root = safe_parse(path).getroot()
+        except ParseError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} is not well-formed XML: {exc}",
+                detail=relative,
+            )
+        except OSError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"could not read {relative}: {exc}",
+                detail=relative,
+            )
+        except ValueError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} was rejected as unsafe XML: {exc}",
+                detail=relative,
+            )
+
+        if root is None:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} has no root element",
+                detail=relative,
+            )
+
+        provenance = [self.provenance(apk_sha256, source_locator(output_dir, path))]
+        rows: list[ResourceString] = []
+        for element in root:
+            tag = _local_name(element.tag)
+            name = element.get("name")
+            if not name or tag not in _TEXT_ELEMENTS:
+                continue
+
+            if tag == "string":
+                rows.append(
+                    ResourceString(
+                        name=name,
+                        value=_text_of(element),
+                        kind=ResourceKind.STRING,
+                        qualifier=qualifier,
+                        file=relative,
+                        provenance=provenance,
+                    )
+                )
+                continue
+
+            kind = ResourceKind.STRING_ARRAY if tag == "string-array" else ResourceKind.PLURAL
+            for position, item in enumerate(element):
+                if _local_name(item.tag) != "item":
+                    continue
+                rows.append(
+                    ResourceString(
+                        name=name,
+                        value=_text_of(item),
+                        kind=kind,
+                        quantity=item.get("quantity"),
+                        position=position,
+                        qualifier=qualifier,
+                        file=relative,
+                        provenance=provenance,
+                    )
+                )
+        return rows, None
+
     # -- smali -------------------------------------------------------------
 
     def smali_path(self, class_name: str, output_dir: Path) -> Path | None:
@@ -327,6 +481,46 @@ def _as_text(value: object) -> str | None:
     return str(value)
 
 
+def _values_qualifier(directory_name: str) -> str | None:
+    """The qualifier of a values directory: ``values-zh`` → ``zh``.
+
+    ``values/`` itself has none — it holds the default resource, the one every
+    other qualified directory overrides.
+    """
+    if directory_name == "values":
+        return None
+    _, separator, qualifier = directory_name.partition("-")
+    return qualifier if separator else None
+
+
+def _relative_to(path: Path, root: Path) -> str:
+    """A path relative to the tree it lives in, in the form a locator uses."""
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.name
+
+
+def _local_name(tag: str) -> str:
+    """An element's tag without its namespace.
+
+    A values file normally declares no namespace, but nothing stops a decoded
+    resource table from carrying one, and ``{http://…}string`` is still a
+    ``<string>``.
+    """
+    return tag.rpartition("}")[2]
+
+
+def _text_of(element: Element) -> str:
+    """The text an element holds.
+
+    A string resource may contain markup — ``<b>`` for bold — and the text of
+    the whole element is what a reader sees. Surrounding whitespace is dropped
+    because the Android resource compiler drops it too.
+    """
+    return "".join(element.itertext()).strip()
+
+
 def _describe_filter(element: Element) -> str:
     """Compact one-line description of an intent-filter, for the manifest summary."""
     actions = [a.get(ANDROID + "name", "") for a in element.findall("action")]
@@ -339,4 +533,4 @@ def _describe_filter(element: Element) -> str:
     return "; ".join(parts)
 
 
-__all__ = ["ANDROID_NS", "ApktoolBackend"]
+__all__ = ["ANDROID_NS", "MAX_RESOURCE_ERRORS", "ApktoolBackend", "source_locator"]

@@ -46,6 +46,7 @@ def _project_block(project: Project) -> dict[str, Any]:
         "method_count": project.method_count,
         "reference_count": project.reference_count,
         "evidence_count": project.evidence_count,
+        "resource_count": project.resource_count,
     }
 
 
@@ -54,6 +55,10 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
         "classes": result.project.class_count,
         "methods": result.project.method_count,
         "cross_references": result.project.reference_count,
+        # The strings the resource table declared. A separate number from the
+        # DEX string pool, because they are separate things: one is what the
+        # code loads, the other is what a person wrote.
+        "resource_strings": result.project.resource_count,
         # How many of those cross-references are backed by an evidence record.
         # The two numbers differ on purpose: an indexed call into library code
         # is a fact about the JDK, not a conclusion about this app.

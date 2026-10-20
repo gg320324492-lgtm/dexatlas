@@ -52,6 +52,7 @@ def render_markdown(result: AnalysisResult) -> str:
             )
         )
     metrics += [
+        ("Resource strings indexed", f"{project.resource_count:,}"),
         ("Cross-references indexed", f"{project.reference_count:,}"),
         ("Cross-references with evidence", f"{_cross_reference_count(result.evidence):,}"),
         ("Evidence records", f"{project.evidence_count:,}"),
