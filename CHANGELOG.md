@@ -29,6 +29,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   which belonged to an earlier tree; the release's own generated report measured
   94.0% (1857/1975 lines) from the tree it was cut from. They now state the
   measured figure.
+- **The `[0.1.0]` entry counted 208 tests; the release shipped 204.** A commit made
+  after the release overwrote the entry with the test count of the tree at the time.
+  The tag measures 204, and the v0.1.0 release notes said 204. The `[0.1.1]` entry
+  inherited it as "up from 208", and now says 204.
+- **The README's badges had stopped at v0.1.2.** They showed 275 tests and 89%
+  coverage — that release's numbers — while the project was on 444 tests and 94.0%.
+  A badge URL cannot carry a generated figure, so this is a number to write and
+  re-check, not one that can be measured; it now states the measured values.
 
 ## [0.1.3] — 2026-10-20
 
@@ -239,7 +247,7 @@ verifiable when decompilation fails — had never run, for any APK.
 
 ### Engineering
 
-- 244 tests (192 fast, 52 integration), up from 208
+- 244 tests (192 fast, 52 integration), up from 204
 - First-party coverage 89.1% (1523/1709 lines), up from 87.8%. The Apktool adapter
   went from 82.7% to 94%
 - `mypy` strict, `ruff` lint and format, GitHub Actions green on Python 3.12 and 3.13
@@ -286,7 +294,7 @@ every language model switched off.
 
 ### Engineering
 
-- 208 tests, 88% coverage on first-party code
+- 204 tests, 88% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file
