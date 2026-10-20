@@ -941,7 +941,29 @@ def automatic_base() -> str | None:
     return None
 
 
+def use_utf8_output() -> None:
+    """Make the output independent of the console's encoding.
+
+    A finding quotes the line it is about, and that line may hold an emoji —
+    the execution report marks its findings with 🔴. A console that cannot
+    encode it (GBK, cp1252) would kill the script halfway through its report,
+    and the exit code it managed to give would be the one a crash gives: 1,
+    the same as the one a real finding gives. The report has to finish on
+    every machine, so the output is UTF-8 and a character that cannot be
+    written is replaced rather than raised.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            continue
+
+
 def main(argv: list[str] | None = None) -> int:
+    use_utf8_output()
     parser = argparse.ArgumentParser(
         description="Check the documentation's version claims against the repository."
     )
