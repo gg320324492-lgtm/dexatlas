@@ -202,6 +202,30 @@ def test_a_citation_that_names_a_lowercase_symbol_is_checked(
     assert checker.main() == 1
 
 
+def test_a_backend_name_in_prose_is_not_code_the_citation_has_to_hold(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The name of a tool is a word a sentence uses, not code a citation points at.
+
+    A table row that lists the backends and cites the line that fills the
+    ``tool`` field was reported as drift: the file the citation names happens
+    to mention one of them in a docstring, and the checker took the mention
+    for the claim. The row says which backends exist; the citation says who
+    fills the field. Both are true, and the citation is the one that is
+    checked.
+    """
+    checker = _checker()
+    document = tmp_path / "doc.md"
+    document.write_text(
+        "| `tool` | `str` | the backend name (`jadx` / `apktool` / `androguard`) "
+        "| `src/dexatlas/tools/base.py:258` |\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 0
+
+
 def test_a_citation_that_only_points_at_a_location_is_still_checked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

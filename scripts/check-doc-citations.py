@@ -93,6 +93,15 @@ CLAUSE_ENDS = "，,：:—–→⇒"  # noqa: RUF001
 
 #: Words that are capitalised or in backticks but are not symbols: the names
 #: of the tools, of the project, and the type names of Python.
+#:
+#: The backend names are here in lower case too, and deliberately so. They are
+#: the *values* the ``tool`` field holds — a document that writes them says
+#: which backends exist, not that the cited lines mention them. The docstring
+#: of :func:`is_symbolic` says as much: ``jadx`` and ``apktool`` are words a
+#: sentence uses, not code a citation points at. Without the lower-case
+#: spellings, a table row that lists the backends and cites the line that
+#: fills the field was reported as drift, because the file the citation
+#: names happens to mention one of them in a docstring.
 NOT_SYMBOLS = {
     "The",
     "This",
@@ -123,8 +132,11 @@ NOT_SYMBOLS = {
     "DexAtlas",
     "JADX",
     "Jadx",
+    "jadx",
     "Apktool",
+    "apktool",
     "Androguard",
+    "androguard",
     "Java",
     "Smali",
     "Kotlin",
