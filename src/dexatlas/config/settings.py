@@ -8,6 +8,8 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from dexatlas.core.paths import absolute_path
+
 
 class Settings(BaseSettings):
     """Environment-driven configuration.
@@ -41,7 +43,26 @@ class Settings(BaseSettings):
     @field_validator("workspace", mode="before")
     @classmethod
     def _expand_workspace(cls, value: object) -> object:
-        return Path(value).expanduser() if isinstance(value, str) else value
+        """Anchor the workspace to a directory that cannot move under it.
+
+        The workspace is read for the whole life of the process: the database,
+        the projects and every backend's output tree hang off it, and the
+        settings object is cached for that whole life too. A relative
+        workspace therefore names one directory when it is written down and
+        another when it is read — and it is handed to subprocesses, which
+        resolve a relative path against their *own* working directory, so the
+        two readings are not even the same directory.
+
+        Anchoring it once, here, is what makes the name mean one place for
+        the whole run: ``.dexatlas`` becomes the directory it was relative to
+        when the process started, and it stays that directory even if
+        something changes the working directory afterwards.
+        """
+        if isinstance(value, str):
+            return absolute_path(Path(value).expanduser())
+        if isinstance(value, Path):
+            return absolute_path(value)
+        return value
 
     @property
     def database_path(self) -> Path:

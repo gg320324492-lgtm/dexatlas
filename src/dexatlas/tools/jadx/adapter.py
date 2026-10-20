@@ -28,7 +28,7 @@ from pathlib import Path
 
 from dexatlas.config.settings import Settings
 from dexatlas.core.models import ClassKind, ClassRef, ToolError
-from dexatlas.core.paths import class_to_relative_path, is_inside
+from dexatlas.core.paths import absolute_path, class_to_relative_path, is_inside
 from dexatlas.tools.base import Backend, ToolInvocation, ToolOutcome, which_or_none
 
 logger = logging.getLogger(__name__)
@@ -179,12 +179,16 @@ class JadxBackend(Backend):
         name in ``bin/`` is the shell script. Pointing at it from Windows yields
         "not a valid Win32 application", so the platform's own launcher is preferred
         when one exists next to the configured path.
+
+        The launcher is returned as an absolute path. It is executed with a working
+        directory of its own — the output tree — so a relative one would be looked
+        up inside that directory instead of the one the operator configured.
         """
         configured = self._settings.jadx_path
         found = which_or_none([configured], names=("jadx", "jadx.bat", "jadx.exe"))
         if found is None:
             return None
-        return self._platform_launcher(found)
+        return absolute_path(self._platform_launcher(found))
 
     def _platform_launcher(self, found: Path) -> Path:
         """Prefer a launcher this platform can actually execute."""
@@ -213,7 +217,17 @@ class JadxBackend(Backend):
     # -- decompilation -----------------------------------------------------
 
     def decompile(self, apk: Path, output_dir: Path, *, timeout: int | None = None) -> ToolOutcome:
-        """Run JADX over an APK, writing Java sources into ``output_dir/sources``."""
+        """Run JADX over an APK, writing Java sources into ``output_dir/sources``.
+
+        Every path handed to the decompiler names one place. The output directory
+        is both the child's working directory and the argument that tells it where
+        to write, and a relative path would be read twice — once against this
+        process's directory and once against the child's — so JADX would write
+        into a doubly-nested copy of the tree it was told to write into, and the
+        index would find nothing there. The APK is made absolute for the same
+        reason: it is read relative to the child's working directory, which is
+        not this process's directory.
+        """
         executable = self.resolve()
         if executable is None:
             return ToolOutcome(
@@ -224,7 +238,10 @@ class JadxBackend(Backend):
                 error=self.missing_error(),
             )
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # One directory, one meaning: the same absolute path is the child's
+        # working directory and the argument that names its output.
+        target = absolute_path(output_dir)
+        target.mkdir(parents=True, exist_ok=True)
         return self.run(
             ToolInvocation(
                 argv=[
@@ -235,10 +252,10 @@ class JadxBackend(Backend):
                     "--threads-count",
                     "4",
                     "--output-dir",
-                    str(output_dir),
-                    str(apk),
+                    str(target),
+                    str(absolute_path(apk)),
                 ],
-                cwd=output_dir,
+                cwd=target,
                 timeout=timeout,
             )
         )

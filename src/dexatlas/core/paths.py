@@ -10,6 +10,10 @@ describe the analysis rather than the server:
   rule, so the two backends cannot drift apart.
 - A path that names the server's filesystem is replaced by one that names the
   file, so an API response or a report can be read on another machine.
+
+A third rule is about the paths that never reach a reader at all: the ones
+handed to another process, and the ones written down and read back later.
+:func:`absolute_path` is what settles them.
 """
 
 from __future__ import annotations
@@ -25,6 +29,27 @@ from pathlib import Path
 #: built, the file is asked for, and the answer arrives as an error from the
 #: operating system instead of as "no such file".
 MAX_COMPONENT_BYTES = 255
+
+
+def absolute_path(path: Path) -> Path:
+    """The path, anchored to a directory that cannot move under it.
+
+    A relative path has two readings: "the directory this process is in now",
+    and "the directory this process was in when the path was written down". A
+    subprocess reads the second one — it resolves a relative argument against
+    its *own* working directory — so a relative path handed to one can name
+    two different places at once. A path that is written into a database and
+    read back later has the same problem: it names whatever directory the
+    reader happens to be in.
+
+    ``absolute()`` settles it. A relative path is anchored to the current
+    directory, and an absolute path is left exactly as it was. ``resolve()``
+    would also follow symlinks, and that rewrites a path the operator chose:
+    the configured workspace would stop being the name they gave it, in the
+    database and in every message that mentions it, and the subprocess would
+    be handed a path the index does not read.
+    """
+    return path.absolute()
 
 
 def is_single_component(part: str) -> bool:
@@ -99,4 +124,10 @@ def is_inside(root: Path, candidate: Path) -> bool:
         return False
 
 
-__all__ = ["class_to_relative_path", "display_path", "is_inside", "is_single_component"]
+__all__ = [
+    "absolute_path",
+    "class_to_relative_path",
+    "display_path",
+    "is_inside",
+    "is_single_component",
+]
