@@ -156,6 +156,8 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 
 - **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
 - **[架构说明](docs/architecture/README.md)** —— 项目如何组织，以及为什么这样设计
+- **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
+- **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 
 Phase 1 剩余工作（源码评审，以及由评审结论写出的任务清单）见

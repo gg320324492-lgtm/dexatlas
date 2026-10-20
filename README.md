@@ -174,6 +174,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
 - **[Architecture](docs/architecture/README.md)** — how it fits together and why
+- **[Current status](docs/status.md)** — where the project stands and what is left
+  (Chinese; 当前状态)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
   which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
