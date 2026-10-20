@@ -39,7 +39,7 @@ and a pooled literal, calling a shared helper, and returning. The cross-referenc
 it produces point at a method the APK really defines, so they can be resolved
 against the symbol table.
 
-### The three scales
+### The scales
 
 | Scale | Classes | Methods/class | Instructions/method | DEX files | Purpose |
 |---|---|---|---|---|---|
@@ -65,8 +65,8 @@ code.
 
 | | |
 |---|---|
-| CPU / RAM | Windows 11 11 (10.0.26200), x86-64 |
-| Python | CPython 3.12 (uv-managed) |
+| OS | Windows 11 (10.0.26200), x86-64 |
+| Python | CPython 3.12.13 (uv-managed) |
 | Androguard | 4.1.4 |
 | Apktool | 2.11.1 |
 | JDK | OpenJDK 21.0.12.1 (LTS) |
@@ -538,6 +538,55 @@ spends its time on.
   here, and the `medium` scale 201 seconds, which is why `medium` is
   opt-in. The runners are faster and slower in ways this document does not
   measure.
+
+---
+
+## 6a. What this costs CI
+
+The suite is marked `slow`, so it runs in the two CI jobs that have the
+backends. The scale is `smoke` by default, and nothing in CI sets
+`DEXATLAS_LARGE_APK_SCALE`.
+
+| CI job | Backends | What the new tests do | Cost |
+|---|---|---|---|
+| Tests (Python 3.12) | all three | Run at the `smoke` scale | ~15 s (5.8 s with the version cached) |
+| Tests (Python 3.13) | **none** | **Skip** — no Apktool, no JRE, no Androguard | 0 s |
+| Tests (Apktool only, no JADX) | Apktool + Androguard | Run at the `smoke` scale; the missing decompiler is recorded as a `NOT_INSTALLED` error, which the test allows | ~15 s |
+
+**The Python 3.13 job skips rather than fails**, because the module's
+`skipif` conditions cover all three ways this machine can be missing what the
+tests need: Androguard not installed, Apktool not locatable, and no `java` on
+`PATH`. The skip is not silent — pytest reports all 16 tests as skipped.
+
+The two jobs that do run it pay about 15 seconds each, against a slow-suite
+runtime of 105 seconds. The generator itself is not in the picture for CI
+beyond the samples it builds: two of them (the `smoke` sample and the
+multi-DEX one) are built once per module and shared by the tests.
+
+**The `medium` and larger scales are not for CI.** At `medium` the test file
+takes 201 seconds, and the reason is the defect in
+[§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol): the
+144.97-second extract is the bulk of it, and 0.77 of those seconds is the
+analysis.
+
+**With the version cached, the same file takes 14.39 seconds.** That was
+measured, not estimated — the same suite, the same machine, the same
+`medium` sample, with the version lookup made once instead of once per
+symbol:
+
+```
+DEXATLAS_LARGE_APK_SCALE=medium pytest tests/test_large_apk_scale.py -q
+  -> 11 passed, 5 xfailed in 201.16s        (today)
+
+DEXATLAS_LARGE_APK_SCALE=medium pytest tests/test_large_apk_scale.py -q
+   with the version cached
+  -> 11 passed, 5 xfailed in 14.39s         (what the fix would buy)
+```
+
+A 14-second `medium` tier would fit in CI comfortably. **The fix in
+[§5.3](#53-the-version-of-the-backend-is-probed-once-per-symbol) is what
+makes the larger scales affordable at all**, which is why it is first in the
+list.
 
 ---
 
