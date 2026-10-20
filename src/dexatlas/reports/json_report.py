@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from dexatlas.core.models import Evidence, EvidenceKind, Project, index_gaps
+from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import AnalysisResult
 from dexatlas.reports.coverage import decompilation_coverage
 
@@ -35,7 +36,10 @@ def _project_block(project: Project) -> dict[str, Any]:
         "apk": {
             "sha256": project.apk.sha256,
             "size_bytes": project.apk.size_bytes,
-            "path": str(project.apk.path),
+            # The file's name, not the path to it. A report is written to a
+            # file, diffed and pasted into issues, and the server's filesystem
+            # layout is not part of the analysis.
+            "path": display_path(project.apk.path),
             "dex_files": project.apk.dex_files,
             "native_libraries": project.apk.native_libraries,
             "has_signed_certificate": project.apk.has_signed_certificate,

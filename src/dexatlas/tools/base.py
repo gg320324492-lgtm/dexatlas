@@ -8,14 +8,17 @@ hangs engine degrade one step instead of the whole run.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
+import signal
 import subprocess
+import tempfile
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 from dexatlas.config.settings import Settings
 from dexatlas.core.models import Provenance, ToolError, ToolErrorCode
@@ -24,6 +27,30 @@ logger = logging.getLogger(__name__)
 
 #: Output that exceeds this is treated as a runaway backend rather than a result.
 _DEFAULT_MAX_OUTPUT = 256 * 1024 * 1024
+
+#: The signal that ends a process without giving it a chance to react.
+#:
+#: ``SIGKILL`` does not exist on Windows, where the tree is killed by
+#: ``taskkill`` instead, so the portable name is looked up rather than imported.
+_KILL_SIGNAL = getattr(signal, "SIGKILL", signal.SIGTERM)
+
+#: Windows' flag for putting a child into a process group of its own.
+_CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+
+#: How long the tree is given to die before the call gives up on it.
+_TERMINATION_GRACE_SECONDS = 5.0
+
+#: How long ``taskkill`` is given to do its work.
+_TASKKILL_TIMEOUT_SECONDS = 30.0
+
+#: What the tree kill achieved.
+#:
+#: "Was terminated" is a claim about the machine, so the three outcomes are
+#: kept apart: the tree was killed, the launcher had already exited on its own,
+#: or nothing could be killed.
+_KILLED = "killed"
+_ALREADY_EXITED = "already-exited"
+_NOT_TERMINATED = "not-terminated"
 
 
 @dataclass(slots=True)
@@ -112,6 +139,15 @@ class Backend(ABC):
 
         Argument arrays only — never a shell string — so nothing inside an analysed APK
         can inject a command.
+
+        The call really is bounded by the timeout: a backend that spawns a launcher
+        which spawns the tool takes the whole tree down with it, rather than
+        leaving the work running behind the caller's back.
+
+        The output is captured through files rather than pipes. A pipe stays
+        open for every process that inherited it, so a tool that outlived its
+        launcher would keep the reader waiting long past the timeout — which is
+        exactly the case the timeout exists for.
         """
         started = time.monotonic()
         argv = list(invocation.argv)
@@ -133,52 +169,66 @@ class Backend(ABC):
         logger.debug("%s: %s", self.name, " ".join(argv))
 
         try:
-            completed = subprocess.run(
-                argv,
-                cwd=invocation.cwd,
-                env=invocation.env,
-                capture_output=True,
-                timeout=timeout,
-                shell=False,
-                check=False,
-            )
-        except subprocess.TimeoutExpired:
-            return fail(
-                ToolErrorCode.TIMEOUT,
-                f"{self.name} exceeded its {timeout}s timeout and was terminated",
-            )
-        except FileNotFoundError:
-            return self._not_found(argv)
-        except PermissionError as exc:
-            return fail(ToolErrorCode.NOT_INSTALLED, f"{self.name} is not executable: {exc}")
+            with tempfile.TemporaryFile() as out_file, tempfile.TemporaryFile() as err_file:
+                try:
+                    process = subprocess.Popen(
+                        argv,
+                        cwd=invocation.cwd,
+                        env=invocation.env,
+                        stdin=subprocess.DEVNULL,
+                        stdout=out_file,
+                        stderr=err_file,
+                        shell=False,
+                        **_process_group_options(),
+                    )
+                except FileNotFoundError:
+                    return self._not_found(argv)
+                except PermissionError as exc:
+                    return fail(
+                        ToolErrorCode.NOT_INSTALLED, f"{self.name} is not executable: {exc}"
+                    )
+                except OSError as exc:
+                    return fail(
+                        ToolErrorCode.EXIT_NONZERO, f"{self.name} could not be executed: {exc}"
+                    )
+
+                try:
+                    process.wait(timeout=timeout)
+                except subprocess.TimeoutExpired:
+                    message = _timeout_message(self.name, timeout, _terminate_tree(process))
+                    return fail(ToolErrorCode.TIMEOUT, message)
+
+                stdout = self._decode(
+                    _read_capped(out_file.file, self._settings.tool_max_output_bytes)
+                )
+                stderr = self._decode(
+                    _read_capped(err_file.file, self._settings.tool_max_output_bytes)
+                )
+
+                if process.returncode != 0:
+                    return ToolOutcome(
+                        returncode=process.returncode,
+                        stdout=stdout,
+                        stderr=stderr,
+                        duration_seconds=time.monotonic() - started,
+                        error=ToolError(
+                            tool=self.name,
+                            code=ToolErrorCode.EXIT_NONZERO,
+                            message=f"{self.name} exited with code {process.returncode}",
+                            detail=stderr.strip()[-2000:] or stdout.strip()[-2000:] or None,
+                        ),
+                        argv=argv,
+                    )
+
+                return ToolOutcome(
+                    returncode=0,
+                    stdout=stdout,
+                    stderr=stderr,
+                    duration_seconds=time.monotonic() - started,
+                    argv=argv,
+                )
         except OSError as exc:
             return fail(ToolErrorCode.EXIT_NONZERO, f"{self.name} could not be executed: {exc}")
-
-        stdout = self._decode(completed.stdout)
-        stderr = self._decode(completed.stderr)
-
-        if completed.returncode != 0:
-            return ToolOutcome(
-                returncode=completed.returncode,
-                stdout=stdout,
-                stderr=stderr,
-                duration_seconds=time.monotonic() - started,
-                error=ToolError(
-                    tool=self.name,
-                    code=ToolErrorCode.EXIT_NONZERO,
-                    message=f"{self.name} exited with code {completed.returncode}",
-                    detail=stderr.strip()[-2000:] or stdout.strip()[-2000:] or None,
-                ),
-                argv=argv,
-            )
-
-        return ToolOutcome(
-            returncode=0,
-            stdout=stdout,
-            stderr=stderr,
-            duration_seconds=time.monotonic() - started,
-            argv=argv,
-        )
 
     def _not_found(self, argv: Sequence[str]) -> ToolOutcome:
         executable = argv[0] if argv else self.name
@@ -225,6 +275,122 @@ class Backend(ABC):
             self._record_version_known = True
             self._record_version = self.version()
         return self._record_version
+
+
+def _timeout_message(tool: str, timeout: int, outcome: str) -> str:
+    """What to say about a backend that outlived its timeout.
+
+    The message is a claim about the machine, so it says what actually
+    happened: the tree was killed, the launcher had already exited on its own,
+    or nothing could be killed and the work may still be running.
+    """
+    if outcome == _KILLED:
+        return f"{tool} exceeded its {timeout}s timeout and was terminated"
+    if outcome == _ALREADY_EXITED:
+        return f"{tool} exceeded its {timeout}s timeout; its launcher had already exited"
+    return f"{tool} exceeded its {timeout}s timeout and could not be terminated"
+
+
+def _process_group_options() -> dict[str, Any]:
+    """Put the child into a process group of its own.
+
+    A backend is a launcher as often as it is a tool: ``jadx.bat`` runs
+    ``java.exe``, and the launcher is all that a timeout on the direct child
+    would reach. A group of its own is what lets the whole tree be taken down
+    together — on POSIX by signalling the group, on Windows by asking
+    ``taskkill`` to walk the children.
+    """
+    if os.name == "nt":
+        return {"creationflags": _CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _terminate_tree(process: subprocess.Popen[bytes]) -> str:
+    """Kill the process and everything it started.
+
+    Killing only the direct child leaves the tool running. On Windows
+    ``jadx.bat`` is a ``cmd.exe`` whose child is ``java.exe``: the work
+    carries on, holding the output it inherited, and the call that started it
+    waits for it anyway.
+
+    Returns what was achieved — see :data:`_KILLED` and its neighbours.
+    """
+    outcome = _taskkill_tree(process) if os.name == "nt" else _kill_process_group(process)
+    _reap(process)
+    return outcome
+
+
+def _kill_process_group(process: subprocess.Popen[bytes]) -> str:
+    """Kill the child's process group, which on POSIX is the whole tree.
+
+    The child leads its own group, so the group's id is the child's pid.
+    ``kill`` with a negative pid addresses a process group, which is what
+    ``killpg`` does and is spelled the same way on every platform.
+    """
+    try:
+        os.kill(-process.pid, _KILL_SIGNAL)
+    except ProcessLookupError:
+        # The group is empty, so everything in it is already gone.
+        return _ALREADY_EXITED
+    except (PermissionError, OSError):
+        logger.warning("could not kill the process group %d", process.pid)
+        return _NOT_TERMINATED
+    return _KILLED
+
+
+def _taskkill_tree(process: subprocess.Popen[bytes]) -> str:
+    """Kill a process tree on Windows.
+
+    ``taskkill /T`` walks the parent-child relationship, so a launcher and the
+    tool it started die together, and ``/F`` is what makes it immediate.
+
+    Only a successful call counts as a kill. A launcher that had already
+    exited cannot be walked from, so whatever it started would be left
+    running — and "terminated" is a claim about the machine, not about the
+    attempt.
+    """
+    try:
+        completed = subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+            capture_output=True,
+            timeout=_TASKKILL_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return _NOT_TERMINATED
+    if completed.returncode == 0:
+        return _KILLED
+    if process.poll() is not None:
+        # The launcher had already exited — it had finished the work itself,
+        # or it had left something behind that no longer has a parent to be
+        # found through.
+        return _ALREADY_EXITED
+    return _NOT_TERMINATED
+
+
+def _reap(process: subprocess.Popen[bytes]) -> None:
+    """Collect the killed child, waiting briefly for it to go."""
+    try:
+        process.wait(timeout=_TERMINATION_GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=_TERMINATION_GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            logger.warning("a backend process did not exit after being killed")
+
+
+def _read_capped(handle: IO[bytes], limit: int) -> bytes:
+    """What a backend wrote, up to the cap.
+
+    The file is truncated first. A runaway backend can write far more than the
+    cap allows, and the cap exists to keep that from becoming the problem.
+    """
+    handle.seek(0, os.SEEK_END)
+    if handle.tell() > limit:
+        handle.truncate(limit)
+    handle.seek(0)
+    return handle.read()
 
 
 def which_or_none(candidates: Sequence[str | None], *, names: Sequence[str] = ()) -> Path | None:

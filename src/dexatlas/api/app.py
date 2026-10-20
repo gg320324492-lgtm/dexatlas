@@ -11,6 +11,7 @@ background task is honest about what it is rather than pretending to scale.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -24,13 +25,17 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from dexatlas import __version__
 from dexatlas.config.settings import Settings, get_settings
-from dexatlas.core.ingest import ApkValidationError, inspect_apk
-from dexatlas.core.models import Project, SourceDocument, canonical_method_id
+from dexatlas.core import ingest
+from dexatlas.core.ingest import ApkValidationError, UploadTooLarge, inspect_apk, save_upload
+from dexatlas.core.models import ApkMetadata, Project, SourceDocument, canonical_method_id
+from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -39,6 +44,12 @@ logger = logging.getLogger(__name__)
 
 #: Uploads land here before analysis. Scoped to the workspace, never executed.
 UPLOAD_DIRNAME = "uploads"
+
+#: The upload is larger than the limit.
+#:
+#: Starlette renamed this constant and deprecated the old name, so the number
+#: is written out rather than imported from a version-dependent place.
+HTTP_CONTENT_TOO_LARGE = 413
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -68,6 +79,40 @@ app = FastAPI(
 )
 
 
+class UploadSizeLimitMiddleware:
+    """Refuse an upload that declares more than the limit, before it is read.
+
+    The framework parses a request's body before the handler ever sees it, so
+    the only place a declared size can be refused is in front of the route.
+    A request that declares no length — a chunked upload — is caught by the
+    counter in the handler instead, which stops the copy while it streams.
+    """
+
+    def __init__(self, app: ASGIApp, limit: Callable[[], int]) -> None:
+        self.app = app
+        self.limit = limit
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope.get("method") not in {"POST", "PUT", "PATCH"}:
+            await self.app(scope, receive, send)
+            return
+
+        max_bytes = self.limit()
+        declared = Headers(scope=scope).get("content-length")
+        if declared is not None and declared.isdigit() and int(declared) > max_bytes:
+            response = JSONResponse(
+                {"detail": f"the upload is larger than the {max_bytes}-byte limit"},
+                status_code=HTTP_CONTENT_TOO_LARGE,
+            )
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(UploadSizeLimitMiddleware, limit=lambda: ingest.MAX_APK_BYTES)
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -90,7 +135,12 @@ class ProjectResponse(BaseModel):
     id: str
     status: str
     apk_sha256: str
-    apk_path: str
+    apk_path: str = Field(
+        description=(
+            "The analysed APK's file name. The server's directory layout is not "
+            "published; the file itself is identified exactly by `apk_sha256`."
+        )
+    )
     apk_size_bytes: int
     class_count: int
     method_count: int
@@ -111,6 +161,73 @@ class SubmitResponse(BaseModel):
     project_id: str
     sha256: str
     already_analysed: bool
+
+
+#: The headers a source response carries, declared so the schema says what the
+#: response actually is. A client that generates from this schema can then read
+#: the kind of source it got without parsing the body.
+_SOURCE_HEADERS: dict[str, dict[str, Any]] = {
+    "X-DexAtlas-Source-Kind": {
+        "description": "Which representation the body holds.",
+        "schema": {"type": "string", "enum": ["java", "smali"]},
+    },
+    "X-DexAtlas-Source-Tool": {
+        "description": "The backend that produced the source.",
+        "schema": {"type": "string"},
+    },
+    "X-DexAtlas-Source-Locator": {
+        "description": "Where the source lives inside the producing tool's output tree.",
+        "schema": {"type": "string"},
+    },
+    "X-DexAtlas-Source-Tool-Version": {
+        "description": "The version of the producing tool that the analysis recorded.",
+        "schema": {"type": "string"},
+    },
+}
+
+#: The JSON form of a source, declared to match what is actually returned.
+_SOURCE_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "project_id": {"type": "string"},
+        "class_name": {"type": "string"},
+        "method": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "kind": {"type": "string", "enum": ["java", "smali"]},
+        "provenance": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string"},
+                    "tool_version": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                    "apk_sha256": {"type": "string"},
+                    "locator": {"type": "string"},
+                },
+                "required": ["tool", "apk_sha256", "locator"],
+            },
+        },
+        "text": {"type": "string"},
+    },
+    "required": ["project_id", "class_name", "kind", "provenance", "text"],
+}
+
+#: What the source endpoints can answer with. The default is the source text
+#: and nothing else, so the body is exactly the file a caller piped it into;
+#: the JSON form carries the whole provenance in the document.
+_SOURCE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    200: {
+        "description": "The source, as text or — with `?format=json` — as a JSON document.",
+        "headers": _SOURCE_HEADERS,
+        "content": {
+            "text/plain": {"schema": {"type": "string"}},
+            "application/json": {"schema": _SOURCE_JSON_SCHEMA},
+        },
+    },
+    404: {
+        "description": "No such class, or no source for it.",
+        "content": {"application/json": {"schema": {"type": "object"}}},
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -156,8 +273,14 @@ def analyze(
     target = upload_dir / Path(file.filename or "upload.apk").name
 
     try:
-        with target.open("wb") as handle:
-            handle.write(file.file.read())
+        save_upload(file.file, target)
+    except UploadTooLarge as exc:
+        # Refused while it streamed: the bytes over the limit were never
+        # written, and the partial file has already been removed.
+        raise HTTPException(
+            status_code=HTTP_CONTENT_TOO_LARGE,
+            detail=f"the APK is larger than the {exc.limit}-byte limit",
+        ) from exc
     except OSError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -183,7 +306,9 @@ def analyze(
             detail=f"/projects/{existing.id}",
         )
 
-    background.add_task(_run_analysis, analyzer, target)
+    # The APK has already been inspected, so the analysis is handed the
+    # metadata rather than inspecting it a second time.
+    background.add_task(_run_analysis, analyzer, target, apk)
     return AnalyzeJobResponse(
         project_id=f"apk_{apk.sha256[:16]}",
         status="pending",
@@ -191,26 +316,26 @@ def analyze(
     )
 
 
-def _run_analysis(analyzer: Analyzer, apk_path: Path) -> None:
+def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
     try:
-        analyzer.analyze(apk_path)
+        analyzer.analyze(apk_path, metadata=apk)
     except Exception:
         logger.exception("background analysis of %s failed", apk_path)
 
 
 @app.get("/projects", tags=["analysis"])
-def list_projects(analyzer: AnalyzerDep) -> list[ProjectResponse]:
+def list_projects(analyzer: AnalyzerDep, settings: SettingsDep) -> list[ProjectResponse]:
     """Every analysed project, newest first."""
-    return [_project_response(p) for p in analyzer.store.list_projects()]
+    return [_project_response(p, settings) for p in analyzer.store.list_projects()]
 
 
 @app.get("/projects/{project_id}", response_model=ProjectResponse, tags=["analysis"])
-def get_project(project_id: str, analyzer: AnalyzerDep) -> ProjectResponse:
+def get_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -> ProjectResponse:
     """One project's metadata, counts and any backend errors."""
     project = analyzer.store.get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
-    return _project_response(project)
+    return _project_response(project, settings)
 
 
 @app.get("/projects/{project_id}/manifest", tags=["analysis"])
@@ -277,7 +402,11 @@ def list_resources(
     }
 
 
-@app.get("/projects/{project_id}/classes/{class_name:path}/source", tags=["analysis"])
+@app.get(
+    "/projects/{project_id}/classes/{class_name:path}/source",
+    tags=["analysis"],
+    responses=_SOURCE_RESPONSES,
+)
 def get_class_source(
     project_id: str,
     class_name: str,
@@ -300,7 +429,11 @@ def get_class_source(
     return PlainTextResponse(document.text, headers=_source_headers(document))
 
 
-@app.get("/projects/{project_id}/methods/{class_name:path}/{method_name}", tags=["analysis"])
+@app.get(
+    "/projects/{project_id}/methods/{class_name:path}/{method_name}",
+    tags=["analysis"],
+    responses=_SOURCE_RESPONSES,
+)
 def get_method_source(
     project_id: str,
     class_name: str,
@@ -386,6 +519,21 @@ def _redact(message: str, secret: str) -> str:
     return message.replace(secret, Path(secret).name)
 
 
+def _redact_workspace(message: str | None, workspace: Path) -> str | None:
+    """Replace the server's workspace path with a placeholder.
+
+    A backend's error message can quote the path it was handed, and that path
+    is the server's. The workspace root is the part that names the machine; what
+    is left of the path is a place inside the analysis, and that is worth
+    keeping.
+    """
+    if not message:
+        return message
+    for candidate in (str(workspace), str(workspace.resolve())):
+        message = message.replace(candidate, "<workspace>")
+    return message
+
+
 def _source_headers(document: SourceDocument) -> dict[str, str]:
     """Headers that say where a source came from.
 
@@ -422,12 +570,14 @@ def _source_payload(
 # ---------------------------------------------------------------------------
 
 
-def _project_response(project: Any) -> ProjectResponse:
+def _project_response(project: Any, settings: Settings) -> ProjectResponse:
     return ProjectResponse(
         id=project.id,
         status=project.status.value,
         apk_sha256=project.apk.sha256,
-        apk_path=str(project.apk.path),
+        # The name of the analysed file, not the path to it. The path is the
+        # server's filesystem, and this response is published.
+        apk_path=display_path(project.apk.path),
         apk_size_bytes=project.apk.size_bytes,
         class_count=project.class_count,
         method_count=project.method_count,
@@ -435,7 +585,15 @@ def _project_response(project: Any) -> ProjectResponse:
         evidence_count=project.evidence_count,
         resource_count=project.resource_count,
         tool_versions=project.tool_versions,
-        errors=[ErrorResponse.model_validate(e.model_dump()) for e in project.errors],
+        errors=[
+            ErrorResponse(
+                tool=error.tool,
+                code=error.code.value,
+                message=error.message,
+                detail=_redact_workspace(error.detail, settings.workspace),
+            )
+            for error in project.errors
+        ],
     )
 
 

@@ -6,7 +6,12 @@ services:
       context: .
     image: dexatlas:latest
     ports:
-      - "8000:8000"
+      # Bound to the loopback interface on purpose. The API has no
+      # authentication — it lists every project and serves their sources — so
+      # publishing it on every interface would publish the analysis to the
+      # network. Put a reverse proxy with authentication in front of it to
+      # expose it; see docs/install.md.
+      - "127.0.0.1:8000:8000"
     volumes:
       - dexatlas-workspace:/workspace
     environment:

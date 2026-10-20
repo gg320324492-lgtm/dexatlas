@@ -28,6 +28,7 @@ from dexatlas.core.models import (
     ToolError,
     ToolErrorCode,
 )
+from dexatlas.core.paths import class_to_relative_path, is_inside
 from dexatlas.tools.base import Backend, ToolInvocation, ToolOutcome, which_or_none
 
 logger = logging.getLogger(__name__)
@@ -137,6 +138,11 @@ class ApktoolBackend(Backend):
         if not manifest_path.is_file():
             return None, None
 
+        # The name of the file, not the path to it. The path is the server's
+        # filesystem, and an error message is published to whoever asked for
+        # the analysis.
+        relative = _relative_to(manifest_path, output_dir)
+
         try:
             root = safe_parse(manifest_path).getroot()
         except ParseError as exc:
@@ -144,7 +150,7 @@ class ApktoolBackend(Backend):
                 tool=self.name,
                 code=ToolErrorCode.PARSE_ERROR,
                 message=f"AndroidManifest.xml is not well-formed XML: {exc}",
-                detail=str(manifest_path),
+                detail=relative,
             )
         except OSError as exc:
             return None, ToolError(
@@ -164,7 +170,7 @@ class ApktoolBackend(Backend):
                 tool=self.name,
                 code=ToolErrorCode.PARSE_ERROR,
                 message="AndroidManifest.xml has no root element",
-                detail=str(manifest_path),
+                detail=relative,
             )
 
         info = ManifestInfo(
@@ -363,13 +369,17 @@ class ApktoolBackend(Backend):
         Directories are searched in sorted order, so a class name that appears in two
         dexes resolves to the same file on every call.
         """
-        relative = _class_to_relative_path(class_name)
+        relative = class_to_relative_path(class_name, ".smali")
         if relative is None:
             return None
 
         for root in _smali_directories(output_dir):
             candidate = root / relative
-            if candidate.is_file():
+            if not candidate.is_file():
+                continue
+            # The name was checked; the file could still be a link out of the
+            # tree. The last check is that the file really is inside it.
+            if is_inside(root, candidate):
                 return candidate
         return None
 
@@ -396,42 +406,6 @@ def _smali_directories(output_dir: Path) -> list[Path]:
     if not output_dir.is_dir():
         return []
     return sorted(p for p in output_dir.glob(f"{_SMALI_DIR_PREFIX}*") if p.is_dir())
-
-
-def _class_to_relative_path(class_name: str) -> Path | None:
-    """``com.foo.Bar`` → ``com/foo/Bar.smali``, or None if the name is not a class name.
-
-    Class names come from an analysed APK, so they are untrusted input. Each part must
-    be a single path component; anything that would change the shape of the path —
-    ``..``, an absolute prefix, a separator, a drive letter — is rejected rather than
-    normalised, because normalising would silently change which file is read.
-    """
-    parts = class_name.split(".")
-    if not parts or not all(parts):
-        return None
-    for part in parts:
-        if not _is_single_component(part):
-            return None
-    return Path(*parts).with_suffix(".smali")
-
-
-def _is_single_component(part: str) -> bool:
-    """Whether ``part`` is exactly one path component and nothing more.
-
-    Callers reach this only for non-empty segments: ``_class_to_relative_path``
-    rejects a name with any empty segment before it splits into components, so an
-    empty string, ``"."`` and ``".."`` never arrive here. Testing for them again
-    would suggest this function is safe on its own, which it is not.
-    """
-    # A separator or drive letter means the caller handed us a path, not a class name.
-    if "/" in part or "\\" in part or ":" in part:
-        return False
-    # NUL and control characters have no place in a class name and truncate paths in
-    # the C runtime that Windows ultimately calls.
-    if any(ord(char) < 0x20 or char == "\x7f" for char in part):
-        return False
-    # Wildcards would make the glob match something other than this class.
-    return not any(char in part for char in "*?[]")
 
 
 def _parse_bool(value: str | None) -> bool | None:

@@ -39,9 +39,20 @@ The image carries JADX and Apktool; the build fails if either cannot be download
 run, so a broken backend is caught at build time rather than during your first analysis.
 
 ```bash
-docker run --rm -p 8000:8000 -v dexatlas-workspace:/workspace dexatlas
+docker run --rm -p 127.0.0.1:8000:8000 -v dexatlas-workspace:/workspace dexatlas
 # API docs at http://localhost:8000/docs
 ```
+
+The port is published on `127.0.0.1` on purpose. **The REST API has no
+authentication**: it lists every project, serves their decompiled sources and
+accepts APKs to analyse. Publishing it on every interface would publish the
+analysis to the network, so the default is this machine only. See
+[Exposing the API](#exposing-the-api) for what to do if you need it elsewhere.
+
+> The container's own server binds `0.0.0.0` — it has to, or the port mapping
+> would find nothing to connect to. What is published, and where, is decided on
+> the host: by the `-p` argument above, or by the `ports:` entry in
+> `docker-compose.yml`.
 
 ## Backends
 
@@ -165,6 +176,49 @@ uv run uvicorn dexatlas.api.app:app --reload
 # interactive docs at http://localhost:8000/docs
 ```
 
+Uvicorn binds `127.0.0.1` unless it is told otherwise, so this listens on
+this machine only. The API has **no authentication** — anyone who can reach it
+can list every analysed project, read their decompiled sources and upload APKs
+to be analysed. That is a reasonable trade for a single-user tool on a laptop,
+and an unreasonable one on a network.
+
+### Exposing the API
+
+To reach the API from another machine, put a reverse proxy with
+authentication in front of it and publish the proxy, not DexAtlas:
+
+```bash
+# 1. Keep DexAtlas on the loopback interface.
+docker run --rm -p 127.0.0.1:8000:8000 -v dexatlas-workspace:/workspace dexatlas
+
+# 2. Put your proxy in front of it, with whatever authentication you use.
+#    nginx, Caddy, Traefik: all of them can do TLS and an auth layer.
+```
+
+What that buys you, and what it costs:
+
+- **The proxy is the security boundary.** DexAtlas itself checks nothing about
+  who is calling: no API key, no session, no rate limit. Everything that
+  matters — who may list the projects, who may read a source, who may upload an
+  APK — is decided by the proxy, so the proxy must actually authenticate.
+- **The port mapping is what the network sees.** Publishing `8000:8000` binds
+  the API on every interface of the host, and every machine that can route to
+  it can use it. `127.0.0.1:8000:8000` cannot be reached from off the host.
+- **An upload is a resource.** The API accepts an APK, writes it to the
+  workspace and analyses it. Without a proxy in front, an exposed API is an
+  invitation to fill the disk. The upload limit below bounds one upload; it
+  does not bound how many arrive.
+- **The API answers with paths.** It reports the *name* of each analysed file
+  and redacts the server's own directories from its error messages — but a
+  project listing is still a listing of what you have analysed.
+
+If none of that is what you want, the CLI does the same work with no server and
+no network at all:
+
+```bash
+uv run dexatlas analyze app.apk --output report.md
+```
+
 | Method   | Path                                        | Purpose                       |
 | -------- | ------------------------------------------- | ----------------------------- |
 | `GET`    | `/health`                                   | Liveness and backend versions |
@@ -188,6 +242,19 @@ uv run uvicorn dexatlas.api.app:app --reload
 curl -X POST -F "file=@app.apk" http://localhost:8000/analyze
 curl "http://localhost:8000/projects/<id>/report?format=markdown"
 ```
+
+### What the API refuses
+
+| Limit                     | Value  | Why                                                        |
+| ------------------------- | ------ | ---------------------------------------------------------- |
+| Upload size               | 256 MiB | Above the 200 MB ceiling Google Play puts on an APK, so every distributable APK is accepted |
+| Declared uncompressed size | 2 GiB  | A real APK expands two- or three-fold; eight times that is more than any real package needs |
+| Expansion ratio           | 100×   | Far past anything real, and far below the thousand-fold expansion of a bomb |
+
+An upload over the size limit is refused with `413` while it streams — it is
+never held in memory and never written in full. An archive that declares more
+than the limits allow is refused with `422`, and it is refused from the ZIP
+central directory, before a single byte of it is decompressed.
 
 ## Development
 

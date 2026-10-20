@@ -43,6 +43,44 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A class name could walk out of the decompiler's output tree.** The JADX backend
+  turned a class name into a path without checking any part of it, so a name that
+  was already a path — absolute, with a drive letter, with a UNC prefix — was
+  honoured as one, and the file it named was read and served. The Apktool backend
+  had checked every part; the rules now live in one place (`dexatlas.core.paths`)
+  and both backends use them, so they cannot drift apart. A name that fails the
+  check is "no such class" — a 404, not a 500 whose traceback carries the
+  server's own directories.
+- **The API published the server's paths.** `apk_path` and the JSON report's
+  `project.apk.path` carried the absolute path of the analysed file, and a
+  manifest parse error carried the absolute path of the decoded file. The file's
+  *name* is published now, the workspace root is redacted from error details, and
+  the promise the architecture document makes — that the API redacts server paths
+  — holds in more than the one place it used to.
+- **An upload was read into memory in one piece, and an archive could ask for
+  gigabytes.** The upload is streamed and counted, and refused at 256 MiB while it
+  streams — never held in memory, never written in full. An archive whose
+  declared contents exceed 2 GiB, or that expands more than a hundredfold, is
+  refused from its ZIP central directory, before a byte of it is decompressed.
+  The same APK was also inspected twice — once by the API and once by the
+  analysis — and is inspected once now.
+- **A backend that outlived its timeout was not stopped.** The timeout killed the
+  process that was started, which for JADX is a `cmd.exe` whose child is the
+  `java.exe` doing the work: the work carried on, held the output the caller was
+  waiting on, and the call waited for it anyway. The whole tree is taken down
+  now — a process group on POSIX, `taskkill /T` on Windows — and the message says
+  "could not be terminated" when it could not be.
+- **The default deployment published an unauthenticated API on every interface.**
+  The API has no authentication by design; it is a single-user tool. But
+  `docker-compose.yml` published it on `0.0.0.0` and the installation guide
+  taught the same command. Both publish on `127.0.0.1` now, and the guide says
+  what exposing it means and what a reverse proxy in front of it is for. The
+  server inside the container still binds `0.0.0.0` — it has to, or the port
+  mapping would find nothing to connect to.
+- **The OpenAPI schema did not describe the source endpoints.** They answer with
+  the source text by default and with a JSON document on request, and both carry
+  `X-DexAtlas-Source-*` headers; the schema claimed JSON with an empty body. It
+  says what the endpoints actually return now, headers included.
 - **The backend's version was read once per indexed symbol.** Every class, method,
   field and cross-reference carries a provenance record, and every record asked the
   backend for its version — a query that scans the installed distributions. On a
