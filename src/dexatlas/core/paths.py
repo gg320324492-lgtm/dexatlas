@@ -16,25 +16,42 @@ from __future__ import annotations
 
 from pathlib import Path
 
+#: The longest a path component may be, in bytes. POSIX filesystems cap a
+#: component's name at 255 bytes, and Windows caps it at the same number, so a
+#: longer one cannot name a file anywhere.
+#:
+#: The rule is here rather than only in the callers because a name that long
+#: is refused by the *filesystem*, not by the shape of the path: the path is
+#: built, the file is asked for, and the answer arrives as an error from the
+#: operating system instead of as "no such file".
+MAX_COMPONENT_BYTES = 255
+
 
 def is_single_component(part: str) -> bool:
     """Whether ``part`` is exactly one path component and nothing more.
 
     Callers reach this only for non-empty segments:
     :func:`class_to_relative_path` rejects a name with any empty segment before
-    it splits into components, so an empty string, ``"."`` and ``".."`` never
-    arrive here. Testing for them again would suggest this function is safe on
-    its own, which it is not.
+    it splits into components, so an empty string never arrives here. ``"."``
+    and ``".."`` are refused as well — they are the two components that change
+    where a path points, and a rule that refused them only because of what
+    the caller happened to filter first would be a rule with a hole in it.
     """
     # A separator or drive letter means the caller handed us a path, not a class name.
     if "/" in part or "\\" in part or ":" in part:
+        return False
+    # The two components that move the path somewhere else.
+    if part in {".", ".."}:
         return False
     # NUL and control characters have no place in a class name and truncate paths in
     # the C runtime that Windows ultimately calls.
     if any(ord(char) < 0x20 or char == "\x7f" for char in part):
         return False
     # Wildcards would make a glob match something other than this class.
-    return not any(char in part for char in "*?[]")
+    if any(char in part for char in "*?[]"):
+        return False
+    # A component longer than the filesystem allows is not a file name at all.
+    return len(part.encode("utf-8", errors="replace")) <= MAX_COMPONENT_BYTES
 
 
 def class_to_relative_path(class_name: str, suffix: str) -> Path | None:
