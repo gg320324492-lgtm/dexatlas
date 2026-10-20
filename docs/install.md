@@ -175,6 +175,7 @@ uv run uvicorn dexatlas.api.app:app --reload
 | `GET`    | `/projects/{id}/manifest`                   | Parsed AndroidManifest.xml    |
 | `GET`    | `/projects/{id}/classes`                    | Indexed classes               |
 | `GET`    | `/projects/{id}/methods`                    | Indexed methods               |
+| `GET`    | `/projects/{id}/resources`                 | Indexed resource strings      |
 | `GET`    | `/projects/{id}/classes/{name}/source`      | Class source                 |
 | `GET`    | `/projects/{id}/methods/{class}/{method}`   | Method source                |
 | `GET`    | `/projects/{id}/xrefs/{method_id}`          | Callers of a method          |

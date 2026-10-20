@@ -16,8 +16,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->577<!--/fig--> 个（<!--fig:tests.fast-->459<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->94.6%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->601<!--/fig--> 个（<!--fig:tests.fast-->483<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->94.5%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 
@@ -161,7 +161,8 @@ uv run python scripts/check-doc-citations.py
 
 ### 安全边界
 
-仓库里**不含**任何第三方 APK、DEX、so 或 jar。分析样本只有两个来源：
+仓库里**不含**任何第三方分析产物——APK、DEX、so、jar、zip、obb、vdex 这些后缀
+一个都没有。分析样本只有两个来源：
 
 - **自建** —— `examples/` 下的 5 个，每个的 smali 源码就在旁边，
   `scripts/build-test-apks.sh` 能重建

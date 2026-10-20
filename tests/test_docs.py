@@ -26,6 +26,28 @@ RELATIVE_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)\s]+)")
 #: Directories whose contents are generated or third-party.
 SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache"}
 
+#: Suffixes that mark a file as an analysis artefact rather than source.
+#:
+#: The list is longer than the five the rule started with, because an APK is not
+#: the only way to carry one: a split APK is ``.apks``, an XAPK is a bundle of
+#: APKs, an expansion file is ``.obb``, and a ``.vdex``/``.odex`` is a DEX
+#: container — the very thing Androguard reads. A rule that only knew five
+#: spellings would let the same binary in under a different name.
+_ANALYSIS_ARTIFACT_SUFFIXES = {
+    ".apk",
+    ".apks",
+    ".apkm",
+    ".xapk",
+    ".aab",
+    ".dex",
+    ".odex",
+    ".vdex",
+    ".obb",
+    ".so",
+    ".jar",
+    ".zip",
+}
+
 #: Documents that must exist for a reader to get started.
 REQUIRED_DOCS = [
     "README.md",
@@ -149,15 +171,15 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     examples = REPO_ROOT / "examples"
     allowed = {
         str(path.relative_to(REPO_ROOT)).replace("\\", "/")
-        for path in examples.rglob("*.apk")
-        if path.is_file()
+        for path in examples.rglob("*")
+        if path.is_file() and path.suffix.lower() in _ANALYSIS_ARTIFACT_SUFFIXES
     }
     assert allowed, "no first-party sample was found under examples/"
 
     tracked_bad = [
         name
         for name in result.stdout.splitlines()
-        if Path(name).suffix.lower() in {".apk", ".dex", ".aab", ".so", ".jar"}
+        if Path(name).suffix.lower() in _ANALYSIS_ARTIFACT_SUFFIXES
         and name not in allowed
     ]
     assert not tracked_bad, f"third-party analysis artifacts are tracked: {tracked_bad}"
