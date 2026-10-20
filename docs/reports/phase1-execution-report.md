@@ -76,7 +76,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->473<!--/fig-->（<!--fig:tests.fast-->376<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->482<!--/fig-->（<!--fig:tests.fast-->385<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->94.0%<!--/fig-->**（<!--fig:coverage.covered-->1857<!--/fig-->/<!--fig:coverage.total-->1975<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -124,9 +124,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->376<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->385<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->97<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->473<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->482<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -773,10 +773,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->473<!--/fig--> 个：<!--fig:tests.fast-->376<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->482<!--/fig--> 个：<!--fig:tests.fast-->385<!--/fig--> 快 + <!--fig:tests.slow-->97<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->94.0%<!--/fig-->（<!--fig:coverage.covered-->1857<!--/fig-->/<!--fig:coverage.total-->1975<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->473<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->482<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -787,9 +787,10 @@ uv run pytest --cov=dexatlas --cov-report=term
 git checkout v0.1.0    # <!--fig:history.v0.1.0.tests-->204<!--/fig--> 个测试
 git checkout v0.1.1    # <!--fig:history.v0.1.1.tests-->244<!--/fig--> 个测试
 git checkout v0.1.2    # <!--fig:history.v0.1.2.tests-->275<!--/fig--> 个测试
+git checkout v0.1.3    # <!--fig:history.v0.1.3.tests-->444<!--/fig--> 个测试
 ```
 
-在装齐后端和样本的完整环境里，这三个 tag 的套件都是全绿的；v0.1.1 和 v0.1.2 各带
+在装齐后端和样本的完整环境里，这四个 tag 的套件都是全绿的；v0.1.1 和 v0.1.2 各带
 1 个 `xfail`——`test_an_empty_path_disables_the_backend`，那个缺陷在 v0.1.2 之后修好了，
 标记随之摘掉。
 
@@ -933,18 +934,21 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     },
     "v0.1.2": {
       "tests": 275
+    },
+    "v0.1.3": {
+      "tests": 444
     }
   },
   "schema": 3,
   "source_fingerprint": "sha256:ad4804af6e50dbdfa5450df9f0a6f1141c8acecbf76d908285b59febff24dfa4",
   "suite": {
-    "passed": 473,
+    "passed": 482,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 376,
+    "fast": 385,
     "slow": 97,
-    "total": 473
+    "total": 482
   }
 }-->

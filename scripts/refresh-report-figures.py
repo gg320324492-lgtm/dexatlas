@@ -78,6 +78,13 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+#: The status page states the same figures as the report — the test counts and
+#: the coverage — and it is the first thing a reader looks at, so a number
+#: that has gone stale there is worth catching. It is refreshed together with
+#: the report it summarises; pointing the script at another document refreshes
+#: only that document, because the test suite refreshes copies of the report
+#: and must not write to the real status page while it does so.
+STATUS_PATH = REPO_ROOT / "docs" / "status.md"
 SOURCE_ROOT = REPO_ROOT / "src" / "dexatlas"
 EXAMPLES_ROOT = REPO_ROOT / "examples"
 
@@ -90,7 +97,7 @@ WEAK_MODULE_PERCENT = 90.0
 #: The released versions the report compares its own figures against. Their test
 #: counts belong to those tags, not to the current tree, so they are measured
 #: where they live -- in an archive of the tag itself.
-HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2")
+HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2", "v0.1.3")
 
 #: ``<!--fig:key-->value<!--/fig-->`` — everything between the markers is generated.
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
