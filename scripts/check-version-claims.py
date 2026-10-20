@@ -103,6 +103,40 @@ UNRELEASED_LINK = re.compile(
     r"^\[Unreleased\]:\s*\S*compare/(?P<value>v?\d+\.\d+\.\d+)", re.MULTILINE
 )
 
+#: ``<!--fig:key-->value<!--/fig-->`` — the figures the refresh script writes
+#: into the execution report. They are measurements, so a hand-written number
+#: that disagrees with one of them is a number that was copied and went stale.
+FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
+
+#: The report that holds the measured figures of a release.
+REPORT_AT_TAG = "docs/reports/phase1-execution-report.md"
+
+#: The release notes of a release.
+RELEASE_NOTES = "docs/releases/{tag}.md"
+
+#: One section of the changelog: "## [0.1.3] — 2026-10-20" and what follows it.
+CHANGELOG_SECTION = re.compile(
+    r"^## \[(?P<version>\d+\.\d+\.\d+)\][^\n]*\n(?P<body>.*?)(?=^## |\Z)",
+    re.MULTILINE | re.DOTALL,
+)
+
+#: A coverage percentage a text states. "coverage is 93.9%" and "93.9%
+#: coverage" both count; a percentage that belongs to a module, or to the
+#: version before this one, does not — it is not attached to the word.
+COVERAGE_STATED = re.compile(
+    r"(?:coverage|覆盖率)[^%\n]{0,40}?(?P<after>\d+(?:\.\d+)?)\s*%"
+    r"|(?P<before>\d+(?:\.\d+)?)\s*%[^%\n]{0,20}?(?:coverage|覆盖率)"
+)
+
+#: A test count a text states: "444 tests (347 fast, 97 integration)".
+TESTS_STATED = re.compile(
+    r"(?P<total>\d+)\s+tests\b"
+    r"(?:\s*\(\s*(?P<fast>\d+)\s+fast\s*,\s*(?P<slow>\d+)\s+(?:integration|slow)\s*\))?"
+)
+
+#: A number that belongs to the version before this one: "up from 89.2%".
+PREVIOUS_VERSION = re.compile(r"(?:up from|previously|before)\s+$", re.IGNORECASE)
+
 #: Words that say a release has happened.
 RELEASED = re.compile(
     r"已发布|已经发布|已发行|已上线|已推送|正式发布|发布了|发布"
@@ -265,6 +299,22 @@ def git_succeeds(*args: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def git_optional(*args: str) -> str | None:
+    """The output of a git command, or None when the command does not work."""
+    result = subprocess.run(
+        ["git", *args],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout
 
 
 def read_facts() -> Facts:
@@ -595,6 +645,137 @@ def check_text(path: str, text: str, facts: Facts) -> list[Finding]:
     return findings
 
 
+def measured_figures(tag: str) -> dict[str, str]:
+    """The figures the execution report of a release carries.
+
+    An empty result means the release predates the generated figures, or that
+    it has no report: there is nothing measured to compare with, and nothing
+    is claimed.
+    """
+    report = git_optional("show", f"{tag}:{REPORT_AT_TAG}")
+    if report is None:
+        return {}
+    return dict(FIGURE.findall(report))
+
+
+def release_documents(
+    tag: str, version: str, by_path: dict[str, str]
+) -> list[tuple[str, str, int]]:
+    """The documents that state a release's numbers, with their line offsets.
+
+    The offset is the number of lines before the text starts, so that a
+    finding in the changelog's section points at the line in the changelog.
+    """
+    documents: list[tuple[str, str, int]] = []
+
+    notes = RELEASE_NOTES.format(tag=tag)
+    if notes in by_path:
+        documents.append((notes, by_path[notes], 0))
+
+    changelog = by_path.get("CHANGELOG.md", "")
+    for match in CHANGELOG_SECTION.finditer(changelog):
+        if match.group("version") != version:
+            continue
+        offset = changelog[: match.start("body")].count("\n")
+        documents.append(("CHANGELOG.md", match.group("body"), offset))
+    return documents
+
+
+def percentage(value: str) -> float | None:
+    """A percentage as a number: "94.0%" and "94" are the same number."""
+    try:
+        return float(value.rstrip("%"))
+    except ValueError:
+        return None
+
+
+def check_stated_numbers(
+    path: str, text: str, offset: int, measured: dict[str, str], version: str
+) -> list[Finding]:
+    """The numbers a release document states, against the numbers measured."""
+    findings: list[Finding] = []
+    for number, line in enumerate(text.splitlines(), 1):
+        # A number between the markers is generated, not written by hand.
+        spoken = FIGURE.sub(lambda match: " " * len(match.group(0)), line)
+        excerpt = collapse(line)[:160]
+
+        for match in COVERAGE_STATED.finditer(spoken):
+            stated = match.group("after") or match.group("before")
+            expected = measured.get("coverage.pct")
+            if stated is None or expected is None:
+                continue
+            if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
+                continue
+            if percentage(stated) == percentage(expected):
+                continue
+            findings.append(
+                Finding(
+                    path=path,
+                    line=offset + number,
+                    kind="release-coverage",
+                    version=version,
+                    message=(
+                        f"it says the coverage is {stated}%, the measured coverage is {expected}"
+                    ),
+                    excerpt=excerpt,
+                )
+            )
+
+        for match in TESTS_STATED.finditer(spoken):
+            if PREVIOUS_VERSION.search(spoken, max(0, match.start() - 12), match.start()):
+                continue
+            for key, group in (
+                ("tests.total", "total"),
+                ("tests.fast", "fast"),
+                ("tests.slow", "slow"),
+            ):
+                stated = match.group(group)
+                expected = measured.get(key)
+                if stated is None or expected is None:
+                    continue
+                if stated == expected:
+                    continue
+                findings.append(
+                    Finding(
+                        path=path,
+                        line=offset + number,
+                        kind="release-tests",
+                        version=version,
+                        message=(f"it says {key} is {stated}, the measured number is {expected}"),
+                        excerpt=excerpt,
+                    )
+                )
+    return findings
+
+
+def check_release_numbers(facts: Facts, documents: list[tuple[str, str]]) -> list[Finding]:
+    """The numbers the release documents state, against the numbers measured.
+
+    The release notes and the changelog say how many tests a release had and
+    how well the code was covered. Those are measurements, and the execution
+    report of the same release holds the measured ones — written there by
+    ``scripts/refresh-report-figures.py``. Comparing the two is a comparison
+    of two measurements, not a list of expected values.
+
+    A release whose report predates the generated figures has nothing to
+    compare with, and is left alone.
+    """
+    findings: list[Finding] = []
+    by_path = dict(documents)
+    tags = sorted(
+        (tag for tag in facts.tags if tag.startswith("v")),
+        key=lambda tag: version_key(tag.lstrip("v")),
+    )
+    for tag in tags:
+        measured = measured_figures(tag)
+        if not measured:
+            continue
+        version = tag.lstrip("v")
+        for path, text, offset in release_documents(tag, version, by_path):
+            findings.extend(check_stated_numbers(path, text, offset, measured, version))
+    return findings
+
+
 def documents_in_tree() -> list[tuple[str, str]]:
     """The markdown files of the working tree, with their text."""
     documents: list[tuple[str, str]] = []
@@ -656,6 +837,7 @@ def main(argv: list[str] | None = None) -> int:
     findings = check_facts(facts)
 
     documents = documents_in_tree()
+    findings.extend(check_release_numbers(facts, documents))
     for name, text in documents:
         findings.extend(check_text(name, text, facts))
 
@@ -666,7 +848,10 @@ def main(argv: list[str] | None = None) -> int:
         if base is None or not git_succeeds("rev-parse", "--verify", f"{base}^{{commit}}"):
             print(f"could not resolve the base commit {args.base!r}", file=sys.stderr)
             return 2
-        for name, text in documents_at(base):
+        base_documents = documents_at(base)
+        for finding in check_release_numbers(facts, base_documents):
+            known.add(finding.key)
+        for name, text in base_documents:
             for finding in check_text(name, text, facts):
                 known.add(finding.key)
 

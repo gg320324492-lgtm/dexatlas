@@ -320,3 +320,83 @@ def test_a_rewritten_claim_is_a_new_finding() -> None:
     second = _claims(checker, "仓库里目前最新的 tag 为 `v0.1.2`")
     assert first and second
     assert first[0].key != second[0].key  # type: ignore[attr-defined]
+
+
+# -- the numbers a release document states ---------------------------------
+
+
+#: The figures the execution report of v0.1.3 carries, measured.
+MEASURED = {
+    "tests.total": "444",
+    "tests.fast": "347",
+    "tests.slow": "97",
+    "coverage.pct": "94.0%",
+}
+
+
+def _stated(checker: ModuleType, text: str) -> list[object]:
+    """The findings the checker reports for the numbers a document states."""
+    return checker.check_stated_numbers("docs/releases/v0.1.3.md", text, 0, MEASURED, "0.1.3")
+
+
+def test_a_coverage_number_that_is_not_the_measured_one_is_a_finding() -> None:
+    """The release notes of v0.1.3 said 93.9%; the report of that release
+    measured 94.0%. Nobody noticed, and the wrong number shipped."""
+    checker = _checker()
+    claims = _stated(checker, "First-party coverage is **93.9%**.")
+    assert _kinds(claims) == ["release-coverage"]
+    assert "93.9" in claims[0].message  # type: ignore[attr-defined]
+
+
+def test_a_coverage_number_that_is_the_measured_one_is_not_a_finding() -> None:
+    checker = _checker()
+    claims = _stated(checker, "First-party coverage is **94.0%** (1857/1975 lines).")
+    assert claims == []
+
+
+def test_the_previous_version_coverage_is_not_a_finding() -> None:
+    """ "up from 89.2%" states what the version before this one measured."""
+    checker = _checker()
+    claims = _stated(checker, "- First-party coverage 94.0%, up from 89.2%")
+    assert claims == []
+
+
+def test_a_module_coverage_is_not_a_finding() -> None:
+    """A module's own coverage is not the coverage of the release."""
+    checker = _checker()
+    claims = _stated(checker, "The Apktool adapter, previously at 82.7%, is now 94%.")
+    assert claims == []
+
+
+def test_a_test_count_that_is_the_measured_one_is_not_a_finding() -> None:
+    checker = _checker()
+    claims = _stated(checker, "- 444 tests (347 fast, 97 integration), up from 275")
+    assert claims == []
+
+
+def test_a_test_count_that_was_copied_wrong_is_a_finding() -> None:
+    checker = _checker()
+    claims = _stated(checker, "- 445 tests (347 fast, 97 integration), up from 275")
+    assert _kinds(claims) == ["release-tests"]
+    assert "445" in claims[0].message  # type: ignore[attr-defined]
+
+
+def test_a_passed_count_of_another_configuration_is_not_a_finding() -> None:
+    """The verification table counts what each configuration passed, and they
+    are not the same number."""
+    checker = _checker()
+    claims = _stated(checker, "| No backends installed | 394 passed, 50 skipped |")
+    assert claims == []
+
+
+def test_a_generated_number_is_not_a_finding() -> None:
+    """A number between the markers was measured, not written by hand."""
+    checker = _checker()
+    claims = _stated(checker, "Coverage: <!--fig:coverage.pct-->94.0%<!--/fig-->")
+    assert claims == []
+
+
+def test_the_line_of_a_stated_number_is_reported() -> None:
+    checker = _checker()
+    claims = _stated(checker, "First-party coverage is **93.9%**.")
+    assert claims[0].line == 1  # type: ignore[attr-defined]
