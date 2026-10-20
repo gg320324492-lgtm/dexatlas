@@ -1176,7 +1176,7 @@ def test_the_readme_badge_states_the_measured_numbers() -> None:
     """
     script = _figure_script()
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    stated = script.apply_badges(readme, {"tests.total": "801", "coverage.pct": "94.2%"})
+    stated = script.apply_badges(readme, {"tests.passing": "801", "coverage.pct": "94.2%"})
 
     assert "badge/tests-801%20passing" in stated
     # The percent sign is spelled "%25" in a URL, and only once: a badge
@@ -1189,7 +1189,7 @@ def test_writing_the_badge_again_changes_nothing() -> None:
     """Refreshing a badge that is already right must leave it alone."""
     script = _figure_script()
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    values = {"tests.total": "801", "coverage.pct": "94.2%"}
+    values = {"tests.passing": "801", "coverage.pct": "94.2%"}
 
     once = script.apply_badges(readme, values)
 
@@ -1201,4 +1201,18 @@ def test_a_readme_without_the_badge_is_left_alone() -> None:
     script = _figure_script()
     text = "# A readme\n\nNo badge here.\n"
 
-    assert script.apply_badges(text, {"tests.total": "801", "coverage.pct": "94.2%"}) == text
+    assert script.apply_badges(text, {"tests.passing": "801", "coverage.pct": "94.2%"}) == text
+
+
+def test_a_badge_with_no_measurement_keeps_its_number() -> None:
+    """A partial measurement measures neither figure, so neither is written.
+
+    A badge with an empty number in it says nothing at all, which is worse
+    than a badge with a stale one: a stale number can be checked, and an
+    empty one cannot. The run that measured nothing leaves the badge alone.
+    """
+    script = _figure_script()
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    for values in ({}, {"tests.passing": "", "coverage.pct": ""}):
+        assert script.apply_badges(readme, values) == readme

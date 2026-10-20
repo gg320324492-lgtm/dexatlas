@@ -718,11 +718,12 @@ def apply_figures(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
 
 #: The badge of the test count: ``.../badge/tests-444%20passing-brightgreen.svg``.
 #: The number is URL-escaped in the badge and written by hand; this is the
-#: pattern that finds it.
-BADGE_TESTS = re.compile(r"(?P<head>badge/tests-)(?P<number>[\d.]+)(?P<tail>%20passing)")
+#: pattern that finds it. The number may be empty -- a badge whose number was
+#: lost is still a badge, and it has to be repairable.
+BADGE_TESTS = re.compile(r"(?P<head>badge/tests-)(?P<number>[\d.]*)(?P<tail>%20passing)")
 
 #: The badge of the coverage: ``.../badge/coverage-94.0%25-brightgreen.svg``.
-BADGE_COVERAGE = re.compile(r"(?P<head>badge/coverage-)(?P<number>[\d.]+)(?P<tail>%25)")
+BADGE_COVERAGE = re.compile(r"(?P<head>badge/coverage-)(?P<number>[\d.]*)(?P<tail>%25)")
 
 
 def apply_badges(text: str, values: dict[str, str]) -> str:
@@ -737,13 +738,16 @@ def apply_badges(text: str, values: dict[str, str]) -> str:
     A readme without the badge is left alone: not every readme has one, and
     one that does not is not a document with a stale number.
     """
-    tests = values.get("tests.total")
+    tests = values.get("tests.passing")
     coverage = values.get("coverage.pct")
-    if tests is not None:
+    # A value that is missing or empty is not written: a badge with an empty
+    # number in it is worse than a badge with a stale one, because it says
+    # nothing at all rather than something that can be checked.
+    if tests:
         text = BADGE_TESTS.sub(
             lambda match: f"{match.group('head')}{tests}{match.group('tail')}", text
         )
-    if coverage is not None:
+    if coverage:
         # The value carries the percent sign ("94.2%") and the badge is a
         # URL: the tail of the pattern already spells the percent sign as
         # "%25", so the number goes in without one. Writing the value as it
@@ -1131,12 +1135,21 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # The readme badges state the same two figures, and their numbers were
-    # written by hand. They are written here from the same measurement, so a
-    # badge cannot drift away from the report it summarises.
-    badge_values = {
-        "tests.total": str(total),
-        "coverage.pct": record.get("coverage", {}).get("pct", ""),
-    }
+    # written by hand. They are written here from the same measurement the
+    # report is written from -- the same values, not a second calculation of
+    # them -- so a badge cannot drift away from the report it summarises.
+    #
+    # The test badge says "passing", so it states the number that passed, not
+    # the number the collector found. A partial run measured neither of them
+    # for the whole suite, so a badge is not written from one: the figures it
+    # would state are figures of a run that did not run everything.
+    badge_values: dict[str, str] = {}
+    if complete:
+        measured_values = render_figures(record)
+        badge_values = {
+            "tests.passing": measured_values["suite.passed"],
+            "coverage.pct": measured_values["coverage.pct"],
+        }
     readmes: list[tuple[Path, str, str]] = []
     for readme in README_PATHS:
         if not readme.is_file():

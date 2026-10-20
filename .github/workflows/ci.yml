@@ -78,6 +78,9 @@ jobs:
           fi
 
   test:
+    # The 3.12 job also runs the default configuration end to end — a
+    # relative workspace, outside the repository — because that is the
+    # configuration every test in the suite had been avoiding.
     name: Tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
@@ -127,6 +130,31 @@ jobs:
 
       - name: Enforce coverage threshold
         run: uv run coverage report --fail-under=80
+
+      # The default configuration, run from a directory that is not the
+      # repository.
+      #
+      # Every test in this suite uses an absolute workspace, so the default --
+      # a relative one -- was never exercised. That is how the default lost
+      # its Java decompilation for a whole release: the path was handed to
+      # JADX twice, resolved against two different bases, and the sources
+      # landed in a nested copy of the tree the index reads. The report
+      # credited jadx 1.5.2 and recorded nothing from it.
+      #
+      # The unit tests pin that now, but they use a stand-in for the command
+      # line. This step runs the real thing, in the configuration a reader
+      # gets when they follow the quick start: a relative workspace, outside
+      # the repository, and a report that has to say the decompiler worked.
+      - name: The default configuration decompiles
+        if: matrix.python-version == '3.12'
+        run: |
+          cd "$RUNNER_TEMP"
+          uv run --project "$GITHUB_WORKSPACE" --no-sync dexatlas analyze \
+            "$GITHUB_WORKSPACE/examples/demo-app/demo.apk" --output report.md
+          # The row is the claim: the report has to say that JADX turned
+          # methods into Java. Its absence is what the broken default looked
+          # like from the outside.
+          grep -q "Methods decompiled by JADX" report.md
 
   test-partial-backends:
     name: Tests (Apktool only, no JADX)

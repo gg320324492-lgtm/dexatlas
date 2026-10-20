@@ -40,6 +40,16 @@ _CHUNK_SIZE = 1024 * 1024
 #: stops being an inconvenience and starts being a disk-space problem.
 MAX_APK_BYTES = 256 * 1024 * 1024
 
+#: The name an upload is shown under when the client did not give one.
+DEFAULT_UPLOAD_NAME = "upload.apk"
+
+#: The longest a name shown to a reader may be, in bytes.
+#:
+#: A file name cannot be longer than this on any filesystem DexAtlas runs on, so
+#: a name that is longer cannot name anything — and a name that is shown is a
+#: name somebody may try to use.
+MAX_NAME_BYTES = 255
+
 #: The largest total uncompressed size an APK's contents may declare.
 #:
 #: A real APK expands by a factor of two or three, so 2 GiB — eight times that — is
