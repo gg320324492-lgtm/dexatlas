@@ -15,6 +15,12 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 > 本报告中的测试数、覆盖率已随 v0.1.1 同步过一次；现在这些数字改由脚本自动生成
 > （见 1.2 节与 6 节），不必再随每次发布手工同步。
 >
+> **v0.1.3 补充（已发布）**
+>
+> v0.1.3「证据能指回原处」把交叉引用变成了证据、让 locator 随报告迁移、
+> 让字符串常量知道自己被用在哪里，并给文档的行号引用加上了自动核对。
+> v0.1.3 已发布：https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.3
+>
 > **v0.1.2 补充（已发布）**
 >
 > 报告 3.10 节记录了 v0.1.2 的 FIX-002「补齐 5 个自建测试 APK 与演示视频」——
@@ -929,7 +935,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 3,
-  "source_fingerprint": "sha256:1e939edc5b41c272edf0d2b010beab1d8a360655bfcb10d0f98cfd09fa1a0c16",
+  "source_fingerprint": "sha256:ad4804af6e50dbdfa5450df9f0a6f1141c8acecbf76d908285b59febff24dfa4",
   "suite": {
     "passed": 444,
     "skipped": 0,

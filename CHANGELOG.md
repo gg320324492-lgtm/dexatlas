@@ -7,9 +7,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Everything below landed on `main` after v0.1.2 and **has not been released**:
-there is no tag and no release for it. The version number is decided when it is
-released, so none is written here.
+Nothing changed yet.
+
+## [0.1.3] — 2026-10-20
+
+Evidence that points back. A conclusion you cannot point back to is not a
+conclusion — this release makes that true of more things than it used to be.
 
 ### Added
 
@@ -270,7 +273,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.3
 [0.1.2]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
 [0.1.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.0
