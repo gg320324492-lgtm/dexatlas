@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->565<!--/fig-->（<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.5%<!--/fig-->**（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->589<!--/fig-->（<!--fig:tests.fast-->471<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.5%<!--/fig-->**（<!--fig:coverage.covered-->2176<!--/fig-->/<!--fig:coverage.total-->2303<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -119,9 +119,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->447<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->471<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->118<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->565<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->589<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -774,10 +774,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->565<!--/fig--> 个：<!--fig:tests.fast-->447<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->589<!--/fig--> 个：<!--fig:tests.fast-->471<!--/fig--> 快 + <!--fig:tests.slow-->118<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.5%<!--/fig-->（<!--fig:coverage.covered-->2152<!--/fig-->/<!--fig:coverage.total-->2277<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->565<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.5%<!--/fig-->（<!--fig:coverage.covered-->2176<!--/fig-->/<!--fig:coverage.total-->2303<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->589<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -900,14 +900,14 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "api/app.py": [166, 14],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [211, 5],
+      "cli/main.py": [237, 5],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 0],
       "core/__init__.py": [3, 0],
       "core/evidence.py": [60, 0],
       "core/ingest.py": [36, 2],
       "core/models.py": [264, 4],
-      "core/pipeline.py": [275, 10],
+      "core/pipeline.py": [275, 12],
       "core/storage.py": [220, 7],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
@@ -923,8 +923,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/jadx/adapter.py": [242, 33],
       "tools/registry.py": [28, 0]
     },
-    "missing": 125,
-    "statements": 2277
+    "missing": 127,
+    "statements": 2303
   },
   "history": {
     "v0.1.0": {
@@ -941,15 +941,15 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 3,
-  "source_fingerprint": "sha256:acc8c3e974133d0e8668da839d157a608019a5ae5365e10bb2524c40f89476af",
+  "source_fingerprint": "sha256:f5f00f27014a94e18a21350be23212c416c3ad48c6a6c0c555da7cef2c8c894b",
   "suite": {
-    "passed": 565,
+    "passed": 589,
     "skipped": 0,
     "xfailed": 0
   },
   "tests": {
-    "fast": 447,
+    "fast": 471,
     "slow": 118,
-    "total": 565
+    "total": 589
   }
 }-->
