@@ -184,11 +184,13 @@ def _missing_backend_evidence(evidence: list[Evidence], tool: str) -> Evidence |
     """The record of a backend that never ran.
 
     Such a record cites the tool and cites no version — a tool that did not run
-    has no version to quote — and points at the failure in its locator.
+    has no version to quote — and points at the failure in its locator. Every
+    locator names its backend, so the failure is addressed as
+    ``<tool>:error/<code>``.
     """
     for item in evidence:
         for provenance in item.provenance:
-            if provenance.tool == tool and provenance.locator.startswith("error/"):
+            if provenance.tool == tool and provenance.locator.startswith(f"{tool}:error/"):
                 return item
     return None
 
@@ -598,5 +600,7 @@ def test_the_analysis_records_the_decompilation_coverage(
     provenance = failure.provenance[0]
     assert provenance.tool == "jadx"
     assert provenance.tool_version is None, "a tool that never ran has no version"
-    assert provenance.locator == "error/not_installed"
+    # Every locator names its backend, so a reader can tell which tool a location
+    # belongs to without looking at the provenance's other fields.
+    assert provenance.locator == "jadx:error/not_installed"
     assert failure.detail["error"]["code"] == "not_installed"
