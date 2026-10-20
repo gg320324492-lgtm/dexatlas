@@ -3,6 +3,19 @@
 Every command delegates to :class:`~dexatlas.core.pipeline.Analyzer`. The CLI holds no
 analysis logic of its own — the same code path backs the REST API, so the two cannot
 drift apart.
+
+Two kinds of "nothing" are kept apart, because they mean different things to whoever
+reads the output:
+
+* the request was wrong — the project id names nothing, or the input is not an APK.
+  That is exit code :data:`EXIT_BAD_REQUEST`.
+* the request was fine and the answer is empty — the project has no classes, no
+  callers, no source for that class. That is exit code :data:`EXIT_EMPTY`.
+
+A limit is a bound on what is shown, never a way to get a wrong answer. ``--limit 0``
+and ``--limit -1`` are refused rather than quietly listing nothing — or, worse,
+listing everything but the last row, because a negative index counts from the end.
+A listing that was cut short says how many rows it left out.
 """
 
 from __future__ import annotations
@@ -20,7 +33,7 @@ from dexatlas import __version__
 from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
-from dexatlas.core.models import ResourceKind, SourceDocument, canonical_method_id
+from dexatlas.core.models import Project, ResourceKind, SourceDocument, canonical_method_id
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -28,6 +41,10 @@ from dexatlas.reports.markdown import render_markdown
 app = typer.Typer(
     name="dexatlas",
     help="Evidence-first Android reverse engineering and analysis platform.",
+    epilog=(
+        "Exit codes: 0 the command did what was asked; 1 the answer is empty; "
+        "2 the request was wrong (no such project, or an input that is not an APK)."
+    ),
     no_args_is_help=True,
     add_completion=False,
 )
@@ -38,6 +55,16 @@ ExitCode = typer.Exit
 
 #: The mark for elided output. ``mark`` spells it safely on a legacy code page.
 ELLIPSIS = "…"
+
+#: The request itself was wrong: no such project, or an input that is not an APK.
+EXIT_BAD_REQUEST = 2
+
+#: The request was fine and the answer is empty: no classes matched, no callers, no
+#: source for that class.
+EXIT_EMPTY = 1
+
+#: What a project id looks like, for the message that says "there is no such project".
+PROJECT_ID_SHAPE = "apk_0123456789abcdef"
 
 
 class SourceFormat(StrEnum):
@@ -58,6 +85,34 @@ def _more(count: int, singular: str, plural: str | None = None) -> str:
 def _resource_word(count: int) -> str:
     """``resource string`` or ``resource strings``, to fit the count."""
     return "resource string" if count == 1 else "resource strings"
+
+
+def _require_project(analyzer: Analyzer, project_id: str) -> Project:
+    """Fail with a clear message when the project id names nothing.
+
+    "No classes matched" and "there is no such project" are answers to different
+    questions, and a reader told the first when the truth is the second goes
+    looking for a class that was never indexed. The shape of an id is given,
+    because a mistyped id is the usual cause.
+    """
+    project = analyzer.store.get_project(project_id)
+    if project is None:
+        err_console.print(
+            f"[red]No such project:[/red] {project_id}\n"
+            f"Project ids look like [bold]{PROJECT_ID_SHAPE}[/bold] — 'apk_' "
+            "followed by the first 16 hex characters of the APK's SHA-256.\n"
+            "Run `dexatlas projects` to list the projects in this workspace."
+        )
+        raise ExitCode(code=EXIT_BAD_REQUEST)
+    return project
+
+
+def _not_shown(hidden: int, singular: str, plural: str | None = None) -> str:
+    """The line that says a listing was cut short, and by how much."""
+    return (
+        f"[dim]{mark(ELLIPSIS)} {_more(hidden, singular, plural)} not shown "
+        "(use --limit to see more)[/dim]"
+    )
 
 
 @app.callback()
@@ -132,7 +187,7 @@ def analyze(
         result = Analyzer().analyze(apk)
     except ApkValidationError as exc:
         err_console.print(f"[red]Not a usable APK:[/red] {exc}")
-        raise ExitCode(code=2) from exc
+        raise ExitCode(code=EXIT_BAD_REQUEST) from exc
 
     project = result.project
     console.print(
@@ -165,7 +220,7 @@ def analyze(
         )
         console.print(f"JSON report {mark(ARROW)} [bold]{json_output}[/bold]")
 
-    raise ExitCode(code=0 if result.succeeded else 1)
+    raise ExitCode(code=0 if result.succeeded else EXIT_EMPTY)
 
 
 @app.command()
@@ -201,11 +256,19 @@ def classes(
     prefix: Annotated[
         str | None, typer.Option("--prefix", help="Filter by package prefix.")
     ] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Maximum classes to list.")] = 50,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum classes to list. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 50,
     provenance_limit: Annotated[
         int,
         typer.Option(
             "--provenance-limit",
+            min=0,
             help="How many sources to show per class. 0 shows none.",
         ),
     ] = 2,
@@ -220,10 +283,11 @@ def classes(
     it left out; ``--all`` shows them all, and the REST API returns them all.
     """
     analyzer = Analyzer()
+    _require_project(analyzer, project_id)
     indexed = analyzer.store.list_classes(project_id, prefix=prefix)
     if not indexed:
         err_console.print("[yellow]No classes matched.[/yellow]")
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
     rows = indexed[:limit]
     for cls in rows:
@@ -240,10 +304,7 @@ def classes(
 
     hidden_classes = len(indexed) - len(rows)
     if hidden_classes > 0:
-        console.print(
-            f"[dim]{mark(ELLIPSIS)} {_more(hidden_classes, 'class', 'classes')} not shown "
-            f"(use --limit to see more)[/dim]"
-        )
+        console.print(_not_shown(hidden_classes, "class", "classes"))
 
 
 @app.command()
@@ -252,7 +313,14 @@ def methods(
     class_name: Annotated[
         str | None, typer.Option("--class", help="Restrict to one class.")
     ] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Maximum methods to list.")] = 100,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum methods to list. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 100,
 ) -> None:
     """List the methods indexed for a project.
 
@@ -261,11 +329,13 @@ def methods(
     source to read.
     """
     analyzer = Analyzer()
-    rows = analyzer.store.list_methods(project_id, class_name)[:limit]
-    if not rows:
+    _require_project(analyzer, project_id)
+    indexed = analyzer.store.list_methods(project_id, class_name)
+    if not indexed:
         err_console.print("[yellow]No methods matched.[/yellow]")
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
+    rows = indexed[:limit]
     table = Table(header_style="bold")
     table.add_column("Method")
     table.add_column("Flags")
@@ -277,6 +347,13 @@ def methods(
             "yes" if method.decompiled else "no",
         )
     console.print(table)
+
+    # A capped listing that does not say so is a listing that looks complete.
+    # The other two listings already admitted it; this one did not, and a
+    # project with thousands of methods is exactly where the difference shows.
+    hidden = len(indexed) - len(rows)
+    if hidden > 0:
+        console.print(_not_shown(hidden, "method"))
 
 
 @app.command()
@@ -296,12 +373,13 @@ def source(
 ) -> None:
     """Print a class (or one method) as decompiled Java, falling back to Smali.
 
-    The source is Java or Smali, and the two are not interchangeable. Where it
-    came from is printed on stderr, so stdout carries the source and nothing
-    else and can be piped into a file unchanged; ``--format json`` carries the
-    same information in the document itself.
+    The source is Java or Smali, and the two are not interchangeable. Which one
+    it is, and where it came from, are printed on stderr, so stdout carries the
+    source and nothing else and can be piped into a file unchanged;
+    ``--format json`` carries the same information in the document itself.
     """
     analyzer = Analyzer()
+    _require_project(analyzer, project_id)
     document = (
         analyzer.method_source_document(project_id, class_name, method)
         if method
@@ -312,8 +390,15 @@ def source(
             f"[yellow]No source for {class_name}.[/yellow] "
             "JADX and Apktool must both be installed, and the APK re-analysed."
         )
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
+    # The kind travels beside the source, never inside it. The text form is
+    # meant to be redirected into a file unchanged, and a first line saying
+    # "java" would be a line of the file that is not code. stderr is the same
+    # bargain the REST API strikes with its ``X-DexAtlas-Source-Kind`` header:
+    # the body stays the source, and the answer to "is this Java or Smali?"
+    # sits beside it.
+    err_console.print(f"[dim]source kind: {document.kind.value}[/dim]")
     for source in document.provenance:
         err_console.print(f"[dim]{source.ref()}[/dim]")
 
@@ -357,7 +442,14 @@ def resources(
     name: Annotated[
         str | None, typer.Option("--name", help="Show one resource, by its exact name.")
     ] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Maximum resources to list.")] = 100,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum resources to list. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 100,
 ) -> None:
     """List the resource strings indexed for a project.
 
@@ -366,13 +458,14 @@ def resources(
     declared in, so a value found here can be traced back to its declaration.
     """
     analyzer = Analyzer()
+    _require_project(analyzer, project_id)
     rows = analyzer.resources(project_id, name=name)
     if not rows:
         err_console.print(
             "[yellow]No resources matched.[/yellow] "
             "The Apktool backend reads them; it may not have been installed."
         )
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
     table = Table(header_style="bold")
     table.add_column("Resource")
@@ -394,25 +487,36 @@ def resources(
 
     hidden = len(rows) - len(rows[:limit])
     if hidden > 0:
-        console.print(
-            f"[dim]{mark(ELLIPSIS)} {_more(hidden, 'resource')} not shown "
-            f"(use --limit to see more)[/dim]"
-        )
+        console.print(_not_shown(hidden, "resource"))
 
 
 @app.command()
 def search(
     project_id: Annotated[str, typer.Argument(help="Project id.")],
     keyword: Annotated[str, typer.Argument(help="Term to search for.")],
-    limit: Annotated[int, typer.Option("--limit", help="Maximum results.")] = 50,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum results. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 50,
 ) -> None:
     """Full-text search across a project's indexed symbols."""
     analyzer = Analyzer()
-    rows = analyzer.search(project_id, keyword, limit=limit)
-    if not rows:
+    _require_project(analyzer, project_id)
+    # One row more than was asked for: the extra row is how the command knows
+    # there is something left to show. The search is answered inside SQLite,
+    # which returns the rows and no total, so the number of rows left out is
+    # not known here — the message says that more exist without claiming how
+    # many.
+    found = analyzer.search(project_id, keyword, limit=limit + 1)
+    if not found:
         err_console.print(f"[yellow]No matches for {keyword!r}.[/yellow]")
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
+    rows = found[:limit]
     table = Table(header_style="bold")
     table.add_column("Kind")
     table.add_column("Name")
@@ -421,15 +525,21 @@ def search(
         table.add_row(str(row["kind"]), str(row["name"]), str(row["excerpt"]))
     console.print(table)
 
+    if len(found) > limit:
+        console.print(
+            f"[dim]{mark(ELLIPSIS)} more results not shown (use --limit to see more)[/dim]"
+        )
+
 
 @app.command()
 def manifest(project_id: Annotated[str, typer.Argument(help="Project id.")]) -> None:
     """Show the parsed AndroidManifest.xml for a project."""
     analyzer = Analyzer()
+    _require_project(analyzer, project_id)
     info = analyzer.store.get_manifest(project_id)
     if info is None:
         err_console.print("[yellow]No manifest recorded.[/yellow] Apktool may be unavailable.")
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
     console.print(f"[bold]{info.package or '(unknown package)'}[/bold]")
     console.print(
@@ -459,13 +569,14 @@ def xrefs(
 ) -> None:
     """List the callers of a method."""
     analyzer = Analyzer()
+    _require_project(analyzer, project_id)
     # Canonicalise before the lookup, so the id echoed back on failure is the one
     # that was actually searched for — and can be pasted again.
     method_id = canonical_method_id(method_id)
     rows = analyzer.store.get_method_references(project_id, method_id)
     if not rows:
         err_console.print(f"[yellow]No callers of {method_id}.[/yellow]")
-        raise ExitCode(code=1)
+        raise ExitCode(code=EXIT_EMPTY)
 
     for row in rows:
         console.print(f"  [bold]{row.caller}[/bold]  {mark(ARROW)} [dim]{row.callee}[/dim]")

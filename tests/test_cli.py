@@ -289,6 +289,92 @@ def jadx_available(workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPa
     get_settings.cache_clear()
 
 
+@pytest.fixture
+def apktool_available(workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make the Apktool backend discoverable without running Apktool.
+
+    The same stub the decompiler gets: the backend resolves a path that exists
+    and nothing else, and the Smali fallback only reads files.
+    """
+    from dexatlas.config.settings import get_settings
+
+    stub = tmp_path / "tools" / "apktool.jar"
+    stub.parent.mkdir(parents=True, exist_ok=True)
+    stub.write_text("", encoding="utf-8")
+    monkeypatch.setenv("DEXATLAS_APKTOOL_JAR", str(stub))
+    get_settings.cache_clear()
+
+
+@pytest.fixture
+def empty_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A project that was analysed and produced no symbols.
+
+    It exists — the row is in the database — and there is nothing in it. That
+    is a different situation from an id that names no project, and the two
+    deserve different answers.
+    """
+    from dexatlas.config.settings import get_settings
+    from dexatlas.core.models import ApkMetadata, Project, ProjectStatus
+    from dexatlas.core.storage import Store
+
+    monkeypatch.setenv("COLUMNS", "200")
+
+    store = Store.open(get_settings().database_path)
+    project = Project(
+        id=Project.new_id(SEEDED_SHA256),
+        apk=ApkMetadata(sha256=SEEDED_SHA256, size_bytes=4096, path=Path("empty.apk")),
+        status=ProjectStatus.COMPLETED,
+    )
+    project_workspace = workspace / "projects" / project.id
+    project_workspace.mkdir(parents=True, exist_ok=True)
+    store.save_project(project, project_workspace, manifest=None)
+    return project.id
+
+
+#: The Smali of the seeded class: what the fallback prints when the decompiler
+#: could not reconstruct it.
+SEEDED_SMALI = """.class public final Lcom/example/demo/MainActivity;
+.super Ljava/lang/Object;
+.source "MainActivity.java"
+
+
+# direct methods
+.method public onCreate()V
+    .locals 0
+
+    return-void
+.end method
+"""
+
+
+@pytest.fixture
+def smali_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
+    """A project whose only source is Smali.
+
+    JADX is disabled by the ``workspace`` fixture, so the class falls back to
+    the disassembler's output — the case where a reader who is not told what
+    they are looking at reads Dalvik assembly as if it were Java.
+    """
+    from dexatlas.config.settings import get_settings
+    from dexatlas.core.models import ApkMetadata, Project, ProjectStatus
+    from dexatlas.core.storage import Store
+
+    monkeypatch.setenv("COLUMNS", "200")
+
+    store = Store.open(get_settings().database_path)
+    project = Project(
+        id=Project.new_id(SEEDED_SHA256),
+        apk=ApkMetadata(sha256=SEEDED_SHA256, size_bytes=4096, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+    )
+    project_workspace = workspace / "projects" / project.id
+    smali = project_workspace / "apktool" / "smali" / "com" / "example" / "demo"
+    smali.mkdir(parents=True)
+    (smali / "MainActivity.smali").write_text(SEEDED_SMALI, encoding="utf-8")
+    store.save_project(project, project_workspace, manifest=None)
+    return project.id
+
+
 def _printed_method_id(output: str, marker: str) -> str:
     """The method id the CLI printed on the line that names ``marker``."""
     for line in output.splitlines():
@@ -414,39 +500,68 @@ def test_projects_on_empty_workspace(workspace: Path) -> None:
 
 
 def test_classes_on_empty_workspace(workspace: Path) -> None:
+    """An id that names nothing is a wrong request, and it says so.
+
+    It used to exit 1 with "No classes matched." — which is an answer about
+    the project's contents, given for a question about the project's name.
+    """
     result = _run("classes", "apk_nope")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
 
 
 def test_manifest_on_unknown_project(workspace: Path) -> None:
     result = _run("manifest", "apk_nope")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
 
 
 def test_search_on_unknown_project(workspace: Path) -> None:
     result = _run("search", "apk_nope", "anything")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
 
 
 def test_source_on_unknown_project(workspace: Path) -> None:
     result = _run("source", "apk_nope", "com.example.Missing")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
 
 
 def test_xrefs_on_unknown_project(workspace: Path) -> None:
     result = _run("xrefs", "apk_nope", "com.example.Missing.m()V")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
 
 
 def test_methods_on_unknown_project(workspace: Path) -> None:
     result = _run("methods", "apk_nope")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
+
+
+def test_resources_on_unknown_project(workspace: Path) -> None:
+    """The resource listing used to blame the Apktool backend for an id that
+    named nothing — a backend that is installed and working was reported as
+    possibly missing."""
+    result = _run("resources", "apk_nope")
+
+    assert result.exit_code == 2
+    assert "No such project" in result.stderr
+    assert "Apktool" not in result.output
+
+
+def test_the_unknown_project_message_says_what_an_id_looks_like(workspace: Path) -> None:
+    """A mistyped id is the usual cause, so the shape of one is given."""
+    result = _run("classes", "apk_nope")
+
+    assert "apk_0123456789abcdef" in result.stderr
 
 
 # -- analysis ---------------------------------------------------------------
@@ -657,6 +772,159 @@ def test_xrefs_lists_the_callers_of_a_method(seeded_project: str) -> None:
     assert "com.example.demo.SyncService.start(Ljava/lang/String;)V" in result.stdout
 
 
+# -- the two kinds of nothing ------------------------------------------------
+
+
+def test_classes_on_a_project_with_no_classes_says_nothing_matched(empty_project: str) -> None:
+    """The project exists and has no classes. That is an answer about the
+    project, and it is not the answer to "does this project exist"."""
+    result = _run("classes", empty_project)
+
+    assert result.exit_code == 1
+    assert "No classes matched." in result.stderr
+    assert "No such project" not in result.output
+
+
+def test_methods_on_a_project_with_no_methods_says_nothing_matched(empty_project: str) -> None:
+    result = _run("methods", empty_project)
+
+    assert result.exit_code == 1
+    assert "No methods matched." in result.stderr
+
+
+def test_resources_on_a_project_with_no_resources_says_nothing_matched(
+    empty_project: str,
+) -> None:
+    result = _run("resources", empty_project)
+
+    assert result.exit_code == 1
+    assert "No resources matched." in result.stderr
+
+
+def test_search_on_a_project_with_no_matches_says_nothing_matched(empty_project: str) -> None:
+    result = _run("search", empty_project, "anything")
+
+    assert result.exit_code == 1
+    assert "No matches for 'anything'." in result.stderr
+
+
+def test_manifest_on_a_project_with_no_manifest_says_so(empty_project: str) -> None:
+    """The project was analysed; the disassembler recorded no manifest. That is
+    a different fact from the project not being there."""
+    result = _run("manifest", empty_project)
+
+    assert result.exit_code == 1
+    assert "No manifest recorded." in result.stderr
+    assert "No such project" not in result.output
+
+
+# -- limits ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("command", ["classes", "methods", "resources"])
+def test_a_limit_of_zero_is_refused(command: str, seeded_project: str) -> None:
+    """A limit of zero listed nothing and said the listing was cut short.
+
+    The REST API refuses it, and the refusal is the right one: "show me
+    nothing" is a question with an answer, and the answer is not a listing.
+    """
+    result = _run(command, seeded_project, "--limit", "0")
+
+    assert result.exit_code == 2
+    assert "Invalid value" in result.stderr
+    assert "not shown" not in result.stdout
+
+
+@pytest.mark.parametrize("command", ["classes", "methods", "resources"])
+def test_a_negative_limit_is_refused(command: str, seeded_project: str) -> None:
+    """``list[:-1]`` counts from the end, so a negative limit listed
+    everything *except* the last row — and did not say so.
+
+    A limit that quietly inverts is worse than no limit at all: the reader
+    believes they saw the whole listing.
+    """
+    result = _run(command, seeded_project, "--limit", "-1")
+
+    assert result.exit_code == 2
+    assert "Invalid value" in result.stderr
+    assert "not shown" not in result.stdout
+
+
+def test_a_refused_limit_lists_nothing_at_all(seeded_project: str) -> None:
+    """A refused limit is an error, and it must not leak a listing."""
+    result = _run("classes", seeded_project, "--limit", "-1")
+
+    assert result.exit_code == 2
+    assert "MainActivity" not in result.stdout
+    assert "SyncService" not in result.stdout
+
+
+def test_a_negative_provenance_limit_is_refused(seeded_project: str) -> None:
+    """The same inversion, one option over: ``provenance[:-1]`` hid the last
+    source of every class and said nothing."""
+    result = _run("classes", seeded_project, "--provenance-limit", "-1")
+
+    assert result.exit_code == 2
+    assert "Invalid value" in result.stderr
+
+
+def test_a_provenance_limit_of_zero_still_shows_none(seeded_project: str) -> None:
+    """Zero is a documented value here: show no sources at all."""
+    result = _run("classes", seeded_project, "--provenance-limit", "0")
+
+    assert result.exit_code == 0
+    assert "jadx ->" not in result.stdout
+    assert "1 more source not shown" in result.stdout
+
+
+def test_a_limit_of_one_is_accepted(seeded_project: str) -> None:
+    result = _run("classes", seeded_project, "--limit", "1")
+
+    assert result.exit_code == 0
+    assert "com.example.demo.MainActivity" in result.stdout
+
+
+def test_methods_says_how_many_methods_the_limit_hid(seeded_project: str) -> None:
+    """The class and resource listings admitted the cut. This one did not, and
+    a project with thousands of methods is exactly where that shows.
+
+    A listing that does not say it was cut short looks complete.
+    """
+    result = _run("methods", seeded_project, "--limit", "1")
+
+    assert result.exit_code == 0
+    assert "onCreate" in result.stdout
+    assert "1 more method not shown" in result.stdout
+
+
+def test_methods_says_nothing_when_nothing_was_hidden(seeded_project: str) -> None:
+    result = _run("methods", seeded_project)
+
+    assert result.exit_code == 0
+    assert "not shown" not in result.stdout
+
+
+def test_search_says_that_more_results_exist(seeded_project: str) -> None:
+    """Both string constants contain the token; only one is shown, and the
+    reader is told that the listing was cut short.
+
+    The exact count is not available to the command — the search is answered
+    inside SQLite, which returns rows and no total — so the message says that
+    more exist without claiming a number it does not have.
+    """
+    result = _run("search", seeded_project, "TOKEN", "--limit", "1")
+
+    assert result.exit_code == 0
+    assert "more results not shown" in result.stdout
+
+
+def test_search_says_nothing_when_nothing_was_hidden(seeded_project: str) -> None:
+    result = _run("search", seeded_project, "TOKEN")
+
+    assert result.exit_code == 0
+    assert "not shown" not in result.stdout
+
+
 # -- source ------------------------------------------------------------------
 
 
@@ -668,6 +936,42 @@ def test_source_prints_the_decompiled_class(seeded_project: str, jadx_available:
     # The source is printed as text, not as Rich markup: a decompiled file is full of
     # square brackets, and interpreting them would corrupt every listing.
     assert "[bold]not markup[/bold]" in result.stdout
+
+
+def test_source_says_which_representation_it_is(seeded_project: str, jadx_available: None) -> None:
+    """Java and Smali are not interchangeable, and the text form says which.
+
+    The answer travels on stderr, beside the provenance: stdout carries the
+    source and nothing else, so a redirected file holds the source unchanged.
+    The REST API strikes the same bargain with its ``X-DexAtlas-Source-Kind``
+    header.
+    """
+    result = _run("source", seeded_project, "com.example.demo.MainActivity")
+
+    assert result.exit_code == 0
+    assert "source kind: java" in result.stderr
+
+
+def test_the_kind_does_not_touch_the_source(seeded_project: str, jadx_available: None) -> None:
+    """The kind is metadata. A file the command wrote has to be the source and
+    nothing else, or it is not a file the decompiler wrote."""
+    result = _run("source", seeded_project, "com.example.demo.MainActivity")
+
+    assert result.exit_code == 0
+    assert "source kind" not in result.stdout
+    assert result.stdout.strip() == SEEDED_JAVA.strip()
+
+
+def test_the_smali_fallback_says_which_representation_it_is(
+    smali_project: str, apktool_available: None
+) -> None:
+    """The case the text form is most in need of saying: the decompiler could
+    not reconstruct the method, and what is printed is bytecode."""
+    result = _run("source", smali_project, "com.example.demo.MainActivity")
+
+    assert result.exit_code == 0
+    assert "source kind: smali" in result.stderr
+    assert ".method" in result.stdout
 
 
 def test_source_method_option_prints_one_method(seeded_project: str, jadx_available: None) -> None:
