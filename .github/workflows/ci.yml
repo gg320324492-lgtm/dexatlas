@@ -13,6 +13,29 @@ concurrency:
 permissions:
   contents: read
 
+  probe:
+    name: Probe the base
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Probe
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set +e
+          echo "PROBE event_name=${{ github.event_name }}"
+          echo "PROBE before=${BEFORE}"
+          echo "PROBE head=$(git rev-parse HEAD)"
+          echo "PROBE origin/main=$(git rev-parse origin/main)"
+          echo "PROBE merge-base=$(git merge-base HEAD origin/main)"
+          uv run python scripts/check-version-claims.py --base auto
+          echo "PROBE auto exit: $?"
+          uv run python scripts/check-version-claims.py --base "$BEFORE"
+          echo "PROBE before exit: $?"
+          exit 0
+
 jobs:
   lint:
     name: Lint and format
