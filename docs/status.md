@@ -190,11 +190,24 @@ Python 包，所以「装没装后端」要分开说：
 # 全装（默认）
 uv run pytest
 
-# 两个外部后端都不在：去掉路径配置，并让 java 不在 PATH 上
-env -u DEXATLAS_JADX_PATH -u DEXATLAS_APKTOOL_JAR uv run pytest
+# 两个外部后端都不在
+DEXATLAS_JADX_PATH="" DEXATLAS_APKTOOL_JAR="" uv run pytest
 
 # 只装 Apktool
-env -u DEXATLAS_JADX_PATH uv run pytest
+DEXATLAS_JADX_PATH="" uv run pytest
+```
+
+**注意是空值，不是 `env -u`。** 后端路径的配置是三态的：
+`None`（没设）表示**去 PATH 上找**，空字符串表示**显式禁用**，
+一个存在的路径表示**用它**。`env -u DEXATLAS_JADX_PATH` 只是「没设」，
+于是它回退到 PATH 查找——而 jadx 的 `bin` 通常就在 PATH 上，
+**后端并没有被禁用**。要禁用，得给它空值：
+
+```console
+$ DEXATLAS_JADX_PATH="" uv run dexatlas backends
+│ jadx       │ not installed │ —       │
+│ apktool    │     available │ 2.11.1  │
+│ androguard │     available │ 4.1.4   │
 ```
 
 **这三个配置都要跑。** 只跑默认那一种，正是两个假定 JADX 已安装的测试
