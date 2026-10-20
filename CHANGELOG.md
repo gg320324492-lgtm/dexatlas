@@ -7,7 +7,108 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+Everything below landed on `main` after v0.1.2 and **has not been released**:
+there is no tag and no release for it. The version number is decided when it is
+released, so none is written here.
+
+### Added
+
+- **`docs/analysis-provenance.md`** — what each conclusion is actually backed by:
+  which backend produces which kind of conclusion, what the four `Provenance`
+  fields hold, the real locator format of every backend, and how a reader can
+  verify a claim themselves. Every claim in it points at a file and a line, or
+  at the output of a real run.
+- **Cross-references are evidence now.** The pipeline records one
+  `cross_reference` record per called method of the analysed APK. The unit is
+  the callee, not the call, and calls into library code stay in the index
+  without becoming a conclusion about this application.
+- **The decompilation coverage is stated.** The report gained a "Methods
+  decompiled by JADX" line and one `observation` record carrying the failed
+  methods and the classes JADX wrote no source for. `dexatlas methods` shows a
+  "Decompiled" column.
+- **The CLI says what it folds.** `dexatlas classes` still shows a short list of
+  sources per class, but it now says how many it left out and how to see them:
+  `--all` prints every source, `--provenance-limit N` sets the number, and a
+  class list cut by `--limit` says so too.
+- **Every locator travels.** A locator is now `<tool>:<place>`, where the place
+  is relative to the artefact the tool names — the APK for Androguard, the
+  output tree for JADX and Apktool. JADX's used to be an absolute path, so a
+  report carried a pointer to the machine that produced it and to nothing else;
+  the two halves of one record were not even the same kind of thing. A
+  workspace indexed before the change still reads back in the current form, so
+  no migration is needed.
+
+### Fixed
+
+- **A method id had two spellings.** The methods table and the cross-reference
+  table stored the same method differently, so an id copied out of
+  `dexatlas methods` never resolved in `dexatlas xrefs` for any method with two
+  or more arguments. There is one spelling now — the canonical JVM descriptor —
+  in the model, in the store and in the lookup, and a workspace indexed by an
+  earlier version still resolves.
+- **The report's counts did not match the tables.** Analysing the multi-dex
+  sample printed 14 methods where the table held 11 rows. The counts come from
+  the tables now, so the number in the report is the number a query returns,
+  and the definitions that collapsed into one row keep both provenances.
+- **`decompiled` held a different fact than its name.** The flag was set from
+  "this method has a code item in the DEX", which is not "JADX decompiled this
+  method". It says what it says now: JADX is the only backend that can answer
+  the question, so the pipeline reads JADX's own output. A `JADX WARN` comment
+  above a method is no longer counted as a failure, and a constructor is
+  recognised by having no return type rather than by its name. The database
+  column and the API field keep their names; the value under that name changed
+  meaning, so an existing workspace holds the old meaning until it is
+  re-analysed.
+- **The CLI saw less than the API it fronts.** `dexatlas classes` printed the
+  first two sources of a class and said nothing, while the REST endpoint
+  returned all of them. See "The CLI says what it folds" above.
+- **An empty configured path did not disable a backend.** The documented
+  three-state semantics — unset means "look on `PATH`", empty means "do not
+  use this one", a path means "use this" — were only two states, because an
+  empty string was skipped and the lookup fell through to `PATH`. The strict
+  `xfail` that recorded the defect is now a plain assertion test.
+- **The `LIKE` prefix filter did not escape the underscore.** `--prefix
+  com.example.com_ex` also matched `com.example.comXex.Gamma`, because `_` is
+  a wildcard in SQL and underscores are legal in Android package names. The
+  answer was wrong, not merely fuzzy.
+- **The report's account of the cross-reference fix was inverted.** It claimed
+  Androguard's `get_descriptor()` returned the canonical spelling; measured on
+  4.1.4 it returns the spaced one, which is what made the v0.1.0 fix look
+  complete when it was not.
+- **The REST endpoint echoed whatever the caller typed.** It returns the
+  canonical spelling now, which is the one that can be pasted into the next
+  request.
+- **The exported-component evidence carried no tool version.** One report held
+  `apktool 2.11.1 -> AndroidManifest.xml` next to `apktool ->
+  AndroidManifest.xml#/application`: the same tool, the same run, one record
+  with a version and one without, and no way to tell "this tool has no
+  version" from "nobody filled this in". The backend-error evidence had the
+  same hole, and a failure is evidence too. The versions are probed before the
+  evidence is built and handed to the builder, so a record cannot be written
+  without them; `None` now means exactly one thing — the tool did not run.
+- **The report's own figures were written by hand.** They are measured by
+  `scripts/refresh-report-figures.py` now, and `tests/test_docs.py` checks the
+  report against the code. The refresh converges in one run instead of two, and
+  it tells a report that is merely out of date apart from a tree that is
+  broken.
+- **The source fingerprint depended on line endings.** Git checks out CRLF on
+  Windows and LF on Linux, so the same source had two fingerprints and the
+  report was declared stale on every platform but the one it was measured on.
+- **Nine places where the documentation said one thing and the code did
+  another**, plus three smaller ones. The merge rule for a class's `kind` was
+  written backwards, the coverage table listed two modules above the threshold
+  it claimed to be limited to, two method ids were quoted in a spelling the
+  repository does not use, the test file table was missing two files, a code
+  block was attributed to the wrong test, the historical test counts were wrong,
+  and one section skipped a number. The figures that can be measured now are
+  measured, and the ones that were hand-copied are checked by a test.
+
+### Engineering
+
+- 421 tests (332 fast, 89 integration), up from 275
+- First-party coverage 93.9% (1804/1921 lines), up from 89.2% (1525/1709)
+- `mypy` strict, `ruff` lint and format; the CI workflow covers Python 3.12 and
+  3.13, a Docker build, a dependency audit and the lint job
 
 ## [0.1.2] — 2026-10-20
 

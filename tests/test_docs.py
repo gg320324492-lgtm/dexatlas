@@ -398,6 +398,10 @@ REQUIRED_FIGURES = (
     "coverage.pct",
     "coverage.covered",
     "coverage.total",
+    "coverage.weak_modules",
+    "history.v0.1.0.tests",
+    "history.v0.1.1.tests",
+    "history.v0.1.2.tests",
 )
 
 
@@ -558,6 +562,13 @@ def test_execution_report_discloses_every_weak_module() -> None:
     The report promises to show where it is weak. A module that falls below the
     threshold and is not mentioned is a gap in that promise, and the table of
     weak modules is the first thing a reviewer reads.
+
+    The table is generated, so the weak modules are derived from the
+    measurement rather than written out by hand -- and the report has to name
+    exactly those, no more and no fewer. A module above the threshold in the
+    table is as much a mistake as a weak module missing from it: the table
+    claims to be the weak list, and a reader who finds a 100% module in it has
+    learned to distrust the whole table.
     """
     script = _figure_script()
     record = _recorded_measurement()
@@ -565,15 +576,54 @@ def test_execution_report_discloses_every_weak_module() -> None:
 
     assert record, "the report carries no measurement record"
 
-    weak = {
-        module
-        for module, (statements, missing) in record["coverage"]["files"].items()
-        if statements and (statements - missing) / statements * 100 < script.WEAK_MODULE_PERCENT
-    }
-    hidden = sorted(module for module in weak if f"coverage.file.{module}.pct" not in stated)
-    assert not hidden, (
-        f"these modules are below {script.WEAK_MODULE_PERCENT}% coverage but the report "
-        "does not list them: " + ", ".join(hidden)
+    weak = script.weak_modules(record["coverage"]["files"])
+    listed = script.listed_modules(REPORT.read_text(encoding="utf-8"))
+
+    assert listed == weak, (
+        f"the report's weak-module table names {listed} but the measurement says {weak}"
+    )
+    assert "coverage.weak_modules" in stated, "the report states no weak-module table"
+
+
+def test_execution_report_history_figures_match_the_released_tags() -> None:
+    """The historical test counts must be the counts those tags actually have.
+
+    These numbers describe a released version, not the current tree, so they
+    are measured in an archive of the tag itself. A hand-copied number is
+    exactly the kind of figure that goes stale: it was wrong once already, and
+    nothing but a measurement would have said so.
+    """
+    script = _figure_script()
+    stated = _stated_figures()
+
+    for tag in script.HISTORY_TAGS:
+        count = script.collected_at_tag(tag)
+        if count is None:
+            pytest.skip(f"{tag} could not be measured here")
+        values = sorted(set(stated.get(f"history.{tag}.tests", [])))
+        assert values == [str(count)], (
+            f"history.{tag}.tests: the report says {values or ['nothing']}, "
+            f"the tag has {count} tests"
+        )
+
+
+def test_execution_report_lists_every_test_file() -> None:
+    """The test-file table has to list every file the suite is made of.
+
+    It is the reader's map from the report's claims to the code that backs
+    them, and a row missing from it is a place the reader is not sent. The
+    table was two files short once, and nothing noticed: the numbers in the
+    table are checked, the rows in it are not.
+    """
+    report = REPORT.read_text(encoding="utf-8")
+    assert "### 2.1" in report, "the report has no 2.1 section to hold the test-file table"
+    section = report.split("### 2.1", 1)[-1].split("\n### ", 1)[0]
+    listed = set(re.findall(r"\| `(test_[A-Za-z0-9_]+\.py)` \|", section))
+    on_disk = {path.name for path in (REPO_ROOT / "tests").glob("test_*.py")}
+
+    assert listed == on_disk, (
+        f"the report's test-file table lists {sorted(listed)} "
+        f"but the suite is made of {sorted(on_disk)}"
     )
 
 

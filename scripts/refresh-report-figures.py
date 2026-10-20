@@ -62,12 +62,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 from dataclasses import dataclass
 from importlib.util import find_spec
@@ -85,11 +87,19 @@ SOURCE_PREFIX = "src/dexatlas/"
 #: A first-party module below this coverage is a weak spot the report must disclose.
 WEAK_MODULE_PERCENT = 90.0
 
+#: The released versions the report compares its own figures against. Their test
+#: counts belong to those tags, not to the current tree, so they are measured
+#: where they live -- in an archive of the tag itself.
+HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2")
+
 #: ``<!--fig:key-->value<!--/fig-->`` — everything between the markers is generated.
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
 
 #: ``<!--report-figures:{...}-->`` — the machine-readable record of the measurement.
 RECORD = re.compile(r"<!--report-figures:(.*?)-->", re.DOTALL)
+
+#: A row of the generated weak-module table: "| `core/pipeline.py` | 96.9% | 7 / 228 |".
+TABLE_ROW = re.compile(r"^\| `([^`]+)` \|", re.MULTILINE)
 
 #: pytest's collection summary, e.g. "196/275 tests collected (79 deselected)".
 COLLECTED = re.compile(r"(\d+)(?:/(\d+))? tests collected")
@@ -321,22 +331,103 @@ def code_facts() -> dict[str, int]:
     }
 
 
+def collected_at_tag(tag: str) -> int | None:
+    """How many tests a released version's suite contained.
+
+    The number belongs to that tag, not to the current tree, so it is measured
+    where it lives: an archive of the tag, collected by pytest. Nothing is
+    executed, so the measurement needs no backends, no fixtures and no
+    workspace -- it is the same on every machine, and there is no such thing as
+    a partial one.
+
+    ``None`` means the tag could not be measured (no git, no such tag, no
+    pytest), and the caller keeps the recorded value rather than guessing.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory) / tag
+        root.mkdir()
+
+        archive = subprocess.run(
+            ["git", "archive", tag],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            check=False,
+        )
+        if archive.returncode != 0:
+            return None
+        try:
+            with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as tar:
+                tar.extractall(root, filter="data")
+        except (tarfile.TarError, OSError):
+            return None
+
+        # The tag's own source has to win over the installed one, so it goes
+        # first on the import path.
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(root / "src"), *([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])]
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "--collect-only",
+                "-q",
+                "-p",
+                "no:cacheprovider",
+            ],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+    match = COLLECTED.search(result.stdout)
+    return int(match.group(1)) if match else None
+
+
+def history_figures(text: str, previous: dict[str, Any]) -> dict[str, Any]:
+    """The test count of each released version the report compares itself against.
+
+    A tag that cannot be measured keeps the value it already had -- the same
+    rule the coverage figures follow when a measurement is partial. A tag that
+    was never measured and never recorded keeps whatever the report already
+    says, so a missing git checkout cannot stop the refresh over a footnote.
+    """
+    history: dict[str, Any] = dict(previous.get("history", {}))
+    for tag in HISTORY_TAGS:
+        count = collected_at_tag(tag)
+        if count is not None:
+            history[tag] = {"tests": count}
+            continue
+        if tag in history:
+            continue
+        for key, value in FIGURE.findall(text):
+            if key == f"history.{tag}.tests" and value.isdigit():
+                history[tag] = {"tests": int(value)}
+                break
+    return history
+
+
 def build_record(
     coverage: Coverage,
     suite: dict[str, int],
     fast: int,
     slow: int,
     total: int,
+    history: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The record of one measurement: everything the report can state."""
     return {
-        "schema": 2,
+        "schema": 3,
         "code": code_facts(),
         "coverage": {
             "files": coverage.files,
             "missing": coverage.missing,
             "statements": coverage.statements,
         },
+        "history": history or {},
         "source_fingerprint": source_fingerprint(),
         "suite": {
             "passed": suite.get("passed", 0),
@@ -350,6 +441,51 @@ def build_record(
 def percent(covered: int, total: int) -> str:
     """Coverage as the report states it: one decimal, like every other figure."""
     return f"{covered / total * 100:.1f}%" if total else "n/a"
+
+
+def weak_modules(files: dict[str, list[int]]) -> list[str]:
+    """The modules below the disclosure threshold, weakest first.
+
+    The report promises to show where it is weak. A module that falls below
+    the threshold and is not mentioned is a gap in that promise, so the list
+    is derived from the measurement rather than written out by hand.
+    """
+    weak = [
+        (module, statements, missing)
+        for module, (statements, missing) in files.items()
+        if statements and (statements - missing) / statements * 100 < WEAK_MODULE_PERCENT
+    ]
+    weak.sort(key=lambda row: (row[1] - row[2]) / row[1] * 100)
+    return [module for module, _, _ in weak]
+
+
+def render_weak_modules(files: dict[str, list[int]]) -> str:
+    """The weak-module table, as the report shows it.
+
+    The table is generated, so it cannot name a module the measurement does
+    not call weak, nor leave out one it does. The leading newline keeps the
+    rows out of the opening HTML comment: a comment runs to the first ``-->``,
+    and a table inside one would not render.
+    """
+    lines = [
+        "| 模块 | 覆盖率 | 未覆盖行 / 总行数 |",
+        "|------|--------|------------------|",
+    ]
+    modules = weak_modules(files)
+    if not modules:
+        lines.append(f"| 没有低于 {WEAK_MODULE_PERCENT:.0f}% 的模块 | — | — |")
+    for module in modules:
+        statements, missing = files[module]
+        lines.append(
+            f"| `{module}` | {percent(statements - missing, statements)} | {missing} / {statements} |"
+        )
+    return "\n" + "\n".join(lines) + "\n"
+
+
+def listed_modules(text: str) -> list[str]:
+    """The modules the report's weak-module table names, in the order it lists them."""
+    table = "".join(value for key, value in FIGURE.findall(text) if key == "coverage.weak_modules")
+    return TABLE_ROW.findall(table)
 
 
 def render_figures(record: dict[str, Any]) -> dict[str, str]:
@@ -374,11 +510,14 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "coverage.covered": str(covered),
         "coverage.total": str(coverage["statements"]),
         "coverage.missed": str(coverage["missing"]),
+        "coverage.weak_modules": render_weak_modules(coverage["files"]),
     }
     for module, (statements, missing) in coverage["files"].items():
         values[f"coverage.file.{module}.pct"] = percent(statements - missing, statements)
         values[f"coverage.file.{module}.statements"] = str(statements)
         values[f"coverage.file.{module}.missed"] = str(missing)
+    for tag, entry in record.get("history", {}).items():
+        values[f"history.{tag}.tests"] = str(entry["tests"])
     return values
 
 
@@ -448,14 +587,15 @@ def read_record(text: str) -> dict[str, Any]:
 
 
 def undisclosed_modules(record: dict[str, Any], text: str) -> list[str]:
-    """Weak modules the report does not mention — an incomplete disclosure."""
-    stated = {match.group(1) for match in FIGURE.finditer(text)}
-    weak = {
-        module
-        for module, (statements, missing) in record["coverage"]["files"].items()
-        if statements and (statements - missing) / statements * 100 < WEAK_MODULE_PERCENT
-    }
-    return sorted(module for module in weak if f"coverage.file.{module}.pct" not in stated)
+    """Weak modules the report's table does not mention — an incomplete disclosure.
+
+    The table is generated, so this should never name anything. It is the
+    check that says so: a table edited by hand, or a report written before the
+    table was generated, is caught here instead of being believed.
+    """
+    listed = set(listed_modules(text))
+    weak = weak_modules(record["coverage"]["files"])
+    return [module for module in weak if module not in listed]
 
 
 def missing_prerequisites() -> list[str]:
@@ -487,6 +627,7 @@ def converge(
     fast: int,
     slow: int,
     total: int,
+    history: dict[str, Any] | None = None,
 ) -> Refresh:
     """Bring the report and its self-checks into agreement, within one run.
 
@@ -502,7 +643,7 @@ def converge(
     self-checks pass.
     """
     suite = dict(code.counts)
-    record = build_record(coverage, suite, fast, slow, total)
+    record = build_record(coverage, suite, fast, slow, total, history)
     candidate = render_or_fail(text, record)
 
     checks = Outcome(counts={})
@@ -519,7 +660,7 @@ def converge(
                 rounds=round_number,
             )
         suite, coverage = new_suite, new_coverage
-        record = build_record(coverage, suite, fast, slow, total)
+        record = build_record(coverage, suite, fast, slow, total, history)
         candidate = render_or_fail(text, record)
 
     return Refresh(
@@ -589,6 +730,12 @@ def main(argv: list[str] | None = None) -> int:
     slow, _ = collected_tests("slow")
     print(f"  {total} tests: {fast} fast, {slow} integration")
 
+    print("Measuring the test counts of the released versions...")
+    history = history_figures(text, previous)
+    for tag in HISTORY_TAGS:
+        entry = history.get(tag)
+        print(f"  {tag}: {entry['tests'] if entry else 'not measured'} tests")
+
     print("Running the suite with coverage (this takes a couple of minutes)...")
     code = measure_code_tests()
     coverage = read_coverage()
@@ -612,7 +759,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if complete:
         print("Measuring the report's self-checks against a candidate report...")
-        refresh = converge(text, report_path, code, coverage, fast, slow, total)
+        refresh = converge(text, report_path, code, coverage, fast, slow, total, history)
         record = refresh.record
         updated = refresh.text
         checks = refresh.checks
@@ -639,7 +786,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         # The coverage and the pass/skip split of a partial run describe a
         # different tree, so the previous measurement of them is kept.
-        record = build_record(coverage, code.counts, fast, slow, total)
+        record = build_record(coverage, code.counts, fast, slow, total, history)
         record["coverage"] = previous["coverage"]
         record["suite"] = previous["suite"]
         record["source_fingerprint"] = previous["source_fingerprint"]
