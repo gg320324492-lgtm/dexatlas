@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->94.0%<!--/fig-->**（<!--fig:coverage.covered-->1857<!--/fig-->/<!--fig:coverage.total-->1975<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
-| CI | 5 job 全绿（3.12 / 3.13 / Docker / 依赖审计 / lint） | 全绿 |
+| CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
 | 自建测试 APK | **<!--fig:samples.apks-->5<!--/fig--> 个**（验收清单要求 5 个） | 5 个 |
 | 提交数 | 20（截至 v0.1.2，明细见文末附录） | — |
 
@@ -326,7 +326,7 @@ for root in sorted(smali_root.glob("smali*")):   # ← 却在这里面找 smali*
 
 ### 3.8 CI 反复失败暴露的问题
 
-CI 一共红了 **4 次**，每次都是真问题：
+CI 一共红了 **5 次**，每次都是真问题：
 
 | 次数 | 失败 job | 真实原因 |
 |------|----------|----------|
@@ -334,6 +334,33 @@ CI 一共红了 **4 次**，每次都是真问题：
 | 2 | 4/6 | 覆盖率门禁偷偷用了 `-m "not slow"`，把该测的代码排除掉了，报告 70% 而非 82% |
 | 3 | 2/6 | 测试无条件 import Pillow，而 Pillow 在 CI 没装的 `demo` extra 里 |
 | 4 | 1/5 | Smali 回退的集成测试依赖「JADX 不可用」，而我是用「把 `jadx_path` 指向不存在的目录」实现的 |
+| 5 | **0/6** | workflow 文件里用了 job 级 `env: ${{ runner.temp }}`，而 `runner` 上下文在那个位置不可用 |
+
+第 5 次是这五次里**最难查**的一次，值得单独写：
+
+**它不是一次测试失败，是一次 run 失败——而且一个 job 都没被调度。** GitHub 创建了
+run，然后立刻把它标成 failed，`total_count: 0`，没有 check run、没有消息、
+不可重试。看起来像平台故障，不像我的代码出问题。
+
+定位靠三步：
+
+1. **推一个空提交**（不动任何文件）——仍然 0 jobs。说明不是那个 commit 的内容。
+2. **把 workflow 文件回退到跑过绿灯的版本**——6 个 job 正常调度。
+   于是问题确定在 workflow 文件里，而不在平台。
+3. **用 actionlint 检查**——一行就指出来了：
+
+   ```
+   context "runner" is not allowed here. available contexts are "github",
+   "inputs", "matrix", "needs", "secrets", "strategy", "vars"
+   ```
+
+`runner` 上下文只能在 step 里用，不能在 job 级的 `env:` 块里用。而那个 `env:` 块
+本来就不需要——安装脚本读的是 `RUNNER_TEMP`，那是环境变量，不是表达式。
+
+**PyYAML 能解析这个文件，GitHub 不能。** 语法错误和「语义上 GitHub 不接受」
+是两回事，而 YAML 解析器只管前者。所以 actionlint 现在是 lint job 的一步：
+用 GitHub 自己的规则检查 workflow 文件，这类错误几秒钟就能发现，而不是表现为
+一次没有任何输出的失败。
 
 第 2 次尤其值得注意：**门禁本身是坏的**。它报告的 70% 和真实的 82% 都不是问题，
 问题是它测的东西和它声称测的东西不一样。

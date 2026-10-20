@@ -102,13 +102,38 @@ released, so none is written here.
   block was attributed to the wrong test, the historical test counts were wrong,
   and one section skipped a number. The figures that can be measured now are
   measured, and the ones that were hand-copied are checked by a test.
+- **The cross-reference kind said one thing and meant another.** Its
+  documentation listed five ways a call can be made; the code only ever
+  produced one. It is read from the bytecode instruction now, so a static
+  call and a virtual call are distinguishable in the index. `dynamic` is not
+  among them: the instructions that would carry it name a call site rather
+  than a method, so there is no callee to record.
+- **A string constant knew nothing about where it was used.** The fields for
+  it existed and were never filled, so a hardcoded key could be found but
+  not traced to the method that uses it. The bytecode walk that collects
+  cross-references now records the use sites too, at no extra cost. Pool
+  entries no instruction loads — type descriptors, member names — still
+  have no location, because nothing loads them.
+- **The version was wrong in two places at once.** The published packages
+  called themselves 0.1.0 after v0.1.1 and v0.1.2 had shipped, and the
+  number was written in both the package and the project file. It lives in
+  one place now and the build reads it from there.
+- **A workflow mistake could not be seen.** A job-level `env:` block used
+  `${{ runner.temp }}`, which GitHub does not allow there. The run was
+  created and failed without scheduling a single job, with no message and
+  nothing to retry — it looked like a platform fault. `actionlint` is part
+  of the lint job now, and it applies GitHub's own rules.
+- **The Docker build could not read the version.** The dependency layer
+  installs before the source is copied, and the build backend needs the
+  version file. The image copies that one file into the dependency layer.
 
 ### Engineering
 
-- 421 tests (332 fast, 89 integration), up from 275
-- First-party coverage 93.9% (1804/1921 lines), up from 89.2% (1525/1709)
+- 444 tests (347 fast, 97 integration), up from 275
+- First-party coverage 93.9%, up from 89.2%
 - `mypy` strict, `ruff` lint and format; the CI workflow covers Python 3.12 and
-  3.13, a Docker build, a dependency audit and the lint job
+  3.13, a configuration with one backend deliberately absent, a Docker build, a
+  dependency audit, the lint job and a workflow lint
 
 ## [0.1.2] — 2026-10-20
 
