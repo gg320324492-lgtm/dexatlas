@@ -7,7 +7,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+### Added
+
+- **A status page** — `docs/status.md` says where the project stands and what is left:
+  the released versions, the acceptance status of Phase 1, and the gaps that remain.
+  It is written in Chinese, like the analysis coverage document.
+
+### Fixed
+
+- **The documentation names the release that shipped each fix.** The Phase 1 execution
+  report's opening, the headings of its sections 3.11 – 3.15, and the opening of
+  section 6 of the analysis coverage document all described work that had already
+  shipped. They now name v0.1.3, which shipped it.
+- **The status page named a constant that does not exist.** It referred to a
+  `MAX_INSTRUCTION_LIMIT`; the limits the code actually enforces are
+  `DEFAULT_METHOD_LIMIT`, `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT`.
+- **The READMEs pointed at finished work as the current backlog.** The eight tasks that
+  planned Phase 1 are archived under `.github/issues/v0.1.0/planned/`; what is
+  outstanding is the Phase 1 source review.
+- **The v0.1.3 release notes quoted a hand-copied coverage figure.** They said 93.9%,
+  which belonged to an earlier tree; the release's own generated report measured
+  94.0% (1857/1975 lines) from the tree it was cut from. They now state the
+  measured figure.
+- **The `[0.1.0]` entry counted 208 tests; the release shipped 204.** A commit made
+  after the release overwrote the entry with the test count of the tree at the time.
+  The tag measures 204, and the v0.1.0 release notes said 204. The `[0.1.1]` entry
+  inherited it as "up from 208", and now says 204.
+- **The README's badges had stopped at v0.1.2.** They showed 275 tests and 89%
+  coverage — that release's numbers — while the project was on 444 tests and 94.0%.
+  A badge URL cannot carry a generated figure, so this is a number to write and
+  re-check, not one that can be measured; it now states the measured values.
 
 ## [0.1.3] — 2026-10-20
 
@@ -133,7 +162,7 @@ conclusion — this release makes that true of more things than it used to be.
 ### Engineering
 
 - 444 tests (347 fast, 97 integration), up from 275
-- First-party coverage 93.9%, up from 89.2%
+- First-party coverage 94.0% (1857/1975 lines), up from 89.2%
 - `mypy` strict, `ruff` lint and format; the CI workflow covers Python 3.12 and
   3.13, a configuration with one backend deliberately absent, a Docker build, a
   dependency audit, the lint job and a workflow lint
@@ -218,7 +247,7 @@ verifiable when decompilation fails — had never run, for any APK.
 
 ### Engineering
 
-- 244 tests (192 fast, 52 integration), up from 208
+- 244 tests (192 fast, 52 integration), up from 204
 - First-party coverage 89.1% (1523/1709 lines), up from 87.8%. The Apktool adapter
   went from 82.7% to 94%
 - `mypy` strict, `ruff` lint and format, GitHub Actions green on Python 3.12 and 3.13
@@ -265,7 +294,7 @@ every language model switched off.
 
 ### Engineering
 
-- 208 tests, 88% coverage on first-party code
+- 204 tests, 88% coverage on first-party code
 - `mypy` strict, `ruff` lint and format, all green in CI on Python 3.12 and 3.13
 - Docker image with JADX, Apktool and Androguard verified to run at build time
 - Dependency audit via `pip-audit` over the resolved lock file

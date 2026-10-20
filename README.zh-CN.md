@@ -12,9 +12,10 @@ DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整�
 工作流，面向开发者、安全研究员，以及对自己拥有或已获授权的应用进行分析的工程师。
 
 > [!IMPORTANT]
-> **当前状态：早期开发（Phase 1 — 基础能力）。** CLI、分析内核与报告流水线正在构建中。
-> Agent 编排、MCP 与 Web 工作台属于**规划中**的能力，尚未实现——详见
-> [路线图](#路线图)。本文档不会声称任何尚未实际可运行的功能。
+> **当前状态：早期开发（Phase 1 — 基础能力）。** CLI、分析内核与报告流水线在 `v0.1.0`
+> 发布，此后每个版本都在交付；未完成的是 Phase 1 的源码审核。Agent 编排、MCP 与 Web
+> 工作台属于**规划中**的能力，尚未实现——详见[路线图](#路线图)。
+> 本文档不会声称任何尚未实际可运行的功能。
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas 分析内置演示 APK：后端发现、分析摘要、manifest 中的导出组件，以及报告中的证据等级" width="900">
@@ -166,7 +167,9 @@ Phase 1 剩余工作（源码评审，以及由评审结论写出的任务清单
 ## 参与贡献
 
 欢迎提交 Issue、Bug 报告与 Pull Request——详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
-当前以 `v0.1.0` milestone 为准，其中 8 个 Phase 1 任务是进行中的工作清单。
+规划 Phase 1 的 8 个任务已归档在
+[`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/) 下，每个文件都记着
+背后的设计决策；当前的工作是 Phase 1 的源码审核。
 
 请勿提交包含 APK、反编译源码，或任何来自你无权分析的应用程序的代码。参见
 [SECURITY.md](SECURITY.md)。
