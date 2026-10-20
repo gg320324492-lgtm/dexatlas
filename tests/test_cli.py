@@ -347,9 +347,7 @@ def test_the_declared_version_is_not_a_stale_release() -> None:
     """
     from dexatlas import __version__
 
-    assert re.match(r"^\d+\.\d+\.\d+(\.dev\d+)?$", __version__), (
-        f"{__version__} is not a version"
-    )
+    assert re.match(r"^\d+\.\d+\.\d+(\.dev\d+)?$", __version__), f"{__version__} is not a version"
 
 
 def test_backends_runs() -> None:

@@ -25,11 +25,12 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | manifest 的版本号 / SDK（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:289-320` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:263-274` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取 | `core/pipeline.py:291-321` |
-| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:305-320` |
+| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:336-350` |
 | 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:320-373` |
 | 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:276-287` |
-| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:326-338` |
-| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:362-381` |
+| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:362-372` |
+| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:432-458` |
+| 字符串常量**出现在哪** | **Androguard**（遍历字节码时记录 `const-string` 的引用点） | `StringConstant.class_name` / `method_name` | `tools/androguard/adapter.py:432-458` |
 | 资源（`res/`、布局、字符串表） | **没有人** | 不在模型里 | 见 5.4 |
 
 几条需要注意的推论：
@@ -43,8 +44,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
   不进索引、不进证据表（`core/pipeline.py:291-321`）。
 - **资源没有覆盖。** Apktool 会把 `res/` 解码到工作区，但 `src/` 里没有任何代码读它
   （`grep -rn "res/values\|resources" src/` 只命中 `ingest.py:15` 的文件名常量
-  `resources.arsc` 和它的错误消息（`ingest.py:44`）、`models.py:290` 里
-  `StringConstant` 那句「found in the DEX or resources」的 docstring，以及 Apktool
+  `resources.arsc` 和它的错误消息（`ingest.py:44`），以及 Apktool
   模块自己提到 resources 的 docstring——**没有一处是读 `res/`**）。
   这一条在 5.4 里展开。
 
@@ -62,11 +62,11 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | `superclass` | `existing.superclass or cls.superclass` | **Androguard 说了算**（它先跑） |
 | `interfaces` | 两个集合的并集 | 两边都保留 |
 | `access_flags` | 两个集合的并集 | 两边都保留 |
-| `method_count` / `field_count` | `max()` | 取**较大**的那个，不做取舍 |
+| `method_count` / `field_count` | `max()`（**只是视图**） | 合并阶段取较大值；**落库时按 `methods` / `fields` 表的实际行数重算**，所以表里的数永远等于查询返回的行数 |
 | `provenance` | 拼接 | **两条都留**，谁也不覆盖谁 |
 
 合并的**顺序**就是执行顺序：Apktool → Androguard → JADX
-（`core/pipeline.py:132-141`、`143-151`、`153-169`）。Apktool 不产出 `ClassRef`，
+（`core/pipeline.py:132-141`、`core/pipeline.py:143-151`、`core/pipeline.py:153-169`）。Apktool 不产出 `ClassRef`，
 所以真正参与合并的只有 Androguard（先）和 JADX（后）。
 
 Androguard 先跑不是因为它更重要，是因为它是**结构**的正确来源（`docs/architecture/README.md`
@@ -84,9 +84,9 @@ JADX 报 `interface` 时结果是 `interface`，哪怕 Androguard 报的是 `cla
 
 ```json
 "provenance": [
-    {"tool": "androguard", "tool_version": "androguard 4.1.4",
+    {"tool": "androguard", "tool_version": "4.1.4",
      "locator": "androguard:classes.dex#com.example.multidex.SharedConfig"},
-    {"tool": "androguard", "tool_version": "androguard 4.1.4",
+    {"tool": "androguard", "tool_version": "4.1.4",
      "locator": "androguard:classes2.dex#com.example.multidex.SharedConfig"},
     {"tool": "jadx", "tool_version": "1.5.2",
      "locator": "jadx:sources/com/example/multidex/SharedConfig.java"}
@@ -123,6 +123,20 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 （`core/storage.py:73`）。它和 `provenance.tool_version` 是**两份独立的数据**——
 管道把同一份版本表交给证据构造器（`core/pipeline.py:118-124`），
 所以两份数据现在说的是同一件事。
+
+### 3.1.1 交叉引用自己带的信息：调用方式
+
+`MethodReference` 除了 `caller` 和 `callee`，还有一个 `kind` 字段，**说的是这条调用
+边是怎么发起的**：`virtual`（虚调用）、`super`（父类调用）、`direct`（直接调用）、
+`static`（静态调用）、`interface`（接口调用），以及 `invoke`——opcode 认不出来时
+的兜底。
+
+Dalvik 有好几种调用方式，它们在字节码里是**不同的指令**，而指令是唯一能说出
+「这是静态调用还是虚调用」的东西。以前这个字段的文档写着五种取值，实际产出的却
+只有 `invoke` 一种——名字和值对不上。现在它从指令名读出来，所以文档和实现是一回事。
+
+`dynamic` 不在其中：能承载它的 `invoke-custom` / `invoke-polymorphic` 指向的是
+call site 或 method handle，不是方法，没有 callee 可填。
 
 ### 3.2 locator 的实际格式
 
@@ -180,10 +194,12 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
 诚实起见，下面这些**当前不在** provenance 里：
 
 - **行号。** 原因见上。
-- **字符串常量出自哪个类、哪个方法。** `StringConstant` 有 `class_name` / `method_name`
-  两个字段（`models.py:293-294`），但唯一的生产者 `AndroguardBackend._index_strings`
-  从不填它们（`tools/androguard/adapter.py:366-377`）。实测全部为 `null`。
-  一条字符串常量**只能定位到「哪个 DEX 里有这个字符串」，定位不到「哪段代码用了它」**。
+- **字符串池里没有被任何指令加载的条目。** `StringConstant` 的 `class_name` /
+  `method_name` 现在**会填**（`models.py:293-294`）：遍历字节码时顺带记下每条
+  `const-string` 指令引用了哪个池项，于是「这个 URL 出现在哪个方法里」可以回答。
+  但 DEX 字符串池里还有类型描述符（`Landroid/app/Activity;`）、成员名（`onCreate`）
+  这类**没有指令直接加载**的条目——demo-app 的 63 条池项里只有 8 条是真正的字面量，
+  剩下 55 条没有位置。**池里有，不等于代码用了它。**
 - **资源。** 见 5.4。
 - **Smali 内容的来源。** Smali 回退路径（`core/pipeline.py:302-303`、`317-321`）返回的是
   裸字符串，**不附带任何 provenance**。也就是说：当 `class_source` 返回 Smali 而不是 Java 时，
@@ -231,7 +247,7 @@ $ uv run dexatlas backends
 ├────────────┼───────────┼──────────────────┤
 │ jadx       │ available │ 1.5.2            │
 │ apktool    │ available │ 2.11.1           │
-│ androguard │ available │ androguard 4.1.4 │
+│ androguard │ available │ 4.1.4 │
 └────────────┴───────────┴──────────────────┘
 ```
 
@@ -282,7 +298,7 @@ JSON 报告的 `project` 段和 `tools` 段（节选自真实输出）：
   "tools": {
     "jadx": "1.5.2",
     "apktool": "2.11.1",
-    "androguard": "androguard 4.1.4"
+    "androguard": "4.1.4"
   },
   "errors": []
 }
@@ -318,7 +334,7 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
   "tools": {
     "jadx": "1.5.2",
     "apktool": "2.11.1",
-    "androguard": "androguard 4.1.4"
+    "androguard": "4.1.4"
   },
   "errors": []
 }
@@ -358,7 +374,7 @@ $ python -c "import sqlite3; c=sqlite3.connect(r'C:/Users/admin/AppData/Local/Te
 
 **管道里产出三种 `kind`：** `declaration`（类、manifest、导出组件）、
 `cross_reference`（这个 APK 自己的方法被谁调用）和 `observation`（后端失败，
-以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:353-358`），
+以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:430-436`），
 `behaviour` 和 `code_located` **一次都不会出现**——它们是给 Phase 2 的模型输出准备的。
 
 **`cross_reference` 的粒度是「被调用的方法」，不是「调用」**：一个被五十处调用的方法
@@ -390,7 +406,7 @@ for r in c.execute("SELECT caller, callee, provenance FROM xrefs WHERE project_i
     print(r[0], '->', r[1]); print('   ', json.loads(r[2]))
 PY
 com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V -> com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-    [{'tool': 'androguard', 'tool_version': 'androguard 4.1.4', 'apk_sha256': '80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9', 'locator': 'androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V->com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;'}]
+    [{'tool': 'androguard', 'tool_version': '4.1.4', 'apk_sha256': '80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9', 'locator': 'androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V->com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;'}]
 ```
 
 **第三步**：打开工作区里 Androguard 说的那个 DEX，对照 Apktool 解出的 Smali：
@@ -452,7 +468,7 @@ $ uv run dexatlas backends
 ├────────────┼───────────────┼──────────────────┤
 │ jadx       │ not installed │ —                │
 │ apktool    │     available │ 2.11.1           │
-│ androguard │     available │ androguard 4.1.4 │
+│ androguard │     available │ 4.1.4 │
 └────────────┴───────────────┴──────────────────┘
 
 $ uv run dexatlas analyze examples/demo-app/demo.apk
@@ -666,18 +682,18 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
   ```console
   $ uv run dexatlas classes apk_80a8fe0e81204c9f
 com.example.demo.Crypto class
-  androguard androguard 4.1.4 -> androguard:classes.dex#com.example.demo.Crypto
+  4.1.4 -> androguard:classes.dex#com.example.demo.Crypto
   jadx 1.5.2 -> jadx:sources/com/example/demo/Crypto.java
 com.example.demo.MainActivity class
-  androguard androguard 4.1.4 -> androguard:classes.dex#com.example.demo.MainActivity
+  4.1.4 -> androguard:classes.dex#com.example.demo.MainActivity
   jadx 1.5.2 -> jadx:sources/com/example/demo/MainActivity.java
 com.example.demo.NetworkClient class
-  androguard androguard 4.1.4 -> androguard:classes.dex#com.example.demo.NetworkClient
+  4.1.4 -> androguard:classes.dex#com.example.demo.NetworkClient
   jadx 1.5.2 -> jadx:sources/com/example/demo/NetworkClient.java
 com.example.demo.R class
   jadx 1.5.2 -> jadx:sources/com/example/demo/R.java
 com.example.demo.SyncService class
-  androguard androguard 4.1.4 -> androguard:classes.dex#com.example.demo.SyncService
+  4.1.4 -> androguard:classes.dex#com.example.demo.SyncService
   jadx 1.5.2 -> jadx:sources/com/example/demo/SyncService.java
   ```
 
@@ -910,9 +926,9 @@ multidex-app 的 `SharedConfig` 有**三条**来源（两个 DEX + JADX），CLI
 $ uv run dexatlas classes apk_a488e43e38c2b8e9
 ...
 com.example.multidex.SharedConfig class
-  androguard androguard 4.1.4 ->
+  4.1.4 ->
 androguard:classes.dex#com.example.multidex.SharedConfig
-  androguard androguard 4.1.4 ->
+  4.1.4 ->
 androguard:classes2.dex#com.example.multidex.SharedConfig
 ```
 
@@ -926,9 +942,9 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 $ uv run dexatlas classes apk_a488e43e38c2b8e9
 ...
 com.example.multidex.SharedConfig class
-  androguard androguard 4.1.4 ->
+  4.1.4 ->
 androguard:classes.dex#com.example.multidex.SharedConfig
-  androguard androguard 4.1.4 ->
+  4.1.4 ->
 androguard:classes2.dex#com.example.multidex.SharedConfig
   … 1 more source not shown (use --all to see all 3)
 ```
@@ -975,7 +991,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 | `E-0002` 2 component(s) are explicitly exported | `apktool -> AndroidManifest.xml#/application` |
 
 **同一条工具链的两条证据，一条带版本一条不带。** 报告里的
-`Tool versions: androguard androguard 4.1.4, apktool 2.11.1, jadx 1.5.2` 那行
+`Tool versions: 4.1.4, apktool 2.11.1, jadx 1.5.2` 那行
 （`reports/markdown.py:70`、`reports/markdown.py:123-129`）是从 `Project.tool_versions` 来的，
 和 per-evidence 的 `tool_version` 是两份数据（见 3.1）。
 
@@ -1002,7 +1018,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 
 顺带一提 `Provenance.ref()`（`models.py:112-120`）的输出是
 `f"{tool} {tool_version} -> {locator}"`，所以 Androguard 那条会显示成
-`androguard androguard 4.1.4 -> ...`——「androguard」出现两次。不是 bug，是拼接的结果。
+`4.1.4 -> ...`——「androguard」出现两次。不是 bug，是拼接的结果。
 
 ### 6.6 `xrefs` 表里可能有重复的 caller/callee 对
 
@@ -1048,7 +1064,7 @@ jadx 1.5.2 -> jadx:C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/projects/a
 
 ```
 jadx 1.5.2 -> jadx:sources/com/example/demo/Crypto.java
-androguard androguard 4.1.4 -> androguard:classes.dex#com.example.demo.Crypto
+4.1.4 -> androguard:classes.dex#com.example.demo.Crypto
 ```
 
 要定位文件，读者需要知道两件事，两件都是可推导的：

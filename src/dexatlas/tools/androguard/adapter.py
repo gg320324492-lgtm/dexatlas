@@ -460,6 +460,12 @@ class AndroguardBackend(Backend):
                                 ],
                             )
                         )
+                        # One value can be used in several methods, and each use is
+                        # its own row. The limit counts rows, so it has to be checked
+                        # after every row, not once per value.
+                        if len(constants) >= limit:
+                            logger.warning("androguard: string limit %d reached; truncated", limit)
+                            return constants
                 if len(constants) >= limit:
                     logger.warning("androguard: string limit %d reached; truncated", limit)
                     break
