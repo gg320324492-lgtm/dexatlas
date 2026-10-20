@@ -613,3 +613,44 @@ class ResourceString(Sourced):
         if self.qualifier:
             return f"{self.name} ({self.qualifier})"
         return self.name
+
+
+# ---------------------------------------------------------------------------
+# Source documents
+# ---------------------------------------------------------------------------
+
+
+class SourceKind(StrEnum):
+    """Which representation a source document holds."""
+
+    JAVA = "java"
+    """Decompiled Java, written by JADX."""
+
+    SMALI = "smali"
+    """Dalvik bytecode, disassembled by Apktool.
+
+    The fallback for a method the decompiler could not reconstruct. It is not a
+    worse kind of source — it is closer to the original fact — but a reader has
+    to know which one they are looking at.
+    """
+
+
+class SourceDocument(Sourced):
+    """One class's or method's source, and where it came from.
+
+    A bare string cannot say which of the two representations it is, so the
+    answer to "is this Java or Smali?" has to travel with the text. The
+    provenance says which tool produced it, at what version, and in which file
+    of that tool's output tree it lives.
+    """
+
+    text: str
+    """The source itself — Java, or Smali."""
+
+    kind: SourceKind
+    """Which representation it is."""
+
+    @property
+    def tool(self) -> str:
+        """The tool that produced it, or an empty string when nothing did."""
+        return self.provenance[0].tool if self.provenance else ""

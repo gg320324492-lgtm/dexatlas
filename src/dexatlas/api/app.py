@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field
 from dexatlas import __version__
 from dexatlas.config.settings import Settings, get_settings
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
-from dexatlas.core.models import Project, canonical_method_id
+from dexatlas.core.models import Project, SourceDocument, canonical_method_id
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -278,25 +278,50 @@ def list_resources(
 
 
 @app.get("/projects/{project_id}/classes/{class_name:path}/source", tags=["analysis"])
-def get_class_source(project_id: str, class_name: str, analyzer: AnalyzerDep) -> PlainTextResponse:
-    """A class as decompiled Java, falling back to Smali when JADX could not."""
-    text = analyzer.class_source(project_id, class_name)
-    if text is None:
+def get_class_source(
+    project_id: str,
+    class_name: str,
+    analyzer: AnalyzerDep,
+    format: Annotated[
+        str, Query(pattern="^(text|json)$", description="The source text, or a JSON document.")
+    ] = "text",
+) -> Any:
+    """A class as decompiled Java, falling back to Smali when JADX could not.
+
+    The response says which of the two it is. The plain-text form carries it in
+    the ``X-DexAtlas-Source-*`` headers, so the body stays exactly the source;
+    the JSON form carries the whole provenance in the document.
+    """
+    document = analyzer.class_source_document(project_id, class_name)
+    if document is None:
         raise HTTPException(status_code=404, detail=f"no source for {class_name!r}")
-    return PlainTextResponse(text)
+    if format == "json":
+        return _source_payload(project_id, class_name, None, document)
+    return PlainTextResponse(document.text, headers=_source_headers(document))
 
 
 @app.get("/projects/{project_id}/methods/{class_name:path}/{method_name}", tags=["analysis"])
 def get_method_source(
-    project_id: str, class_name: str, method_name: str, analyzer: AnalyzerDep
-) -> PlainTextResponse:
-    """One method's body, preferring decompiled Java and falling back to Smali."""
-    text = analyzer.method_source(project_id, class_name, method_name)
-    if text is None:
+    project_id: str,
+    class_name: str,
+    method_name: str,
+    analyzer: AnalyzerDep,
+    format: Annotated[
+        str, Query(pattern="^(text|json)$", description="The source text, or a JSON document.")
+    ] = "text",
+) -> Any:
+    """One method's body, preferring decompiled Java and falling back to Smali.
+
+    As with the class source, the response says which representation it is.
+    """
+    document = analyzer.method_source_document(project_id, class_name, method_name)
+    if document is None:
         raise HTTPException(
             status_code=404, detail=f"no decompiled source for {class_name}.{method_name}"
         )
-    return PlainTextResponse(text)
+    if format == "json":
+        return _source_payload(project_id, class_name, method_name, document)
+    return PlainTextResponse(document.text, headers=_source_headers(document))
 
 
 @app.get("/projects/{project_id}/xrefs/{method_id:path}", tags=["analysis"])
@@ -359,6 +384,37 @@ def delete_project(project_id: str, analyzer: AnalyzerDep) -> None:
 def _redact(message: str, secret: str) -> str:
     """Replace a server-side path with its basename, for messages shown to a caller."""
     return message.replace(secret, Path(secret).name)
+
+
+def _source_headers(document: SourceDocument) -> dict[str, str]:
+    """Headers that say where a source came from.
+
+    The body of the plain-text response is the source and nothing else — a
+    caller that pipes it into a file should get the file and not a header — so
+    the answer to "is this Java or Smali?" travels beside it. The JSON form
+    carries the same information inside the document.
+    """
+    headers = {"X-DexAtlas-Source-Kind": document.kind.value}
+    for source in document.provenance:
+        headers["X-DexAtlas-Source-Tool"] = source.tool
+        headers["X-DexAtlas-Source-Locator"] = source.locator
+        if source.tool_version:
+            headers["X-DexAtlas-Source-Tool-Version"] = source.tool_version
+    return headers
+
+
+def _source_payload(
+    project_id: str, class_name: str, method: str | None, document: SourceDocument
+) -> dict[str, Any]:
+    """The JSON form of a source: the text, and where it came from."""
+    return {
+        "project_id": project_id,
+        "class_name": class_name,
+        "method": method,
+        "kind": document.kind.value,
+        "provenance": [p.model_dump(mode="json") for p in document.provenance],
+        "text": document.text,
+    }
 
 
 # ---------------------------------------------------------------------------

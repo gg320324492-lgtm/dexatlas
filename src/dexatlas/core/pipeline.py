@@ -32,6 +32,8 @@ from dexatlas.core.models import (
     ProjectStatus,
     Provenance,
     ResourceString,
+    SourceDocument,
+    SourceKind,
     StringConstant,
     ToolError,
     ToolErrorCode,
@@ -39,6 +41,7 @@ from dexatlas.core.models import (
 from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
+from dexatlas.tools.apktool.adapter import source_locator as apktool_source_locator
 from dexatlas.tools.jadx.adapter import ClassDecompilation, JadxBackend, source_locator
 from dexatlas.tools.registry import BackendRegistry
 
@@ -306,36 +309,133 @@ class Analyzer:
     # -- queries -----------------------------------------------------------
 
     def class_source(self, project_id: str, class_name: str) -> str | None:
-        """JADX's Java for a class, falling back to Apktool's Smali."""
-        workspace = self._store.get_workspace(project_id)
-        if workspace is None:
-            return None
+        """JADX's Java for a class, falling back to Apktool's Smali.
 
-        if self._jadx.available():
-            source = self._jadx.read_class_source(class_name, workspace / "jadx")
-            if source is not None:
-                return source
-
-        if self._apktool.available():
-            return self._apktool.read_smali(class_name, workspace / "apktool")
-        return None
+        The text alone does not say which of the two it is. A caller that has to
+        know — because it renders the source, or cites it — should use
+        :meth:`class_source_document`, which carries the provenance with it.
+        """
+        document = self.class_source_document(project_id, class_name)
+        return document.text if document is not None else None
 
     def method_source(self, project_id: str, class_name: str, method_name: str) -> str | None:
-        """One method's body, preferring decompiled Java and falling back to Smali."""
-        workspace = self._store.get_workspace(project_id)
-        if workspace is None:
+        """One method's body, preferring decompiled Java and falling back to Smali.
+
+        As with :meth:`class_source`, the text does not say where it came from;
+        :meth:`method_source_document` does.
+        """
+        document = self.method_source_document(project_id, class_name, method_name)
+        return document.text if document is not None else None
+
+    def class_source_document(self, project_id: str, class_name: str) -> SourceDocument | None:
+        """A class's source, and which backend produced it.
+
+        JADX's Java when the decompiler wrote one, Apktool's Smali when it did
+        not. The provenance says which, so the caller never has to infer it from
+        the shape of the text or from what happens to be in the workspace.
+
+        The locator names the file inside the producing tool's own output tree,
+        so it points at the artefact rather than at the machine that made it.
+        """
+        context = self._source_context(project_id)
+        if context is None:
             return None
+        project, workspace = context
 
         if self._jadx.available():
-            source = self._jadx.read_method_source(class_name, method_name, workspace / "jadx")
-            if source is not None:
-                return source
+            output_dir = workspace / "jadx"
+            source = self._jadx.read_class_source(class_name, output_dir)
+            path = self._jadx.class_source_path(class_name, output_dir)
+            if source is not None and path is not None:
+                return SourceDocument(
+                    text=source,
+                    kind=SourceKind.JAVA,
+                    provenance=[
+                        self._source_provenance(project, "jadx", source_locator(output_dir, path))
+                    ],
+                )
+
+        if self._apktool.available():
+            output_dir = workspace / "apktool"
+            source = self._apktool.read_smali(class_name, output_dir)
+            path = self._apktool.smali_path(class_name, output_dir)
+            if source is not None and path is not None:
+                return SourceDocument(
+                    text=source,
+                    kind=SourceKind.SMALI,
+                    provenance=[
+                        self._source_provenance(
+                            project, "apktool", apktool_source_locator(output_dir, path)
+                        )
+                    ],
+                )
+        return None
+
+    def method_source_document(
+        self, project_id: str, class_name: str, method_name: str
+    ) -> SourceDocument | None:
+        """One method's body, and which backend produced it.
+
+        The Smali fallback is the case this exists for: a method the decompiler
+        could not reconstruct is still readable as bytecode, and a reader who is
+        not told that is looking at Smali will read it as Java.
+        """
+        context = self._source_context(project_id)
+        if context is None:
+            return None
+        project, workspace = context
+
+        if self._jadx.available():
+            output_dir = workspace / "jadx"
+            source = self._jadx.read_method_source(class_name, method_name, output_dir)
+            path = self._jadx.class_source_path(class_name, output_dir)
+            if source is not None and path is not None:
+                locator = f"{source_locator(output_dir, path)}#{method_name}"
+                return SourceDocument(
+                    text=source,
+                    kind=SourceKind.JAVA,
+                    provenance=[self._source_provenance(project, "jadx", locator)],
+                )
 
         # Smali fallback: a method JADX cannot decompile is still present in bytecode.
         if not self._apktool.available():
             return None
-        smali = self._apktool.read_smali(class_name, workspace / "apktool")
-        return _extract_smali_method(smali, method_name) if smali else None
+        output_dir = workspace / "apktool"
+        smali = self._apktool.read_smali(class_name, output_dir)
+        path = self._apktool.smali_path(class_name, output_dir)
+        if not smali or path is None:
+            return None
+        body = _extract_smali_method(smali, method_name)
+        if body is None:
+            return None
+        locator = f"{apktool_source_locator(output_dir, path)}#{method_name}"
+        return SourceDocument(
+            text=body,
+            kind=SourceKind.SMALI,
+            provenance=[self._source_provenance(project, "apktool", locator)],
+        )
+
+    def _source_context(self, project_id: str) -> tuple[Project, Path] | None:
+        """The project and its workspace, when both are still there."""
+        project = self._store.get_project(project_id)
+        workspace = self._store.get_workspace(project_id)
+        if project is None or workspace is None:
+            return None
+        return project, workspace
+
+    def _source_provenance(self, project: Project, tool: str, locator: str) -> Provenance:
+        """The provenance of a source read out of a stored workspace.
+
+        The version is the one the *analysis* recorded, not the one installed
+        now. The file on disk was written by the tool that ran then; a
+        decompiler upgraded since would otherwise be credited with it.
+        """
+        return Provenance(
+            tool=tool,
+            tool_version=project.tool_versions.get(tool),
+            apk_sha256=project.apk.sha256,
+            locator=locator,
+        )
 
     def search(self, project_id: str, keyword: str, limit: int = 50) -> list[dict[str, object]]:
         return self._store.search(project_id, keyword, limit=limit)

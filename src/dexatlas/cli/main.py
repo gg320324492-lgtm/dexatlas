@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -19,7 +20,7 @@ from dexatlas import __version__
 from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
-from dexatlas.core.models import ResourceKind, canonical_method_id
+from dexatlas.core.models import ResourceKind, SourceDocument, canonical_method_id
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -37,6 +38,16 @@ ExitCode = typer.Exit
 
 #: The mark for elided output. ``mark`` spells it safely on a legacy code page.
 ELLIPSIS = "…"
+
+
+class SourceFormat(StrEnum):
+    """What ``dexatlas source`` prints."""
+
+    TEXT = "text"
+    """The source text on stdout, and where it came from on stderr."""
+
+    JSON = "json"
+    """One JSON document carrying the source and its provenance."""
 
 
 def _more(count: int, singular: str, plural: str | None = None) -> str:
@@ -275,21 +286,69 @@ def source(
     method: Annotated[
         str | None, typer.Option("--method", help="Print one method instead of the class.")
     ] = None,
+    output_format: Annotated[
+        SourceFormat,
+        typer.Option(
+            "--format",
+            help="Print the source text, or a JSON document carrying its provenance.",
+        ),
+    ] = SourceFormat.TEXT,
 ) -> None:
-    """Print a class (or one method) as decompiled Java, falling back to Smali."""
+    """Print a class (or one method) as decompiled Java, falling back to Smali.
+
+    The source is Java or Smali, and the two are not interchangeable. Where it
+    came from is printed on stderr, so stdout carries the source and nothing
+    else and can be piped into a file unchanged; ``--format json`` carries the
+    same information in the document itself.
+    """
     analyzer = Analyzer()
-    text = (
-        analyzer.method_source(project_id, class_name, method)
+    document = (
+        analyzer.method_source_document(project_id, class_name, method)
         if method
-        else analyzer.class_source(project_id, class_name)
+        else analyzer.class_source_document(project_id, class_name)
     )
-    if text is None:
+    if document is None:
         err_console.print(
             f"[yellow]No source for {class_name}.[/yellow] "
             "JADX and Apktool must both be installed, and the APK re-analysed."
         )
         raise ExitCode(code=1)
-    console.print(text, markup=False, highlight=False)
+
+    for source in document.provenance:
+        err_console.print(f"[dim]{source.ref()}[/dim]")
+
+    if output_format is SourceFormat.JSON:
+        # Printed as text: a JSON document is full of square brackets, and Rich
+        # would read them as markup and corrupt the document.
+        console.print(
+            json.dumps(
+                _source_payload(project_id, class_name, method, document),
+                indent=2,
+                ensure_ascii=False,
+            ),
+            markup=False,
+            highlight=False,
+            soft_wrap=True,
+        )
+        return
+    # ``soft_wrap`` keeps the console from re-flowing the source: a line longer
+    # than the terminal is still one line of code, and a command whose output is
+    # piped into a file has to put the file in it unchanged.
+    console.print(document.text, markup=False, highlight=False, soft_wrap=True)
+
+
+def _source_payload(
+    project_id: str, class_name: str, method: str | None, document: SourceDocument
+) -> dict[str, object]:
+    """The JSON form of a source: the text, and where it came from."""
+    return {
+        "project_id": project_id,
+        "class_name": class_name,
+        "method": method,
+        "kind": document.kind.value,
+        "provenance": [p.model_dump(mode="json") for p in document.provenance],
+        "text": document.text,
+    }
 
 
 @app.command()
