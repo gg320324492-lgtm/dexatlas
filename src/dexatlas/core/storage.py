@@ -313,6 +313,18 @@ def _table_names(connection: sqlite3.Connection) -> set[str]:
     return {row[0] for row in rows}
 
 
+def _journal_mode(connection: sqlite3.Connection) -> str:
+    """The journal mode the database is in.
+
+    Reading it does not write; changing it does. That difference is the
+    whole of this function's reason to exist: the mode used to be set on
+    every connection, which made every read of the database a write, and
+    SQLite allows one writer at a time.
+    """
+    row = connection.execute("PRAGMA journal_mode").fetchone()
+    return str(row[0]).lower() if row else ""
+
+
 def _recorded_version(connection: sqlite3.Connection, tables: set[str]) -> int | None:
     """The schema version the database records, or ``None`` if it records none.
 
@@ -357,6 +369,15 @@ class Store:
         with store.transaction() as connection:
             tables = _table_names(connection)
             version = _recorded_version(connection, tables)
+
+            # The journal mode is a property of the database, and setting it
+            # is a write -- so it is set here, once, and only when the
+            # database is not in it already. Reading the mode does not write;
+            # changing it does, and it cannot be changed from inside a
+            # transaction, so it happens before the schema is written.
+            if _journal_mode(connection) != "wal":
+                connection.execute("PRAGMA journal_mode = WAL")
+
             if version != SCHEMA_VERSION or not _SCHEMA_TABLES.issubset(tables):
                 # The workspace does not hold this schema: it is new, it was
                 # written by an older build, or a table is missing from it.
@@ -381,10 +402,19 @@ class Store:
 
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
+        """A connection to the workspace database, in a transaction.
+
+        Only *connection* properties are set here. The journal mode is a
+        property of the database rather than of the connection, and setting
+        it is a write -- so it is set once, where the database is created or
+        upgraded, and not on every connection. Setting it here made every
+        read a write, and SQLite allows one writer at a time: a liveness
+        probe that opened the workspace could lock the analysis out of its
+        own database, and could be locked out itself.
+        """
         connection = sqlite3.connect(self._path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA journal_mode = WAL")
         try:
             yield connection
             connection.commit()

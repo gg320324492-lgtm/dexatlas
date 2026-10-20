@@ -14,6 +14,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated, Any
+from uuid import uuid4
 
 from fastapi import (
     BackgroundTasks,
@@ -45,6 +46,16 @@ logger = logging.getLogger(__name__)
 
 #: Uploads land here before analysis. Scoped to the workspace, never executed.
 UPLOAD_DIRNAME = "uploads"
+
+#: The name an upload is stored under when the client did not give one.
+DEFAULT_UPLOAD_NAME = "upload.apk"
+
+#: The longest a stored file name may be, in bytes.
+#:
+#: A file name cannot be longer than this on any filesystem DexAtlas runs on,
+#: so a longer name cannot name anything -- and a name that is stored is a
+#: name somebody may try to use.
+MAX_NAME_BYTES = 255
 
 #: The upload is larger than the limit.
 #:
@@ -286,12 +297,19 @@ def analyze(
     file: Annotated[UploadFile, File(description="An APK you are authorized to analyse.")],
 ) -> AnalyzeJobResponse:
     """Accept an APK and analyse it in the background."""
-    upload_dir = settings.workspace / UPLOAD_DIRNAME
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    target = upload_dir / Path(file.filename or "upload.apk").name
+    upload_root = settings.workspace / UPLOAD_DIRNAME
+    upload_root.mkdir(parents=True, exist_ok=True)
+    # The name the client gave, kept for the reader: it is what the report
+    # shows and what a rejection names.
+    name = _stored_name(file.filename)
+    # The upload is staged under a name of this server's choosing. The name the
+    # client gave is not used for the path: two uploads that happen to carry
+    # the same name must not be able to write over one another, because the
+    # analysis of the first one reads the path the second one would replace.
+    staged = upload_root / f".incoming-{uuid4().hex}"
 
     try:
-        save_upload(file.file, target)
+        save_upload(file.file, staged)
     except UploadTooLarge as exc:
         # Refused while it streamed: the bytes over the limit were never
         # written, and the partial file has already been removed.
@@ -306,15 +324,29 @@ def analyze(
         ) from exc
 
     try:
-        apk = inspect_apk(target)
+        apk = inspect_apk(staged)
     except ApkValidationError as exc:
-        target.unlink(missing_ok=True)
+        staged.unlink(missing_ok=True)
         # The validator names the absolute path; a remote caller has no business
-        # learning the server's filesystem layout.
+        # learning the server's filesystem layout. What it is told instead is
+        # the name it gave the file -- which is the name it has to recognise.
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=_redact(str(exc), str(target)),
+            detail=str(exc).replace(str(staged), name),
         ) from exc
+
+    # The bytes are known and valid, so the file can go where it belongs: in a
+    # directory named after its own hash. Two uploads can then share a path
+    # only when they are the same bytes, and a project can only ever hold the
+    # classes of the file that was hashed into its name.
+    #
+    # The name the client gave is kept as the name of the file inside, because
+    # that is the name a reader of the report wants to see.
+    stored_dir = upload_root / apk.sha256
+    stored_dir.mkdir(parents=True, exist_ok=True)
+    target = stored_dir / name
+    staged.replace(target)
+    apk.path = target
 
     existing = analyzer.store.find_project_by_hash(apk.sha256)
     if existing is not None:
@@ -530,6 +562,23 @@ def delete_project(project_id: str, analyzer: AnalyzerDep) -> None:
     """Remove a project and its symbols."""
     if not analyzer.store.delete_project(project_id):
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+
+
+def _stored_name(filename: str | None) -> str:
+    """The name the upload is stored under.
+
+    The client's name is kept, because a reader of the report wants to know
+    what the file was called. It is made safe first: a name may not name a
+    directory, may not be empty, and may not be longer than a file name can
+    be -- a name that is stored is a name somebody may try to use.
+    """
+    name = Path(filename or "").name
+    if not name or name in {".", ".."}:
+        return DEFAULT_UPLOAD_NAME
+    encoded = name.encode("utf-8", errors="replace")
+    if len(encoded) > MAX_NAME_BYTES:
+        name = encoded[:MAX_NAME_BYTES].decode("utf-8", errors="ignore")
+    return name or DEFAULT_UPLOAD_NAME
 
 
 def _redact(message: str, secret: str) -> str:
