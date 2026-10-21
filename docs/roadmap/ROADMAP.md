@@ -227,6 +227,14 @@ evidence, and recovers from failure.
 > **multi-tool coordination + evidence-first output + resumable tasks + measurable
 > analysis quality.**
 
+> **The plan is written.** The source review is complete, so Phase 2 is planned
+> against the code that exists rather than against the assumption that it does
+> not: **[Phase 2 plan](phase2-plan.md)** — the issues, the implementation order,
+> the interface changes, the test plan and the acceptance criteria.
+> It opens with two stages of debt the review found and this section did not know
+> about, and it corrects two assumptions below: the evidence model is already
+> built, and MCP does not exist at all.
+
 ### 2.1 Agent orchestration
 
 Start with **one primary agent with explicit internal roles**, not a dozen independent

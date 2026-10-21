@@ -180,11 +180,16 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
   which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
+- **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review, against the code that exists
 - **[Large-APK benchmark](docs/benchmarks/large-apk.md)** — what the analysis does to a
   200,000-method APK, what it refuses to claim, and what it never measured
 
-Remaining Phase 1 work — the source review, and the issues written from it — is tracked
-in [issue #1](https://github.com/gg320324492-lgtm/dexatlas/issues/1).
+The source review is done: 44 findings across three reviews, every one of them
+re-verified against the tree it was found on.
+
+- **[Review report](docs/reports/phase1-review-report.md)** — what was found, what was fixed, and what is deferred (Chinese; 评审报告)
+- **[Maturity assessment](docs/reports/phase1-maturity-assessment.md)** — six weighted dimensions, scored from what could be run (Chinese; 成熟度评估)
+- **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings, each with two options and a recommendation (Chinese; Phase 2 任务清单)
 
 ## Contributing
 
