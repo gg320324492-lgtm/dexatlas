@@ -118,7 +118,87 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The README's badges had stopped at v0.1.2.** They showed 275 tests and 89%
   coverage — that release's numbers — while the project was on 444 tests and 94.0%.
   A badge URL cannot carry a generated figure, so this is a number to write and
-  re-check, not one that can be measured; it now states the measured values.
+  re-check, not one that can be measured. The badge is written from the
+  measurement now — see the review findings below.
+
+### Found by the Phase 1 source review
+
+The review ran three parallel audits against the tree and produced 44 findings;
+every one was re-verified on the tree it was found on, and the ones that are
+fixed below are fixed with a test that goes red when the fix is reverted.
+The review report is `docs/reports/phase1-review-report.md`.
+
+- **An upload's file name was the client's to choose.** Two different APKs
+  uploaded under the same name landed on the same path, and the analysis of the
+  first one reads that path in the background — so it read the *second* APK's
+  bytes, and the project it produced said it held the first APK's classes.
+  Nothing a reader could check contradicted the record: the project's hash was
+  the first APK's, its identifier was the first APK's, and every provenance
+  record named the first APK's hash. The file is stored under its own hash now,
+  so two uploads share a path only when they are the same bytes.
+- **The default configuration did not decompile Java.** The default workspace is
+  a relative path, and the JADX backend handed the same relative path to the
+  child process twice — once as `--output-dir` and once as its working
+  directory. The path was read against two different bases, so the sources
+  landed in a nested copy of the tree the index reads: the report lost the
+  decompilation row, the class count dropped by one, and the source fell back
+  to Smali — while the tool-version line still credited jadx. Every path a
+  backend is handed now means one place, and CI runs the default configuration
+  end to end.
+- **A read of the database was a write.** The journal mode is a property of the
+  database rather than of the connection, and setting it is a write — so every
+  read took the one write lock SQLite allows, and a second request failed with
+  `database is locked`. It is set once, where the database is created.
+- **An analysis that crashed left the project running forever.** The pipeline
+  documented that failures are recorded on the project rather than raised, and
+  did neither: an exception left the project in `running` with no error
+  recorded, and the API answered every later upload of that APK with the
+  existing project — so it was never analysed again. A failure now lands the
+  project in `failed` with the error on it, and the exception still reaches the
+  caller.
+- **The liveness probe wrote to the database.** `GET /health` built a whole
+  analyzer, which opened the workspace and took the write lock, on every
+  request. Which backends are installed is a fact about the machine, not about
+  the database, and the probe no longer opens one.
+- **Two numbers that sat next to each other counted different things.** The
+  report's "cross-references with evidence" counted the called methods that
+  got a record, while the "cross-references indexed" beside it counted the
+  calls — so a method called from three places read as "one of three had
+  evidence". Both now count edges, in the same unit, and the report says which
+  is which.
+- **The evidence table dropped the conclusion it was making room for.** With
+  more than 200 classes, the decompilation-coverage record fell outside the
+  window: the metric was still in the report and the evidence behind it was
+  not. The evidence is ordered so the conclusions come first, and the report
+  says how many records were left out and what they were.
+- **The exported report said the analysis took no time.** The API rebuilt the
+  result from storage and did not restore the duration — and the database had
+  no column for it. It is stored now, and an old workspace says "unknown"
+  rather than "0.0 seconds".
+- **The numbers in the report were compared with themselves.** The suite and
+  coverage figures were checked against the record written next to them, so
+  writing "999" into both changed nothing anybody could see, and the
+  fingerprint that declares them stale covered only the source — adding a test
+  did not make them stale. They are measured now, and the fingerprint covers
+  the suite and the tools that measure it.
+- **The citation checker checked 18 of 94 references, and always passed.** The
+  script's `main()` returned 0 whatever it found, and the test re-implemented
+  the rules with a different tolerance. Ninety-three of the ninety-four
+  references are checked now, and a drifted one fails the check.
+- **The version-claim checker passed on the case it was built for.** A commit
+  that released a version while the documents still denied it was classified as
+  drift the base already had, and the check passed. The base commit is now
+  judged against its own facts.
+- **A behaviour could be published as a finding.** The evidence level was
+  documented as the mechanism that stops an unverified claim from being
+  reported as one, and nothing stopped a caller from recording a behaviour as
+  verified — which the report renders as "deterministically established by an
+  analysis tool". A model cannot promote itself now.
+- **The readmes' badges were written by hand.** A badge is a URL, so it cannot
+  carry a generated figure, so its number was copied — and it was stale. The
+  badge is written from the same measurement the report is written from, and a
+  run that does not account for every test in the tree is refused rather than
+  published.
 
 ## [0.1.3] — 2026-10-20
 
