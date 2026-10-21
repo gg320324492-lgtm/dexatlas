@@ -18,8 +18,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->738<!--/fig--> 个（<!--fig:tests.fast-->618<!--/fig--> 快 + <!--fig:tests.slow-->120<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->93.7%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->885<!--/fig--> 个（<!--fig:tests.fast-->764<!--/fig--> 快 + <!--fig:tests.slow-->121<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->94.1%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 | 成熟度评估 | **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)） |

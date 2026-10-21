@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->738<!--/fig-->（<!--fig:tests.fast-->618<!--/fig--> 快 + <!--fig:tests.slow-->120<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.7%<!--/fig-->**（<!--fig:coverage.covered-->2353<!--/fig-->/<!--fig:coverage.total-->2511<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->885<!--/fig-->（<!--fig:tests.fast-->764<!--/fig--> 快 + <!--fig:tests.slow-->121<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->94.1%<!--/fig-->**（<!--fig:coverage.covered-->2500<!--/fig-->/<!--fig:coverage.total-->2656<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -91,7 +91,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 |------|--------|------------------|
 | `tools/base.py` | 82.2% | 32 / 180 |
 | `cli/console.py` | 82.4% | 6 / 34 |
-| `tools/jadx/adapter.py` | 87.1% | 33 / 256 |
+| `tools/jadx/adapter.py` | 87.2% | 33 / 257 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
@@ -112,7 +112,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.7%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->94.1%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -120,9 +120,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->618<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->120<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->738<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->764<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->121<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->885<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -166,6 +166,16 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_upload_limits.py` | 上传大小上限、zip bomb 在解压前被拒、同一份 APK 只读一次 |
 | `test_backend_timeout.py` | 后端超时时整棵进程树一起死，包括它启动的那个 |
 | `test_deployment_boundary.py` | 部署默认只对本机开放：端口映射绑回环，容器内仍绑 0.0.0.0 |
+| `test_health_endpoint.py` | 探活端点不碰工作区数据库：数据库建不了时它照样返回 200 |
+| `test_store_open.py` | 打开工作区不写：版本对得上时一个字节都不写，版本对不上时才升级 |
+| `test_read_does_not_write.py` | 一次纯读不改数据库：journal mode 是数据库的属性，不是每次连接都设的 |
+| `test_upload_isolation.py` | 两个同名上传不会写到同一个路径去；分析读到的字节必须和它的元数据对得上 |
+| `test_jadx_relative_paths.py` | 默认配置（相对工作区）下 JADX 的输出路径只有一个意思，Java 反编译真的生效 |
+| `test_analysis_failure.py` | 分析崩了必须说得清：项目不留在 `running`，错误被记下，异常照样传出去 |
+| `test_analysis_duration.py` | 这次分析花了多久：CLI 和 API 导出的是同一个数，而且不是 0 |
+| `test_report_cross_reference_units.py` | 「有证据的交叉引用」和「索引的交叉引用」必须同一个单位 |
+| `test_evidence_table_window.py` | 证据表只有 200 行时，结论级的记录不能被挤掉，截断必须在表前说清楚 |
+| `test_docstring_claims.py` | 文档字符串声称的，必须就是代码做的：两个后端的分工、迁移加了什么、摄取读了多少 |
 
 ### 2.2 几类值得注意的测试
 
@@ -782,10 +792,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->738<!--/fig--> 个：<!--fig:tests.fast-->618<!--/fig--> 快 + <!--fig:tests.slow-->120<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->885<!--/fig--> 个：<!--fig:tests.fast-->764<!--/fig--> 快 + <!--fig:tests.slow-->121<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.7%<!--/fig-->（<!--fig:coverage.covered-->2353<!--/fig-->/<!--fig:coverage.total-->2511<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->738<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->94.1%<!--/fig-->（<!--fig:coverage.covered-->2500<!--/fig-->/<!--fig:coverage.total-->2656<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->884<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -905,23 +915,23 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "files": {
       "__init__.py": [3, 0],
       "api/__init__.py": [3, 0],
-      "api/app.py": [198, 14],
+      "api/app.py": [222, 14],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
       "cli/main.py": [237, 5],
       "config/__init__.py": [3, 0],
-      "config/settings.py": [34, 0],
+      "config/settings.py": [39, 1],
       "core/__init__.py": [3, 0],
-      "core/evidence.py": [60, 0],
-      "core/ingest.py": [86, 6],
-      "core/models.py": [267, 4],
-      "core/paths.py": [29, 2],
-      "core/pipeline.py": [274, 12],
-      "core/storage.py": [221, 7],
+      "core/evidence.py": [63, 0],
+      "core/ingest.py": [88, 3],
+      "core/models.py": [301, 4],
+      "core/paths.py": [31, 2],
+      "core/pipeline.py": [307, 17],
+      "core/storage.py": [241, 4],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
-      "reports/json_report.py": [21, 0],
-      "reports/markdown.py": [68, 2],
+      "reports/json_report.py": [22, 0],
+      "reports/markdown.py": [88, 0],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
       "tools/androguard/adapter.py": [265, 23],
@@ -929,11 +939,11 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/apktool/adapter.py": [211, 12],
       "tools/base.py": [180, 32],
       "tools/jadx/__init__.py": [3, 0],
-      "tools/jadx/adapter.py": [256, 33],
+      "tools/jadx/adapter.py": [257, 33],
       "tools/registry.py": [28, 0]
     },
-    "missing": 158,
-    "statements": 2511
+    "missing": 156,
+    "statements": 2656
   },
   "history": {
     "v0.1.0": {
@@ -949,16 +959,20 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tests": 444
     }
   },
-  "schema": 3,
-  "source_fingerprint": "sha256:ed4b8342a084a115d9d0b5edf66c29ff3e653f9c460dc8ecfae166bf5e61bf3c",
+  "schema": 4,
+  "source_fingerprint": "sha256:42d16641a1dc7df79377b5087015d94865e8989218181c6eb4524e447b593a9d",
   "suite": {
-    "passed": 738,
+    "failed": 1,
+    "passed": 884,
     "skipped": 0,
-    "xfailed": 0
+    "skipped_tests": [],
+    "xfailed": 0,
+    "xfailed_tests": [],
+    "xpassed": 0
   },
   "tests": {
-    "fast": 618,
-    "slow": 120,
-    "total": 738
+    "fast": 764,
+    "slow": 121,
+    "total": 885
   }
 }-->

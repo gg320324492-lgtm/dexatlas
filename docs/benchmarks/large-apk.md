@@ -435,7 +435,7 @@ indexed APK from a clipped one — in the one place a reader would look.
 
 **Fixed by:** a limit that truncates the index now produces a `ToolError` whose
 code is `OUTPUT_TRUNCATED` — the code `ToolErrorCode` had defined for exactly
-this and used for nothing (`src/dexatlas/core/models.py:33-41`). The error is
+this and used for nothing (`src/dexatlas/core/models.py:34-42`). The error is
 written into `project.errors`, it appears in the report's "Backend errors"
 section, and it appears in the evidence table as
 `androguard:error/output_truncated`. The project status stays `completed`,
