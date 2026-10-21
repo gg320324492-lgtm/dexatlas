@@ -392,16 +392,14 @@ def probe(monkeypatch):
     return p
 
 
-def test_two_concurrent_analyses_of_one_apk_do_not_share_a_workspace(
-    settings, probe, demo_apk
-):
+def test_two_concurrent_analyses_of_one_apk_do_not_share_a_workspace(settings, probe, demo_apk):
     analyzer = Analyzer(settings)
     results, errors = [], []
 
     def run():
         try:
             results.append(analyzer.analyze(demo_apk))
-        except BaseException as exc:      # noqa: BLE001
+        except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
 
     threads = [threading.Thread(target=run) for _ in range(2)]
@@ -418,9 +416,7 @@ def test_two_concurrent_analyses_of_one_apk_do_not_share_a_workspace(
     assert probe.max_concurrent == 2, "两次分析没有同时在跑，这条测试没证明并发"
 
     # 关键断言：两个分析没有共用同一个目录
-    assert len(set(probe.output_dirs)) == 2, (
-        f"两个分析用了同一个目录：{probe.output_dirs}"
-    )
+    assert len(set(probe.output_dirs)) == 2, f"两个分析用了同一个目录：{probe.output_dirs}"
 ```
 
 **怎么证明这不是假绿**（这是本条的重点）：
@@ -464,12 +460,13 @@ def test_two_concurrent_analyses_both_produce_a_complete_result(settings, demo_a
 `src/dexatlas/core/storage.py:305-318`：
 
 ```python
-    @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
-        connection = sqlite3.connect(self._path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA journal_mode = WAL")     # ← :371，每一条语句都跑
+# store.py 的 transaction() —— Store 的唯一出入口，一次纯读也走这里
+@contextmanager
+def transaction(self) -> Iterator[sqlite3.Connection]:
+    connection = sqlite3.connect(self._path)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("PRAGMA journal_mode = WAL")  # ← :371，每一条语句都跑
 ```
 
 `transaction()` 是 Store 的**唯一**出入口：`get_project`、`list_projects`、`search`、
@@ -576,7 +573,7 @@ def test_reading_the_workspace_does_not_write_to_the_database(tmp_path):
     finally:
         connection.close()
 
-    store.list_projects()          # ← 一次纯读
+    store.list_projects()  # ← 一次纯读
 
     assert _journal_mode(db) == "delete", "一次读把 journal mode 改了 —— 它拿了写锁"
 ```
@@ -596,7 +593,7 @@ def test_two_concurrent_opens_of_a_new_workspace_both_succeed(tmp_path):
         barrier.wait(timeout=30)
         try:
             Store.open(db)
-        except BaseException as exc:      # noqa: BLE001
+        except BaseException as exc:  # noqa: BLE001
             errors.append(exc)
 
     threads = [threading.Thread(target=open_it) for _ in range(2)]
@@ -739,12 +736,13 @@ if version != SCHEMA_VERSION or not _SCHEMA_TABLES.issubset(tables):
 `src/dexatlas/core/storage.py:277-285` 对 `resources` 就是这么做的：
 
 ```python
-    resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
-    if resource_columns and "position" not in resource_columns:
-        # The table is a cache of the analysis rather than a source of truth —
-        # the next analysis fills it again — so it is dropped and created empty.
-        connection.execute("DROP TABLE resources")
-        connection.execute(_RESOURCES_TABLE)
+# _migrate() 里已有的先例
+resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
+if resource_columns and "position" not in resource_columns:
+    # The table is a cache of the analysis rather than a source of truth —
+    # the next analysis fills it again — so it is dropped and created empty.
+    connection.execute("DROP TABLE resources")
+    connection.execute(_RESOURCES_TABLE)
 ```
 
 **照抄这个形状**：`PRAGMA table_info(xrefs)` 里没有主键索引 → `DROP TABLE xrefs` +
@@ -782,10 +780,8 @@ def test_the_same_call_edge_is_stored_once(store):
         callee="com.example.B.bar()V",
         kind=InvocationKind.VIRTUAL,
     )
-    store.save_symbols(
-        "p1", [], [], [], [edge, edge], []
-    )
-    rows = store._count_xrefs("p1")     # 或直接查 connection
+    store.save_symbols("p1", [], [], [], [edge, edge], [])
+    rows = store._count_xrefs("p1")  # 或直接查 connection
     assert rows == 1, "同一条调用边存了两行"
 ```
 
@@ -831,17 +827,17 @@ def _quiet_androguard() -> Iterator[None]:
     library may legitimately be used at debug level elsewhere in the process.
     """
     try:
-        from loguru import logger as loguru_logger      # :105
+        from loguru import logger as loguru_logger  # :105
     except ImportError:
         yield
         return
 
-    previous = os.environ.get("LOGURU_LEVEL")            # :110
-    os.environ["LOGURU_LEVEL"] = "ERROR"                 # :111
-    loguru_logger.remove()                               # :112   ← 全局删除所有 handler
+    previous = os.environ.get("LOGURU_LEVEL")  # :110
+    os.environ["LOGURU_LEVEL"] = "ERROR"  # :111
+    loguru_logger.remove()  # :112   ← 全局删除所有 handler
     try:
         yield
-    finally:                                              # :115-119  ← 只恢复了环境变量
+    finally:  # :115-119  ← 只恢复了环境变量
         if previous is None:
             os.environ.pop("LOGURU_LEVEL", None)
         else:
@@ -991,13 +987,9 @@ def test_an_analysis_leaves_the_process_logging_alone(settings, demo_apk):
     try:
         Analyzer(settings).analyze(demo_apk)
 
-        assert set(loguru.logger._core.handlers) == set(before), (
-            "分析之后 loguru 的 handler 变了"
-        )
+        assert set(loguru.logger._core.handlers) == set(before), "分析之后 loguru 的 handler 变了"
         loguru.logger.info("the host is still listening")
-        assert "the host is still listening" in host_sink.getvalue(), (
-            "宿主进程的日志被分析吞掉了"
-        )
+        assert "the host is still listening" in host_sink.getvalue(), "宿主进程的日志被分析吞掉了"
     finally:
         loguru.logger.remove(handler_id)
 ```
@@ -1013,8 +1005,7 @@ def test_an_analysis_leaves_the_process_logging_alone(settings, demo_apk):
 再补一条钉住「不能把该压制的放开」的：
 
 ```python
-def test_androguard_debug_output_is_still_suppressed(settings, demo_apk, caplog):
-    ...
+def test_androguard_debug_output_is_still_suppressed(settings, demo_apk, caplog): ...
 ```
 
 （这条要配合方案 A 落地后，改为断言 androguard 的 DEBUG 记录**没有**出现在输出里。）
@@ -1142,7 +1133,9 @@ def test_the_upload_directory_has_a_total_size_limit(client, settings, demo_apk)
     # 把配额调到很小
     settings.upload_max_total_bytes = 1024
     # 第一次上传成功
-    assert client.post("/analyze", files={"file": ("a.apk", demo_apk.read_bytes())}).status_code == 202
+    assert (
+        client.post("/analyze", files={"file": ("a.apk", demo_apk.read_bytes())}).status_code == 202
+    )
     # 第二次超配额 → 413
     response = client.post("/analyze", files={"file": ("b.apk", demo_apk.read_bytes())})
     assert response.status_code == 413
@@ -1241,9 +1234,7 @@ def test_the_api_exported_report_does_not_claim_a_zero_duration(client, demo_pro
     而 markdown.py:70 无条件打印这个数。
     """
     markdown = client.get(f"/projects/{demo_project}/report?format=markdown").text
-    assert "| Analysis time | 0.0s |" not in markdown, (
-        "报告写了一个分析从未产生过的时长"
-    )
+    assert "| Analysis time | 0.0s |" not in markdown, "报告写了一个分析从未产生过的时长"
 ```
 
 **在旧代码上会不会红？会**：`_rebuild_result`（`api/app.py:600-610`）没有设
@@ -1254,8 +1245,8 @@ def test_the_api_exported_report_does_not_claim_a_zero_duration(client, demo_pro
 不是「字段存在」。而且要**同时**断言另一条：
 
 ```python
-    # 并且必须真的有耗时，而不是把这一行藏起来
-    assert "| Analysis time |" in markdown
+# 并且必须真的有耗时，而不是把这一行藏起来
+assert "| Analysis time |" in markdown
 ```
 
 这样「把这一行删掉」这种改法也会红 —— 而那也是不合格的改法
@@ -1270,8 +1261,10 @@ def test_a_storage_failure_is_recorded_not_raised(monkeypatch, settings, demo_ap
 
     现在会红：sqlite3.Error 直接上抛。
     """
+
     def boom(*args, **kwargs):
         raise sqlite3.OperationalError("database is locked")
+
     monkeypatch.setattr(Store, "save_symbols", boom)
     result = Analyzer(settings).analyze(demo_apk)
     assert result.project.errors, "存储层的失败没有被记录"
@@ -1512,13 +1505,7 @@ exit=3
 def test_the_dead_code_check_finds_an_unused_function(tmp_path):
     """把一段新死代码放进一个临时副本，门禁必须报出来。"""
     source = tmp_path / "sample.py"
-    source.write_text(
-        "def used():\n"
-        "    return 1\n"
-        "\n"
-        "def never_called():\n"
-        "    return 2\n"
-    )
+    source.write_text("def used():\n    return 1\n\ndef never_called():\n    return 2\n")
     result = subprocess.run(
         ["vulture", str(source), "--min-confidence", "60"],
         capture_output=True,
