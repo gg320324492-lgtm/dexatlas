@@ -35,7 +35,13 @@ from dexatlas import __version__
 from dexatlas.config.settings import Settings, get_settings
 from dexatlas.core import ingest
 from dexatlas.core.ingest import ApkValidationError, UploadTooLarge, inspect_apk, save_upload
-from dexatlas.core.models import ApkMetadata, Project, SourceDocument, canonical_method_id
+from dexatlas.core.models import (
+    ApkMetadata,
+    Project,
+    ProjectStatus,
+    SourceDocument,
+    canonical_method_id,
+)
 from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
@@ -349,12 +355,17 @@ def analyze(
     apk.path = target
 
     existing = analyzer.store.find_project_by_hash(apk.sha256)
-    if existing is not None:
+    if existing is not None and existing.status is not ProjectStatus.FAILED:
         return AnalyzeJobResponse(
             project_id=existing.id,
             status=existing.status.value,
             detail=f"/projects/{existing.id}",
         )
+    # A project that failed is analysed again. The failure was recorded, with
+    # its reason, and sending the same APK is how the operator asks for
+    # another go; answering with the failed project instead would make the
+    # failure permanent — the project id is the APK's hash, so the upload
+    # would find it and return it for ever.
 
     # The APK has already been inspected, so the analysis is handed the
     # metadata rather than inspecting it a second time.
@@ -367,10 +378,23 @@ def analyze(
 
 
 def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
+    """Analyse an APK in the background.
+
+    Two things can happen, and the log has to tell them apart: the analysis
+    can fail, or it can finish and find nothing. The first is an error and
+    the second is an answer, and a log that says "failed" for both sends the
+    reader looking for a fault that is not there.
+    """
     try:
-        analyzer.analyze(apk_path, metadata=apk)
+        result = analyzer.analyze(apk_path, metadata=apk)
     except Exception:
+        # The pipeline records the failure on the project before it raises, so
+        # the project is failed rather than running, and its errors say what
+        # happened. The log says the same thing.
         logger.exception("background analysis of %s failed", apk_path)
+        return
+    if not result.succeeded:
+        logger.warning("background analysis of %s completed but produced no symbols", apk_path)
 
 
 @app.get("/projects", tags=["analysis"])
@@ -665,7 +689,13 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
 
 
 def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
-    """Reconstruct an :class:`AnalysisResult` from storage, for on-demand export."""
+    """Reconstruct an :class:`AnalysisResult` from storage, for on-demand export.
+
+    Everything the reports state has to come out of the workspace, including
+    how long the analysis took: a report exported over the API that says
+    "0.0s" for an analysis that took three seconds states a number the
+    analysis never produced.
+    """
     project = analyzer.store.get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
@@ -674,6 +704,7 @@ def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
         manifest=analyzer.store.get_manifest(project_id),
         evidence=analyzer.store.list_evidence(project_id),
         workspace=analyzer.store.get_workspace(project_id),
+        duration_seconds=project.duration_seconds or 0.0,
     )
 
 

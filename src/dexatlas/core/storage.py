@@ -37,7 +37,7 @@ from dexatlas.core.models import (
     canonical_method_id,
 )
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 #: Tables cleared when a project is re-analysed. Content-addressed project ids mean a
 #: re-analysis replaces rather than accumulates.
@@ -115,6 +115,7 @@ CREATE TABLE IF NOT EXISTS projects (
     reference_count  INTEGER NOT NULL DEFAULT 0,
     evidence_count   INTEGER NOT NULL DEFAULT 0,
     resource_count   INTEGER NOT NULL DEFAULT 0,
+    duration_seconds REAL,
     manifest         TEXT,
     workspace        TEXT
 );
@@ -221,8 +222,9 @@ _PROJECT_UPSERT = """
 INSERT INTO projects (
     id, apk_sha256, apk_path, apk_size_bytes, created_at, status,
     tool_versions, errors, class_count, method_count,
-    reference_count, evidence_count, resource_count, manifest, workspace
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    reference_count, evidence_count, resource_count, duration_seconds,
+    manifest, workspace
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     apk_path      = excluded.apk_path,
     status        = excluded.status,
@@ -233,6 +235,7 @@ ON CONFLICT(id) DO UPDATE SET
     reference_count = excluded.reference_count,
     evidence_count  = excluded.evidence_count,
     resource_count  = excluded.resource_count,
+    duration_seconds = excluded.duration_seconds,
     manifest      = excluded.manifest,
     workspace     = excluded.workspace
 """
@@ -289,12 +292,20 @@ def _migrate(connection: sqlite3.Connection) -> None:
     of an analysis rather than a source of truth: the next analysis fills it
     again. These two changes are the whole of what this function does — the
     schema version is recorded by the caller.
+
+    A column that holds a *measurement* is added without a default, and the
+    rows that were already there read as nothing rather than as zero. The
+    analysis time is a measurement of one run; a workspace written before the
+    measurement was stored never took one, and zero is a number that run
+    never reported.
     """
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(projects)")}
     if "resource_count" not in columns:
         connection.execute(
             "ALTER TABLE projects ADD COLUMN resource_count INTEGER NOT NULL DEFAULT 0"
         )
+    if "duration_seconds" not in columns:
+        connection.execute("ALTER TABLE projects ADD COLUMN duration_seconds REAL")
 
     resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
     if resource_columns and "position" not in resource_columns:
@@ -446,6 +457,7 @@ class Store:
                     project.reference_count,
                     project.evidence_count,
                     project.resource_count,
+                    project.duration_seconds,
                     manifest.model_dump_json() if manifest else None,
                     str(workspace),
                 ),
@@ -859,6 +871,7 @@ def _row_to_project(row: sqlite3.Row) -> Project:
         reference_count=row["reference_count"],
         evidence_count=row["evidence_count"],
         resource_count=row["resource_count"],
+        duration_seconds=row["duration_seconds"],
     )
 
 

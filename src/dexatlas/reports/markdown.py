@@ -14,9 +14,11 @@ from dexatlas.core.models import (
     EvidenceLevel,
     ManifestInfo,
     Project,
+    cross_reference_call_sites,
+    cross_reference_records,
     index_gaps,
 )
-from dexatlas.core.pipeline import AnalysisResult
+from dexatlas.core.pipeline import AnalysisResult, analysis_duration
 from dexatlas.reports.coverage import decompilation_coverage
 
 _LEVEL_NOTE = {
@@ -31,8 +33,24 @@ _MAX_EVIDENCE_ROWS = 200
 _XREF_NOTE = (
     "A cross-reference record is made for a method of this APK that is called from "
     "elsewhere. Calls into library code are indexed as cross-references but are not "
-    "evidence: they say something about the JDK, not about this app."
+    "evidence: they say something about the JDK, not about this app. One record "
+    "covers every call site of the method it is about, so the call sites the records "
+    "cover add up to more than the number of records."
 )
+
+#: What the three cross-reference numbers count, said where they are.
+#:
+#: They are three numbers about three different things, and they are printed
+#: next to each other. A reader who takes them for the same thing reads a
+#: ratio out of them that is not there: "3 of 23 cross-references have
+#: evidence" is a claim about the same 23 that the third number contradicts.
+_XREF_COUNT_NOTE = [
+    "> **The cross-reference counts are three numbers about three things.** The",
+    "> indexed count is the call edges the index holds, one row per call. The",
+    "> count with evidence is the call sites a cross-reference record covers:",
+    "> one record is made per called method of this APK, and it covers every call",
+    "> site of that method. The record count is the number of those records.",
+]
 
 #: What an incomplete index means for the numbers beside it.
 _INDEX_GAP_NOTE = [
@@ -63,11 +81,15 @@ def render_markdown(result: AnalysisResult) -> str:
     metrics += [
         ("Resource strings indexed", f"{project.resource_count:,}"),
         ("Cross-references indexed", f"{project.reference_count:,}"),
-        ("Cross-references with evidence", f"{_cross_reference_count(result.evidence):,}"),
+        # The call sites the cross-reference records cover, and the number of
+        # records themselves. The two are different numbers about different
+        # things: one record covers every call site of the method it is about.
+        ("Cross-references with evidence", f"{cross_reference_call_sites(result.evidence):,}"),
+        ("Cross-reference records", f"{cross_reference_records(result.evidence):,}"),
         ("Evidence records", f"{project.evidence_count:,}"),
         ("DEX files", f"{len(project.apk.dex_files)}"),
         ("Native libraries", f"{len(project.apk.native_libraries)}"),
-        ("Analysis time", f"{result.duration_seconds:.1f}s"),
+        ("Analysis time", _duration_cell(result)),
     ]
 
     lines: list[str] = [
@@ -87,6 +109,8 @@ def render_markdown(result: AnalysisResult) -> str:
         "| --- | ---: |",
     ]
     lines += [f"| {name} | {_cell(value)} |" for name, value in metrics]
+    if cross_reference_records(result.evidence):
+        lines += ["", *_XREF_COUNT_NOTE]
     if index_gaps(project.errors):
         lines += ["", *_INDEX_GAP_NOTE]
     lines += [
@@ -200,14 +224,59 @@ def _manifest_section(manifest: ManifestInfo) -> list[str]:
     return lines
 
 
-def _cross_reference_count(evidence: list[Evidence]) -> int:
-    """How many of the indexed cross-references became evidence records."""
-    return sum(1 for item in evidence if item.kind == EvidenceKind.CROSS_REFERENCE)
+def _duration_cell(result: AnalysisResult) -> str:
+    """How long the analysis took — or that it is not known.
+
+    A run that was never timed has no duration, and a report that prints
+    ``0.0s`` for it states a measurement the run never made.
+    """
+    duration = analysis_duration(result)
+    return "unknown" if duration is None else f"{duration:.1f}s"
+
+
+def _is_class_declaration(item: Evidence) -> bool:
+    """Whether a record is the declaration of a class.
+
+    The class declarations are the index of the APK rather than a finding
+    about it, and they are the records a truncated table drops first. The
+    summary is what says which record is which: the manifest's record is
+    about the package, and the exported components' record is about the
+    components.
+    """
+    return item.kind is EvidenceKind.DECLARATION and item.summary.startswith("Class ")
+
+
+def _truncation_note(total: int, shown: int, omitted: list[Evidence]) -> list[str]:
+    """The note that says the evidence table is not the whole of the evidence.
+
+    A table of two hundred rows that says nothing about the rest reads as a
+    report of two hundred records. The reader has to be told while they are
+    looking at the table — not in a footnote under it — how many records it
+    left out and what they were.
+    """
+    kinds = Counter(item.kind.value for item in omitted)
+    breakdown = ", ".join(f"{count} {kind}" for kind, count in sorted(kinds.items()))
+    note = [
+        f"> **This table is truncated.** It shows the first {shown:,} of the {total:,} "
+        f"evidence records this analysis produced; the other {len(omitted):,} are not "
+        f"shown ({breakdown})."
+    ]
+    classes = sum(1 for item in omitted if _is_class_declaration(item))
+    if classes:
+        note.append(
+            f"> {classes:,} of them are class declarations: the index of the APK, not a "
+            "finding about it. The metrics above count the whole analysis, so a class "
+            "with no row here is not a class the analysis failed to find."
+        )
+    return note
 
 
 def _evidence_section(evidence: list[Evidence]) -> list[str]:
     if not evidence:
         return ["", "## Evidence", "", "_No evidence records were produced._"]
+
+    shown = evidence[:_MAX_EVIDENCE_ROWS]
+    omitted = evidence[_MAX_EVIDENCE_ROWS:]
 
     lines = [
         "",
@@ -215,18 +284,23 @@ def _evidence_section(evidence: list[Evidence]) -> list[str]:
         "",
         _XREF_NOTE,
         "",
+    ]
+    if omitted:
+        lines += _truncation_note(len(evidence), len(shown), omitted)
+        lines += [""]
+    lines += [
         "| ID | Level | Kind | Summary | Source |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for item in evidence[:_MAX_EVIDENCE_ROWS]:
+    for item in shown:
         source = item.provenance[0].ref() if item.provenance else "-"
         summary = item.summary.replace("|", "\\|")
         lines.append(
             f"| `{item.id}` | `{item.level.value}` | {item.kind.value} | {summary} | `{source}` |"
         )
 
-    if len(evidence) > _MAX_EVIDENCE_ROWS:
-        lines += ["", f"_{len(evidence) - _MAX_EVIDENCE_ROWS} further evidence records omitted._"]
+    if omitted:
+        lines += ["", f"_{len(omitted)} further evidence records omitted._"]
 
     return lines
 

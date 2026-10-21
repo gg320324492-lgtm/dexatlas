@@ -5,7 +5,8 @@ this class exists to keep true. Neither entry point contains analysis logic of i
 
 Backends run independently and none can abort the run: each step records its own
 :class:`ToolError`, and the project is still persisted. An APK that defeats JADX still
-yields a manifest, a symbol index and a report.
+yields a manifest, a symbol index and a report. The analysis itself is not a backend:
+when it fails, the project is left failed and the failure is raised to the caller.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from dexatlas.config.settings import Settings
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
 from dexatlas.core.models import (
+    ANALYSIS_TOOL,
     DECOMPILATION_DETAIL,
     ApkMetadata,
     ClassRef,
@@ -106,11 +108,13 @@ class Analyzer:
     ) -> AnalysisResult:
         """Analyse an APK end to end.
 
-        Raises :class:`ApkValidationError` only when the input is not an APK at all.
-        Every later failure is recorded on the project instead of raised.
+        Raises :class:`ApkValidationError` when the input is not an APK at
+        all. A backend that cannot do its job is recorded on the project and
+        the run carries on. A failure of the analysis itself leaves the
+        project failed and is raised as :class:`AnalysisFailed`: a run that
+        says nothing is not a run that found nothing.
 
-        ``metadata`` is an inspection the caller has already done, so an APK that
-        was inspected twice is not inspected twice.
+        ``metadata`` is an inspection the caller has already done.
         """
         started = time.monotonic()
         apk = metadata if metadata is not None else inspect_apk(apk_path)
@@ -120,93 +124,172 @@ class Analyzer:
         self._store.save_project(project, workspace, manifest=None)
         self._store.set_status(project.id, ProjectStatus.RUNNING)
 
-        # The versions are probed before the evidence is built, because the
-        # evidence names the version of the tool that produced it. Probing them
-        # once, here, keeps one answer for the project record and for every
-        # evidence record.
-        project.tool_versions = self._backends.versions()
-        builder = EvidenceBuilder(
-            project_id=project.id,
-            tool_versions=project.tool_versions,
-            apk_sha256=apk.sha256,
-        )
-
-        manifest: ManifestInfo | None = None
-        classes: list[ClassRef] = []
-        methods: list[MethodRef] = []
-        fields: list[FieldRef] = []
-        references: list[MethodReference] = []
-        strings: list[StringConstant] = []
-        resources: list[ResourceString] = []
-
-        if include_apktool:
-            manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)
-            resources.extend(apktool_resources)
-            for apktool_error in errors:
-                project.errors.append(apktool_error)
-            if manifest is not None:
-                # The manifest's findings come before the code's index: an
-                # exported component is a conclusion, and the report's evidence
-                # table is capped, so what is recorded last is what gets dropped.
-                builder.add_exported_components(manifest.components)
-
-        if include_androguard:
-            extracted = self._run_androguard(apk.path, project, builder)
-            classes.extend(extracted[0])
-            methods.extend(extracted[1])
-            fields.extend(extracted[2])
-            references.extend(extracted[3])
-            strings.extend(extracted[4])
-            if extracted[5] is not None:
-                project.errors.append(extracted[5])
-
-        if include_jadx:
-            jadx_classes, error, jadx_status = self._run_jadx(apk.path, project, workspace, builder)
-            classes.extend(jadx_classes)
-            if error is not None:
-                project.errors.append(error)
-            # The decompiler is the only backend that can say whether a method
-            # was decompiled, so the flag is set here — after JADX has run, and
-            # before the symbols are written.
-            _apply_decompilation(methods, jadx_status)
-            _record_decompilation(
-                builder,
-                project=project,
-                classes=classes,
-                methods=methods,
-                status=jadx_status,
-                output_dir=workspace / "jadx",
+        try:
+            # The versions are probed before the evidence is built, because the
+            # evidence names the version of the tool that produced it. Probing
+            # them once, here, keeps one answer for the project record and for
+            # every evidence record.
+            project.tool_versions = self._backends.versions()
+            builder = EvidenceBuilder(
+                project_id=project.id,
+                tool_versions=project.tool_versions,
+                apk_sha256=apk.sha256,
             )
 
-        classes = _merge_classes(classes)
-        counts = self._store.save_symbols(
-            project.id, classes, methods, fields, references, strings, resources
+            manifest: ManifestInfo | None = None
+            classes: list[ClassRef] = []
+            methods: list[MethodRef] = []
+            fields: list[FieldRef] = []
+            references: list[MethodReference] = []
+            strings: list[StringConstant] = []
+            resources: list[ResourceString] = []
+            dex_classes: list[ClassRef] = []
+
+            if include_apktool:
+                manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)
+                resources.extend(apktool_resources)
+                for apktool_error in errors:
+                    project.errors.append(apktool_error)
+                if manifest is not None:
+                    # The manifest's findings come before the code's index: an
+                    # exported component is a conclusion, and the report's evidence
+                    # table is capped, so what is recorded last is what gets dropped.
+                    builder.add_exported_components(manifest.components)
+
+            if include_androguard:
+                extracted = self._run_androguard(apk.path, project, builder)
+                # The classes the DEX reader found. The evidence declares these
+                # and not the decompiler's: the DEX reader is the one that read
+                # the class definitions out of the bytecode.
+                dex_classes = extracted[0]
+                classes.extend(dex_classes)
+                methods.extend(extracted[1])
+                fields.extend(extracted[2])
+                references.extend(extracted[3])
+                strings.extend(extracted[4])
+                if extracted[5] is not None:
+                    project.errors.append(extracted[5])
+
+            if include_jadx:
+                jadx_classes, error, jadx_status = self._run_jadx(
+                    apk.path, project, workspace, builder
+                )
+                classes.extend(jadx_classes)
+                if error is not None:
+                    project.errors.append(error)
+                # The decompiler is the only backend that can say whether a method
+                # was decompiled, so the flag is set here — after JADX has run, and
+                # before the symbols are written.
+                _apply_decompilation(methods, jadx_status)
+                _record_decompilation(
+                    builder,
+                    project=project,
+                    classes=classes,
+                    methods=methods,
+                    status=jadx_status,
+                    output_dir=workspace / "jadx",
+                )
+
+            # The class declarations are the index, not a conclusion: a class
+            # declaration says the class exists, and a report of an APK with two
+            # thousand classes is mostly an index. They are therefore recorded
+            # last, after the conclusions — what the APK exports, how much of it
+            # the decompiler could read — so that the conclusions are the records
+            # that survive the report's cap on the evidence table. What is
+            # recorded last is what gets dropped.
+            builder.add_classes(dex_classes, limit=MAX_EVIDENCE_CLASSES)
+            if len(dex_classes) > MAX_EVIDENCE_CLASSES:
+                # The operator gets the same news the reader does: the evidence
+                # holds a sample of the classes, and the report says so.
+                logger.info(
+                    "androguard: indexed %d classes; evidence covers the first %d",
+                    len(dex_classes),
+                    MAX_EVIDENCE_CLASSES,
+                )
+
+            classes = _merge_classes(classes)
+            counts = self._store.save_symbols(
+                project.id, classes, methods, fields, references, strings, resources
+            )
+
+            evidence = builder.build()
+            project.evidence_count = self._store.save_evidence(project.id, evidence)
+
+            # The counts are the ones the tables hold. A count taken from the lists
+            # that went in is a count of symbols the database never stored — a class
+            # defined in two dex files is one row — and a report built on it
+            # disagrees with every query run against it.
+            project.class_count = counts.classes
+            project.method_count = counts.methods
+            project.reference_count = counts.references
+            project.resource_count = counts.resources
+            project.status = (
+                ProjectStatus.FAILED if not classes and not manifest else ProjectStatus.COMPLETED
+            )
+
+            # The time the run took is measured once and stored, so that a report
+            # exported later from the workspace states the number the report
+            # written at the time stated.
+            elapsed = time.monotonic() - started
+            project.duration_seconds = elapsed
+            self._store.save_project(project, workspace, manifest)
+
+            return AnalysisResult(
+                project=project,
+                manifest=manifest,
+                evidence=evidence,
+                workspace=workspace,
+                duration_seconds=elapsed,
+            )
+        except Exception as exc:
+            # The analysis failed. The project is left failed — never running —
+            # and the reason is recorded on it, so that the failure is in the
+            # database as well as in the exception the caller is about to get.
+            raise AnalysisFailed(self._record_failure(project, workspace, exc)) from exc
+        except BaseException:
+            # A keyboard interrupt or a shutdown is not an analysis failure,
+            # and it is not swallowed either. The run is over, though, and the
+            # project must not be left running: the API finds a project by the
+            # APK's hash and hands it back as it is.
+            self._record_failure(project, workspace, None)
+            raise
+
+    def _record_failure(
+        self, project: Project, workspace: Path, exc: BaseException | None
+    ) -> ToolError:
+        """Leave the project failed, and say what failed.
+
+        A project that is left running is a project that is never coming back:
+        the API finds it by the APK's hash and hands it back as it is, so an
+        analysis that died half way through would be reported as an analysis
+        that is still going. The failure is therefore recorded on the project
+        before the exception goes on to the caller.
+
+        The failure is recorded as a :class:`ToolError` of DexAtlas itself,
+        not of a backend: no backend failed, the analysis did. A backend's
+        own failure is recorded by its own adapter, under the backend's name.
+        """
+        if exc is None:
+            message = "the analysis did not complete: it was interrupted"
+        else:
+            message = f"the analysis did not complete: {type(exc).__name__}"
+            if str(exc):
+                message = f"{message}: {exc}"
+
+        error = ToolError(
+            tool=ANALYSIS_TOOL,
+            code=ToolErrorCode.ANALYSIS_FAILED,
+            message=message,
         )
-
-        evidence = builder.build()
-        project.evidence_count = self._store.save_evidence(project.id, evidence)
-
-        # The counts are the ones the tables hold. A count taken from the lists
-        # that went in is a count of symbols the database never stored — a class
-        # defined in two dex files is one row — and a report built on it
-        # disagrees with every query run against it.
-        project.class_count = counts.classes
-        project.method_count = counts.methods
-        project.reference_count = counts.references
-        project.resource_count = counts.resources
-        project.status = (
-            ProjectStatus.FAILED if not classes and not manifest else ProjectStatus.COMPLETED
-        )
-
-        self._store.save_project(project, workspace, manifest)
-
-        return AnalysisResult(
-            project=project,
-            manifest=manifest,
-            evidence=evidence,
-            workspace=workspace,
-            duration_seconds=time.monotonic() - started,
-        )
+        project.status = ProjectStatus.FAILED
+        project.errors.append(error)
+        try:
+            self._store.save_project(project, workspace, manifest=None)
+        except Exception:
+            # The workspace is what failed, most likely. The failure still has
+            # to reach the caller, and the log is where it can be read.
+            logger.exception("could not record the analysis failure on %s", project.id)
+        return error
 
     # -- backend steps -----------------------------------------------------
 
@@ -287,7 +370,8 @@ class Analyzer:
         # Conclusions before the index. A cross-reference says something about
         # the code; a class declaration only says the class exists. The
         # report's evidence table is capped, so what is recorded last is what
-        # gets dropped.
+        # gets dropped — which is why the class declarations are recorded by
+        # the caller, after the decompiler has had its say.
         #
         # The evidence is built from what came back, whether or not something
         # went wrong. Every one of those rows was read out of the bytecode, so
@@ -302,15 +386,6 @@ class Analyzer:
         # classes of the DEX file that parsed really do exist, and the calls
         # really are in the bytecode.
         builder.add_cross_references(methods, references)
-        builder.add_classes(classes, limit=MAX_EVIDENCE_CLASSES)
-        if len(classes) > MAX_EVIDENCE_CLASSES:
-            # The operator gets the same news the reader does: the evidence
-            # holds a sample of the classes, and the report says so.
-            logger.info(
-                "androguard: indexed %d classes; evidence covers the first %d",
-                len(classes),
-                MAX_EVIDENCE_CLASSES,
-            )
         return classes, methods, fields, references, strings, error
 
     def _run_jadx(
@@ -683,4 +758,56 @@ def _record_decompilation(
     )
 
 
-__all__ = ["AnalysisResult", "Analyzer", "ApkValidationError", "ToolErrorCode"]
+# ---------------------------------------------------------------------------
+# The failure of the analysis, and its measurement
+# ---------------------------------------------------------------------------
+
+
+class AnalysisFailed(Exception):
+    """The analysis did not complete.
+
+    Raised when the analysis itself fails — a step raises, or the workspace
+    cannot be written. A backend that cannot do its job is *not* this: that
+    is recorded on the project and the run carries on without it.
+
+    The failure is recorded on the project before this is raised, so the
+    project is never left running and the reason is in the database as well
+    as in the exception. The error it was recorded as travels with it, so a
+    caller can report the same thing the report would say.
+    """
+
+    def __init__(self, error: ToolError) -> None:
+        super().__init__(error.message)
+        self.error = error
+        """The failure, as it was recorded on the project."""
+
+
+def analysis_duration(result: AnalysisResult) -> float | None:
+    """How long the analysis took, in seconds — or ``None`` when it is unknown.
+
+    The project's own measurement is the one the reports state: it is the
+    number that was stored with the analysis, so a report exported later out
+    of the workspace states the same number the report written at the time
+    stated. The result's own value is the fallback for a result that was
+    built by hand rather than read back out of a workspace.
+
+    Zero is not a duration. An analysis takes time, so a run that reports
+    none was never timed — a workspace written before the measurement was
+    stored holds none — and the reports say that the time is unknown rather
+    than print a number the run never produced.
+    """
+    stored = result.project.duration_seconds
+    if stored is not None:
+        return stored
+    measured = result.duration_seconds
+    return measured if measured else None
+
+
+__all__ = [
+    "AnalysisFailed",
+    "AnalysisResult",
+    "Analyzer",
+    "ApkValidationError",
+    "ToolErrorCode",
+    "analysis_duration",
+]

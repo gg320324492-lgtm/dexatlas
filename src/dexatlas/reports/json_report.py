@@ -5,9 +5,15 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from dexatlas.core.models import Evidence, EvidenceKind, Project, index_gaps
+from dexatlas.core.models import (
+    Evidence,
+    Project,
+    cross_reference_call_sites,
+    cross_reference_records,
+    index_gaps,
+)
 from dexatlas.core.paths import display_path
-from dexatlas.core.pipeline import AnalysisResult
+from dexatlas.core.pipeline import AnalysisResult, analysis_duration
 from dexatlas.reports.coverage import decompilation_coverage
 
 
@@ -56,6 +62,7 @@ def _project_block(project: Project) -> dict[str, Any]:
 
 def _summary_block(result: AnalysisResult) -> dict[str, Any]:
     gaps = index_gaps(result.project.errors)
+    duration = analysis_duration(result)
     return {
         "classes": result.project.class_count,
         "methods": result.project.method_count,
@@ -65,11 +72,16 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
         # code loads, the other is what a person wrote.
         "resource_strings": result.project.resource_count,
         # How many of those cross-references are backed by an evidence record.
-        # The two numbers differ on purpose: an indexed call into library code
-        # is a fact about the JDK, not a conclusion about this app.
-        "cross_references_with_evidence": sum(
-            1 for item in result.evidence if item.kind == EvidenceKind.CROSS_REFERENCE
-        ),
+        # The unit is the call site: one record covers every call site of the
+        # method it is about, so the call sites the records cover are the
+        # indexed cross-references that have a record behind them. The two
+        # numbers differ on purpose: an indexed call into library code is a
+        # fact about the JDK, not a conclusion about this app.
+        "cross_references_with_evidence": cross_reference_call_sites(result.evidence),
+        # The number of records themselves — one per called method of this APK.
+        # It is a different number about a different thing, and it is stated
+        # next to the other one so that neither can be read as the other.
+        "cross_reference_records": cross_reference_records(result.evidence),
         "evidence_by_level": _evidence_counts(result.evidence),
         # How much of the indexed code the decompiler turned into Java. It is
         # what the ``decompiled`` flag on a method means, counted.
@@ -81,7 +93,10 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
         "index_gaps": [
             {"tool": gap.tool, "code": gap.code.value, "message": gap.message} for gap in gaps
         ],
-        "duration_seconds": round(result.duration_seconds, 2),
+        # How long the analysis took, or null when it was never timed. A
+        # report that states 0.0 seconds for a run nobody timed states a
+        # measurement that was never made.
+        "duration_seconds": None if duration is None else round(duration, 2),
         "backends_with_errors": sorted({e.tool for e in result.project.errors}),
     }
 

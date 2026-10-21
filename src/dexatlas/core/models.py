@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -39,6 +40,16 @@ class ToolErrorCode(StrEnum):
     PARSE_ERROR = "parse_error"
     UNSUPPORTED = "unsupported"
     OUTPUT_TRUNCATED = "output_truncated"
+    ANALYSIS_FAILED = "analysis_failed"
+    """The analysis itself did not complete.
+
+    Every other code here describes a *tool* that could not do its job: it
+    was not installed, it timed out, it wrote something that could not be
+    read. This one describes the failure of the analysis — the pipeline that
+    runs the tools — rather than of any one of them. A backend that fails is
+    recorded by its own adapter, and the run carries on without it; a failure
+    of the analysis is recorded once, on the project, and stops the run.
+    """
 
 
 class ToolError(BaseModel):
@@ -69,6 +80,16 @@ class ToolError(BaseModel):
 #: resource table, and the symbol index is whole without them.
 INDEX_TOOL = "androguard"
 
+#: The tool that owns the analysis itself.
+#:
+#: A backend failure is recorded by the backend's own adapter, under the
+#: backend's name: the failure belongs to the tool that failed. A failure of
+#: the analysis belongs to no backend — it is DexAtlas itself that did not
+#: finish — and it is recorded under this name so that a reader can tell the
+#: two apart. A record that says "jadx timed out" is about a tool; a record
+#: that says "dexatlas did not complete" is about the run.
+ANALYSIS_TOOL = "dexatlas"
+
 
 def index_gaps(errors: list[ToolError]) -> list[ToolError]:
     """The failures that leave the symbol index short of the whole APK.
@@ -79,8 +100,17 @@ def index_gaps(errors: list[ToolError]) -> list[ToolError]:
     index is missing whatever that file held, and every count in a report has
     to be read as a count of *what was indexed* rather than of what the APK
     contains.
+
+    A failure of the analysis is a gap as well. The run stopped, so whatever
+    the index would have held is not in it, and a report that says the index
+    is complete — over a project with no classes at all — would be the worst
+    kind of wrong.
     """
-    return [error for error in errors if error.tool == INDEX_TOOL]
+    return [
+        error
+        for error in errors
+        if error.tool == INDEX_TOOL or error.code is ToolErrorCode.ANALYSIS_FAILED
+    ]
 
 
 #: A locator written before the JADX output tree became a relative path. The old
@@ -553,6 +583,49 @@ class Evidence(Sourced):
 #: from, and the record is what the analysis stated.
 DECOMPILATION_DETAIL = "decompilation"
 
+#: The key under which a cross-reference record's detail states how many call
+#: sites it covers.
+#:
+#: The unit of a cross-reference record is the *called method*, not the call:
+#: one record says "this method of this APK is called from here, here and
+#: here", and the call sites it names are the detail. A record that covered
+#: one call site and a record that covered fifty are the same kind of thing,
+#: and the number of call sites is what tells them apart.
+CROSS_REFERENCE_CALL_COUNT = "call_count"
+
+
+def cross_reference_records(evidence: Sequence[Evidence]) -> int:
+    """How many cross-reference records the analysis produced.
+
+    One record per called method of the APK: a method called from fifty places
+    is one conclusion, not fifty.
+    """
+    return sum(1 for item in evidence if item.kind is EvidenceKind.CROSS_REFERENCE)
+
+
+def cross_reference_call_sites(evidence: Sequence[Evidence]) -> int:
+    """How many indexed call sites a cross-reference record covers.
+
+    This is the number the two reports state beside the number of indexed
+    cross-references, and it has to be the same unit as that number.
+
+    The indexed cross-references are call *edges* — one row per call — and a
+    record covers the call sites of the method it is about. Summing the call
+    sites the records cover therefore answers the question the report poses:
+    how many of the indexed calls are backed by a record.
+
+    A record that states no call count — one written by an older build, or one
+    made by hand — counts as one call site: a record is made from at least one
+    reference, so one is the smallest number it can honestly be.
+    """
+    total = 0
+    for item in evidence:
+        if item.kind is not EvidenceKind.CROSS_REFERENCE:
+            continue
+        count = item.detail.get(CROSS_REFERENCE_CALL_COUNT)
+        total += count if isinstance(count, int) else 1
+    return total
+
 
 # ---------------------------------------------------------------------------
 # Project
@@ -587,6 +660,19 @@ class Project(BaseModel):
     Counted from the rows the ``resources`` table holds, the same way the
     other counts are: a number taken from the list that was handed in is a
     number the database cannot produce.
+    """
+    duration_seconds: float | None = None
+    """How long the analysis took, in seconds.
+
+    A measurement of *this run*, not a fact about the APK: the same bytes
+    analysed on a faster machine take less time, and the number belongs to
+    the run rather than to the project. It is therefore kept here and not on
+    :class:`ApkMetadata`, which holds what the archive is.
+
+    ``None`` means the run was never timed — a workspace written before the
+    measurement was stored holds none. A report that printed ``0.0s`` for
+    such a row would be claiming a measurement that was never taken, so the
+    reports say that the time is unknown instead.
     """
 
     @classmethod
