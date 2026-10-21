@@ -3,14 +3,17 @@
 **Written after the Phase 1 source review, against the code that exists.**
 The roadmap says this plan is written after the review "so that Phase 2 is planned
 against real code rather than assumptions written before any code existed"
-([ROADMAP.md](../roadmap/ROADMAP.md)). This is that document.
+([ROADMAP.md](ROADMAP.md)). This is that document.
+
+**Accepted baseline:** `phase1-acceptance-2026-10-21` → `a1e81ce8ae262b84fa06bc5a3afb995fd0238660`
+**Phase 1 status:** accepted as a functional static-analysis MVP.
 
 **Inputs:**
 
 | | |
 |---|---|
 | Review report | [phase1-review-report.md](../reports/phase1-review-report.md) — 6 blocking, 16 important, 12 optional, 9 deferred |
-| Maturity assessment | [phase1-maturity-assessment.md](../reports/phase1-maturity-assessment.md) — **5.50 / 10** across six weighted dimensions |
+| Maturity assessment | [phase1-maturity-assessment.md](../reports/phase1-maturity-assessment.md) — **5.50 / 10**, the **pre-fix** baseline |
 | Deferred findings, in detail | [phase2-issue-list.md](../reports/phase2-issue-list.md) — 8 items, each with two options and a recommendation |
 
 **What the assessment changes about the plan.** The roadmap's Phase 2 section was
@@ -23,287 +26,428 @@ no tool definitions — `grep -rn -i mcp src/dexatlas/` returns nothing.
 
 So Phase 2 is not "add agents to a project that lacks them". It is **"expose what
 already exists to an agent, and make the parts that were assumed safe actually
-safe"**. Two of the roadmap's assumptions do not survive contact with the code:
+safe"**.
 
-1. The roadmap assumed the agent layer would sit on a stable core. The review
-   found **nine important defects in the core itself**, four of which are still
-   open (`#4`, `#7`, `#11`, `#12`). The MCP server would expose them.
-2. The roadmap's evidence separation — "an LLM's opinion that code looks risky is
-   never promoted to a confirmed vulnerability" — was, at the time of the
-   assessment, **a convention and not a mechanism**: nothing stopped a caller
-   from constructing `Evidence(kind=BEHAVIOUR, level=VERIFIED)`. It is now a
-   validator on the model, and Phase 2's model output lands on `LEAD`.
+**The development principle, which is also the acceptance rule:**
+
+> **Evidence before inference. Correctness before autonomy.**
 
 ---
 
-## 1. The issues
+## 1. The milestones
 
-### Stage 0 — Phase 1 debt (no schema change, no interface change)
-
-These are open findings from the review. They are cheap, they are independent,
-and **they are the debt a Phase 2 would otherwise inherit and expose**.
-
-| # | Issue | Cost | Why now |
+| | Milestone | Version | What it delivers |
 |---|---|---|---|
-| **#12** | The uploaded APK is never deleted; the workspace grows forever | 1 day (with X1, already done) | The upload is now stored under its content hash, so "delete the copy" is unambiguous |
-| **#11** | loguru's global handler is removed and never restored — a library that removes *your* logging | 0.5 day | `logger.disable("androguard")` / `enable()` instead of `logger.remove()` |
-| **F8** | 10 dead functions across the tree; ruff cannot find dead functions | 1–2 days | Configure vulture (`--ignore-decorators`, `--ignore-names`, `[tool.vulture]`), delete what it finds, and make its exit code a CI gate. **It under-reports** — names shadowed by locals or enum members are invisible to it — so the tool is a signal, not a proof. |
-| **#14/#15** | 25 places where a docstring or comment says one thing and the code does another | 2–3 days | The five high-severity ones are fixed; these are the middle and low ones. Each fix is either "the code was right, the words were wrong" or "the words were right, the code was wrong" — and the second kind must not be resolved by weakening the words. |
+| **M0** | Core contracts & reliability | `v0.2.0-pre` | The analyzer is safe and predictable for programmatic access |
+| **M1** | Read-only MCP server | `v0.2.0` | The existing analysis is usable by an agent, as tools |
+| **M2** | Single evidence-first agent | `v0.3.0` | Planning, tool calls, verification, recovery, human checkpoints |
+| **M3** | Evaluation & benchmarking | `v0.4.0` | Measured quality against baselines, not demonstrations |
+| **M4** | Web workbench & portfolio | `v0.5.0` | A product a stranger can understand and a client can evaluate |
 
-### Stage 1 — Storage and concurrency (schema changes)
+**The order is not arbitrary.** M0 exists because M1 would otherwise publish the
+defects: an MCP tool that reads `xrefs` inherits a wrong count, and a tool that
+resolves a method by name alone returns the wrong overload of a method the agent
+is about to reason about. M1 precedes M2 because the orchestration has nothing to
+orchestrate without tools. M3 precedes M4 because a workbench built against a
+moving API is the most expensive thing to write twice.
 
-| # | Issue | Cost | Depends on |
-|---|---|---|---|
-| **#7** | `xrefs` has no primary key: the same call edge can be written twice, and `reference_count` counts *calls*, not *edges* | 1–2 days | — |
-| **#4** | Concurrent analyses of one APK share a workspace directory and write over one another | 2–3 days | X2 (done) |
+**Do not develop the agent and the web front end at the same time.** M1 and M2's
+tool contracts have to settle first, or the React pages are written twice.
 
-**#7** is a schema change: primary key `(project_id, caller, callee, kind)`, and
-`_migrate` drops and recreates the table — the same shape `resources` already
-uses for a changed primary key. It changes what `reference_count` means, so the
-execution report, the provenance document and the API's xrefs endpoint all change
-with it.
+---
 
-**#4** has two designs (see [phase2-issue-list.md §3](../reports/phase2-issue-list.md)):
-a per-run directory that is swapped into place on success, or a file lock that
-serialises analyses of one project id. **Recommendation: the run directory**, with
-the lock as optional hardening. The run directory is what makes the analysis
-*resumable*, which Phase 2 wants anyway.
+## 2. M0 — Core contracts & reliability (`v0.2.0-pre`)
 
-### Stage 2 — The MCP surface
+**Goal:** make the existing analyzer safe and predictable for programmatic agent
+access.
 
-This is the roadmap's Phase 2 centre of gravity, and it is the dimension the
-assessment scored **4 / 10 with a 20% weight** — the weakest dimension, and the
-one the project has promised most about.
+### P2-001 · Overload-safe method resolution
 
-| Capability | What it means here | Notes |
-|---|---|---|
-| **MCP server** | Expose DexAtlas's own normalised analysis tools: index a project, query classes/methods/xrefs/evidence, search, read a source document | The tools are the REST API's resources, re-expressed as tools. **No new analysis logic** — the point is that an agent gets the same evidence a human does. |
-| **Tool schemas** | Every tool has a schema a model can call, with the *locator* format documented | The `locator` shape (`<tool>:<place>`) is already the portability contract; it becomes the tool's return format. |
-| **Evidence in the response** | A tool that returns a conclusion returns its evidence ids and provenance with it | This is the differentiator the roadmap names, and the code already supports it: `Provenance` is frozen and `EvidenceBuilder` cannot be built without tool versions. |
-| **Read-only by default** | Tools read the workspace; mutating operations are out of scope | The roadmap says the model never gets arbitrary shell execution. The API already has no such capability, so this is a property to preserve, not to build. |
+**Why it is first.** A method resolved by name alone can return the wrong
+overload, and that error travels straight into an agent's answer. Fixing it after
+the agent ships costs far more.
 
-**What MCP must not do:** bypass the evidence model. A tool that returns "this
-looks risky" without a provenance has broken the project's premise, and the
-`EvidenceLevel` validator exists to stop exactly that.
+**The state of the code.** `Analyzer.method_source_document(project_id, class_name,
+method_name)` takes **no descriptor** — the CLI's `source` command and the API's
+source endpoints take a class name and a method name, and the first match wins.
+The DEX descriptor (`(Ljava/lang/String;)Ljava/lang/String;`) is what
+distinguishes the overloads, and the index already stores it in `methods.descriptor`
+— it is simply not used for the lookup.
 
-### Stage 3 — Agent orchestration
+**What to do:**
 
-The roadmap's five roles (Planning, Code Analyst, Tool Executor, Evidence Verifier,
-Report Builder) are a reasonable decomposition, but the review says the plan
-should be written against real code. Two corrections:
+- Canonical method identifiers built on the **full DEX descriptor**, not the name.
+- Update `Analyzer`, the JADX and Smali adapters, the CLI and the API.
+- When an exact match is impossible, return **explicit ambiguity information**
+  rather than a best guess: which candidates matched, and why the exact one could
+  not be chosen.
+- Tests for overloaded methods, constructors, and ambiguous decompiled signatures.
+
+**Exit criteria:** no overloaded method silently resolves to the wrong body; the
+ambiguity is reported rather than guessed.
+
+### P2-002 · `AnalysisRun` and transactional results
+
+**Why.** The project id is a content hash: the same APK always maps to the same
+project. So a re-analysis overwrites the previous one **in place**, and a reader
+can see the symbols of one run beside the evidence of another. The Phase 1 review
+found the same shape of problem twice — the `evidence` table not being cleared,
+and the upload being overwritten — and fixed both by hand. A run identifier
+fixes the class of it.
+
+**What to do:**
+
+- An `AnalysisRun` with a unique run id **independent of the APK identity**,
+  carrying the tool versions, the input SHA-256, the execution status and the
+  completeness of the run.
+- Each run's results are staged separately and published only as a **committed
+  snapshot**.
+- No stale evidence after a re-analysis or an interrupted run.
+- Schema migration, and tests for legacy workspaces.
+
+**Exit criteria:** no cross-run symbols or evidence are visible; an interrupted
+run leaves the previous complete run intact.
+
+### P2-003 · `CallSite` and `CallEdge` semantics
+
+**Why — and a correction to this plan's earlier draft.** The first draft of this
+plan proposed giving `xrefs` the primary key `(project_id, caller, callee, kind)`.
+**That is wrong**, and it is wrong in a way that loses data: the same caller
+reaching the same callee from two different bytecode offsets is two *call sites*,
+and a unique key over the pair collapses them into one row. The call sites are
+the finer-grained truth, and a de-duplicated table cannot recover them.
+
+**What to do instead:**
+
+- Distinguish **`CallSite`** (one concrete call location: DEX identity, caller,
+  **instruction offset**, invocation kind, callee) from **`CallEdge`** (the
+  aggregated relationship between two methods).
+- A call edge is *derived* from its call sites — never the other way round.
+- Every count states which of the two it means: **sites** or **edges**. The Phase 1
+  review already found one report conflating them (`cross_references` counted
+  calls while `cross_references_with_evidence` counted methods); that conflation
+  is what this issue removes at the source.
+- Provenance survives the migration.
+
+**Exit criteria:** the number of call sites and the number of call edges are both
+available, both correct, and never used for one another.
+
+### P2-004 · Verified evidence invariants
+
+**Why.** The Phase 1 review found that the evidence level was a **convention**
+rather than a mechanism: nothing stopped a caller from recording a behaviour as
+verified, and the report renders every verified record as "deterministically
+established by an analysis tool". A validator now refuses `BEHAVIOUR + VERIFIED`
+— but that is one rule, not a proof. The acceptance argument is:
+
+- Separate contracts for **deterministic observations** (a tool read something)
+  and **model-generated claims** (a model said something).
+- A verified code observation requires **validated source provenance** — the
+  locator has to resolve, and it has to resolve inside the analysis.
+- A **locator resolver** that confirms source membership and location, so
+  "verified" is backed by a resolution rather than by a string that looks right.
+- **Model output can never create a verified observation on its own.**
+- Negative tests for empty, stale, mismatched and fabricated provenance.
+
+**Exit criteria:** invalid provenance cannot produce a verified code finding.
+
+### P2-005 · Runtime isolation and lifecycle
+
+**Why.** Three things in the current tree are not yet true for an embedded
+service, and an agent is an embedded service:
+
+- The Androguard adapter **removes loguru's global handlers** and does not
+  restore them. A library that removes *your* logging is a library that breaks
+  its host.
+- Androguard parses untrusted DEX **in the service process**. A malformed DEX
+  that takes the interpreter down takes the service with it.
+- The upload retention, cleanup and cancellation behaviour is undefined, and the
+  workspace grows.
+
+**What to do:**
+
+- Stop modifying the host application's global loguru handlers.
+- Run the untrusted DEX parsing in an **isolated worker**.
+- Bound runtime, memory and temporary disk where the platform allows it.
+- **One active writer per APK/run workspace** — the concurrency defect the
+  Phase 1 review found (`#4`) is a precondition for the agent, not a phase-2
+  extra.
+- Define upload retention, cleanup and cancellation.
+- Keep the existing local-first security boundary.
+
+**Exit criteria:** parallel analyses have deterministic, isolated outcomes; the
+host application's logging is untouched.
+
+### M0 exit criteria
+
+- All the critical correctness tests pass.
+- No cross-run symbols or evidence are visible.
+- No overloaded method silently resolves to the wrong body.
+- Invalid provenance cannot produce a verified code finding.
+- Parallel analyses have deterministic, isolated outcomes.
+- Existing public CLI/API compatibility is **either preserved or explicitly
+  versioned** — never silently changed.
+- Every bug fix carries a regression test **that fails on the previous
+  implementation**.
+
+---
+
+## 3. M1 — Read-only MCP server (`v0.2.0`)
+
+**Goal:** make DexAtlas usable as an evidence-aware tool provider for AI agents.
+
+### The package
+
+`src/dexatlas/mcp/`
+
+```
+server.py            the server and its transport
+schemas.py           the tool schemas
+tools/projects.py    list_projects, get_project_status, get_manifest
+tools/symbols.py     search_symbols, get_class_source, get_method_source
+tools/references.py  find_callers, find_callees
+tools/evidence.py    get_evidence, resolve_locator
+tools/search.py      full-text search over the index
+security.py          what the tools may and may not do
+```
+
+### The tools
+
+| Tool | Responsibility |
+|---|---|
+| `list_projects` | List local analysis projects |
+| `get_project_status` | Read the analysis status and whether the index is complete |
+| `get_manifest` | The parsed manifest |
+| `search_symbols` | Search the indexed classes, methods and strings |
+| `get_class_source` | Java or Smali, with provenance |
+| `get_method_source` | **An exact method** — by descriptor, not by name (P2-001) |
+| `find_callers` | The references to a method |
+| `find_callees` | The methods a method calls |
+| `get_evidence` | An evidence record and its source references |
+| `resolve_locator` | Resolve a provenance locator into a bounded source excerpt |
+
+Begin with the local **stdio** transport. Remote access is a separate deployment
+decision, not a Phase 2 default.
+
+### Requirements
+
+- **Reuse the existing `Analyzer` and `Store`.** No duplicated analysis logic —
+  that is the whole point of the project.
+- Pydantic input and output schemas.
+- Explicit pagination and result-size limits.
+- Structured error and completeness information: a missing tool, a missing source
+  and a truncated analysis each say which they are.
+- **No arbitrary shell execution, no unrestricted file reads, no APK mutation.**
+- Treat the APK's strings and decompiled code as **untrusted data, not
+  instructions** — the contents of an analysed APK must never be able to steer the
+  agent. This is a security property of the tool layer, and it needs a test.
+- A runnable MCP client example, and integration tests.
+
+### M1 exit criteria
+
+- Every exposed tool is tested against the **first-party** fixtures.
+- A caller can resolve every returned evidence record to the correct source.
+- Missing tools, missing sources and truncated analyses return explicit
+  structured results.
+- The MCP server runs **without any model provider** — it is a tool server, and
+  a tool server that needs a model is not a tool server.
+- The README carries working setup instructions.
+
+---
+
+## 4. M2 — Single evidence-first agent (`v0.3.0`)
+
+**Goal:** one reliable orchestrator, not a collection of loosely coordinated
+autonomous agents.
+
+### The package
+
+`src/dexatlas/agent/`
+
+```
+orchestrator.py       the loop
+planner.py            turning a question into a bounded plan
+tool_executor.py      calling the MCP tools
+evidence_verifier.py  checking that a conclusion has evidence
+state.py              the task state machine
+providers/            the model endpoints
+reporter.py           filling the existing report format
+```
+
+### The workflow
+
+1. Accept an authorised analysis question.
+2. Resolve the APK project **and the analysis-run identity**.
+3. Plan a bounded series of tool calls.
+4. Execute read-only tools through MCP.
+5. Retrieve and validate the supporting source evidence.
+6. Identify contradictions, ambiguity and incomplete coverage.
+7. Produce conclusions with explicit confidence and limitations.
+8. Save the task state, and offer a resumable result.
+
+### Two corrections to the roadmap's original version
 
 - **The Evidence Verifier is not a new role — it is `EvidenceBuilder`.** The
-  mechanism that makes a tool's output a finding already exists, and Phase 2
-  should route every conclusion through it rather than inventing a second path.
-  A model's output is `LEAD`; only a tool's output can be `VERIFIED`.
-- **The Report Builder is `reports/markdown.py` and `reports/json_report.py`.** The
-  report format is the deliverable, and it is already written. Phase 2 builds the
-  thing that fills it in, not a new format.
+  mechanism that makes a tool's output a finding already exists, and the
+  orchestration routes its conclusions through it rather than inventing a second
+  path. A model's output is `LEAD`; only a tool's output can be `VERIFIED`.
+- **The Report Builder is `reports/markdown.py` and `reports/json_report.py`.**
+  The report format is the deliverable and it is already written; Phase 2 fills
+  it in rather than replacing it.
 
-The genuinely new machinery: a task state machine, failure retry, an iteration
-budget, resume-after-interrupt, and human confirmation checkpoints.
+The genuinely new machinery: the task state machine, failure retry, the iteration
+and token budgets, resume-after-interrupt, and the human confirmation checkpoints.
 
-### Stage 4 — Web workbench
+### Features
 
-React + TypeScript against the FastAPI backend. **Deferred until the API is
-typed and paginated** (Stage 1) — a workbench built against untyped endpoints
-has to be rewritten when they gain response models.
+- An OpenAI-compatible model endpoint, and a **second independently tested**
+  provider or a local model interface.
+- Per-task token, iteration and execution budgets.
+- Tool-call logging, retries and circuit breakers.
+- Persistent task state and resume-after-interrupt.
+- User-visible progress, with **no unsupported completion claims**.
+- Explicit user approval before sensitive operations.
+- Structured reports that separate verified facts, leads and insufficient
+  evidence.
 
-### Deferred to Phase 3
+### M2 exit criteria
 
-| Item | Why |
-|---|---|
-| Vector retrieval / heavy RAG | The roadmap already says these are not hard dependencies; code search and precise symbol resolution are the primary channels, and both exist |
-| Dynamic instrumentation | Needs its own permission model and a threat model; not a `v0.5.0` item |
-| Real commercial APK benchmarking | Needs samples this project does not have |
-
----
-
-## 2. Implementation order
-
-```
-Stage 0  Phase 1 debt ──────────────────────────────────  ~5 days
-         #12 · #11 · F8 · #14/#15
-         (independent; parallelisable; no schema change)
-                    │
-                    ▼
-Stage 1  Storage & concurrency ─────────────────────────  ~5 days
-         #7 xrefs primary key  (schema change: SCHEMA_VERSION + _migrate)
-         #4 per-run workspace directory
-         (both change what the database holds; do them before anything
-          exposes the schema)
-                    │
-                    ▼
-Stage 2  MCP server ────────────────────────────────────  ~2 weeks
-         tools over the now-stable resources
-         + a locator round-trip test per tool
-                    │
-                    ▼
-Stage 3  Agent orchestration ───────────────────────────  ~3 weeks
-         state machine · retry · resume · checkpoints
-         + the ≥20-task human-verified task set
-                    │
-                    ▼
-Stage 4  Web workbench ─────────────────────────────────  ~3 weeks
-         (only after the API is typed and paginated)
-```
-
-**The order is not arbitrary.** Stage 0 and Stage 1 exist because Stage 2 would
-otherwise publish the defects: an MCP tool that reads `xrefs` inherits #7's wrong
-count, and an MCP server that starts analyses inherits #4's collision. Stage 2
-precedes Stage 3 because the orchestration has nothing to orchestrate without
-tools, and Stage 4 is last because a workbench written against a moving API is
-the most expensive thing to write twice.
-
-**Rough total: ~3 months for `v0.5.0`.** That is a bigger Phase 2 than the
-roadmap's exit targets imply, and the difference is Stage 0 and Stage 1 — nine
-days of debt that the roadmap did not know about.
+- The agent completes a fixed task suite without arbitrary system access.
+- Results carry resolvable evidence ids and locators.
+- Timeouts, backend failures and model failures are all tested.
+- **It does not interpret instructions found inside the APK as commands.**
+- The user can inspect and reproduce every tool-driven conclusion.
 
 ---
 
-## 3. Interface changes
+## 5. M3 — Evaluation and benchmarking (`v0.4.0`)
 
-Everything below is a change to a contract somebody outside this repository may
-depend on. Each one needs a version note in `CHANGELOG.md`.
+**Goal:** measured quality, not impressive demonstrations.
 
-### 3.1 Storage (`src/dexatlas/core/storage.py`)
+### The benchmark set
 
-| Change | Migration |
+At least **30 tasks** over the first-party samples and legally reusable
+fixtures, covering:
+
+- manifest interpretation
+- component declarations
+- cross-reference tracing
+- string and resource search
+- **method overloads**
+- multi-DEX analysis
+- ambiguity in decompiled code
+- partial results and backend failure
+- source provenance verification
+- questions that **cannot** be answered
+
+Each task carries an independently checked expected answer.
+
+### The baselines
+
+| | |
 |---|---|
-| `xrefs` gains `PRIMARY KEY (project_id, caller, callee, kind)` | `SCHEMA_VERSION` 3 → 4; `_migrate` drops and recreates the table, the way `resources` already does |
-| `reference_count` changes meaning: it counts **edges**, not calls | The execution report, the provenance document and the API's xrefs endpoint all change with it |
+| **A** | An LLM with decompiled source-text retrieval |
+| **B** | An LLM with structured symbol search and call references |
+| **DexAtlas agent** | Structured tools, provenance resolution, completeness awareness, evidence verification |
 
-### 3.2 REST API (`src/dexatlas/api/app.py`)
+The same model, the same input sample and comparable budgets across the three.
 
-| Change | Notes |
-|---|---|
-| The 9 untyped endpoints gain response models | `ProjectResponse` and friends already exist; the rest are bare `dict[str, Any]` |
-| The endpoints that return lists gain pagination | `limit` exists on some and not all; the xrefs endpoint has no bound at all |
-| `GET /projects/{id}/report?format=json` keeps its shape | The `duration_seconds` field was added in Phase 1 and is `null` for workspaces analysed before it |
-| **No endpoint is removed or renamed** | Phase 2 is additive on the HTTP surface |
+### The metrics
 
-### 3.3 CLI (`src/dexatlas/cli/main.py`)
+Correct-answer rate · evidence-grounding rate · **unsupported-assertion rate** ·
+false-positive rate · tool-call success rate · recovery rate · token consumption ·
+execution duration.
 
-| Change | Notes |
-|---|---|
-| New `dexatlas evidence` subcommand | Query evidence by kind, level, or provenance; `--json` for machine output |
-| `dexatlas analyze --json` is unchanged | The JSON report shape is a contract |
+### M3 exit criteria
 
-### 3.4 MCP (new)
-
-| Surface | Shape |
-|---|---|
-| Tools | One per read-only REST resource; each returns the resource plus the evidence ids and provenance behind it |
-| Tool schemas | Explicit input schema; the output carries `locator` strings that resolve to a file in the workspace |
-| Errors | A tool failure is a `ToolError`-shaped value, not an exception the model has to interpret |
-
-### 3.5 The evidence model (`src/dexatlas/core/models.py`)
-
-| Change | Notes |
-|---|---|
-| `EvidenceLevel.LEAD` gets its first producer | Model output. The validator already refuses `BEHAVIOUR + VERIFIED`, so a model cannot promote itself |
-| `EvidenceKind.CODE_LOCATED` and `BEHAVIOUR` get producers | `CODE_LOCATED` when a conclusion points at a specific line; `BEHAVIOUR` for a model's observation |
-| **The model does not change shape** | `EvidenceKind`, `EvidenceLevel` and `Provenance` are already the contract the tools will speak |
+- At least 30 tasks with auditable expected answers.
+- **Every reported metric can be regenerated by a script in the repository.**
+- At least two model/provider configurations actually tested.
+- Tool-execution success reaches the 95% target on the specified benchmark, **or
+  the shortfall is disclosed**.
+- Every externally reported code conclusion is source-traceable or explicitly
+  marked unverified.
+- **A comparison never claims an improvement the measurements do not support.**
 
 ---
 
-## 4. Test plan
+## 6. M4 — Web workbench & portfolio (`v0.5.0`)
 
-### 4.1 For every issue: a test that is red before the fix
+**Goal:** a product a new user, a GitHub reader and a potential client can
+understand and evaluate.
 
-The project's own rule, and the one the review enforced: **not "the tests pass"
-but "revert the fix and the test goes red"**. The Phase 1 round verified 21 such
-breakage experiments; Stage 0 and Stage 1 each carry one.
+### The front end
 
-### 4.2 For the MCP tools: each tool runs against a real fixture
+React + TypeScript + Vite, a maintained code-editor component, a lightweight
+graph viewer.
 
-A tool test that only checks the schema is worthless. Each tool gets:
+### The screens
 
-- a call against the bundled demo APK (no download),
-- a call against a fixture that **fails** — the tool has to return the failure as
-  a value, not an exception,
-- a check that the returned locators resolve to files inside the workspace.
+1. Project dashboard with backend status
+2. APK upload and analysis progress
+3. Package / class / method explorer
+4. Java & Smali source viewer with source-location links
+5. Call graph and cross-reference navigation
+6. Agent workspace: planned and completed operations
+7. Evidence viewer, separating observations from hypotheses
+8. Benchmark and report export
 
-### 4.3 For the agent: a task set with human-verified answers
+### Developer experience
 
-The roadmap's exit target is "≥20 tasks with human-verified answers". This is the
-first thing in the project that **cannot be verified automatically**, and it is
-the one the roadmap cares about most. The protocol:
+- Docker-based local setup
+- Stable REST / OpenAPI schemas
+- An MCP integration guide
+- An example Python client
+- English and Chinese documentation
+- Architecture decision records
+- A contributing guide, issues, and a versioned changelog
 
-1. 20+ tasks over the bundled samples, each with a stated expected answer.
-2. Every answer checked by a human against the evidence, not against the model.
-3. The task set is a **fixture in the repository** — it is a test, not a demo.
-4. It is run on every model provider that is claimed to work.
+### Public assets
 
-### 4.4 For the claims: the "no false claims" guard is extended
+- A 60–90 second end-to-end demo
+- A technical architecture diagram
+- At least two complete case studies
+- A public benchmark summary
+- A downloadable example analysis report
+- An Upwork-oriented portfolio description
 
-`tests/test_docs.py` already refuses to let the README claim features that are not
-shipped ("MCP server is shipped"). **Phase 2 must extend that guard** to the
-MCP server and the agent: the moment a tool exists, the guard has to know what
-"exists" means, or it will start passing on a claim that is only half true.
+### M4 exit criteria
 
-### 4.5 The gates that run every time
-
-| Gate | What it protects |
-|---|---|
-| `pytest` under three backend configurations | The three configurations are the product's promises |
-| `refresh-report-figures.py --check` | The report's numbers describe the tree |
-| `check-doc-citations.py` | The documents' line references still say what they say |
-| `check-version-claims.py` | The published state matches the repository |
-| vulture's exit code | Dead code stays dead |
-| A **Linux** run | Two of the three platform defects in this project's history were Windows-only |
-
----
-
-## 5. Acceptance criteria
-
-### 5.1 The roadmap's Phase 2 exit targets, measured
-
-| Metric | Target | How it is measured |
-|---|---|---|
-| Agent task set | ≥20 tasks, human-verified answers | The fixture in §4.3; the answers are checked by a human and committed |
-| Tool execution | ≥95% success rate on tool tasks | Measured over the task set |
-| Evidence | 100% of externally shown conclusions traceable | A checker walks every conclusion in every produced report and resolves its provenance |
-| Error recovery | Handles timeouts, tool crashes and model failures | The task set includes the failure cases; each has a stated expected outcome |
-| Model coverage | ≥2 providers verified | The task set is run against each |
-| User experience | Complete loop: upload APK → read the analysis report | The loop is a test, not a demo |
-| Public showcase | ≥2 screen recordings and 1 downloadable sample report | Human work, checked by eye |
-
-### 5.2 The criteria this review added
-
-The review found that the project's failures were all of one kind: **an output
-that was self-consistent and about the wrong thing**. So Phase 2's own exit
-criteria are about that:
-
-| Criterion | What it rules out |
-|---|---|
-| Every evidence record a tool returns has a locator that resolves to a file in the workspace | A conclusion about a file that is not there |
-| No tool output can carry a level above `VERIFIED` without a tool behind it | A model's opinion published as a finding |
-| Every number in every report can be reproduced by a command in the repository | A number nobody can check |
-| The MCP server refuses to start against a workspace whose schema it does not understand | A tool reading a table that means something else |
-| `grep -rn -i mcp src/dexatlas/` returns something, **and** the README's claim about it is true | The failure mode of this project: shipping a promise |
-
-### 5.3 What "done" means for the debt
-
-Stage 0 and Stage 1 are done when:
-
-- every issue in §1 has a merged commit **and** a test that was red before it;
-- the 21 defect classes in [status.md §6](../status.md) each either have an
-  automated guard or are listed in the roadmap as accepted;
-- the maturity assessment is re-run and its six scores are published alongside
-  the previous ones.
+- A new user can install and run the documented system.
+- Upload → analysis → question → evidence navigation → report export works end
+  to end.
+- Tests pass on the supported platforms and backend configurations.
+- Known security and reliability limitations are **disclosed**.
+- **No unverified feature appears as a completed feature in the README.**
+- Every model-dependent capability can be disabled without breaking the static
+  analysis core.
 
 ---
 
-## 6. What this plan does not cover
+## 7. The rules this plan is run under
 
-- **A timeline in calendar dates.** The estimates are effort, and the project has
+- One issue produces one reviewable PR wherever that is practical.
+- Every bug fix carries a regression test **that fails on the previous
+  implementation**.
+- **No production claim without a runnable test, a benchmark, or a documented
+  manual verification.**
+- Published git tags are not edited.
+- REST endpoints stay backward-compatible where that is practical.
+- Readable code and small interfaces over premature abstractions.
+- Third-party APKs, secrets and sensitive customer data stay out of the
+  repository.
+- **A milestone is advanced only after source review and acceptance.**
+
+---
+
+## 8. What this plan does not cover
+
+- **Calendar dates.** The estimates are engineering effort, and this project has
   no history of estimating its own work — this is the first plan written against
   a code base rather than an idea.
 - **The commercial APK benchmark.** It needs samples this project does not have
   ([phase1-review-report.md §7](../reports/phase1-review-report.md)).
 - **Windows and macOS.** Every platform difference in this project's history was
-  found on Linux. The gates above run on Linux; the local verification loop is
-  WSL.
+  found on Linux. The gates run on Linux; the local verification loop is WSL.
 - **What Phase 3 looks like.** The roadmap's Phase 3 section stands; it will need
   the same treatment when its time comes.

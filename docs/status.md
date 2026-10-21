@@ -22,7 +22,7 @@
 | 一方代码覆盖率 | <!--fig:coverage.pct-->94.2%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
-| 成熟度评估 | **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)） |
+| 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
 **CI 的六个 job 各自覆盖一种配置**，不是重复：
 
@@ -72,7 +72,7 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 |---|---|
 | 1. 版本提交 | 完成：四个 tag（v0.1.0 ~ v0.1.3）、仓库链接、可复现命令 |
 | 2. 架构与代码审核 | 完成：三个并行审核（核心实现 / 接口与安全边界 / 测试可靠性），共 44 条发现，**每一条都在新基线上逐条复核过** |
-| 3. 成熟度评估 | 完成：[成熟度评估](reports/phase1-maturity-assessment.md)，六个加权维度，总分 5.50 / 10 |
+| 3. 成熟度评估 | 完成：[成熟度评估](reports/phase1-maturity-assessment.md)，六个加权维度。**5.50 / 10 是修复前的基线**，不是这棵树的当前分数 |
 | 4. 评审报告 | 写作中 |
 | 5. 重新规划下一阶段 | 素材已备：[Phase 2 issue 清单](reports/phase2-issue-list.md)，每条带现状、两个方案、推荐和钉住它的测试 |
 
