@@ -1103,6 +1103,37 @@ def main(argv: list[str] | None = None) -> int:
             )
         if status_path is not None:
             print(f"  the status page's self-checks: {status_checks.describe()}")
+
+        # Every test in the tree has to have an outcome for the run to describe
+        # the tree. A test that neither passed, failed, skipped nor was
+        # expected to fail is a test the run did not account for -- a
+        # collection that stopped early, or a file that was never collected --
+        # and the numbers of such a run are numbers about a smaller tree.
+        # The script used to accept them, and a badge once said "353 passing"
+        # on a tree of 885 tests.
+        #
+        # The self-checks are measured separately from the code tests and added
+        # up here, so the accounting is complete only now.
+        accounted = sum(
+            record["suite"].get(name, 0)
+            for name in ("passed", "failed", "skipped", "xfailed", "xpassed")
+        )
+        if accounted != total:
+            print(
+                "The run did not account for every test in the tree:\n"
+                f"  the tree has {total} tests; the run accounted for {accounted}\n"
+                "  ("
+                + ", ".join(
+                    f"{name}={record['suite'].get(name, 0)}"
+                    for name in ("passed", "failed", "skipped", "xfailed", "xpassed")
+                )
+                + ")"
+            )
+            print(
+                "\nNothing was written. The figures would describe a tree smaller "
+                "than the one the report is about."
+            )
+            return 1
     else:
         if not previous.get("coverage") or not previous.get("suite"):
             raise SystemExit(
@@ -1145,19 +1176,26 @@ def main(argv: list[str] | None = None) -> int:
     #
     # The test badge says "passing", so it states the number that passed, not
     # the number the collector found.
-    measured_values = render_figures(record)
-    badge_values = {
-        "tests.passing": measured_values.get("suite.passed", ""),
-        "coverage.pct": measured_values.get("coverage.pct", ""),
-    }
+    #
+    # Only the real readmes are written, and only when the real report is the
+    # one being refreshed. The test suite runs this script against copies of
+    # the report, with measurements it made up; a script that wrote the readme
+    # in that case would put a made-up number in the project's front page --
+    # and the suite would do it on every run.
     readmes: list[tuple[Path, str, str]] = []
-    for readme in README_PATHS:
-        if not readme.is_file():
-            continue
-        original = readme.read_text(encoding="utf-8")
-        refreshed = apply_badges(original, badge_values)
-        if refreshed != original:
-            readmes.append((readme, original, refreshed))
+    if report_path == REPORT_PATH:
+        measured_values = render_figures(record)
+        badge_values = {
+            "tests.passing": measured_values.get("suite.passed", ""),
+            "coverage.pct": measured_values.get("coverage.pct", ""),
+        }
+        for readme in README_PATHS:
+            if not readme.is_file():
+                continue
+            original = readme.read_text(encoding="utf-8")
+            refreshed = apply_badges(original, badge_values)
+            if refreshed != original:
+                readmes.append((readme, original, refreshed))
 
     changes = figure_changes(text, record)
     if status_text is not None:

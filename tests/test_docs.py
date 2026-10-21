@@ -851,6 +851,7 @@ def _install_fake_measurements(
     checks_failures: tuple[str, ...] = (),
     skipped: int = 0,
     skipped_tests: tuple[str, ...] = (),
+    unaccounted: int = 0,
 ) -> None:
     """Replace the script's slow measurements with instant ones.
 
@@ -867,7 +868,7 @@ def _install_fake_measurements(
     def measure_code_tests() -> Any:
         return script.Outcome(
             counts={
-                "passed": total - FAKE_CHECKS - len(code_failures) - skipped,
+                "passed": total - FAKE_CHECKS - len(code_failures) - skipped - unaccounted,
                 "failed": len(code_failures),
                 "skipped": skipped,
                 "xfailed": 0,
@@ -1240,3 +1241,55 @@ def test_the_badge_states_the_numbers_the_report_states() -> None:
 
     assert f"badge/tests-{values['suite.passed']}%20passing" in stated
     assert f"badge/coverage-{values['coverage.pct'].rstrip('%')}%25" in stated
+
+
+def test_the_refresh_script_refuses_a_measurement_that_missed_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A run that did not account for every test describes a smaller tree.
+
+    A badge once said "353 passing" on a tree of 885 tests: the run had
+    stopped early, and the numbers of a run that does not cover the tree are
+    numbers about part of it. The script has to refuse such a measurement
+    rather than publish it.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report()
+    report.write_text(original, encoding="utf-8")
+    # The run accounts for 300 fewer tests than the tree holds.
+    _install_fake_measurements(script, monkeypatch, unaccounted=300)
+
+    assert script.main(["--report", str(report)]) == 1
+
+    out = capsys.readouterr().out
+    assert "did not account for every test" in out
+    assert "Nothing was written" in out
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_the_refresh_script_does_not_write_the_readme_when_it_is_pointed_elsewhere(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A refresh of a copy must not touch the project's own readme.
+
+    The script writes the badge into the readme, and the test suite runs the
+    script against a copy of the report with measurements it made up. A
+    script that wrote the readme in that case put "353 passing" on the
+    project's front page -- and the suite did it on every run, so the number
+    in the badge was whatever the last test had measured.
+
+    The readme is written only when the real report is the one being
+    refreshed, exactly as the status page is.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_fake_report(), encoding="utf-8")
+    readme = REPO_ROOT / "README.md"
+    before = readme.read_bytes()
+
+    _install_fake_measurements(script, monkeypatch)
+
+    script.main(["--report", str(report)])
+
+    assert readme.read_bytes() == before, "the refresh wrote to the project's readme"
