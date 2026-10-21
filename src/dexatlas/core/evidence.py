@@ -205,6 +205,11 @@ class EvidenceBuilder:
                 "callers": callers[:MAX_LISTED_CALLERS],
                 "truncated": len(callers) > MAX_LISTED_CALLERS,
                 "call_count": len(callers),
+                # The indexed cross-references are rows, one per call, and a
+                # caller that calls the same method twice contributes two rows
+                # and one call site. The report states this number beside the
+                # number of indexed rows, so it has to be in the same unit.
+                "edge_count": len(references),
             },
         )
 

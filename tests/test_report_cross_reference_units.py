@@ -252,3 +252,71 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
     assert summary["cross_reference_records"] == 1
     records = [item for item in result.evidence if item.kind is EvidenceKind.CROSS_REFERENCE]
     assert len(records) == 1
+
+
+# -- one caller, two calls ----------------------------------------------------
+
+
+def _one_caller_twice() -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
+    """One caller that calls the same method twice.
+
+    The index holds one row per call, so this is two rows and one caller.
+    A record covers both calls and names the caller once. The number the
+    report states beside the number of indexed rows has to be in the unit
+    of rows -- otherwise the two numbers beside each other are in different
+    units, which is what the review found.
+    """
+    callee = MethodRef(
+        class_name="com.example.Crypto",
+        name="sign",
+        descriptor="([Ljava/lang/String;)Ljava/lang/String;",
+        provenance=_provenance(),
+    )
+    caller = MethodRef(
+        class_name="com.example.Caller",
+        name="call",
+        descriptor="()V",
+        provenance=_provenance(),
+    )
+    edges = [
+        MethodReference(
+            caller=caller.qualified_name,
+            callee=callee.qualified_name,
+            kind=InvocationKind.STATIC,
+            provenance=_provenance(),
+        )
+        for _ in range(2)
+    ]
+    classes = [
+        ClassRef(name=method.class_name, kind=ClassKind.CLASS, provenance=_provenance())
+        for method in (callee, caller)
+    ]
+    return classes, [callee, caller], edges
+
+
+def test_the_number_beside_the_indexed_rows_counts_rows(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One caller, two calls: two indexed rows, and a number that says so.
+
+    The record names the caller once, so the number of call sites is one
+    while the number of indexed rows is two. The report states the number
+    that can be compared with the rows -- the edges -- and the rows it
+    covers must not exceed them.
+    """
+    classes, methods, edges = _one_caller_twice()
+    analyzer = Analyzer(settings)
+
+    def extract(*args: object, **kwargs: object):
+        return classes, methods, [], edges, [], None
+
+    monkeypatch.setattr(analyzer._androguard, "extract", extract)
+    result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
+
+    assert result.project.reference_count == 2, "the index should hold one row per call"
+
+    summary = build_json_report(result)["summary"]
+
+    assert summary["cross_references"] == 2
+    assert summary["cross_references_with_evidence"] == 2
+    assert summary["cross_reference_records"] == 1

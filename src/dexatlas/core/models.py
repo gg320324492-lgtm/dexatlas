@@ -593,6 +593,17 @@ DECOMPILATION_DETAIL = "decompilation"
 #: and the number of call sites is what tells them apart.
 CROSS_REFERENCE_CALL_COUNT = "call_count"
 
+#: The key under which a cross-reference record's detail states how many
+#: indexed call edges it covers.
+#:
+#: The indexed cross-references are rows, one per call, and a caller that
+#: calls the same method twice contributes two rows and one call site. The
+#: two numbers therefore differ, and the report puts them beside each other
+#: -- so the record states both: the call sites it names, and the edges it
+#: covers. The second is the one that can be compared with the number of
+#: indexed rows.
+CROSS_REFERENCE_EDGE_COUNT = "edge_count"
+
 
 def cross_reference_records(evidence: Sequence[Evidence]) -> int:
     """How many cross-reference records the analysis produced.
@@ -604,26 +615,31 @@ def cross_reference_records(evidence: Sequence[Evidence]) -> int:
 
 
 def cross_reference_call_sites(evidence: Sequence[Evidence]) -> int:
-    """How many indexed call sites a cross-reference record covers.
+    """How many indexed call edges a cross-reference record covers.
 
     This is the number the two reports state beside the number of indexed
     cross-references, and it has to be the same unit as that number.
 
-    The indexed cross-references are call *edges* — one row per call — and a
-    record covers the call sites of the method it is about. Summing the call
-    sites the records cover therefore answers the question the report poses:
-    how many of the indexed calls are backed by a record.
+    The indexed cross-references are rows, one per call, and a record covers
+    the edges of the method it is about. Summing the edges the records cover
+    therefore answers the question the report poses: how many of the indexed
+    calls are backed by a record.
 
-    A record that states no call count — one written by an older build, or one
-    made by hand — counts as one call site: a record is made from at least one
-    reference, so one is the smallest number it can honestly be.
+    A record that states no edge count — one written by an older build, or one
+    made by hand — falls back to the call sites it names, and then to one: a
+    record is made from at least one reference, so one is the smallest number
+    it can honestly be.
     """
     total = 0
     for item in evidence:
         if item.kind is not EvidenceKind.CROSS_REFERENCE:
             continue
-        count = item.detail.get(CROSS_REFERENCE_CALL_COUNT)
-        total += count if isinstance(count, int) else 1
+        edges = item.detail.get(CROSS_REFERENCE_EDGE_COUNT)
+        if isinstance(edges, int):
+            total += edges
+            continue
+        sites = item.detail.get(CROSS_REFERENCE_CALL_COUNT)
+        total += sites if isinstance(sites, int) else 1
     return total
 
 
