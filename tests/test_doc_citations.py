@@ -253,6 +253,14 @@ def test_a_citation_that_only_points_at_a_location_is_still_checked(
     assert checker.main() == 1
 
 
+def _line_of(path: Path, text: str) -> int:
+    """The line a piece of code is on, read out of the file itself."""
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if text in line:
+            return number
+    raise AssertionError(f"{text!r} is not in {path}")
+
+
 def test_every_citation_on_a_line_that_cites_several_places_is_checked(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -264,9 +272,17 @@ def test_every_citation_on_a_line_that_cites_several_places_is_checked(
     """
     checker = _checker()
     document = tmp_path / "doc.md"
+    # The ranges are computed rather than written down: this test is about the
+    # rule that a line citing several places is checked in each of them, and a
+    # range typed into the test would fail for a different reason every time
+    # the pipeline moved.
+    source = REPO_ROOT / "src" / "dexatlas" / "core" / "pipeline.py"
+    apktool = _line_of(source, "if include_apktool:")
+    androguard = _line_of(source, "if include_androguard:")
     document.write_text(
-        "The stages run in order (`core/pipeline.py:137-149` with `include_apktool` "
-        "and `core/pipeline.py:151-159` with `include_androguard`).\n",
+        f"The stages run in order (`core/pipeline.py:{apktool}-{apktool}` with "
+        f"`include_apktool` and `core/pipeline.py:{androguard}-{androguard}` with "
+        f"`include_androguard`).\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(checker, "DOCS", [document])
@@ -274,8 +290,8 @@ def test_every_citation_on_a_line_that_cites_several_places_is_checked(
     assert checker.main() == 0
 
     document.write_text(
-        "The stages run in order (`core/pipeline.py:137-149` with `include_apktool` "
-        "and `core/pipeline.py:2-3` with `include_androguard`).\n",
+        f"The stages run in order (`core/pipeline.py:{apktool}-{apktool}` with "
+        f"`include_apktool` and `core/pipeline.py:2-3` with `include_androguard`).\n",
         encoding="utf-8",
     )
 

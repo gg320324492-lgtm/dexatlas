@@ -111,6 +111,25 @@ def display_path(path: Path) -> str:
     return path.name
 
 
+def redact_workspace(message: str, *roots: Path) -> str:
+    """Replace the server's workspace paths in a message with a placeholder.
+
+    An error message can quote the path it was handed, and that path is the
+    server's. The workspace root is the part that names the machine; what is
+    left of the path is a place inside the analysis, and that is worth keeping.
+
+    This lives here rather than in the API because the redaction belongs to
+    the *message*, not to one transport: a message recorded on a project is
+    read back through the API, through the JSON report and through the
+    Markdown report, and redacting it at each of those is three chances to
+    forget one. Redacted once, where it is written, it is redacted everywhere.
+    """
+    for root in roots:
+        for candidate in (str(root), str(root.resolve())):
+            message = message.replace(candidate, "<workspace>")
+    return message
+
+
 def is_inside(root: Path, candidate: Path) -> bool:
     """Whether the file really is inside the tree, links resolved.
 

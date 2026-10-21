@@ -41,6 +41,7 @@ from dexatlas.core.models import (
     ToolError,
     ToolErrorCode,
 )
+from dexatlas.core.paths import redact_workspace
 from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
@@ -268,6 +269,13 @@ class Analyzer:
         The failure is recorded as a :class:`ToolError` of DexAtlas itself,
         not of a backend: no backend failed, the analysis did. A backend's
         own failure is recorded by its own adapter, under the backend's name.
+
+        The message is redacted here, where it is written. An exception's
+        message can quote the path it was handed -- a file that was not
+        there, a directory that could not be created -- and that path is the
+        server's. The message is read back through the API, through the JSON
+        report and through the Markdown report, so redacting it at each of
+        those would be three chances to forget one.
         """
         if exc is None:
             message = "the analysis did not complete: it was interrupted"
@@ -275,6 +283,8 @@ class Analyzer:
             message = f"the analysis did not complete: {type(exc).__name__}"
             if str(exc):
                 message = f"{message}: {exc}"
+        redacted = redact_workspace(message, self._settings.workspace, workspace)
+        message = redacted if redacted is not None else message
 
         error = ToolError(
             tool=ANALYSIS_TOOL,

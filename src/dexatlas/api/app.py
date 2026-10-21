@@ -42,7 +42,7 @@ from dexatlas.core.models import (
     SourceDocument,
     canonical_method_id,
 )
-from dexatlas.core.paths import display_path
+from dexatlas.core.paths import display_path, redact_workspace
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -610,21 +610,6 @@ def _redact(message: str, secret: str) -> str:
     return message.replace(secret, Path(secret).name)
 
 
-def _redact_workspace(message: str | None, workspace: Path) -> str | None:
-    """Replace the server's workspace path with a placeholder.
-
-    A backend's error message can quote the path it was handed, and that path
-    is the server's. The workspace root is the part that names the machine; what
-    is left of the path is a place inside the analysis, and that is worth
-    keeping.
-    """
-    if not message:
-        return message
-    for candidate in (str(workspace), str(workspace.resolve())):
-        message = message.replace(candidate, "<workspace>")
-    return message
-
-
 def _source_headers(document: SourceDocument) -> dict[str, str]:
     """Headers that say where a source came from.
 
@@ -680,8 +665,12 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
             ErrorResponse(
                 tool=error.tool,
                 code=error.code.value,
-                message=error.message,
-                detail=_redact_workspace(error.detail, settings.workspace),
+                # Both fields are redacted: an error's message can quote the
+                # path it was handed just as easily as its detail can.
+                message=redact_workspace(error.message, settings.workspace),
+                detail=(
+                    redact_workspace(error.detail, settings.workspace) if error.detail else None
+                ),
             )
             for error in project.errors
         ],

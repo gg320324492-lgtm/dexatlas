@@ -19,6 +19,7 @@ import pytest
 from typer.testing import CliRunner
 
 from dexatlas.cli.main import app
+from dexatlas.core.pipeline import Analyzer
 
 runner = CliRunner()
 
@@ -1133,3 +1134,88 @@ def test_an_id_printed_by_methods_resolves_in_xrefs(
     refs = _run("xrefs", project_id, sign_id)
     assert refs.exit_code == 0, f"no callers for {sign_id!r}: {refs.output}"
     assert "MainActivity.onCreate" in refs.stdout
+
+
+# -- the analysis itself failed ----------------------------------------------
+
+
+def test_an_analysis_that_broke_exits_with_its_own_code(
+    workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A broken analysis is not an empty answer and not a wrong request.
+
+    The three mean different things to whoever reads the exit code: "this APK
+    has nothing in it" (1), "this input is not analysable" (2), and "this run
+    broke" (3). The last one used to print a traceback and exit 1, which is
+    the same code as an empty answer -- so a caller could not tell a run that
+    found nothing from a run that fell over.
+    """
+    from dexatlas.core.models import ToolError, ToolErrorCode
+    from dexatlas.core.pipeline import AnalysisFailed
+
+    error = ToolError(
+        tool="dexatlas",
+        code=ToolErrorCode.ANALYSIS_FAILED,
+        message="the analysis did not complete: RuntimeError: the DEX reader fell over",
+    )
+
+    def broken(self, apk, **kwargs):
+        raise AnalysisFailed(error)
+
+    monkeypatch.setattr(Analyzer, "analyze", broken)
+
+    apk = tmp_path / "demo.apk"
+    with zipfile.ZipFile(apk, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", "<?xml version='1.0'?><manifest/>")
+        archive.writestr("classes.dex", b"dex\n035\x00")
+
+    result = _run("analyze", str(apk))
+
+    assert result.exit_code == 3
+    # The message says what failed, not where in the code it failed. The output
+    # is read with its line breaks collapsed, because the console wraps a long
+    # line and a reader does not care where the wrap fell.
+    flat = " ".join(result.output.split())
+    assert "the analysis did not complete" in flat
+    assert "the DEX reader fell over" in flat
+    assert "Traceback" not in flat
+
+
+def test_the_three_failures_have_three_exit_codes(
+    workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A caller that reads only the exit code can tell the three apart."""
+    from dexatlas.core.models import ToolError, ToolErrorCode
+    from dexatlas.core.pipeline import AnalysisFailed
+
+    apk = tmp_path / "demo.apk"
+    with zipfile.ZipFile(apk, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", "<?xml version='1.0'?><manifest/>")
+        archive.writestr("classes.dex", b"dex\n035\x00")
+
+    # 2: the input is not an APK at all.
+    not_an_apk = tmp_path / "notes.txt"
+    not_an_apk.write_text("hello", encoding="utf-8")
+    assert _run("analyze", str(not_an_apk)).exit_code == 2
+
+    # 1: the request was fine and the answer was empty. No backend is
+    # installed, so nothing can produce a symbol.
+    monkeypatch.setattr(shutil, "which", lambda *args, **kwargs: None)
+    empty = tmp_path / "no-bytecode.apk"
+    with zipfile.ZipFile(empty, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", "<?xml version='1.0'?><manifest/>")
+        archive.writestr("resources.arsc", b"\x02\x00\x0c\x00")
+    assert _run("analyze", str(empty)).exit_code == 1
+
+    # 3: the analysis itself broke.
+    error = ToolError(
+        tool="dexatlas",
+        code=ToolErrorCode.ANALYSIS_FAILED,
+        message="the analysis did not complete: RuntimeError: the DEX reader fell over",
+    )
+
+    def broken(self, apk, **kwargs):
+        raise AnalysisFailed(error)
+
+    monkeypatch.setattr(Analyzer, "analyze", broken)
+    assert _run("analyze", str(apk)).exit_code == 3

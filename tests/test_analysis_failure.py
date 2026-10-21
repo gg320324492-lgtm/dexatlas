@@ -246,20 +246,24 @@ def test_the_background_task_does_not_call_an_empty_result_a_failure(
 def test_the_command_line_does_not_report_a_failed_analysis_as_a_success(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The CLI lets the failure through, and the exit code is not zero.
+    """The CLI says what failed, and exits with a code of its own.
 
-    The exit code is the CLI's own: it is 1, which is also the code it uses
-    for "the answer is empty". Telling a failed analysis from an empty one
-    needs a code of its own, and a change in ``cli/main.py`` — which is not
-    where this fix was made.
+    Exit code 1 is the code for "the answer is empty", so a failed analysis
+    that also exited 1 could not be told from an APK with nothing in it. The
+    failure has its own code now — 3 — and it says what failed rather than
+    printing a traceback: a caller that reads the output wants to know what
+    broke, not where in the code it broke.
     """
     analyzer = _failing_analyzer(settings, monkeypatch)
     monkeypatch.setattr("dexatlas.cli.main.Analyzer", lambda *args, **kwargs: analyzer)
 
     outcome = runner.invoke(cli_app, ["analyze", str(minimal_apk)])
 
-    assert outcome.exit_code != 0
-    assert isinstance(outcome.exception, AnalysisFailed)
+    assert outcome.exit_code == 3
+    assert outcome.exit_code != 1, "a failed analysis must not read as an empty answer"
+    flat = " ".join(outcome.output.split())
+    assert "did not complete" in flat
+    assert "Traceback" not in flat
 
 
 def test_the_command_line_leaves_the_project_failed(
@@ -382,3 +386,36 @@ def test_uploading_an_analysed_apk_again_does_not_analyse_it_again(
     body = response.json()
     assert body["project_id"] == project.id
     assert body["status"] == "completed"
+
+
+def test_the_failure_message_does_not_leak_the_server_path(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The path is the server's, and the message is read by people who are not.
+
+    An exception's message can quote the path it was handed -- a file that
+    was not there, a directory that could not be created -- and that path
+    names the machine the analysis ran on. The message is recorded on the
+    project, and from there it is read back through the API, through the
+    JSON report and through the Markdown report.
+
+    So it is redacted where it is written, not at each of those: the
+    workspace root becomes a placeholder and the path inside it survives,
+    because that is the part that says what was being worked on.
+    """
+    secret = settings.workspace / "secret" / "path" / "db.sqlite"
+
+    def broken(self, *args, **kwargs):
+        raise FileNotFoundError(f"no such file: {secret}")
+
+    analyzer = Analyzer(settings)
+    monkeypatch.setattr(analyzer, "_run_androguard", broken)
+
+    with pytest.raises(AnalysisFailed) as caught:
+        analyzer.analyze(minimal_apk)
+
+    message = caught.value.error.message
+    assert str(settings.workspace) not in message
+    assert "<workspace>" in message
+    # The path inside the workspace survives: it is what says what failed.
+    assert "secret" in message

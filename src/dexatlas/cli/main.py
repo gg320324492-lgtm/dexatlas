@@ -4,13 +4,17 @@ Every command delegates to :class:`~dexatlas.core.pipeline.Analyzer`. The CLI ho
 analysis logic of its own — the same code path backs the REST API, so the two cannot
 drift apart.
 
-Two kinds of "nothing" are kept apart, because they mean different things to whoever
-reads the output:
+Three kinds of "nothing" are kept apart, because they mean different things to
+whoever reads the output:
 
 * the request was wrong — the project id names nothing, or the input is not an APK.
   That is exit code :data:`EXIT_BAD_REQUEST`.
 * the request was fine and the answer is empty — the project has no classes, no
   callers, no source for that class. That is exit code :data:`EXIT_EMPTY`.
+* the analysis itself failed — a step raised, or the workspace could not be
+  written. That is exit code :data:`EXIT_FAILED`, and it says what failed
+  rather than printing a traceback: a caller that only reads the exit code can
+  tell "this APK is not analysable" from "this analysis broke".
 
 A limit is a bound on what is shown, never a way to get a wrong answer. ``--limit 0``
 and ``--limit -1`` are refused rather than quietly listing nothing — or, worse,
@@ -34,7 +38,7 @@ from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
 from dexatlas.core.models import Project, ResourceKind, SourceDocument, canonical_method_id
-from dexatlas.core.pipeline import Analyzer
+from dexatlas.core.pipeline import AnalysisFailed, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 
@@ -43,7 +47,8 @@ app = typer.Typer(
     help="Evidence-first Android reverse engineering and analysis platform.",
     epilog=(
         "Exit codes: 0 the command did what was asked; 1 the answer is empty; "
-        "2 the request was wrong (no such project, or an input that is not an APK)."
+        "2 the request was wrong (no such project, or an input that is not an APK); "
+        "3 the analysis itself failed."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -62,6 +67,14 @@ EXIT_BAD_REQUEST = 2
 #: The request was fine and the answer is empty: no classes matched, no callers, no
 #: source for that class.
 EXIT_EMPTY = 1
+
+#: The analysis itself failed: a step raised, or the workspace could not be written.
+#:
+#: A failure of the analysis is not an empty answer and not a wrong request, and
+#: a caller that reads only the exit code has to be able to tell the three apart:
+#: "this APK has nothing in it" and "this run broke" call for different
+#: responses.
+EXIT_FAILED = 3
 
 #: What a project id looks like, for the message that says "there is no such project".
 PROJECT_ID_SHAPE = "apk_0123456789abcdef"
@@ -188,6 +201,15 @@ def analyze(
     except ApkValidationError as exc:
         err_console.print(f"[red]Not a usable APK:[/red] {exc}")
         raise ExitCode(code=EXIT_BAD_REQUEST) from exc
+    except AnalysisFailed as exc:
+        # The analysis broke. The reason was recorded on the project before the
+        # exception was raised, so it is in the database as well as here -- and
+        # it is said here rather than as a traceback, because a caller that
+        # reads the output wants to know what failed, not where in the code it
+        # failed. The message is the recorded error's own, so the two say the
+        # same thing.
+        err_console.print(f"[red]{exc.error.message}[/red]")
+        raise ExitCode(code=EXIT_FAILED) from exc
 
     project = result.project
     console.print(

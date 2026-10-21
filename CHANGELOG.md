@@ -156,6 +156,16 @@ The review report is `docs/reports/phase1-review-report.md`.
   existing project — so it was never analysed again. A failure now lands the
   project in `failed` with the error on it, and the exception still reaches the
   caller.
+  The three kinds of failure are told apart by the exit code: 1 is an empty
+  answer, 2 is a wrong request, and **3 is an analysis that broke** — a code
+  of its own, so a caller that reads only the exit code can tell a run that
+  found nothing from a run that fell over.
+  The failure's message is redacted where it is written. An exception's message
+  can quote the path it was handed, and that path names the machine the
+  analysis ran on; the message is read back through the API, through the JSON
+  report and through the Markdown report, so it is redacted once rather than
+  three times. The workspace root becomes a placeholder and the path inside it
+  survives — that is the part that says what was being worked on.
 - **The liveness probe wrote to the database.** `GET /health` built a whole
   analyzer, which opened the workspace and took the write lock, on every
   request. Which backends are installed is a fact about the machine, not about
