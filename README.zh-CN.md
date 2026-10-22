@@ -166,6 +166,8 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 
 源码评审已经做完：三份审核共 44 条发现，每一条都在发现它的那棵树上复验过。
 
+- **[Phase 1 验收记录](docs/releases/phase1-acceptance-2026-10-21.md)** —— 验收了什么，以及它**没有**声称什么
+
 - **[评审报告](docs/reports/phase1-review-report.md)** —— 发现了什么、修了什么、推迟了什么
 - **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分
 - **[Phase 2 任务清单](docs/reports/phase2-issue-list.md)** —— 推迟的发现，每条带两个方案和推荐

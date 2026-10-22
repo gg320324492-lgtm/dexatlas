@@ -187,6 +187,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 The source review is done: 44 findings across three reviews, every one of them
 re-verified against the tree it was found on.
 
+- **[Phase 1 acceptance](docs/releases/phase1-acceptance-2026-10-21.md)** — what was accepted, and what it does not say
+
 - **[Review report](docs/reports/phase1-review-report.md)** — what was found, what was fixed, and what is deferred (Chinese; 评审报告)
 - **[Maturity assessment](docs/reports/phase1-maturity-assessment.md)** — six weighted dimensions, scored from what could be run (Chinese; 成熟度评估)
 - **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings, each with two options and a recommendation (Chinese; Phase 2 任务清单)
