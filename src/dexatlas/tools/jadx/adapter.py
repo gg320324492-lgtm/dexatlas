@@ -27,6 +27,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.methods import (
+    AmbiguousMethodError,
+    JavaContext,
+    MethodCandidate,
+    match_parameter_rank,
+    parse_parameter_types,
+    simple_class_name,
+)
 from dexatlas.core.models import ClassKind, ClassRef, ToolError
 from dexatlas.core.paths import absolute_path, class_to_relative_path, is_inside
 from dexatlas.tools.base import Backend, ToolInvocation, ToolOutcome, which_or_none
@@ -55,6 +63,23 @@ _STATIC_INITIALIZER_RE = re.compile(r"^[ \t]*static[ \t]*\{", re.MULTILINE)
 _PACKAGE_RE = re.compile(r"^\s*package\s+([\w.]+)\s*;", re.MULTILINE)
 _TYPE_RE = re.compile(
     r"^\s*(?:public\s+|final\s+|abstract\s+)*(class|interface|enum)\s+(\w+)", re.MULTILINE
+)
+
+#: A class declaration, with the modifiers a decompiler writes in front of it.
+#:
+#: The file a decompiler writes holds the class it is named after and every
+#: nested class with it, and a nested class's methods are not the outer class's
+#: methods. Which declaration a method belongs to is therefore not a detail:
+#: it is the difference between one class's method and another's.
+_CLASS_DECL_RE = re.compile(
+    r"^[ \t]*(?:(?:public|protected|private|static|final|abstract|sealed|non-sealed)[ \t]+)*"
+    r"(?:class|interface|enum|record)[ \t]+(?P<name>\w+)",
+    re.MULTILINE,
+)
+
+#: A single-type import: the name a source uses, and the class it names.
+_IMPORT_RE = re.compile(
+    r"^[ \t]*import[ \t]+(?:static[ \t]+)?(?P<name>[\w.]+)[ \t]*;", re.MULTILINE
 )
 
 #: A top-level method signature: modifiers, return type, name, parameters, then ``{``.
@@ -128,7 +153,7 @@ class ClassDecompilation:
         if method_name == "<clinit>":
             return True if self.has_static_initializer else None
         if method_name == "<init>":
-            key = _simple_class_name(dex_class_name)
+            key = simple_class_name(dex_class_name)
             if key in self.constructors:
                 return True
             return False if key in self.failed else None
@@ -137,15 +162,6 @@ class ClassDecompilation:
         if method_name in self.failed:
             return False
         return None
-
-
-def _simple_class_name(class_name: str) -> str:
-    """The bare name of a class, without its package or its outer class.
-
-    ``com.example.Outer$Helper`` is ``Helper``. A constructor is written under
-    the class's own name in Java, so this is what a DEX ``<init>`` matches.
-    """
-    return class_name.rpartition(".")[2].rpartition("$")[2]
 
 
 def source_locator(output_dir: Path, path: Path) -> str:
@@ -326,24 +342,58 @@ class JadxBackend(Backend):
         path = self.class_source_path(class_name, output_dir)
         return read_text(path) if path is not None else None
 
-    def read_method_source(self, class_name: str, method_name: str, output_dir: Path) -> str | None:
+    def read_method_source(
+        self,
+        class_name: str,
+        method_name: str,
+        output_dir: Path,
+        descriptor: str | None = None,
+        *,
+        constructor: bool | None = None,
+    ) -> str | None:
         """Extract one top-level method body by brace matching.
 
-        Deliberately conservative: a body is returned only when the signature and its
-        braces are unambiguous. Anything it cannot isolate returns ``None``, which the
-        caller surfaces as "no decompiled source" rather than guessing.
+        A descriptor picks one overload out of several. Without one, a name that
+        matches more than one method is an ambiguity rather than a choice.
         """
-        text = self.read_class_source(class_name, output_dir)
+        path = self.class_source_path(class_name, output_dir)
+        if path is None:
+            return None
+        text = read_text(path)
         if text is None:
             return None
 
-        for span in self._method_spans(text):
-            if span.name != method_name:
-                continue
-            body = _body_from(text, span.start)
-            if body is not None:
-                return body
-        return None
+        classes = _class_layout(text, path, output_dir)
+        context = _java_context(text, classes)
+        spans = _scoped_spans(self._method_spans(text), classes, class_name)
+        candidates = _candidate_spans(spans, class_name, method_name, constructor)
+
+        if not candidates:
+            return None
+
+        if descriptor is None:
+            if len(candidates) > 1:
+                raise AmbiguousMethodError(
+                    class_name, method_name, [_java_candidate(span) for span in candidates]
+                )
+            return _body_from(text, candidates[0].start)
+
+        ranked = [
+            (match_parameter_rank(span.param_types, descriptor, context), span)
+            for span in candidates
+        ]
+        matched = [(rank, span) for rank, span in ranked if rank is not None]
+        if not matched:
+            # The source does not spell this method's signature, so the right
+            # body is not the nearest declaration that happens to share a name.
+            return None
+        best = min(rank for rank, _ in matched)
+        winners = [span for rank, span in matched if rank == best]
+        if len(winners) > 1:
+            raise AmbiguousMethodError(
+                class_name, method_name, [_java_candidate(span) for span in winners]
+            )
+        return _body_from(text, winners[0].start)
 
     @staticmethod
     def method_decompiled(source: str) -> bool:
@@ -447,25 +497,224 @@ class JadxBackend(Backend):
                         start=match.start(),
                         end=end,
                         return_type=match.group("return_type"),
+                        param_types=parse_parameter_types(match.group("params")),
                     )
                 )
         return spans
 
 
 class _MethodSpan:
-    """A located method declaration: its name, its return type and its offsets.
+    """A located method declaration: its name, its signature and its offsets.
+
+    The parameter types are what tell two overloads apart, so they are kept:
+    the signature line already spells them out, and a method that only knows
+    its own name cannot tell ``sign(String)`` from ``sign(String, String)``.
 
     The return type is ``None`` for a constructor, which is what it has in
     Java as well.
     """
 
-    __slots__ = ("end", "name", "return_type", "start")
+    __slots__ = ("end", "name", "param_types", "return_type", "start")
 
-    def __init__(self, name: str, start: int, end: int, return_type: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        start: int,
+        end: int,
+        return_type: str | None = None,
+        param_types: tuple[str, ...] = (),
+    ) -> None:
         self.name = name
         self.start = start
         self.end = end
         self.return_type = return_type
+        self.param_types = param_types
+
+
+@dataclass(frozen=True, slots=True)
+class _ClassSpan:
+    """A class declaration in a decompiled file.
+
+    A decompiler writes a nested class inside the file of the class that holds
+    it, so one file holds several classes, and a method belongs to exactly one
+    of them.
+    """
+
+    name: str
+    """The name the source writes."""
+
+    start: int
+    """Where the declaration starts."""
+
+    end: int
+    """Where the class body ends."""
+
+    parent: int | None
+    """The index of the class this one is declared inside, when there is one."""
+
+
+def _class_spans(text: str) -> list[_ClassSpan]:
+    """The class declarations in a file, and where each body ends.
+
+    The nesting is read off the braces: a declaration inside another class's
+    body is a nested class, and one that is not is a top-level class.
+    """
+    spans: list[_ClassSpan] = []
+    for match in _CLASS_DECL_RE.finditer(text):
+        open_index = text.find("{", match.end())
+        if open_index == -1:
+            continue
+        close_index = _match_brace(text, open_index)
+        if close_index is None:
+            continue
+        parent: int | None = None
+        for index, enclosing in enumerate(spans):
+            if not enclosing.start < match.start() < enclosing.end:
+                continue
+            if parent is None or enclosing.start > spans[parent].start:
+                parent = index
+        spans.append(
+            _ClassSpan(
+                name=match.group("name"),
+                start=match.start(),
+                end=close_index,
+                parent=parent,
+            )
+        )
+    return spans
+
+
+def _file_class_name(path: Path, output_dir: Path) -> str:
+    """The DEX name of the class a decompiled file holds at the top level.
+
+    The file is named after the class it holds, and the DEX spells a class by
+    its path with slashes, so the name of the file is the name of the class.
+    """
+    try:
+        relative = path.relative_to(output_dir / "sources")
+    except ValueError:
+        relative = path
+    return relative.with_suffix("").as_posix()
+
+
+def _class_layout(text: str, path: Path, output_dir: Path) -> list[tuple[_ClassSpan, str]]:
+    """The class declarations in a file, each with the DEX name of the class.
+
+    A nested class is named after the class that holds it, with a ``$``
+    between: ``com/example/Outer$Helper``. A file a decompiler wrote for a
+    class of a flat name holds exactly that class.
+    """
+    spans = _class_spans(text)
+    file_class = _file_class_name(path, output_dir)
+    layout: list[tuple[_ClassSpan, str]] = []
+    for span in spans:
+        if span.parent is None:
+            # The first class in the file is the one the file is named after.
+            name = file_class if not layout else f"{file_class}${span.name}"
+        else:
+            name = f"{layout[span.parent][1]}${span.name}"
+        layout.append((span, name))
+    return layout
+
+
+def _java_context(text: str, layout: list[tuple[_ClassSpan, str]]) -> JavaContext:
+    """What the file says about the names it uses.
+
+    The imports and the package are how a source says which class a bare name
+    means, and the classes the file declares are how it says which class a
+    nested name means.
+    """
+    package_match = _PACKAGE_RE.search(text)
+    imports: dict[str, str] = {}
+    star_imports: list[str] = []
+    for match in _IMPORT_RE.finditer(text):
+        name = match.group("name")
+        if name.endswith(".*"):
+            star_imports.append(name[:-2])
+        else:
+            imports[name.rpartition(".")[2]] = name
+    own = {span.name: dex_name for span, dex_name in layout}
+    return JavaContext(
+        package=package_match.group(1) if package_match else "",
+        imports=imports,
+        star_imports=tuple(star_imports),
+        own_classes=own,
+    )
+
+
+def _scoped_spans(
+    spans: list[_MethodSpan],
+    layout: list[tuple[_ClassSpan, str]],
+    class_name: str,
+) -> list[_MethodSpan]:
+    """The declarations that belong to the class the request names.
+
+    A nested class's methods are not the outer class's methods, and a file that
+    holds both is read for one class or the other — never for both at once.
+    """
+    wanted = class_name.replace(".", "/")
+    scoped = [span for span in spans if _owning_class(span, layout) == wanted]
+    if scoped:
+        return scoped
+    # The file does not declare the class the request names — a name that is not
+    # a class at all, or a decompiler that wrote the class somewhere else.
+    # Every declaration in the file is then a candidate.
+    return spans
+
+
+def _owning_class(span: _MethodSpan, layout: list[tuple[_ClassSpan, str]]) -> str | None:
+    """The DEX name of the class a declaration belongs to.
+
+    The innermost class whose body holds the declaration: a method of a nested
+    class is inside the outer class's body as well, and the inner one is the
+    class that owns it.
+    """
+    owner: str | None = None
+    owner_start = -1
+    for class_span, dex_name in layout:
+        if not class_span.start < span.start < class_span.end:
+            continue
+        if class_span.start > owner_start:
+            owner = dex_name
+            owner_start = class_span.start
+    return owner
+
+
+def _candidate_spans(
+    spans: list[_MethodSpan],
+    class_name: str,
+    method_name: str,
+    constructor: bool | None,
+) -> list[_MethodSpan]:
+    """The declarations a request could be about.
+
+    A constructor is written under the class's own name in Java, and an
+    obfuscated class can have a method of exactly that name too — so a request
+    that does not say which of the two it wants is about both.
+    """
+    if method_name == "<init>" or constructor is True:
+        visible = simple_class_name(class_name)
+        want_constructor: bool | None = True
+    else:
+        visible = method_name
+        want_constructor = constructor
+    candidates = [span for span in spans if span.name == visible]
+    if want_constructor is True:
+        return [span for span in candidates if span.return_type is None]
+    if want_constructor is False:
+        return [span for span in candidates if span.return_type is not None]
+    return candidates
+
+
+def _java_candidate(span: _MethodSpan) -> MethodCandidate:
+    """A candidate read out of the decompiled source.
+
+    The descriptor is unknown here: the source says ``sign(String)``, and which
+    package ``String`` came from is not something the source says.
+    """
+    name = "<init>" if span.return_type is None else span.name
+    spelling = ", ".join(span.param_types)
+    return MethodCandidate(name=name, descriptor=None, signature=f"{span.name}({spelling})")
 
 
 def _match_brace(text: str, open_index: int) -> int | None:

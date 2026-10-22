@@ -16,6 +16,12 @@ whoever reads the output:
   rather than printing a traceback: a caller that only reads the exit code can
   tell "this APK is not analysable" from "this analysis broke".
 
+And a fourth answer that is not "nothing" at all: the request named a method
+that exists several times over, and the answer is several bodies. That is exit
+code :data:`EXIT_AMBIGUOUS`, and it names the candidates rather than choosing
+one — the body of the wrong overload reads like evidence, and a caller that
+pipes it into a report would be citing the wrong method.
+
 A limit is a bound on what is shown, never a way to get a wrong answer. ``--limit 0``
 and ``--limit -1`` are refused rather than quietly listing nothing — or, worse,
 listing everything but the last row, because a negative index counts from the end.
@@ -37,6 +43,7 @@ from dexatlas import __version__
 from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
+from dexatlas.core.methods import AmbiguousMethodError, is_descriptor
 from dexatlas.core.models import Project, ResourceKind, SourceDocument, canonical_method_id
 from dexatlas.core.pipeline import AnalysisFailed, Analyzer
 from dexatlas.reports.json_report import build_json_report
@@ -48,7 +55,8 @@ app = typer.Typer(
     epilog=(
         "Exit codes: 0 the command did what was asked; 1 the answer is empty; "
         "2 the request was wrong (no such project, or an input that is not an APK); "
-        "3 the analysis itself failed."
+        "3 the analysis itself failed; 4 the request was right and the answer is "
+        "ambiguous (the method name matches several overloads)."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -75,6 +83,16 @@ EXIT_EMPTY = 1
 #: "this APK has nothing in it" and "this run broke" call for different
 #: responses.
 EXIT_FAILED = 3
+
+#: The request was fine and the answer is several things: the method name asked
+#: for matches more than one overload, and the caller did not say which.
+#:
+#: This is neither an empty answer nor a wrong request, and a caller that reads
+#: only the exit code has to be able to tell the three apart. "There is nothing
+#: there" and "there are three things there, and only you know which one you
+#: meant" call for different responses: the first is finished, the second is
+#: answered again with a descriptor.
+EXIT_AMBIGUOUS = 4
 
 #: What a project id looks like, for the message that says "there is no such project".
 PROJECT_ID_SHAPE = "apk_0123456789abcdef"
@@ -385,6 +403,14 @@ def source(
     method: Annotated[
         str | None, typer.Option("--method", help="Print one method instead of the class.")
     ] = None,
+    descriptor: Annotated[
+        str | None,
+        typer.Option(
+            "--descriptor",
+            help="The method's DEX descriptor, e.g. '(Ljava/lang/String;)V'. "
+            "Picks one overload out of several.",
+        ),
+    ] = None,
     output_format: Annotated[
         SourceFormat,
         typer.Option(
@@ -399,17 +425,44 @@ def source(
     it is, and where it came from, are printed on stderr, so stdout carries the
     source and nothing else and can be piped into a file unchanged;
     ``--format json`` carries the same information in the document itself.
+
+    A method name that matches several overloads is not answered by picking one
+    of them: the candidates are named, and the exit code says the request was
+    ambiguous. ``--descriptor`` says which overload is meant.
     """
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
-    document = (
-        analyzer.method_source_document(project_id, class_name, method)
-        if method
-        else analyzer.class_source_document(project_id, class_name)
-    )
-    if document is None:
+    if descriptor is not None and not is_descriptor(descriptor):
         err_console.print(
-            f"[yellow]No source for {class_name}.[/yellow] "
+            f"[red]Not a DEX descriptor:[/red] {descriptor}\n"
+            "A descriptor looks like '(Ljava/lang/String;)V' — an argument list "
+            "in brackets, and a return type."
+        )
+        raise ExitCode(code=EXIT_BAD_REQUEST)
+    try:
+        document = (
+            analyzer.method_source_document(project_id, class_name, method, descriptor)
+            if method or descriptor
+            else analyzer.class_source_document(project_id, class_name)
+        )
+    except AmbiguousMethodError as exc:
+        err_console.print(f"[red]Ambiguous method:[/red] {exc}")
+        for candidate in exc.candidates:
+            err_console.print(f"  {candidate.signature}")
+        if any(candidate.descriptor for candidate in exc.candidates):
+            err_console.print(
+                "Ask again with --descriptor and the descriptor of the one you meant."
+            )
+        else:
+            err_console.print(
+                "The symbol index does not hold this method, so it cannot say which "
+                "descriptor each overload has."
+            )
+        raise ExitCode(code=EXIT_AMBIGUOUS) from None
+    if document is None:
+        what = f"{class_name}.{method}" if method else class_name
+        err_console.print(
+            f"[yellow]No source for {what}.[/yellow] "
             "JADX and Apktool must both be installed, and the APK re-analysed."
         )
         raise ExitCode(code=EXIT_EMPTY)
@@ -445,13 +498,24 @@ def source(
 
 
 def _source_payload(
-    project_id: str, class_name: str, method: str | None, document: SourceDocument
+    project_id: str,
+    class_name: str,
+    method: str | None,
+    document: SourceDocument,
 ) -> dict[str, object]:
-    """The JSON form of a source: the text, and where it came from."""
+    """The JSON form of a source: the text, and where it came from.
+
+    The descriptor travels with it, because a document that says which method
+    it holds is worth more than one that says only the name — and two
+    overloads share the name. It is the descriptor the document holds, not the
+    one that was asked for: a request that named only a method still says
+    which of the overloads it got.
+    """
     return {
         "project_id": project_id,
         "class_name": class_name,
         "method": method,
+        "descriptor": document.descriptor,
         "kind": document.kind.value,
         "provenance": [p.model_dump(mode="json") for p in document.provenance],
         "text": document.text,

@@ -43,6 +43,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A method asked for by name could be the wrong one.** `read_method_source` took
+  the first declaration whose *name* matched and returned it, so a class with two
+  overloads of `sign` answered every request for `sign` with whichever one the
+  decompiler happened to write first — and the body of the wrong overload reads
+  exactly like the body of the right one, all the way into an agent's answer. The
+  DEX descriptor tells two overloads apart, and the symbol index already held it:
+  a request may now carry one (`--descriptor` on the command line, `?descriptor=`
+  in the API), and a name that matches several methods is reported as an ambiguity
+  rather than resolved by guessing — the candidates and their descriptors are in
+  the error, so the caller can ask again and be sure of the answer. The CLI says
+  so with an exit code of its own (4), the API with `409`; `1` (nothing there),
+  `2` (a wrong request) and `3` (the analysis failed) still mean what they meant.
+  A name that matches exactly one method is answered as before, and so is a
+  request that carries a descriptor: the old call sites keep working.
+- **A method of a nested class could be the outer class's method.** A decompiler
+  writes a nested class into the file of the class that holds it, so one file
+  holds several classes, and the lookup read the whole file. A request for
+  `Outer$Inner.f` could be answered with `Outer.f`. The methods are now read
+  from the class the request names.
 - **A class name could walk out of the decompiler's output tree.** The JADX backend
   turned a class name into a path without checking any part of it, so a name that
   was already a path — absolute, with a drive letter, with a UNC prefix — was

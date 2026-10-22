@@ -44,7 +44,8 @@ from dexatlas.core.pipeline import (
     _merge_classes,
     _merge_fields,
     _merge_methods,
-    _smali_declares,
+    _MethodIdentity,
+    _smali_signature,
 )
 from dexatlas.reports.markdown import render_markdown
 
@@ -695,8 +696,15 @@ SMALI = """.class public Lcom/example/Demo;
 """
 
 
+def _identity(
+    name: str, descriptor: str | None = None, constructor: bool | None = None
+) -> _MethodIdentity:
+    """The method the pipeline resolved, for a Smali lookup."""
+    return _MethodIdentity(name=name, descriptor=descriptor, constructor=constructor)
+
+
 def test_extracts_a_smali_method() -> None:
-    body = _extract_smali_method(SMALI, "compute")
+    body = _extract_smali_method(SMALI, _identity("compute"), "com.example.Demo")
 
     assert body is not None
     assert body.startswith(".method public static compute")
@@ -705,32 +713,34 @@ def test_extracts_a_smali_method() -> None:
 
 
 def test_smali_methods_do_not_leak_into_each_other() -> None:
-    body = _extract_smali_method(SMALI, "compute")
+    body = _extract_smali_method(SMALI, _identity("compute"), "com.example.Demo")
 
     assert body is not None
     assert "constructor" not in body
 
 
 def test_extracts_a_constructor() -> None:
-    body = _extract_smali_method(SMALI, "<init>")
+    body = _extract_smali_method(SMALI, _identity("<init>"), "com.example.Demo")
 
     assert body is not None
     assert body.endswith(".end method")
 
 
 def test_unknown_smali_method_is_none() -> None:
-    assert _extract_smali_method(SMALI, "nope") is None
+    assert _extract_smali_method(SMALI, _identity("nope"), "com.example.Demo") is None
 
 
 def test_truncated_smali_does_not_return_a_partial_body() -> None:
     truncated = ".method public static broken()V\n    .locals 0\n"
 
-    assert _extract_smali_method(truncated, "broken") is None
+    assert _extract_smali_method(truncated, _identity("broken"), "com.example.Demo") is None
 
 
 def test_smali_header_name_matching() -> None:
-    assert _smali_declares(
-        ".method public static compute(Ljava/lang/String;)Ljava/lang/String;", "compute"
-    )
-    assert _smali_declares(".method public constructor <init>()V", "<init>")
-    assert not _smali_declares(".method public static compute()V", "different")
+    """A Smali header carries the DEX name and the descriptor that follows it."""
+    assert _smali_signature(
+        ".method public static compute(Ljava/lang/String;)Ljava/lang/String;"
+    ) == ("compute", "(Ljava/lang/String;)Ljava/lang/String;")
+    assert _smali_signature(".method public constructor <init>()V") == ("<init>", "()V")
+    assert _smali_signature(".method public static compute()V") == ("compute", "()V")
+    assert _smali_signature(".method") is None

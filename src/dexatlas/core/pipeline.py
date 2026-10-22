@@ -19,6 +19,7 @@ from pathlib import Path
 from dexatlas.config.settings import Settings
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
+from dexatlas.core.methods import AmbiguousMethodError, MethodCandidate, simple_class_name
 from dexatlas.core.models import (
     ANALYSIS_TOOL,
     DECOMPILATION_DETAIL,
@@ -40,6 +41,7 @@ from dexatlas.core.models import (
     StringConstant,
     ToolError,
     ToolErrorCode,
+    canonical_descriptor,
 )
 from dexatlas.core.paths import redact_workspace
 from dexatlas.core.storage import Store
@@ -426,13 +428,19 @@ class Analyzer:
         document = self.class_source_document(project_id, class_name)
         return document.text if document is not None else None
 
-    def method_source(self, project_id: str, class_name: str, method_name: str) -> str | None:
+    def method_source(
+        self,
+        project_id: str,
+        class_name: str,
+        method_name: str | None = None,
+        descriptor: str | None = None,
+    ) -> str | None:
         """One method's body, preferring decompiled Java and falling back to Smali.
 
         As with :meth:`class_source`, the text does not say where it came from;
         :meth:`method_source_document` does.
         """
-        document = self.method_source_document(project_id, class_name, method_name)
+        document = self.method_source_document(project_id, class_name, method_name, descriptor)
         return document.text if document is not None else None
 
     def class_source_document(self, project_id: str, class_name: str) -> SourceDocument | None:
@@ -480,48 +488,159 @@ class Analyzer:
         return None
 
     def method_source_document(
-        self, project_id: str, class_name: str, method_name: str
+        self,
+        project_id: str,
+        class_name: str,
+        method_name: str | None = None,
+        descriptor: str | None = None,
     ) -> SourceDocument | None:
         """One method's body, and which backend produced it.
 
         The Smali fallback is the case this exists for: a method the decompiler
         could not reconstruct is still readable as bytecode, and a reader who is
         not told that is looking at Smali will read it as Java.
+
+        A name that matches more than one method is an error rather than a
+        choice: the body of the wrong overload reads like evidence, and an
+        agent that quotes it quotes the wrong method. The error names the
+        candidates, so the caller can ask again with a descriptor.
         """
         context = self._source_context(project_id)
         if context is None:
             return None
         project, workspace = context
 
+        identity = self._resolve_method(project_id, class_name, method_name, descriptor)
+        fragment = _method_fragment(identity)
+
+        # A decompiled signature can be ambiguous where the bytecode is not — a
+        # decompiler that could not work out a parameter type writes the same
+        # name twice. The bytecode carries the descriptor, so the fallback is
+        # tried before the ambiguity is reported.
+        ambiguity: AmbiguousMethodError | None = None
         if self._jadx.available():
             output_dir = workspace / "jadx"
-            source = self._jadx.read_method_source(class_name, method_name, output_dir)
-            path = self._jadx.class_source_path(class_name, output_dir)
-            if source is not None and path is not None:
-                locator = f"{source_locator(output_dir, path)}#{method_name}"
-                return SourceDocument(
-                    text=source,
-                    kind=SourceKind.JAVA,
-                    provenance=[self._source_provenance(project, "jadx", locator)],
+            try:
+                source = self._jadx.read_method_source(
+                    class_name,
+                    identity.name,
+                    output_dir,
+                    identity.descriptor,
+                    constructor=identity.constructor,
                 )
+                if source is None and identity.unique:
+                    # The source does not spell this method's signature — a
+                    # decompiler that wrote the parameters differently, or a
+                    # type it could not work out. The index says the name is
+                    # one method of the class, so the one declaration of that
+                    # name is the method, and the signature that disagrees
+                    # with it is a spelling.
+                    source = self._jadx.read_method_source(
+                        class_name,
+                        identity.name,
+                        output_dir,
+                        None,
+                        constructor=identity.constructor,
+                    )
+            except AmbiguousMethodError as exc:
+                ambiguity = exc
+            else:
+                path = self._jadx.class_source_path(class_name, output_dir)
+                if source is not None and path is not None:
+                    locator = f"{source_locator(output_dir, path)}#{fragment}"
+                    return SourceDocument(
+                        text=source,
+                        kind=SourceKind.JAVA,
+                        descriptor=identity.descriptor,
+                        provenance=[self._source_provenance(project, "jadx", locator)],
+                    )
 
         # Smali fallback: a method JADX cannot decompile is still present in bytecode.
         if not self._apktool.available():
+            if ambiguity is not None:
+                raise ambiguity
             return None
         output_dir = workspace / "apktool"
         smali = self._apktool.read_smali(class_name, output_dir)
         path = self._apktool.smali_path(class_name, output_dir)
         if not smali or path is None:
+            if ambiguity is not None:
+                raise ambiguity
             return None
-        body = _extract_smali_method(smali, method_name)
+        body = _extract_smali_method(smali, identity, class_name)
         if body is None:
+            if ambiguity is not None:
+                raise ambiguity
             return None
-        locator = f"{apktool_source_locator(output_dir, path)}#{method_name}"
+        locator = f"{apktool_source_locator(output_dir, path)}#{fragment}"
         return SourceDocument(
             text=body,
             kind=SourceKind.SMALI,
+            descriptor=identity.descriptor,
             provenance=[self._source_provenance(project, "apktool", locator)],
         )
+
+    def _resolve_method(
+        self,
+        project_id: str,
+        class_name: str,
+        method_name: str | None,
+        descriptor: str | None,
+    ) -> _MethodIdentity:
+        """Which method a request is about, as far as it can be pinned down.
+
+        The symbol index is the authority: it holds the DEX names and
+        descriptors of the methods the APK really has. A name that matches
+        several of them is an ambiguity, and the error says which — the
+        caller can then ask again with a descriptor. When the index does not
+        hold the method the request falls back to the source, which knows the
+        names but not the descriptors.
+        """
+        indexed = self._store.list_methods(project_id, class_name)
+        if descriptor is not None:
+            target = canonical_descriptor(descriptor)
+            matching = [method for method in indexed if method.descriptor == target]
+            if method_name is not None:
+                # The DEX name is the precise reading of the name, and a
+                # descriptor alongside it is a pair the index holds: an agent
+                # that read a method out of the symbol table has exactly that
+                # pair, and asking with it has to reach the method it names.
+                #
+                # A constructor is written under the class's own name in Java,
+                # so that name is accepted too — but only when nothing in the
+                # index answers to it under its DEX name, because an obfuscated
+                # class can have a method called exactly what the class is
+                # called, and the two have to stay apart.
+                by_dex_name = [method for method in matching if method.name == method_name]
+                if by_dex_name:
+                    matching = by_dex_name
+                else:
+                    matching = [
+                        method
+                        for method in matching
+                        if method.name == "<init>" and method_name == simple_class_name(class_name)
+                    ]
+            if len(matching) == 1:
+                return _identity_of(matching[0], target, indexed, class_name)
+            if len(matching) > 1:
+                raise AmbiguousMethodError(class_name, method_name or "", _candidates_of(matching))
+            return _MethodIdentity(method_name or "", target, None, False)
+
+        if method_name is None:
+            return _MethodIdentity("", None, None, False)
+
+        matching = [
+            method for method in indexed if _method_is_named(method, class_name, method_name)
+        ]
+        if len(matching) > 1:
+            raise AmbiguousMethodError(class_name, method_name, _candidates_of(matching))
+        if len(matching) == 1:
+            # The index says one method answers to this name, and it holds that
+            # method's descriptor. The descriptor is what the source is matched
+            # against: a name is not a method, and the index is the one place
+            # that knows which method this name is.
+            return _identity_of(matching[0], matching[0].descriptor, indexed, class_name)
+        return _MethodIdentity(method_name, None, None, False)
 
     def _source_context(self, project_id: str) -> tuple[Project, Path] | None:
         """The project and its workspace, when both are still there."""
@@ -553,8 +672,118 @@ class Analyzer:
         return self._store.list_resources(project_id, name=name)
 
 
-def _extract_smali_method(smali: str, method_name: str) -> str | None:
-    """Pull one ``.method`` block out of a Smali file."""
+@dataclass(frozen=True, slots=True)
+class _MethodIdentity:
+    """The method a request is about, as far as it could be pinned down."""
+
+    name: str
+    """The DEX method name, or the caller's name when the index could not say."""
+
+    descriptor: str | None
+    """The DEX descriptor, when it is known."""
+
+    constructor: bool | None
+    """Whether the method is the class's constructor.
+
+    ``None`` when the request did not say and the index could not tell: the
+    constructor and a method of the same name are then both candidates.
+    """
+
+    unique: bool = False
+    """Whether the index holds exactly one method under this name.
+
+    The index is the authority on which methods a class has, so a name that
+    answers to one of them has one declaration in the source as well — and a
+    decompiler that spelled the signature differently has not made it another
+    method. The source may then be asked for the name when it cannot be asked
+    for the descriptor.
+    """
+
+
+def _identity_of(
+    method: MethodRef,
+    descriptor: str | None,
+    indexed: list[MethodRef],
+    class_name: str,
+) -> _MethodIdentity:
+    """The identity of an indexed method.
+
+    The descriptor is the one the source has to match, and it is not always
+    the one the index holds: a name that answers to one method is found by
+    that name, and only a name that several methods share needs a descriptor
+    to tell them apart.
+    """
+    named = [other for other in indexed if _method_is_named(other, class_name, method.name)]
+    return _MethodIdentity(
+        name=method.name,
+        descriptor=descriptor,
+        constructor=method.name == "<init>",
+        unique=len(named) == 1,
+    )
+
+
+def _method_fragment(identity: _MethodIdentity) -> str:
+    """How a method is named in a provenance locator.
+
+    A name is not a method, so the descriptor is part of the name when it is
+    known: two overloads share a name, and a locator that named only the name
+    would point at both of them. This is the spelling the symbol table uses
+    for a method, and the Androguard locator already carries it.
+    """
+    if identity.descriptor is not None:
+        return f"{identity.name}{identity.descriptor}"
+    return identity.name
+
+
+def _candidates_of(methods: list[MethodRef]) -> list[MethodCandidate]:
+    """The candidates an ambiguous name matched, with their exact descriptors."""
+    return [
+        MethodCandidate(
+            name=method.name,
+            descriptor=method.descriptor,
+            signature=f"{method.name}{method.descriptor}",
+        )
+        for method in methods
+    ]
+
+
+def _method_is_named(method: MethodRef, class_name: str, method_name: str) -> bool:
+    """Whether an indexed method is the one a request names.
+
+    A constructor is written under the class's own name in Java, so a request
+    for that name is a request for the constructor — and an obfuscated class
+    can have a method of exactly that name too, which makes the request
+    ambiguous rather than answered.
+    """
+    if method.name == method_name:
+        return True
+    return method.name == "<init>" and method_name == simple_class_name(class_name)
+
+
+def _smali_names(identity: _MethodIdentity, class_name: str) -> set[str]:
+    """The DEX names a request could be about.
+
+    A constructor is written under the class's own name in Java, so a request
+    for that name is a request for the constructor — and a request that could
+    be about either is about both.
+    """
+    if identity.constructor is True:
+        return {"<init>"}
+    names = {identity.name}
+    if identity.constructor is None and identity.name == simple_class_name(class_name):
+        names.add("<init>")
+    return names
+
+
+def _extract_smali_method(smali: str, identity: _MethodIdentity, class_name: str) -> str | None:
+    """Pull one ``.method`` block out of a Smali file.
+
+    A Smali header carries the DEX descriptor, so a request that knows one
+    matches exactly. A request that does not is matched by name, and a name
+    several blocks share is an ambiguity rather than a choice.
+    """
+    wanted = _smali_names(identity, class_name)
+    found: list[tuple[str, str, str]] = []
     block: list[str] = []
     inside = False
     for line in smali.splitlines():
@@ -567,19 +796,47 @@ def _extract_smali_method(smali: str, method_name: str) -> str | None:
         block.append(line)
         if line.startswith(".end method"):
             inside = False
-            if _smali_declares(block[0], method_name):
-                return "\n".join(block)
-    return None
+            declared = _smali_signature(block[0])
+            if declared is None:
+                continue
+            name, descriptor = declared
+            if name not in wanted:
+                continue
+            if identity.descriptor is not None and descriptor != identity.descriptor:
+                continue
+            found.append((name, descriptor, "\n".join(block)))
+    if not found:
+        return None
+    if len(found) > 1:
+        raise AmbiguousMethodError(
+            class_name,
+            identity.name,
+            [
+                MethodCandidate(name=name, descriptor=descriptor, signature=f"{name}{descriptor}")
+                for name, descriptor, _body in found
+            ],
+        )
+    return found[0][2]
 
 
-def _smali_declares(header: str, method_name: str) -> bool:
-    """Whether a ``.method`` header declares ``method_name``.
+def _smali_signature(header: str) -> tuple[str, str] | None:
+    """The DEX name and descriptor a ``.method`` header declares.
 
-    Headers look like ``.method public static foo(Ljava/lang/String;)V``; the declared
-    name is the last token up to the argument list.
+    Headers look like ``.method public static foo(Ljava/lang/String;)V``; the
+    declared name and descriptor are the last token, and the descriptor is
+    what tells two overloads apart.
     """
     tokens = header.split()
-    return len(tokens) >= 2 and tokens[-1].split("(")[0] == method_name
+    if len(tokens) < 2:
+        return None
+    last = tokens[-1]
+    open_paren = last.find("(")
+    if open_paren == -1:
+        return None
+    descriptor = last[open_paren:]
+    if ")" not in descriptor:
+        return None
+    return last[:open_paren], descriptor
 
 
 def _merge_classes(classes: list[ClassRef]) -> list[ClassRef]:

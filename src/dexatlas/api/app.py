@@ -35,6 +35,7 @@ from dexatlas import __version__
 from dexatlas.config.settings import Settings, get_settings
 from dexatlas.core import ingest
 from dexatlas.core.ingest import ApkValidationError, UploadTooLarge, inspect_apk, save_upload
+from dexatlas.core.methods import AmbiguousMethodError, is_descriptor
 from dexatlas.core.models import (
     ApkMetadata,
     Project,
@@ -227,6 +228,7 @@ _SOURCE_JSON_SCHEMA: dict[str, Any] = {
         "project_id": {"type": "string"},
         "class_name": {"type": "string"},
         "method": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "descriptor": {"anyOf": [{"type": "string"}, {"type": "null"}]},
         "kind": {"type": "string", "enum": ["java", "smali"]},
         "provenance": {
             "type": "array",
@@ -503,10 +505,45 @@ def get_class_source(
     return PlainTextResponse(document.text, headers=_source_headers(document))
 
 
+#: The responses of the method source endpoint. It has one the class endpoint does
+#: not: a name that matches several overloads is a conflict, not a missing source.
+_METHOD_SOURCE_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **_SOURCE_RESPONSES,
+    409: {
+        "description": "The name matches more than one method; a descriptor is needed.",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "detail": {"type": "string"},
+                        "class_name": {"type": "string"},
+                        "method": {"type": "string"},
+                        "candidates": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "descriptor": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+                                    "signature": {"type": "string"},
+                                },
+                                "required": ["name", "signature"],
+                            },
+                        },
+                    },
+                    "required": ["detail", "class_name", "method", "candidates"],
+                }
+            }
+        },
+    },
+}
+
+
 @app.get(
     "/projects/{project_id}/methods/{class_name:path}/{method_name}",
     tags=["analysis"],
-    responses=_SOURCE_RESPONSES,
+    responses=_METHOD_SOURCE_RESPONSES,
 )
 def get_method_source(
     project_id: str,
@@ -516,12 +553,42 @@ def get_method_source(
     format: Annotated[
         str, Query(pattern="^(text|json)$", description="The source text, or a JSON document.")
     ] = "text",
+    descriptor: Annotated[
+        str | None,
+        Query(
+            description="The method's DEX descriptor, e.g. '(Ljava/lang/String;)V'. "
+            "Picks one overload out of several."
+        ),
+    ] = None,
 ) -> Any:
     """One method's body, preferring decompiled Java and falling back to Smali.
 
     As with the class source, the response says which representation it is.
+
+    A name that matches more than one overload is answered with ``409`` and the
+    candidates, not with one of them: the body of the wrong overload reads like
+    evidence, and a caller that quotes it quotes the wrong method. The
+    ``descriptor`` query parameter says which overload is meant.
     """
-    document = analyzer.method_source_document(project_id, class_name, method_name)
+    if descriptor is not None and not is_descriptor(descriptor):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{descriptor!r} is not a DEX descriptor; one looks like '(Ljava/lang/String;)V'"
+            ),
+        )
+    try:
+        document = analyzer.method_source_document(project_id, class_name, method_name, descriptor)
+    except AmbiguousMethodError as exc:
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": str(exc),
+                "class_name": exc.class_name,
+                "method": exc.method_name,
+                "candidates": [candidate.model_dump(mode="json") for candidate in exc.candidates],
+            },
+        )
     if document is None:
         raise HTTPException(
             status_code=404, detail=f"no decompiled source for {class_name}.{method_name}"
@@ -628,13 +695,24 @@ def _source_headers(document: SourceDocument) -> dict[str, str]:
 
 
 def _source_payload(
-    project_id: str, class_name: str, method: str | None, document: SourceDocument
+    project_id: str,
+    class_name: str,
+    method: str | None,
+    document: SourceDocument,
 ) -> dict[str, Any]:
-    """The JSON form of a source: the text, and where it came from."""
+    """The JSON form of a source: the text, and where it came from.
+
+    The descriptor travels with it, because a document that says which method
+    it holds is worth more than one that says only the name — and two
+    overloads share the name. It is the descriptor the document holds, not the
+    one that was asked for: a request that named only a method still says
+    which of the overloads it got.
+    """
     return {
         "project_id": project_id,
         "class_name": class_name,
         "method": method,
+        "descriptor": document.descriptor,
         "kind": document.kind.value,
         "provenance": [p.model_dump(mode="json") for p in document.provenance],
         "text": document.text,

@@ -836,6 +836,17 @@ class SourceDocument(Sourced):
     kind: SourceKind
     """Which representation it is."""
 
+    descriptor: str | None = None
+    """The DEX descriptor of the method this document holds.
+
+    A name is not a method: ``sign`` is three methods, and only the descriptor
+    tells them apart. The document carries the descriptor when it is known, so
+    a reader is never left with a name that could mean more than one method.
+
+    It is ``None`` for a class's source, and for a method whose descriptor the
+    symbol index does not hold.
+    """
+
     @property
     def tool(self) -> str:
         """The tool that produced it, or an empty string when nothing did."""

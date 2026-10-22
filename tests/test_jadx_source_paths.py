@@ -458,7 +458,15 @@ def test_the_openapi_schema_says_what_the_source_endpoint_returns(
         assert header in headers, f"the schema does not declare {header}"
 
     properties = content["application/json"]["schema"]["properties"]
-    assert set(properties) == {"project_id", "class_name", "method", "kind", "provenance", "text"}
+    assert set(properties) == {
+        "project_id",
+        "class_name",
+        "method",
+        "descriptor",
+        "kind",
+        "provenance",
+        "text",
+    }
 
 
 def test_the_json_form_is_the_one_the_schema_describes(
@@ -477,6 +485,14 @@ def test_the_json_form_is_the_one_the_schema_describes(
 
     assert response.status_code == 200
     body = json.loads(response.text)
-    assert set(body) == {"project_id", "class_name", "method", "kind", "provenance", "text"}
+    assert set(body) == {
+        "project_id",
+        "class_name",
+        "method",
+        "descriptor",
+        "kind",
+        "provenance",
+        "text",
+    }
     assert body["kind"] == "java"
     assert body["provenance"][0]["tool"] == "jadx"
