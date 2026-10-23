@@ -3,14 +3,25 @@
 Evidence ids are stable across re-analysis of the same APK: they are assigned in
 sequence as observations are recorded, so ``E-0007`` in a report resolves back to the
 same row in the database.
+
+There are two ways in here, and they are kept apart on purpose: one for what a tool
+read, and one for what a model said. The builder's own docstring says how.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
+from dexatlas.core.locators import (
+    InvalidLocatorError,
+    LocatorResolver,
+    parse_locator,
+)
 from dexatlas.core.models import (
+    CODE_FINDING_KINDS,
+    LOCATED_FINDING_KIND,
     ClassRef,
     Evidence,
     EvidenceKind,
@@ -33,9 +44,37 @@ MAX_LISTED_CALLERS = 50
 MAX_EVIDENCE_CALLED_METHODS = 100
 
 
+class InvalidProvenanceError(ValueError):
+    """The provenance does not support the record it is attached to.
+
+    Raised when a record claims to be ``VERIFIED`` and its provenance cannot back
+    that claim: no provenance at all, provenance that names another APK, a
+    locator that is not a locator, or a locator that does not resolve inside
+    the analysis the record belongs to.
+
+    The error is the mechanism. A record that says "a tool established this" and
+    cites nothing, or cites something that is not there, puts a false sentence
+    in the report -- and a reader who believes it acts on a guess.
+    """
+
+
 @dataclass(slots=True)
 class EvidenceBuilder:
-    """Accumulates evidence for one project, assigning ids as it goes."""
+    """Accumulates evidence for one project, assigning ids as it goes.
+
+    There are two ways in here, and they are kept apart on purpose.
+
+    :meth:`add` is the way a **tool** records what it read. Its level is passed
+    explicitly and never inferred from the wording, and the top level means the
+    record's provenance backs it: the citation has to name a place that is
+    really there inside the analysis. :meth:`add_claim` is the way a **model**
+    records what it said, and it cannot write a record at the top level at all.
+
+    The separation is the mechanism behind "a model's output is never a
+    finding". It is not a naming convention: the claim path has no level to
+    get wrong, and the tool path refuses a record whose provenance does not
+    resolve.
+    """
 
     project_id: str
     tool_versions: dict[str, str | None]
@@ -49,6 +88,27 @@ class EvidenceBuilder:
     """
 
     apk_sha256: str = ""
+    workspace: Path | None = None
+    """The workspace of the analysis these records belong to.
+
+    The workspace is where the backends wrote what they read, so it is also
+    what a locator is resolved against: a citation that names a file the
+    analysis never wrote names nothing, and a record that cites it cannot be
+    verified.
+
+    It is an argument rather than something derived from the project id,
+    because the workspace moves. A published run lives in a versioned
+    directory of its own, and a builder that computed the path from the id
+    would look in the wrong place the moment that changed.
+    """
+
+    dex_files: Sequence[str] = ()
+    """The dex files of the analysed APK, by name.
+
+    The DEX reader's locators name a member of the APK rather than a file in
+    the workspace, and this is the list that says which members the APK has.
+    """
+
     items: list[Evidence] = field(default_factory=list)
 
     def _next_id(self) -> str:
@@ -63,6 +123,19 @@ class EvidenceBuilder:
         """
         return self.tool_versions.get(tool)
 
+    def resolver(self) -> LocatorResolver | None:
+        """The resolver for this analysis, when the analysis knows where it is.
+
+        ``None`` when the builder was not told which workspace the records
+        belong to. A citation cannot be checked against an analysis the
+        builder knows nothing about, so a record that is nothing but its place
+        is refused rather than believed, and a record about the index is
+        written the way the index states it.
+        """
+        if self.workspace is None:
+            return None
+        return LocatorResolver(self.workspace, dex_files=self.dex_files)
+
     def add(
         self,
         kind: EvidenceKind,
@@ -76,17 +149,119 @@ class EvidenceBuilder:
         ``level`` is always passed explicitly, never inferred from the wording. Only a
         deterministic tool run produces ``VERIFIED``; anything a model suggests is a
         ``LEAD`` until a human or a tool confirms it.
+
+        A ``VERIFIED`` record about a place in the code is checked before it is
+        written: its provenance has to be there, has to belong to this APK, and
+        has to name a place that is really inside this analysis. A record that
+        fails is refused rather than written and believed.
         """
+        provenance = list(provenance)
+        if level is EvidenceLevel.VERIFIED and kind in CODE_FINDING_KINDS:
+            self._check_the_provenance(provenance, kind)
         evidence = Evidence(
             id=self._next_id(),
             kind=kind,
             level=level,
             summary=summary,
             detail=detail or {},
-            provenance=list(provenance),
+            provenance=provenance,
         )
         self.items.append(evidence)
         return evidence
+
+    def add_claim(
+        self,
+        summary: str,
+        provenance: Sequence[Provenance],
+        *,
+        kind: EvidenceKind = EvidenceKind.BEHAVIOUR,
+        level: EvidenceLevel = EvidenceLevel.LEAD,
+        detail: dict[str, object] | None = None,
+    ) -> Evidence:
+        """Record a claim a model made.
+
+        A claim is not a fact. Whatever the model says, and however sure it
+        sounds, the record is a ``LEAD``: the level is not an argument here,
+        because a caller that could pass ``VERIFIED`` could pass it by mistake
+        as easily as on purpose. The level is offered so that a caller can say
+        that it is not even a lead, and it is refused when it is ``VERIFIED``.
+
+        A claim that a tool later confirms is not this claim promoted: it is
+        the tool's own record, recorded through :meth:`add`.
+        """
+        if level is EvidenceLevel.VERIFIED:
+            raise InvalidProvenanceError(
+                "a model's claim is not a fact: it cannot be recorded as verified. "
+                "Record the tool's confirmation as its own evidence."
+            )
+        return self.add(kind, level, summary, provenance, detail)
+
+    def _check_the_provenance(self, provenance: list[Provenance], kind: EvidenceKind) -> None:
+        """Refuse a verified finding about code whose provenance does not back it.
+
+        A **located** finding is nothing but its place: it says "here is the
+        thing, in this file, at this method". So it is always checked, and it
+        is checked against the analysis. Without an analysis there is nothing
+        to check it against, and a record that cannot be checked is refused
+        rather than believed on the strength of a string that looks right.
+
+        A **cross-reference** is a fact about the index, and the index is the
+        analysis's own artifact: the DEX reader read that edge out of the
+        bytecode. It is checked the same way when there is an analysis to
+        check it against.
+
+        Three things are checked, in the order a reader would hit them.
+
+        There has to be provenance: a verified finding with no citation names
+        no place, and the report renders it as established by a tool.
+
+        The citation has to belong to this APK: a locator that names another
+        APK is stale, and following it would take the reader to a different
+        analysis than the one the record is about.
+
+        And the citation has to be a locator at all, and it has to resolve: the
+        file it names has to be in the analysis, the class has to be in the
+        dex, the method has to be declared in the source. A locator that
+        *looks* right is not a resolution, and "looks right" is exactly what a
+        fabricated citation manages.
+        """
+        if kind not in CODE_FINDING_KINDS:
+            return
+        resolver = self.resolver()
+        if resolver is None:
+            if kind is LOCATED_FINDING_KIND:
+                raise InvalidProvenanceError(
+                    "a code-located record cannot be verified without the workspace of the "
+                    "analysis: there is nothing to resolve its citation against"
+                )
+            return
+        if not provenance:
+            raise InvalidProvenanceError(
+                f"a {kind.value} record cannot be verified with no provenance: verified means "
+                "a tool established this, and the record has to name the place it did"
+            )
+        for entry in provenance:
+            if self.apk_sha256 and entry.apk_sha256 != self.apk_sha256:
+                raise InvalidProvenanceError(
+                    f"the provenance names another APK ({entry.apk_sha256[:12]}...), not the "
+                    f"one under analysis ({self.apk_sha256[:12]}...): the citation is stale"
+                )
+            try:
+                parse_locator(entry.locator)
+            except InvalidLocatorError as exc:
+                raise InvalidProvenanceError(
+                    f"{entry.locator!r} is not a locator this project can follow: {exc}"
+                ) from exc
+
+        failures: list[str] = []
+        for entry in provenance:
+            resolution = resolver.resolve(entry.locator)
+            if resolution.ok:
+                return
+            failures.append(f"{entry.locator} ({resolution.reason.value}: {resolution.detail})")
+        raise InvalidProvenanceError(
+            "no provenance of this record resolves inside the analysis: " + "; ".join(failures)
+        )
 
     def add_sourced(
         self,
