@@ -23,7 +23,10 @@ from dexatlas.core.pipeline import AnalysisResult, analysis_duration
 from dexatlas.reports.coverage import decompilation_coverage
 
 _LEVEL_NOTE = {
-    EvidenceLevel.VERIFIED: "Deterministically established by an analysis tool.",
+    EvidenceLevel.VERIFIED: (
+        "Deterministically established by an analysis tool, with a citation that "
+        "resolves inside this analysis."
+    ),
     EvidenceLevel.LEAD: "Risk indicator only. Not a confirmed issue.",
     EvidenceLevel.INSUFFICIENT: "Not enough evidence either way; needs human review.",
 }
@@ -183,8 +186,9 @@ def render_markdown(result: AnalysisResult) -> str:
         "an evidence-first Android analysis platform.",
         "",
         "This report describes only what was deterministically established by the "
-        "analysis tools listed above. Items marked `lead` or `insufficient` are not "
-        "confirmed findings and require human validation.",
+        "analysis tools listed above, and a verified record's citation resolves "
+        "inside the analysis this report describes. Items marked `lead` or "
+        "`insufficient` are not confirmed findings and require human validation.",
         "",
     ]
     return "\n".join(lines)

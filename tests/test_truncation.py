@@ -26,6 +26,7 @@ back over the boundary.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import zipfile
 from pathlib import Path
@@ -39,6 +40,7 @@ from dexatlas.core.models import (
     ClassRef,
     MethodRef,
     MethodReference,
+    Provenance,
     ToolErrorCode,
 )
 from dexatlas.core.pipeline import Analyzer
@@ -46,6 +48,26 @@ from dexatlas.tools.androguard import adapter as androguard_adapter
 from dexatlas.tools.androguard.adapter import AndroguardBackend, androguard_available
 
 FAKE_SHA256 = "c" * 64
+
+
+def _citation(apk: Path, locator: str) -> list[Provenance]:
+    """A citation that names where the symbol really is.
+
+    The symbols these tests hand the pipeline are made up, but the citation
+    that points at them has to be one the analysis can follow: a locator that
+    names another APK, or a string that is not a locator at all, is refused.
+    A test that fabricated one was asking the analysis to believe it — and
+    the rule that refuses it is the whole point of the citation being
+    checked.
+    """
+    return [
+        Provenance(
+            tool="androguard",
+            tool_version="4.1.4",
+            apk_sha256=hashlib.sha256(apk.read_bytes()).hexdigest(),
+            locator=locator,
+        )
+    ]
 
 
 def _write_minimal_apk(path: Path) -> Path:
@@ -307,11 +329,12 @@ def test_a_truncated_index_still_gives_its_evidence(
     them rather than instead of them.
     """
     analyzer = Analyzer(settings)
+    apk = _write_minimal_apk(tmp_path / "fake.apk")
     classes = [
         ClassRef(
             name="com.example.First",
             kind=ClassKind.CLASS,
-            provenance=[],
+            provenance=_citation(apk, "androguard:classes.dex#com.example.First"),
         )
     ]
     methods = [
@@ -319,14 +342,19 @@ def test_a_truncated_index_still_gives_its_evidence(
             class_name="com.example.First",
             name="m0",
             descriptor="()V",
-            provenance=[],
+            provenance=_citation(
+                apk, "androguard:classes.dex#com.example.First#com.example.First.m0()V"
+            ),
         )
     ]
     references = [
         MethodReference(
             caller="com.example.First.m0()V",
             callee="com.example.First.m0()V",
-            provenance=[],
+            provenance=_citation(
+                apk,
+                "androguard:classes.dex#com.example.First.m0()V->com.example.First.m0()V",
+            ),
         )
     ]
     truncation = androguard_adapter.ToolError(
@@ -340,7 +368,6 @@ def test_a_truncated_index_still_gives_its_evidence(
 
     monkeypatch.setattr(analyzer._androguard, "extract", fake_extract)
 
-    apk = _write_minimal_apk(tmp_path / "fake.apk")
     result = analyzer.analyze(apk, include_jadx=False, include_apktool=False)
 
     assert result.project.errors, "the truncation was not recorded on the project"

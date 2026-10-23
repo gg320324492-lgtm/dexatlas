@@ -23,6 +23,7 @@ report uses would pass whatever the report said.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -46,18 +47,39 @@ from dexatlas.reports.markdown import render_markdown
 _FAN_IN = 3
 
 
-def _provenance() -> list[Provenance]:
+def _hash_of(apk: Path) -> str:
+    """The hash of the APK under analysis.
+
+    A citation that names another APK is stale, and a stale citation is
+    refused: the record would point at a different analysis than the one it
+    belongs to.
+    """
+    return hashlib.sha256(apk.read_bytes()).hexdigest()
+
+
+def _provenance(apk_sha256: str, locator: str) -> list[Provenance]:
+    """A citation that names where the symbol really is.
+
+    The symbols these tests hand the pipeline are made up, but the citation
+    that points at them has to be one the analysis can follow: a locator that
+    names another APK, or a string that is not a locator at all, is refused.
+    A test that fabricated one was asking the analysis to believe it — and
+    the rule that refuses it is the whole point of the citation being
+    checked.
+    """
     return [
         Provenance(
             tool="androguard",
             tool_version="4.1.4",
-            apk_sha256="a" * 64,
-            locator="classes.dex",
+            apk_sha256=apk_sha256,
+            locator=locator,
         )
     ]
 
 
-def _fan_in(callers: int) -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
+def _fan_in(
+    apk_sha256: str, callers: int
+) -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
     """One method of this APK, called from ``callers`` places.
 
     Every edge is a separate caller, so the number of edges and the number of
@@ -69,7 +91,11 @@ def _fan_in(callers: int) -> tuple[list[ClassRef], list[MethodRef], list[MethodR
         class_name="com.example.Crypto",
         name="sign",
         descriptor="([Ljava/lang/String;)Ljava/lang/String;",
-        provenance=_provenance(),
+        provenance=_provenance(
+            apk_sha256,
+            "androguard:classes.dex#com.example.Crypto#com.example.Crypto.sign"
+            "([Ljava/lang/String;)Ljava/lang/String;",
+        ),
     )
     methods = [callee]
     edges: list[MethodReference] = []
@@ -78,7 +104,11 @@ def _fan_in(callers: int) -> tuple[list[ClassRef], list[MethodRef], list[MethodR
             class_name=f"com.example.Caller{index}",
             name="call",
             descriptor="()V",
-            provenance=_provenance(),
+            provenance=_provenance(
+                apk_sha256,
+                f"androguard:classes.dex#com.example.Caller{index}#"
+                f"com.example.Caller{index}.call()V",
+            ),
         )
         methods.append(caller)
         edges.append(
@@ -86,14 +116,18 @@ def _fan_in(callers: int) -> tuple[list[ClassRef], list[MethodRef], list[MethodR
                 caller=caller.qualified_name,
                 callee=callee.qualified_name,
                 kind=InvocationKind.STATIC,
-                provenance=_provenance(),
+                provenance=_provenance(
+                    apk_sha256,
+                    f"androguard:classes.dex#com.example.Caller{index}.call()V->"
+                    f"com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;",
+                ),
             )
         )
     classes = [
         ClassRef(
             name=method.class_name,
             kind=ClassKind.CLASS,
-            provenance=_provenance(),
+            provenance=_provenance(apk_sha256, f"androguard:classes.dex#{method.class_name}"),
         )
         for method in methods
     ]
@@ -102,7 +136,7 @@ def _fan_in(callers: int) -> tuple[list[ClassRef], list[MethodRef], list[MethodR
 
 def _analyse(settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch, callers: int):
     """Analyse an APK whose DEX reader returns a method with a known fan-in."""
-    classes, methods, edges = _fan_in(callers)
+    classes, methods, edges = _fan_in(_hash_of(minimal_apk), callers)
     analyzer = Analyzer(settings)
 
     def extract(*args: object, **kwargs: object):
@@ -229,12 +263,17 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
     fact about the JDK, not a conclusion about this app.
     """
     analyzer = Analyzer(settings)
-    classes, methods, edges = _fan_in(_FAN_IN)
+    digest = _hash_of(minimal_apk)
+    classes, methods, edges = _fan_in(digest, _FAN_IN)
     library_edge = MethodReference(
         caller="com.example.Caller0.call()V",
         callee="java.lang.StringBuilder.append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
         kind=InvocationKind.VIRTUAL,
-        provenance=_provenance(),
+        provenance=_provenance(
+            digest,
+            "androguard:classes.dex#com.example.Caller0.call()V->"
+            "java.lang.StringBuilder.append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
+        ),
     )
 
     def extract(*args: object, **kwargs: object):
@@ -257,7 +296,9 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
 # -- one caller, two calls ----------------------------------------------------
 
 
-def _one_caller_twice() -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
+def _one_caller_twice(
+    apk_sha256: str,
+) -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
     """One caller that calls the same method twice.
 
     The index holds one row per call, so this is two rows and one caller.
@@ -270,25 +311,40 @@ def _one_caller_twice() -> tuple[list[ClassRef], list[MethodRef], list[MethodRef
         class_name="com.example.Crypto",
         name="sign",
         descriptor="([Ljava/lang/String;)Ljava/lang/String;",
-        provenance=_provenance(),
+        provenance=_provenance(
+            apk_sha256,
+            "androguard:classes.dex#com.example.Crypto#com.example.Crypto.sign"
+            "([Ljava/lang/String;)Ljava/lang/String;",
+        ),
     )
     caller = MethodRef(
         class_name="com.example.Caller",
         name="call",
         descriptor="()V",
-        provenance=_provenance(),
+        provenance=_provenance(
+            apk_sha256,
+            "androguard:classes.dex#com.example.Caller#com.example.Caller.call()V",
+        ),
     )
     edges = [
         MethodReference(
             caller=caller.qualified_name,
             callee=callee.qualified_name,
             kind=InvocationKind.STATIC,
-            provenance=_provenance(),
+            provenance=_provenance(
+                apk_sha256,
+                "androguard:classes.dex#com.example.Caller.call()V->"
+                "com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;",
+            ),
         )
         for _ in range(2)
     ]
     classes = [
-        ClassRef(name=method.class_name, kind=ClassKind.CLASS, provenance=_provenance())
+        ClassRef(
+            name=method.class_name,
+            kind=ClassKind.CLASS,
+            provenance=_provenance(apk_sha256, f"androguard:classes.dex#{method.class_name}"),
+        )
         for method in (callee, caller)
     ]
     return classes, [callee, caller], edges
@@ -304,7 +360,7 @@ def test_the_number_beside_the_indexed_rows_counts_rows(
     that can be compared with the rows -- the edges -- and the rows it
     covers must not exceed them.
     """
-    classes, methods, edges = _one_caller_twice()
+    classes, methods, edges = _one_caller_twice(_hash_of(minimal_apk))
     analyzer = Analyzer(settings)
 
     def extract(*args: object, **kwargs: object):

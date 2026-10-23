@@ -204,6 +204,13 @@ class Analyzer:
                 project_id=project.id,
                 tool_versions=project.tool_versions,
                 apk_sha256=apk.sha256,
+                # The workspace is where the backends wrote what they read, so
+                # it is what a citation is resolved against -- and it is this
+                # run's own directory, not the project's: a run that writes
+                # into a directory it has not published must not have its
+                # citations checked against a published run's files.
+                workspace=workspace,
+                dex_files=apk.dex_files,
             )
 
             manifest: ManifestInfo | None = None
