@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dexatlas.config.settings import Settings
@@ -44,6 +45,13 @@ from dexatlas.core.models import (
     canonical_descriptor,
 )
 from dexatlas.core.paths import redact_workspace
+from dexatlas.core.runs import (
+    AnalysisCancelled,
+    AnalysisRun,
+    CancellationToken,
+    RunCompleteness,
+    RunStatus,
+)
 from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
@@ -57,6 +65,14 @@ logger = logging.getLogger(__name__)
 #: hundreds of thousands and a per-class evidence row would dwarf the findings.
 MAX_EVIDENCE_CLASSES = 500
 
+#: The name of the database a run stages its results in.
+#:
+#: It sits in the run's own directory, beside the output the backends wrote,
+#: so everything one run produced is in one place. It holds the same schema
+#: as the workspace's own database, which is what lets a finished run be
+#: published into it in one transaction.
+RUN_DATABASE_NAME = "index.db"
+
 
 @dataclass(slots=True)
 class AnalysisResult:
@@ -67,6 +83,12 @@ class AnalysisResult:
     evidence: list[Evidence] = field(default_factory=list)
     workspace: Path | None = None
     duration_seconds: float = 0.0
+    run: AnalysisRun | None = None
+    """The run that produced this, when it is known.
+
+    The project says which APK was analysed; the run says which attempt
+    produced these results, with which tools.
+    """
 
     @property
     def succeeded(self) -> bool:
@@ -97,6 +119,15 @@ class Analyzer:
         return self._store
 
     @property
+    def settings(self) -> Settings:
+        """The settings this analyzer works under.
+
+        The workspace it writes into, and the one a caller has to look at
+        when it wants to know where the results went.
+        """
+        return self._settings
+
+    @property
     def backends(self) -> BackendRegistry:
         return self._backends
 
@@ -108,6 +139,7 @@ class Analyzer:
         include_jadx: bool = True,
         include_apktool: bool = True,
         include_androguard: bool = True,
+        cancellation: CancellationToken | None = None,
     ) -> AnalysisResult:
         """Analyse an APK end to end.
 
@@ -117,15 +149,35 @@ class Analyzer:
         project failed and is raised as :class:`AnalysisFailed`: a run that
         says nothing is not a run that found nothing.
 
+        The results are staged in a database of their own and published in a
+        single transaction, so a reader sees one run's snapshot and never a
+        mixture of two. A run that fails, or is cancelled, publishes nothing:
+        the snapshot published before it is left exactly as it was.
+
         ``metadata`` is an inspection the caller has already done.
+        ``cancellation`` stops the analysis at the next point where stopping
+        cannot leave half-written results behind.
         """
         started = time.monotonic()
         apk = metadata if metadata is not None else inspect_apk(apk_path)
         project = Project.create(apk)
-        workspace = self._settings.projects_dir / project.id
+        run = AnalysisRun.start(project.id, apk.sha256)
 
-        self._store.save_project(project, workspace, manifest=None)
-        self._store.set_status(project.id, ProjectStatus.RUNNING)
+        # Every run writes into a directory of its own. Two analyses of one
+        # APK then cannot write over each other's decompiled output, and a
+        # reader that follows the workspace pointer reads one run's files.
+        workspace = self._settings.projects_dir / project.id / "runs" / run.id
+        run.workspace = workspace
+        staged = workspace / RUN_DATABASE_NAME
+
+        # The project row is written without a workspace: the workspace column
+        # is the pointer to the *published* run, and this run has not
+        # published anything yet. Nothing else about the published
+        # snapshot is touched either -- the counts, the manifest and the
+        # evidence belong to the run that published them.
+        self._store.begin_run(project)
+        run.status = RunStatus.RUNNING
+        self._store.create_run(run)
 
         try:
             # The versions are probed before the evidence is built, because the
@@ -133,6 +185,7 @@ class Analyzer:
             # them once, here, keeps one answer for the project record and for
             # every evidence record.
             project.tool_versions = self._backends.versions()
+            run.tool_versions = dict(project.tool_versions)
             builder = EvidenceBuilder(
                 project_id=project.id,
                 tool_versions=project.tool_versions,
@@ -149,6 +202,7 @@ class Analyzer:
             dex_classes: list[ClassRef] = []
 
             if include_apktool:
+                _check_cancelled(cancellation)
                 manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)
                 resources.extend(apktool_resources)
                 for apktool_error in errors:
@@ -160,6 +214,7 @@ class Analyzer:
                     builder.add_exported_components(manifest.components)
 
             if include_androguard:
+                _check_cancelled(cancellation)
                 extracted = self._run_androguard(apk.path, project, builder)
                 # The classes the DEX reader found. The evidence declares these
                 # and not the decompiler's: the DEX reader is the one that read
@@ -174,6 +229,7 @@ class Analyzer:
                     project.errors.append(extracted[5])
 
             if include_jadx:
+                _check_cancelled(cancellation)
                 jadx_classes, error, jadx_status = self._run_jadx(
                     apk.path, project, workspace, builder
                 )
@@ -211,12 +267,22 @@ class Analyzer:
                 )
 
             classes = _merge_classes(classes)
-            counts = self._store.save_symbols(
+
+            # The results are staged in a database of their own. Nothing a
+            # reader can see changes while the run is writing them, and
+            # publishing them is one transaction.
+            _check_cancelled(cancellation)
+            staged_store = Store.open(staged)
+            # The staged database holds the same schema as the workspace's own,
+            # so the project is written into it as well: the staged rows refer
+            # to it, and the copy publishes them under the same identity.
+            staged_store.save_project(project, workspace, manifest=None)
+            counts = staged_store.save_symbols(
                 project.id, classes, methods, fields, references, strings, resources
             )
 
             evidence = builder.build()
-            project.evidence_count = self._store.save_evidence(project.id, evidence)
+            project.evidence_count = staged_store.save_evidence(project.id, evidence)
 
             # The counts are the ones the tables hold. A count taken from the lists
             # that went in is a count of symbols the database never stored — a class
@@ -235,7 +301,28 @@ class Analyzer:
             # written at the time stated.
             elapsed = time.monotonic() - started
             project.duration_seconds = elapsed
-            self._store.save_project(project, workspace, manifest)
+
+            run.status = (
+                RunStatus.COMPLETED
+                if project.status is ProjectStatus.COMPLETED
+                else RunStatus.FAILED
+            )
+            # A run that recorded an error did not read everything it set out
+            # to read, and a result with gaps in it must say so.
+            run.completeness = (
+                RunCompleteness.PARTIAL if project.errors else RunCompleteness.COMPLETE
+            )
+            run.errors = list(project.errors)
+            run.finished_at = datetime.now(UTC)
+            run.duration_seconds = elapsed
+
+            _check_cancelled(cancellation)
+            if project.status is ProjectStatus.COMPLETED:
+                self._store.publish_run(project, run, staged, manifest)
+            # A run that found nothing has nothing to publish, and publishing
+            # it would replace a snapshot that was complete with one that is
+            # empty.
+            _remove_database(staged)
 
             return AnalysisResult(
                 project=project,
@@ -243,22 +330,28 @@ class Analyzer:
                 evidence=evidence,
                 workspace=workspace,
                 duration_seconds=elapsed,
+                run=run,
             )
+        except AnalysisCancelled:
+            # Nobody asked for this APK to be analysed any more. That is not a
+            # failure of the analysis, and it is recorded as its own thing.
+            self._record_cancellation(project, run)
+            raise
         except Exception as exc:
             # The analysis failed. The project is left failed — never running —
             # and the reason is recorded on it, so that the failure is in the
             # database as well as in the exception the caller is about to get.
-            raise AnalysisFailed(self._record_failure(project, workspace, exc)) from exc
+            raise AnalysisFailed(self._record_failure(project, run, exc)) from exc
         except BaseException:
             # A keyboard interrupt or a shutdown is not an analysis failure,
             # and it is not swallowed either. The run is over, though, and the
             # project must not be left running: the API finds a project by the
             # APK's hash and hands it back as it is.
-            self._record_failure(project, workspace, None)
+            self._record_failure(project, run, None)
             raise
 
     def _record_failure(
-        self, project: Project, workspace: Path, exc: BaseException | None
+        self, project: Project, run: AnalysisRun, exc: BaseException | None
     ) -> ToolError:
         """Leave the project failed, and say what failed.
 
@@ -267,6 +360,12 @@ class Analyzer:
         analysis that died half way through would be reported as an analysis
         that is still going. The failure is therefore recorded on the project
         before the exception goes on to the caller.
+
+        Only the status and the errors are written. The published snapshot --
+        the symbols, the evidence, the counts, the manifest and the workspace
+        pointer -- belongs to the run that published it, and this run
+        published nothing: writing the project's whole record here would
+        replace a complete snapshot with zeroes.
 
         The failure is recorded as a :class:`ToolError` of DexAtlas itself,
         not of a backend: no backend failed, the analysis did. A backend's
@@ -285,7 +384,10 @@ class Analyzer:
             message = f"the analysis did not complete: {type(exc).__name__}"
             if str(exc):
                 message = f"{message}: {exc}"
-        redacted = redact_workspace(message, self._settings.workspace, workspace)
+        roots = [self._settings.workspace]
+        if run.workspace is not None:
+            roots.append(run.workspace)
+        redacted = redact_workspace(message, *roots)
         message = redacted if redacted is not None else message
 
         error = ToolError(
@@ -296,12 +398,48 @@ class Analyzer:
         project.status = ProjectStatus.FAILED
         project.errors.append(error)
         try:
-            self._store.save_project(project, workspace, manifest=None)
+            self._store.set_project_state(project.id, ProjectStatus.FAILED, project.errors)
+            self._store.update_run(self._finish_run(run, RunStatus.FAILED))
         except Exception:
             # The workspace is what failed, most likely. The failure still has
             # to reach the caller, and the log is where it can be read.
             logger.exception("could not record the analysis failure on %s", project.id)
+        _remove_database(run.workspace / RUN_DATABASE_NAME if run.workspace else None)
         return error
+
+    def _record_cancellation(self, project: Project, run: AnalysisRun) -> ToolError:
+        """Leave the project failed, and say that it was cancelled.
+
+        The project cannot be left running -- that is the same lie a crash
+        tells -- but it did not fail either: nobody asked for this APK to be
+        analysed any more. The project's own status has no value for that, so
+        the reason is recorded as an error and the run's own record says
+        *cancelled*, which says it exactly.
+
+        As with a failure, the published snapshot is not touched: the
+        cancelled run published nothing, so the snapshot before it stands.
+        """
+        error = ToolError(
+            tool=ANALYSIS_TOOL,
+            code=ToolErrorCode.ANALYSIS_FAILED,
+            message="the analysis was cancelled before it completed",
+        )
+        project.status = ProjectStatus.FAILED
+        project.errors.append(error)
+        try:
+            self._store.set_project_state(project.id, ProjectStatus.FAILED, project.errors)
+            self._store.update_run(self._finish_run(run, RunStatus.CANCELLED))
+        except Exception:
+            logger.exception("could not record the cancellation on %s", project.id)
+        _remove_database(run.workspace / RUN_DATABASE_NAME if run.workspace else None)
+        return error
+
+    @staticmethod
+    def _finish_run(run: AnalysisRun, status: RunStatus) -> AnalysisRun:
+        """The run as it ends: finished, and saying how."""
+        run.status = status
+        run.finished_at = datetime.now(UTC)
+        return run
 
     # -- backend steps -----------------------------------------------------
 
@@ -453,7 +591,8 @@ class Analyzer:
         The locator names the file inside the producing tool's own output tree,
         so it points at the artefact rather than at the machine that made it.
         """
-        context = self._source_context(project_id)
+        with self._store.reading() as view:
+            context = self._source_context(view, project_id)
         if context is None:
             return None
         project, workspace = context
@@ -505,12 +644,12 @@ class Analyzer:
         agent that quotes it quotes the wrong method. The error names the
         candidates, so the caller can ask again with a descriptor.
         """
-        context = self._source_context(project_id)
-        if context is None:
-            return None
-        project, workspace = context
-
-        identity = self._resolve_method(project_id, class_name, method_name, descriptor)
+        with self._store.reading() as view:
+            context = self._source_context(view, project_id)
+            if context is None:
+                return None
+            project, workspace = context
+            identity = self._resolve_method(view, project_id, class_name, method_name, descriptor)
         fragment = _method_fragment(identity)
 
         # A decompiled signature can be ambiguous where the bytecode is not — a
@@ -582,6 +721,7 @@ class Analyzer:
 
     def _resolve_method(
         self,
+        view: Store,
         project_id: str,
         class_name: str,
         method_name: str | None,
@@ -595,8 +735,12 @@ class Analyzer:
         caller can then ask again with a descriptor. When the index does not
         hold the method the request falls back to the source, which knows the
         names but not the descriptors.
+
+        The index is read through the caller's view, so the method and the
+        workspace the source is read from are the published snapshot's, not
+        two different runs'.
         """
-        indexed = self._store.list_methods(project_id, class_name)
+        indexed = view.list_methods(project_id, class_name)
         if descriptor is not None:
             target = canonical_descriptor(descriptor)
             matching = [method for method in indexed if method.descriptor == target]
@@ -642,10 +786,16 @@ class Analyzer:
             return _identity_of(matching[0], matching[0].descriptor, indexed, class_name)
         return _MethodIdentity(method_name, None, None, False)
 
-    def _source_context(self, project_id: str) -> tuple[Project, Path] | None:
-        """The project and its workspace, when both are still there."""
-        project = self._store.get_project(project_id)
-        workspace = self._store.get_workspace(project_id)
+    def _source_context(self, view: Store, project_id: str) -> tuple[Project, Path] | None:
+        """The project and its published workspace, when both are still there.
+
+        The pointer is read once, inside one transaction, so that the
+        workspace and the symbols a request works from belong to the same
+        run. A publish that lands while the request is being served must
+        not send half of it to one run and half to another.
+        """
+        project = view.get_project(project_id)
+        workspace = view.get_workspace(project_id)
         if project is None or workspace is None:
             return None
         return project, workspace
@@ -670,6 +820,39 @@ class Analyzer:
     def resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
         """The resource strings indexed for a project."""
         return self._store.list_resources(project_id, name=name)
+
+
+def _check_cancelled(cancellation: CancellationToken | None) -> None:
+    """Stop the analysis if it has been asked to stop.
+
+    Called at the points where nothing half-written can be left behind: the
+    analysis has not published anything, so stopping here leaves the
+    published snapshot exactly as it was.
+    """
+    if cancellation is not None:
+        cancellation.raise_if_cancelled()
+
+
+def _remove_database(path: Path | None) -> None:
+    """Delete a staged database, and the journal files beside it.
+
+    The staged results are published by copying them into the workspace's
+    own database, so the staged copy is left with nothing to do once the
+    publish has been committed. The journal files go with it: a database
+    that is deleted while its write-ahead log is still there leaves the log
+    behind, and the next run of the same name would find it.
+
+    A file that cannot be deleted is not a failure of the analysis: the
+    results have already been published, and the leftover is a file in the
+    workspace's own directory. It is logged rather than raised.
+    """
+    if path is None:
+        return
+    for candidate in (path, path.with_name(path.name + "-wal"), path.with_name(path.name + "-shm")):
+        try:
+            candidate.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("could not remove the staged database %s", candidate)
 
 
 @dataclass(frozen=True, slots=True)
