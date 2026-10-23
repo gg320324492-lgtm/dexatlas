@@ -13,6 +13,7 @@ import sqlite3
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Self
 
@@ -36,18 +37,23 @@ from dexatlas.core.models import (
     canonical_descriptor,
     canonical_method_id,
 )
+from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
-#: Tables cleared when a project is re-analysed. Content-addressed project ids mean a
-#: re-analysis replaces rather than accumulates.
+#: The tables that hold a project's published snapshot.
 #:
-#: The evidence table belongs here for the same reason the symbol tables do: it is
-#: written afresh by every analysis, and a table that is not cleared keeps the rows
-#: of the earlier run. The ids are assigned in sequence, so a record left behind
-#: keeps an id that the new run has already given to a different record — and the
-#: database ends up holding rows that the report does not mention, which is the
-#: opposite of what an evidence table is for.
+#: Everything a reader sees about a project's symbols and its evidence lives
+#: here, and it is replaced as a whole when a run publishes: one run's
+#: symbols are never beside another's evidence.
+#:
+#: The evidence table belongs in this list for the same reason the symbol
+#: tables do: it is written afresh by every analysis, and a table that is
+#: not cleared keeps the rows of the earlier run. The ids are assigned in
+#: sequence, so a record left behind keeps an id that the new run has already
+#: given to a different record — and the database ends up holding rows that
+#: the report does not mention, which is the opposite of what an evidence
+#: table is for.
 _PROJECT_TABLES = (
     "classes",
     "methods",
@@ -117,6 +123,29 @@ CREATE TABLE IF NOT EXISTS projects (
     resource_count   INTEGER NOT NULL DEFAULT 0,
     duration_seconds REAL,
     manifest         TEXT,
+    workspace        TEXT,
+    published_run_id TEXT
+);
+
+-- One row per analysis attempt. The run id says nothing about the APK: two
+-- analyses of the same bytes are two runs, and the project id -- a content
+-- hash -- cannot tell them apart.
+--
+-- The row is the run's own record of what happened: which tools took part and
+-- at which versions, how the execution ended, and how much of what the run
+-- set out to read it actually read. The project's row carries the *published*
+-- snapshot's figures; this carries the attempt's.
+CREATE TABLE IF NOT EXISTS analysis_runs (
+    id               TEXT PRIMARY KEY,
+    project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    apk_sha256       TEXT NOT NULL,
+    status           TEXT NOT NULL,
+    completeness     TEXT NOT NULL DEFAULT 'complete',
+    tool_versions    TEXT NOT NULL DEFAULT '{}',
+    errors           TEXT NOT NULL DEFAULT '[]',
+    started_at       TEXT NOT NULL,
+    finished_at      TEXT,
+    duration_seconds REAL,
     workspace        TEXT
 );
 
@@ -237,7 +266,26 @@ ON CONFLICT(id) DO UPDATE SET
     resource_count  = excluded.resource_count,
     duration_seconds = excluded.duration_seconds,
     manifest      = excluded.manifest,
-    workspace     = excluded.workspace
+    -- The workspace is the pointer to the published run's directory, so a
+    -- write that does not name one leaves the pointer where it is. A run
+    -- that has not published yet must not move it: the reader of the
+    -- workspace would follow it into a directory that was never published.
+    workspace     = COALESCE(excluded.workspace, projects.workspace)
+"""
+
+_RUN_UPSERT = """
+INSERT INTO analysis_runs (
+    id, project_id, apk_sha256, status, completeness, tool_versions, errors,
+    started_at, finished_at, duration_seconds, workspace
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    status           = excluded.status,
+    completeness     = excluded.completeness,
+    tool_versions    = excluded.tool_versions,
+    errors           = excluded.errors,
+    finished_at      = excluded.finished_at,
+    duration_seconds = excluded.duration_seconds,
+    workspace        = excluded.workspace
 """
 
 
@@ -306,6 +354,12 @@ def _migrate(connection: sqlite3.Connection) -> None:
         )
     if "duration_seconds" not in columns:
         connection.execute("ALTER TABLE projects ADD COLUMN duration_seconds REAL")
+    if "published_run_id" not in columns:
+        # The pointer to the run whose snapshot is published. A workspace
+        # written before runs existed has no run to point at, and its rows
+        # are the published snapshot of an analysis nobody recorded -- so the
+        # pointer reads as nothing rather than as a run that never happened.
+        connection.execute("ALTER TABLE projects ADD COLUMN published_run_id TEXT")
 
     resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
     if resource_columns and "position" not in resource_columns:
@@ -352,8 +406,15 @@ def _recorded_version(connection: sqlite3.Connection, tables: set[str]) -> int |
 class Store:
     """Project and symbol persistence."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, connection: sqlite3.Connection | None = None) -> None:
         self._path = path
+        self._connection = connection
+        """The connection a read view holds, or ``None`` for an ordinary store.
+
+        A store with a connection is a *view*: it reads through a
+        transaction somebody else opened, and it neither opens transactions
+        of its own nor commits.
+        """
 
     @classmethod
     def open(cls, path: Path) -> Self:
@@ -412,6 +473,31 @@ class Store:
         return store
 
     @contextmanager
+    def reading(self) -> Iterator[Store]:
+        """A read-only view of the workspace: one connection, one transaction.
+
+        Every read through the view sees the same snapshot of the database.
+        That is what stops a request that reads the symbols and then the
+        evidence from seeing one run's symbols beside another's evidence: a
+        publish that lands in between is invisible to a transaction that has
+        already started reading.
+
+        The view is for reading. It holds no write lock, it never commits,
+        and it is closed when the block ends.
+        """
+        connection = sqlite3.connect(self._path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        # A deferred transaction: the snapshot is taken at the first read and
+        # held until the transaction ends.
+        connection.execute("BEGIN")
+        try:
+            yield Store(self._path, connection)
+        finally:
+            connection.rollback()
+            connection.close()
+
+    @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         """A connection to the workspace database, in a transaction.
 
@@ -422,7 +508,14 @@ class Store:
         read a write, and SQLite allows one writer at a time: a liveness
         probe that opened the workspace could lock the analysis out of its
         own database, and could be locked out itself.
+
+        A read view already holds a transaction, so it reads through that
+        one: opening a second would end the snapshot the view exists to
+        hold.
         """
+        if self._connection is not None:
+            yield self._connection
+            return
         connection = sqlite3.connect(self._path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
@@ -438,28 +531,68 @@ class Store:
     # -- projects ----------------------------------------------------------
 
     def save_project(
-        self, project: Project, workspace: Path, manifest: ManifestInfo | None
+        self, project: Project, workspace: Path | None, manifest: ManifestInfo | None
     ) -> None:
+        """Record the project's own row.
+
+        ``workspace`` is the pointer to the published run's directory. It is
+        optional because a run that has not published yet has no directory to
+        point at — and must not move the pointer to one it is about to
+        write into.
+        """
         with self.transaction() as connection:
+            _save_project(connection, project, workspace, manifest)
+
+    def begin_run(self, project: Project) -> None:
+        """Record that a run has started on a project.
+
+        Only the project's identity and its status are written. The counts,
+        the manifest, the tool versions, the errors and the duration belong
+        to the *published* snapshot: a run that has not published yet has
+        nothing to say about them, and writing zeroes over a complete
+        snapshot would leave the project describing nothing while its
+        tables hold an analysis.
+
+        A project that has never been analysed is created whole, because
+        there is no snapshot of its own to preserve.
+        """
+        project.status = ProjectStatus.RUNNING
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT 1 FROM projects WHERE id = ?", (project.id,)
+            ).fetchone()
+            if row is None:
+                _save_project(connection, project, None, None)
+                return
             connection.execute(
-                _PROJECT_UPSERT,
+                "UPDATE projects SET status = ?, apk_path = ?, apk_size_bytes = ? WHERE id = ?",
                 (
-                    project.id,
-                    project.apk.sha256,
+                    ProjectStatus.RUNNING.value,
                     str(project.apk.path),
                     project.apk.size_bytes,
-                    project.created_at.isoformat(),
-                    project.status.value,
-                    json.dumps(project.tool_versions),
-                    json.dumps([e.model_dump(mode="json") for e in project.errors]),
-                    project.class_count,
-                    project.method_count,
-                    project.reference_count,
-                    project.evidence_count,
-                    project.resource_count,
-                    project.duration_seconds,
-                    manifest.model_dump_json() if manifest else None,
-                    str(workspace),
+                    project.id,
+                ),
+            )
+
+    def set_project_state(
+        self, project_id: str, status: ProjectStatus, errors: list[ToolError]
+    ) -> None:
+        """Record the project's status and errors, and nothing else.
+
+        The counts, the manifest and the workspace belong to the *published*
+        snapshot. A run that failed published nothing, so writing the
+        project's whole record here would replace the published run's
+        figures with zeroes and point the workspace at a directory that was
+        never published — which is the opposite of leaving the previous
+        complete run intact.
+        """
+        with self.transaction() as connection:
+            connection.execute(
+                "UPDATE projects SET status = ?, errors = ? WHERE id = ?",
+                (
+                    status.value,
+                    json.dumps([e.model_dump(mode="json") for e in errors]),
+                    project_id,
                 ),
             )
 
@@ -510,6 +643,80 @@ class Store:
             for table in _PROJECT_TABLES:
                 connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
         return cursor.rowcount > 0
+
+    # -- runs --------------------------------------------------------------
+
+    def create_run(self, run: AnalysisRun) -> None:
+        """Record a run that has been created."""
+        with self.transaction() as connection:
+            _save_run(connection, run)
+
+    def update_run(self, run: AnalysisRun) -> None:
+        """Record what became of a run."""
+        with self.transaction() as connection:
+            _save_run(connection, run)
+
+    def get_run(self, run_id: str) -> AnalysisRun | None:
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM analysis_runs WHERE id = ?", (run_id,)
+            ).fetchone()
+        return _row_to_run(row) if row else None
+
+    def list_runs(self, project_id: str) -> list[AnalysisRun]:
+        """Every run of a project, newest first."""
+        with self.transaction() as connection:
+            rows = connection.execute(
+                "SELECT * FROM analysis_runs WHERE project_id = ? ORDER BY started_at DESC, id DESC",
+                (project_id,),
+            ).fetchall()
+        return [_row_to_run(row) for row in rows]
+
+    def get_published_run_id(self, project_id: str) -> str | None:
+        """The run whose snapshot is published, when there is one.
+
+        ``None`` for a workspace written before runs existed: its rows are
+        the published snapshot of an analysis that was never recorded, so
+        there is no run to name.
+        """
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT published_run_id FROM projects WHERE id = ?", (project_id,)
+            ).fetchone()
+        if not row or not row["published_run_id"]:
+            return None
+        return str(row["published_run_id"])
+
+    def get_published_run(self, project_id: str) -> AnalysisRun | None:
+        """The run whose snapshot is published, and its record."""
+        run_id = self.get_published_run_id(project_id)
+        return self.get_run(run_id) if run_id else None
+
+    def publish_run(
+        self,
+        project: Project,
+        run: AnalysisRun,
+        staged: Path,
+        manifest: ManifestInfo | None,
+    ) -> None:
+        """Publish a staged run as the project's snapshot.
+
+        One transaction: the symbol tables, the evidence, the project's own
+        row, the pointer to the run and the run's own row. A reader sees the
+        previous run's snapshot or this one — never a mixture, and never this
+        run's symbols beside the previous run's evidence.
+
+        The staged results live in a database of their own, which is why they
+        can be written at leisure and published in one go: a run that dies
+        half way through leaves the published snapshot exactly as it was.
+        """
+        with self.transaction() as connection:
+            _copy_staged_symbols(connection, project.id, staged)
+            _save_project(connection, project, run.workspace, manifest)
+            connection.execute(
+                "UPDATE projects SET published_run_id = ? WHERE id = ?", (run.id, project.id)
+            )
+            _save_run(connection, run)
 
     # -- symbols -----------------------------------------------------------
 
@@ -811,6 +1018,88 @@ class Store:
 # ---------------------------------------------------------------------------
 
 
+def _save_project(
+    connection: sqlite3.Connection,
+    project: Project,
+    workspace: Path | None,
+    manifest: ManifestInfo | None,
+) -> None:
+    """Write a project's own row, on a connection somebody else owns."""
+    connection.execute(
+        _PROJECT_UPSERT,
+        (
+            project.id,
+            project.apk.sha256,
+            str(project.apk.path),
+            project.apk.size_bytes,
+            project.created_at.isoformat(),
+            project.status.value,
+            json.dumps(project.tool_versions),
+            json.dumps([e.model_dump(mode="json") for e in project.errors]),
+            project.class_count,
+            project.method_count,
+            project.reference_count,
+            project.evidence_count,
+            project.resource_count,
+            project.duration_seconds,
+            manifest.model_dump_json() if manifest else None,
+            str(workspace) if workspace else None,
+        ),
+    )
+
+
+def _save_run(connection: sqlite3.Connection, run: AnalysisRun) -> None:
+    """Write a run's own row, on a connection somebody else owns."""
+    connection.execute(
+        _RUN_UPSERT,
+        (
+            run.id,
+            run.project_id,
+            run.apk_sha256,
+            run.status.value,
+            run.completeness.value,
+            json.dumps(run.tool_versions),
+            json.dumps([e.model_dump(mode="json") for e in run.errors]),
+            run.started_at.isoformat(),
+            run.finished_at.isoformat() if run.finished_at else None,
+            run.duration_seconds,
+            str(run.workspace) if run.workspace else None,
+        ),
+    )
+
+
+def _copy_staged_symbols(connection: sqlite3.Connection, project_id: str, staged: Path) -> None:
+    """Replace a project's published rows with a staged run's rows.
+
+    The staged database holds the same schema as this one — that is what
+    makes the copy possible without a table of column names — so the rows
+    come across in the order both schemas declare them.
+
+    The destination's columns are the ones named in the insert, so a schema
+    that has grown a column since the staged database was written still
+    works: the new column takes its default rather than failing the copy.
+    """
+    source = sqlite3.connect(staged)
+    try:
+        for table in _PROJECT_TABLES:
+            columns = [
+                str(row["name"]) for row in connection.execute(f"PRAGMA table_info({table})")
+            ]
+            rows = source.execute(
+                f"SELECT * FROM {table} WHERE project_id = ?", (project_id,)
+            ).fetchall()
+            connection.execute(f"DELETE FROM {table} WHERE project_id = ?", (project_id,))
+            if not rows:
+                continue
+            placeholders = ", ".join("?" * len(columns))
+            connection.executemany(
+                f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
+                [tuple(row) for row in rows],
+            )
+    finally:
+        source.close()
+
+
 def _dump_provenance(item: Any) -> str:
     return json.dumps([p.model_dump(mode="json") for p in item.provenance])
 
@@ -872,6 +1161,22 @@ def _row_to_project(row: sqlite3.Row) -> Project:
         evidence_count=row["evidence_count"],
         resource_count=row["resource_count"],
         duration_seconds=row["duration_seconds"],
+    )
+
+
+def _row_to_run(row: sqlite3.Row) -> AnalysisRun:
+    return AnalysisRun(
+        id=row["id"],
+        project_id=row["project_id"],
+        apk_sha256=row["apk_sha256"],
+        status=RunStatus(row["status"]),
+        completeness=RunCompleteness(row["completeness"]),
+        tool_versions=json.loads(row["tool_versions"]),
+        errors=[ToolError.model_validate(e) for e in json.loads(row["errors"])],
+        started_at=datetime.fromisoformat(row["started_at"]),
+        finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
+        duration_seconds=row["duration_seconds"],
+        workspace=Path(row["workspace"]) if row["workspace"] else None,
     )
 
 

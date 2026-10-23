@@ -11,7 +11,12 @@ background task is honest about what it is rather than pretending to scale.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+import os
+import threading
+import time
+from collections.abc import AsyncIterator, Callable
+from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
@@ -45,6 +50,7 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.paths import display_path, redact_workspace
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
+from dexatlas.core.runs import AnalysisCancelled, AnalysisRun, CancellationToken
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 from dexatlas.tools.registry import BackendRegistry
@@ -69,6 +75,23 @@ MAX_NAME_BYTES = 255
 #: Starlette renamed this constant and deprecated the old name, so the number
 #: is written out rather than imported from a version-dependent place.
 HTTP_CONTENT_TOO_LARGE = 413
+
+#: How long an uploaded APK is kept, in seconds.
+#:
+#: The upload is the bytes the analysis was given, and it is kept for a
+#: while so that the operator can look at the file the analysis actually
+#: read. It is not kept for ever: the workspace belongs to the server, and
+#: an unbounded pile of APKs is how it fills up. The window is counted from
+#: the end of the analysis that used the upload, so an APK that is analysed
+#: again is kept for another window.
+UPLOAD_RETENTION_SECONDS = 24 * 60 * 60
+
+#: The environment variable that overrides the retention window.
+#:
+#: The project's settings live in ``config/settings.py``, and this change
+#: does not touch them, so the variable is read here. It uses the same
+#: ``DEXATLAS_`` prefix every other setting uses.
+UPLOAD_RETENTION_ENV = "DEXATLAS_UPLOAD_RETENTION_SECONDS"
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -104,6 +127,77 @@ def get_backends(settings: SettingsDep) -> BackendRegistry:
 
 BackendRegistryDep = Annotated[BackendRegistry, Depends(get_backends)]
 
+
+@dataclass
+class _RunningAnalysis:
+    """One analysis that is running, and the way to stop it."""
+
+    token: CancellationToken
+    apk_path: Path
+
+
+class _RunningAnalyses:
+    """The analyses that are running.
+
+    The analysis runs in a background task, so "stop it" cannot be a call
+    into it: it has to be a fact the running code can observe. The token is
+    that fact -- the request sets it, and the analysis stops at the next
+    point where stopping cannot leave half-written results behind.
+
+    The registry is keyed by the project id, which is the handle the API
+    already gave the caller when it accepted the upload.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._analyses: dict[str, _RunningAnalysis] = {}
+
+    def start(self, project_id: str, apk_path: Path) -> CancellationToken:
+        """Register an analysis that is starting, and hand back its token."""
+        token = CancellationToken()
+        with self._lock:
+            self._analyses[project_id] = _RunningAnalysis(token=token, apk_path=apk_path)
+        return token
+
+    def finish(self, project_id: str) -> None:
+        """Forget an analysis that has ended."""
+        with self._lock:
+            self._analyses.pop(project_id, None)
+
+    def cancel(self, project_id: str) -> bool:
+        """Ask an analysis to stop. Whether one was running."""
+        with self._lock:
+            running = self._analyses.get(project_id)
+        if running is None:
+            return False
+        running.token.cancel()
+        return True
+
+    def apk_paths(self) -> set[Path]:
+        """The uploads the running analyses are reading."""
+        with self._lock:
+            return {running.apk_path for running in self._analyses.values()}
+
+
+#: The analyses this process is running.
+_RUNNING = _RunningAnalyses()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Expire the uploads the retention window has passed, when the server starts.
+
+    A server that was down kept its uploads and nobody was there to expire
+    them. The sweep runs before the first request is served rather than
+    after it, so the workspace is already in the state the policy says it
+    should be in.
+    """
+    removed = _expire_uploads(get_settings())
+    if removed:
+        logger.info("removed %d expired upload(s)", len(removed))
+    yield
+
+
 app = FastAPI(
     title="DexAtlas",
     version=__version__,
@@ -112,6 +206,7 @@ app = FastAPI(
         "Analyses applications you own or are authorized to assess."
     ),
     license_info={"name": "Apache-2.0"},
+    lifespan=lifespan,
 )
 
 
@@ -197,6 +292,43 @@ class SubmitResponse(BaseModel):
     project_id: str
     sha256: str
     already_analysed: bool
+
+
+class RunResponse(BaseModel):
+    """One analysis run of a project."""
+
+    id: str
+    """The run's own identifier, which says nothing about the APK."""
+
+    project_id: str
+    status: str
+    completeness: str = Field(
+        description=(
+            "Whether the run read everything it set out to read. A run with "
+            "gaps in it is 'partial', and the gaps are in its errors."
+        )
+    )
+    apk_sha256: str
+    tool_versions: dict[str, str | None]
+    errors: list[ErrorResponse]
+    started_at: str
+    finished_at: str | None
+    duration_seconds: float | None
+    published: bool = Field(
+        description="Whether this run's results are the ones the project publishes."
+    )
+
+
+class UploadResponse(BaseModel):
+    """One stored upload."""
+
+    sha256: str
+    name: str
+    size_bytes: int
+    age_seconds: float = Field(description="How long ago the upload was last used.")
+    expires_in_seconds: float | None = Field(
+        description="How long the upload is kept for, or nothing when the window has passed."
+    )
 
 
 #: The headers a source response carries, declared so the schema says what the
@@ -307,6 +439,9 @@ def analyze(
     """Accept an APK and analyse it in the background."""
     upload_root = settings.workspace / UPLOAD_DIRNAME
     upload_root.mkdir(parents=True, exist_ok=True)
+    # The sweep runs on the way in as well: a deployment that receives
+    # uploads but analyses none of them would otherwise never expire any.
+    _expire_uploads(settings)
     # The name the client gave, kept for the reader: it is what the report
     # shows and what a rejection names.
     name = _stored_name(file.filename)
@@ -382,19 +517,35 @@ def analyze(
 def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
     """Analyse an APK in the background.
 
-    Two things can happen, and the log has to tell them apart: the analysis
-    can fail, or it can finish and find nothing. The first is an error and
-    the second is an answer, and a log that says "failed" for both sends the
-    reader looking for a fault that is not there.
+    Three things can happen, and the log has to tell them apart: the
+    analysis can fail, it can be cancelled, or it can finish and find
+    nothing. The first two are errors and the third is an answer, and a log
+    that says "failed" for all three sends the reader looking for a fault
+    that is not there.
     """
+    project_id = Project.new_id(apk.sha256)
+    token = _RUNNING.start(project_id, apk_path)
     try:
-        result = analyzer.analyze(apk_path, metadata=apk)
+        result = analyzer.analyze(apk_path, metadata=apk, cancellation=token)
+    except AnalysisCancelled:
+        # The operator asked for it to stop. That is not a failure of the
+        # analysis, and the log should not say it is.
+        logger.info("background analysis of %s was cancelled", apk_path)
+        return
     except Exception:
         # The pipeline records the failure on the project before it raises, so
         # the project is failed rather than running, and its errors say what
         # happened. The log says the same thing.
         logger.exception("background analysis of %s failed", apk_path)
         return
+    finally:
+        _RUNNING.finish(project_id)
+        # The retention window is counted from the end of the analysis that
+        # used the upload, so the clock starts again now.
+        _touch(apk_path)
+        # The sweep runs here as well as when the server starts, so a
+        # deployment that is never restarted still expires its uploads.
+        _expire_uploads(analyzer.settings)
     if not result.succeeded:
         logger.warning("background analysis of %s completed but produced no symbols", apk_path)
 
@@ -412,6 +563,134 @@ def get_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -
     if project is None:
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
     return _project_response(project, settings)
+
+
+@app.get("/projects/{project_id}/runs", tags=["analysis"])
+def list_runs(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -> dict[str, Any]:
+    """Every run of a project, newest first.
+
+    A project is the APK; a run is one attempt at analysing it. The run
+    that is *published* is the one whose results the project holds -- the
+    one a reader of the index is looking at.
+    """
+    with analyzer.store.reading() as view:
+        runs = view.list_runs(project_id)
+        published = view.get_published_run_id(project_id)
+    return {
+        "project_id": project_id,
+        "total": len(runs),
+        "published_run_id": published,
+        "runs": [
+            _run_response(run, run.id == published, settings).model_dump(mode="json")
+            for run in runs
+        ],
+    }
+
+
+@app.get("/projects/{project_id}/runs/{run_id}", tags=["analysis"])
+def get_run(
+    project_id: str, run_id: str, analyzer: AnalyzerDep, settings: SettingsDep
+) -> RunResponse:
+    """One run of a project."""
+    with analyzer.store.reading() as view:
+        run = view.get_run(run_id)
+        published = view.get_published_run_id(project_id)
+    if run is None or run.project_id != project_id:
+        raise HTTPException(status_code=404, detail=f"no run {run_id!r} for {project_id!r}")
+    return _run_response(run, run.id == published, settings)
+
+
+@app.post(
+    "/projects/{project_id}/cancel",
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["analysis"],
+)
+def cancel_analysis(project_id: str) -> dict[str, Any]:
+    """Ask the analysis that is running for a project to stop.
+
+    The analysis stops at the next point where stopping cannot leave
+    half-written results behind: it has published nothing at that point,
+    so the snapshot published before it stays exactly as it was.
+
+    The answer is that the request was accepted, not that the analysis has
+    stopped. A backend that is half way through reading the APK finishes
+    reading it first -- the stop happens between the steps.
+    """
+    if not _RUNNING.cancel(project_id):
+        raise HTTPException(status_code=404, detail=f"no analysis is running for {project_id!r}")
+    return {"project_id": project_id, "status": "cancelling"}
+
+
+@app.get("/uploads", tags=["uploads"])
+def list_uploads(settings: SettingsDep) -> list[UploadResponse]:
+    """The stored uploads, and how long they are kept.
+
+    The retention window is a policy of the deployment rather than of the
+    analysis: an uploaded APK is kept for a while after the analysis that
+    used it, and the sweep removes it when the window has passed.
+    """
+    window = _upload_retention_seconds()
+    moment = time.time()
+    uploads: list[UploadResponse] = []
+    for path in _stored_uploads(settings):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        age = moment - stat.st_mtime
+        uploads.append(
+            UploadResponse(
+                sha256=path.parent.name,
+                name=path.name,
+                size_bytes=stat.st_size,
+                age_seconds=round(age, 3),
+                expires_in_seconds=round(max(window - age, 0.0), 3),
+            )
+        )
+    return uploads
+
+
+@app.delete("/uploads/{sha256}", status_code=status.HTTP_204_NO_CONTENT, tags=["uploads"])
+def delete_upload(sha256: str, settings: SettingsDep) -> None:
+    """Remove a stored upload now.
+
+    The bytes the analysis read go with it. The project's own record of
+    the APK -- its hash, its size and its name -- does not, and the
+    analysis can be repeated from the bytes the client still holds.
+    """
+    directory = settings.workspace / UPLOAD_DIRNAME / _safe_hash(sha256)
+    if not directory.is_dir():
+        raise HTTPException(status_code=404, detail=f"no upload {sha256!r}")
+    removed = False
+    for path in sorted(directory.iterdir()):
+        if not path.is_file():
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"could not remove the upload: {exc}",
+            ) from exc
+        removed = True
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"no upload {sha256!r}")
+    # The directory is not empty -- something else was put in it, and it is
+    # not this endpoint's to remove.
+    with suppress(OSError):
+        directory.rmdir()
+
+
+@app.post("/uploads/cleanup", tags=["uploads"])
+def cleanup_uploads(settings: SettingsDep) -> dict[str, Any]:
+    """Remove the uploads the retention window has passed.
+
+    The sweep also runs when the server starts and after every analysis.
+    This endpoint runs it now, for an operator who wants the workspace
+    back to what the policy says it should be without waiting for one.
+    """
+    removed = _expire_uploads(settings)
+    return {"removed": len(removed), "names": sorted(path.name for path in removed)}
 
 
 @app.get("/projects/{project_id}/manifest", tags=["analysis"])
@@ -649,10 +928,11 @@ def export_report(
 
 
 @app.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["analysis"])
-def delete_project(project_id: str, analyzer: AnalyzerDep) -> None:
+def delete_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -> None:
     """Remove a project and its symbols."""
     if not analyzer.store.delete_project(project_id):
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+    _remove_project_workspace(project_id, settings)
 
 
 def _stored_name(filename: str | None) -> str:
@@ -724,6 +1004,169 @@ def _source_payload(
 # ---------------------------------------------------------------------------
 
 
+def _upload_retention_seconds() -> int:
+    """How long an uploaded APK is kept.
+
+    Read from the environment so that a deployment can choose its own
+    window without a code change. A value that is not a number, or that is
+    negative, falls back to the default: a retention policy that cannot be
+    read is not one that should be guessed at.
+    """
+    raw = os.environ.get(UPLOAD_RETENTION_ENV)
+    if raw is None:
+        return UPLOAD_RETENTION_SECONDS
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s is not a number; using the default retention", UPLOAD_RETENTION_ENV)
+        return UPLOAD_RETENTION_SECONDS
+    if value < 0:
+        logger.warning("%s is negative; using the default retention", UPLOAD_RETENTION_ENV)
+        return UPLOAD_RETENTION_SECONDS
+    return value
+
+
+def _stored_uploads(settings: Settings) -> list[Path]:
+    """The uploads that are stored, one per file, in their hash-named directory.
+
+    The staging files -- the ones a request is still writing -- live in the
+    upload root itself rather than in a hash-named directory, so they are
+    not uploads and are not listed.
+    """
+    root = settings.workspace / UPLOAD_DIRNAME
+    if not root.is_dir():
+        return []
+    found: list[Path] = []
+    for directory in sorted(root.iterdir()):
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.iterdir()):
+            if path.is_file():
+                found.append(path)
+    return found
+
+
+def _expire_uploads(settings: Settings, *, now: float | None = None) -> list[Path]:
+    """Remove the uploads the retention window has passed, and say which.
+
+    The uploads of the analyses that are running are never removed: the
+    analysis reads the file it was given, and a file that disappears under
+    it is a failure of the analysis rather than of the cleanup.
+    """
+    root = settings.workspace / UPLOAD_DIRNAME
+    if not root.is_dir():
+        return []
+    window = _upload_retention_seconds()
+    moment = time.time() if now is None else now
+    in_use = _RUNNING.apk_paths()
+    removed: list[Path] = []
+    for path in _stored_uploads(settings):
+        if path in in_use:
+            continue
+        try:
+            age = moment - path.stat().st_mtime
+        except OSError:
+            continue
+        if age < window:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            logger.warning("could not remove the expired upload %s", path.name)
+            continue
+        removed.append(path)
+    for directory in sorted(root.iterdir()):
+        if not directory.is_dir():
+            continue
+        # Not empty: something else lives there, and it is not the sweep's
+        # to remove.
+        with suppress(OSError):
+            directory.rmdir()
+    return removed
+
+
+def _touch(path: Path) -> None:
+    """Mark a file as used now, so that the retention window starts again."""
+    try:
+        os.utime(path, None)
+    except OSError:
+        logger.warning("could not mark the upload %s as used", path.name)
+
+
+def _remove_project_workspace(project_id: str, settings: Settings) -> None:
+    """Remove the directories a deleted project's runs wrote into.
+
+    Every run writes into a directory of its own, so a deleted project
+    leaves a directory per run behind it. The workspace belongs to the
+    server, and the analysis of a project nobody holds any more is not
+    something to keep for ever.
+
+    A file that cannot be removed -- because a reader still has it open --
+    is logged rather than raised: the project is gone from the database
+    either way, and what is left is a file in the server's own directory.
+    """
+    root = settings.projects_dir / project_id
+    if not root.is_dir():
+        return
+    paths = sorted(root.rglob("*"), key=lambda path: len(path.parts), reverse=True)
+    for path in paths:
+        try:
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                path.rmdir()
+        except OSError:
+            logger.warning("could not remove %s", path.name)
+    try:
+        root.rmdir()
+    except OSError:
+        logger.warning("could not remove the workspace of %s", project_id)
+
+
+def _safe_hash(sha256: str) -> str:
+    """A hash that can be used as a directory name, or nothing.
+
+    The hash comes from the request, and a request is not trusted to name a
+    directory: a name that is not a SHA-256 cannot be one, whatever else it
+    might be.
+    """
+    if len(sha256) != 64 or any(char not in "0123456789abcdef" for char in sha256):
+        raise HTTPException(status_code=400, detail=f"{sha256!r} is not a SHA-256 hash")
+    return sha256
+
+
+def _run_response(run: AnalysisRun, published: bool, settings: Settings) -> RunResponse:
+    """One run, as the API publishes it.
+
+    The errors are redacted for the same reason the project's are: an
+    error's message can quote the path it was handed, and that path is the
+    server's.
+    """
+    return RunResponse(
+        id=run.id,
+        project_id=run.project_id,
+        status=run.status.value,
+        completeness=run.completeness.value,
+        apk_sha256=run.apk_sha256,
+        tool_versions=run.tool_versions,
+        errors=[
+            ErrorResponse(
+                tool=error.tool,
+                code=error.code.value,
+                message=redact_workspace(error.message, settings.workspace),
+                detail=(
+                    redact_workspace(error.detail, settings.workspace) if error.detail else None
+                ),
+            )
+            for error in run.errors
+        ],
+        started_at=run.started_at.isoformat(),
+        finished_at=run.finished_at.isoformat() if run.finished_at else None,
+        duration_seconds=run.duration_seconds,
+        published=published,
+    )
+
+
 def _project_response(project: Any, settings: Settings) -> ProjectResponse:
     return ProjectResponse(
         id=project.id,
@@ -756,23 +1199,56 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
 
 
 def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
-    """Reconstruct an :class:`AnalysisResult` from storage, for on-demand export.
+    """Reconstruct an :class:`AnalysisResult` from the published snapshot.
 
     Everything the reports state has to come out of the workspace, including
     how long the analysis took: a report exported over the API that says
     "0.0s" for an analysis that took three seconds states a number the
     analysis never produced.
+
+    The report describes *one* run -- the published one. The project's own
+    status says how the latest attempt ended, which is a different thing: a
+    re-analysis that failed leaves the published snapshot exactly as it
+    was, and the report still has to describe that snapshot rather than the
+    failure that came after it.
     """
-    project = analyzer.store.get_project(project_id)
-    if project is None:
-        raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+    with analyzer.store.reading() as view:
+        project = view.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+        run = view.get_published_run(project_id)
+        manifest = view.get_manifest(project_id)
+        evidence = view.list_evidence(project_id)
+        workspace = view.get_workspace(project_id)
+
+    if run is not None:
+        project = project.model_copy(
+            update={
+                "status": _project_status_of(run),
+                "errors": list(run.errors),
+            }
+        )
     return AnalysisResult(
         project=project,
-        manifest=analyzer.store.get_manifest(project_id),
-        evidence=analyzer.store.list_evidence(project_id),
-        workspace=analyzer.store.get_workspace(project_id),
+        manifest=manifest,
+        evidence=evidence,
+        workspace=workspace,
         duration_seconds=project.duration_seconds or 0.0,
+        run=run,
     )
+
+
+def _project_status_of(run: AnalysisRun) -> ProjectStatus:
+    """The status a published run's project carries.
+
+    A run that was cancelled is never published -- it published nothing --
+    so the only statuses that reach here are the ones the project already
+    has. The mapping is written out rather than assumed so that a run
+    status added later cannot raise in the middle of an export.
+    """
+    if run.status.value in {status.value for status in ProjectStatus}:
+        return ProjectStatus(run.status.value)
+    return ProjectStatus.FAILED
 
 
 __all__ = ["app"]
