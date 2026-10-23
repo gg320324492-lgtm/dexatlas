@@ -23,6 +23,7 @@ from dexatlas.core.models import (
     ToolErrorCode,
 )
 from dexatlas.core.pipeline import AnalysisResult
+from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 
@@ -88,6 +89,8 @@ def _result(
     evidence: list[Evidence] | None = None,
     manifest: ManifestInfo | None = None,
     errors: list[ToolError] | None = None,
+    run: AnalysisRun | None = None,
+    latest_attempt_status: ProjectStatus | None = None,
 ) -> AnalysisResult:
     project = _project()
     project.errors = errors or []
@@ -96,6 +99,8 @@ def _result(
         manifest=manifest,
         evidence=evidence if evidence is not None else [_evidence(EvidenceLevel.VERIFIED, "ok")],
         duration_seconds=3.5,
+        run=run,
+        latest_attempt_status=latest_attempt_status,
     )
 
 
@@ -105,7 +110,68 @@ def _result(
 def test_json_report_is_serialisable() -> None:
     report = build_json_report(_result())
 
-    assert json.loads(json.dumps(report))["schema_version"] == 1
+    assert json.loads(json.dumps(report))["schema_version"] == 2
+
+
+# -- the run the report describes -------------------------------------------
+
+
+def _run(status: RunStatus = RunStatus.COMPLETED) -> AnalysisRun:
+    return AnalysisRun(
+        id="run_0123456789abcdef",
+        project_id="apk_0123456789abcdef",
+        apk_sha256="0" * 64,
+        status=status,
+        completeness=RunCompleteness.COMPLETE,
+        tool_versions={"jadx": "jadx 1.5.2"},
+    )
+
+
+def test_the_markdown_report_names_the_run_it_describes() -> None:
+    """A report that does not say which attempt it describes cannot be checked against one.
+
+    The run has an identity of its own, and the numbers in the report belong
+    to one run rather than to the APK in general.
+    """
+    markdown = render_markdown(_result(run=_run()))
+
+    assert "run_0123456789abcdef" in markdown, "the report does not name the run it describes"
+
+
+def test_the_markdown_report_says_a_later_attempt_did_not_publish() -> None:
+    """The snapshot stands, and the report has to say so.
+
+    A failed re-analysis leaves the published snapshot exactly as it was --
+    that is what publishing a snapshot means. But a report that said
+    "completed" without saying that a later attempt failed would be stating
+    the status of the snapshot as if it were the status of the project.
+    """
+    markdown = render_markdown(_result(run=_run(), latest_attempt_status=ProjectStatus.FAILED))
+
+    assert "later attempt" in markdown.lower(), "the report does not disclose the later attempt"
+    assert "failed" in markdown.lower(), "the report does not say how the later attempt ended"
+
+
+def test_a_report_without_a_later_attempt_says_nothing_about_one() -> None:
+    """The ordinary case must not grow a paragraph about an attempt nobody made."""
+    markdown = render_markdown(_result(run=_run()))
+
+    assert "later attempt" not in markdown.lower()
+
+
+def test_the_json_report_carries_the_run_and_the_later_attempt() -> None:
+    """The machine-readable form says the same two things the readable one does."""
+    report = build_json_report(_result(run=_run(), latest_attempt_status=ProjectStatus.FAILED))
+
+    assert report["run"]["id"] == "run_0123456789abcdef"
+    assert report["run"]["status"] == RunStatus.COMPLETED.value
+    assert report["latest_attempt_status"] == ProjectStatus.FAILED.value
+
+
+def test_the_json_report_of_a_first_analysis_has_no_later_attempt() -> None:
+    report = build_json_report(_result(run=_run()))
+
+    assert report["latest_attempt_status"] is None
 
 
 def test_json_report_includes_backend_errors() -> None:

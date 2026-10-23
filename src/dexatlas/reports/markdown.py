@@ -14,6 +14,7 @@ from dexatlas.core.models import (
     EvidenceLevel,
     ManifestInfo,
     Project,
+    ProjectStatus,
     cross_reference_call_sites,
     cross_reference_records,
     index_gaps,
@@ -60,6 +61,36 @@ _INDEX_GAP_NOTE = [
 ]
 
 
+def _later_attempt_note(status: ProjectStatus) -> list[str]:
+    """What a later attempt that published nothing means for this report.
+
+    The report describes the *published* snapshot, and a later attempt that
+    failed does not change what that snapshot holds. It is still a fact about
+    the APK's current state, and a report that said "completed" without
+    saying so would be stating the status of the snapshot as if it were the
+    status of the project.
+    """
+    return [
+        f"> **A later attempt to analyse this APK ended as `{status.value}`.** The report",
+        "> below describes the *published* run — the last one that completed — and every",
+        "> number and every piece of evidence in it comes from that run. The later attempt",
+        "> published nothing, so it is not in this report; the project record has it.",
+    ]
+
+
+def _run_line(result: AnalysisResult) -> list[str]:
+    """The run the report describes, named.
+
+    A run has an identity of its own, and a report that does not name it
+    cannot say which attempt its numbers come from — which matters as soon
+    as there is more than one.
+    """
+    run = result.run
+    if run is None:
+        return []
+    return [f"**Run:** `{run.id}` ({run.status.value}, {run.completeness.value})  "]
+
+
 def render_markdown(result: AnalysisResult) -> str:
     """Render an analysis as a Markdown report."""
     project = result.project
@@ -99,6 +130,7 @@ def render_markdown(result: AnalysisResult) -> str:
         f"**APK:** `{project.apk.path.name}`  ",
         f"**SHA-256:** `{project.apk.sha256}`  ",
         f"**Status:** {project.status.value}  ",
+        *(_run_line(result) or [""]),
         f"**Tool versions:** {_tool_line(project)}",
         "",
         "---",
@@ -109,6 +141,8 @@ def render_markdown(result: AnalysisResult) -> str:
         "| --- | ---: |",
     ]
     lines += [f"| {name} | {_cell(value)} |" for name, value in metrics]
+    if result.latest_attempt_status is not None:
+        lines += ["", *_later_attempt_note(result.latest_attempt_status)]
     if cross_reference_records(result.evidence):
         lines += ["", *_XREF_COUNT_NOTE]
     if index_gaps(project.errors):

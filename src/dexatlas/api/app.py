@@ -1222,12 +1222,22 @@ def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
         workspace = view.get_workspace(project_id)
 
     if run is not None:
+        # The project's own row says how the *latest* attempt ended; the
+        # published run says how the attempt this report describes ended.
+        # They are the same thing until somebody re-analyses the APK, and
+        # then they are not -- and a report that said "completed" without
+        # saying so would be stating the status of the snapshot as if it
+        # were the status of the project.
+        published_status = _project_status_of(run)
+        latest_attempt_status = project.status if project.status is not published_status else None
         project = project.model_copy(
             update={
-                "status": _project_status_of(run),
+                "status": published_status,
                 "errors": list(run.errors),
             }
         )
+    else:
+        latest_attempt_status = None
     return AnalysisResult(
         project=project,
         manifest=manifest,
@@ -1235,6 +1245,7 @@ def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
         workspace=workspace,
         duration_seconds=project.duration_seconds or 0.0,
         run=run,
+        latest_attempt_status=latest_attempt_status,
     )
 
 

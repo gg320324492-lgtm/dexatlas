@@ -90,6 +90,20 @@ class AnalysisResult:
     produced these results, with which tools.
     """
 
+    latest_attempt_status: ProjectStatus | None = None
+    """How the most recent attempt ended, when it is not the one published.
+
+    A report describes the *published* snapshot: the last run that
+    completed. A later attempt that failed does not change what that
+    snapshot holds -- that is the point of publishing a snapshot -- but it
+    is a fact about the APK's current state, and a report that said
+    "completed" without saying so would be stating the status of the
+    snapshot as if it were the status of the project.
+
+    ``None`` when the published run *is* the latest attempt, which is the
+    ordinary case.
+    """
+
     @property
     def succeeded(self) -> bool:
         return self.project.status == ProjectStatus.COMPLETED

@@ -25,14 +25,42 @@ def build_json_report(result: AnalysisResult) -> dict[str, Any]:
     """
     project = result.project
     return {
-        "schema_version": 1,
+        # 2 adds the run the report describes, and the status of a later
+        # attempt that published nothing. Both are additive; a reader of a
+        # version 1 document that ignores unknown keys is unaffected.
+        "schema_version": 2,
         "generated_at": datetime.now(UTC).isoformat(),
         "project": _project_block(project),
+        "run": _run_block(result),
+        "latest_attempt_status": (
+            result.latest_attempt_status.value if result.latest_attempt_status is not None else None
+        ),
         "tools": project.tool_versions,
         "errors": [e.model_dump(mode="json") for e in project.errors],
         "manifest": result.manifest.model_dump(mode="json") if result.manifest else None,
         "evidence": [e.model_dump(mode="json") for e in result.evidence],
         "summary": _summary_block(result),
+    }
+
+
+def _run_block(result: AnalysisResult) -> dict[str, Any] | None:
+    """The run this report describes.
+
+    The run has an identity of its own, and a document that does not name it
+    cannot say which attempt its numbers come from.
+    """
+    run = result.run
+    if run is None:
+        return None
+    return {
+        "id": run.id,
+        "status": run.status.value,
+        "completeness": run.completeness.value,
+        "apk_sha256": run.apk_sha256,
+        "tool_versions": run.tool_versions,
+        "started_at": run.started_at.isoformat(),
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+        "duration_seconds": run.duration_seconds,
     }
 
 

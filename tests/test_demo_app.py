@@ -169,7 +169,7 @@ def test_demo_report_is_self_consistent(demo_project) -> None:
     serialised = json.dumps(report)
     summary = json.loads(serialised)["summary"]
 
-    assert json.loads(serialised)["schema_version"] == 1
+    assert json.loads(serialised)["schema_version"] == 2
     assert summary["methods"] == EXPECTED_METHODS
     assert summary["cross_references"] == EXPECTED_REFERENCES
     # Backend gaps are reported, not asserted away.
