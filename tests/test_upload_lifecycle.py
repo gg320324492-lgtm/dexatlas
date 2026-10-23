@@ -390,6 +390,29 @@ def test_a_run_that_is_not_the_projects_is_a_not_found(workspace: Path) -> None:
     assert response.status_code == 404
 
 
+def test_deleting_a_project_removes_the_directories_its_runs_wrote(
+    workspace: Path,
+) -> None:
+    """A project nobody holds any more takes its analysis with it.
+
+    Every run writes into a directory of its own, so a project that is
+    deleted leaves a directory per run behind it. The workspace belongs to
+    the server.
+    """
+    store = Store.open(workspace / "dexatlas.db")
+    project = Project.create(_project_metadata())
+    store.save_project(project, None, None)
+    run = AnalysisRun.start(project.id, project.apk.sha256)
+    output = workspace / "projects" / project.id / "runs" / run.id / "jadx"
+    output.mkdir(parents=True)
+    (output / "com.java").write_text("class com {}", encoding="utf-8")
+
+    response = _client().delete(f"/projects/{project.id}")
+
+    assert response.status_code == 204
+    assert not (workspace / "projects" / project.id).exists()
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

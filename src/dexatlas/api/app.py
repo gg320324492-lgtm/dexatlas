@@ -928,10 +928,11 @@ def export_report(
 
 
 @app.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["analysis"])
-def delete_project(project_id: str, analyzer: AnalyzerDep) -> None:
+def delete_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -> None:
     """Remove a project and its symbols."""
     if not analyzer.store.delete_project(project_id):
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+    _remove_project_workspace(project_id, settings)
 
 
 def _stored_name(filename: str | None) -> str:
@@ -1090,6 +1091,36 @@ def _touch(path: Path) -> None:
         os.utime(path, None)
     except OSError:
         logger.warning("could not mark the upload %s as used", path.name)
+
+
+def _remove_project_workspace(project_id: str, settings: Settings) -> None:
+    """Remove the directories a deleted project's runs wrote into.
+
+    Every run writes into a directory of its own, so a deleted project
+    leaves a directory per run behind it. The workspace belongs to the
+    server, and the analysis of a project nobody holds any more is not
+    something to keep for ever.
+
+    A file that cannot be removed -- because a reader still has it open --
+    is logged rather than raised: the project is gone from the database
+    either way, and what is left is a file in the server's own directory.
+    """
+    root = settings.projects_dir / project_id
+    if not root.is_dir():
+        return
+    paths = sorted(root.rglob("*"), key=lambda path: len(path.parts), reverse=True)
+    for path in paths:
+        try:
+            if path.is_symlink() or not path.is_dir():
+                path.unlink()
+            else:
+                path.rmdir()
+        except OSError:
+            logger.warning("could not remove %s", path.name)
+    try:
+        root.rmdir()
+    except OSError:
+        logger.warning("could not remove the workspace of %s", project_id)
 
 
 def _safe_hash(sha256: str) -> str:

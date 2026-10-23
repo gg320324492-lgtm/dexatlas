@@ -127,6 +127,13 @@ read-only view in which every read sees the same snapshot of the database.
 > on a non-empty directory. The versioned directory plus the database
 > pointer is the mechanism, and the pointer really is atomic in SQLite.
 
+## Deleting a project
+
+`DELETE /projects/{id}` removes the project's row, its symbols and its
+runs, and the directories the runs wrote into. A file that cannot be
+removed — because a reader still has it open — is logged rather than
+raised: the project is gone from the database either way.
+
 ## The schema
 
 Schema version 4 adds:
