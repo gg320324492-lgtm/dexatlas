@@ -239,6 +239,12 @@ def _apply_windows_memory_limit(limit_bytes: int) -> bool:
     kernel32.AssignProcessToJobObject.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
     kernel32.GetCurrentProcess.restype = ctypes.c_void_p
     kernel32.GetCurrentProcess.argtypes = []
+    # The error code is asked of kernel32 rather than of ctypes: ctypes only
+    # carries ``get_last_error`` where the platform has one, and a type checker
+    # running on Linux cannot see it. The code comes from the library that
+    # failed, which is the same place either way.
+    kernel32.GetLastError.restype = ctypes.c_uint32
+    kernel32.GetLastError.argtypes = []
 
     class _BasicLimitInformation(ctypes.Structure):
         _fields_ = [
@@ -296,7 +302,7 @@ def _apply_windows_memory_limit(limit_bytes: int) -> bool:
     if not kernel32.AssignProcessToJobObject(handle, kernel32.GetCurrentProcess()):
         logger.warning(
             "androguard: could not join the job object; the memory is unbounded (error %d)",
-            ctypes.get_last_error(),
+            kernel32.GetLastError(),
         )
         kernel32.CloseHandle(handle)
         return False
