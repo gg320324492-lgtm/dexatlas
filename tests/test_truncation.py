@@ -13,8 +13,15 @@ bookkeeping — on a large APK the bookkeeping was the whole run.
 
 The DEX here is a stand-in rather than a real APK: the limits are parameters,
 so a limit can be reached in a test without a large file. The fake answers the
-same calls the real library answers, and the walk is driven through the
-backend's public entry point.
+same calls the real library answers.
+
+The walk those tests drive is the adapter's own, called directly rather than
+through the public entry point. The public entry point parses the DEX in a
+worker process, and a monkeypatch into the library cannot cross a process
+boundary — so the stand-in would never be seen. The worker is checked against
+a real APK instead, in ``tests/test_androguard_isolation.py``: that the walk it
+runs produces the same index, and that a truncation still says so when it comes
+back over the boundary.
 """
 
 from __future__ import annotations
@@ -173,7 +180,7 @@ def test_the_method_limit_says_the_index_is_incomplete(
     """Two methods are indexed; the other two are not, and the error says how many."""
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    *_, error = backend.extract(apk, FAKE_SHA256, method_limit=2)
+    *_, error = backend._extract_symbols(apk, FAKE_SHA256, method_limit=2)
 
     assert error is not None
     assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
@@ -188,7 +195,7 @@ def test_the_instruction_limit_says_the_index_is_incomplete(
     """The instruction limit stops the walk too, and it says what it cost."""
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    *_, error = backend.extract(apk, FAKE_SHA256, instruction_limit=0)
+    *_, error = backend._extract_symbols(apk, FAKE_SHA256, instruction_limit=0)
 
     assert error is not None
     assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
@@ -206,7 +213,7 @@ def test_the_string_limit_says_the_index_is_incomplete(
     everything the APK holds."""
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    *_, error = backend.extract(apk, FAKE_SHA256, string_limit=1)
+    *_, error = backend._extract_symbols(apk, FAKE_SHA256, string_limit=1)
 
     assert error is not None
     assert error.code is ToolErrorCode.OUTPUT_TRUNCATED
@@ -231,7 +238,7 @@ def test_the_string_budget_is_one_per_apk_not_one_per_dex(
     monkeypatch.setattr(_FakeApk, "dex_count", 4)
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    *_, strings, error = backend.extract(apk, FAKE_SHA256, string_limit=3)
+    *_, strings, error = backend._extract_symbols(apk, FAKE_SHA256, string_limit=3)
 
     assert len(strings) == 3, "each DEX file got a budget of its own"
     assert error is not None
@@ -247,7 +254,7 @@ def test_the_instruction_budget_is_one_per_apk_not_one_per_dex(
     monkeypatch.setattr(_FakeApk, "dex_count", 4)
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    classes, methods, _fields, _refs, _strings, error = backend.extract(
+    classes, methods, _fields, _refs, _strings, error = backend._extract_symbols(
         apk, FAKE_SHA256, instruction_limit=2
     )
 
@@ -267,7 +274,7 @@ def test_a_budget_that_is_spent_is_not_reported_again_per_dex(
     monkeypatch.setattr(_FakeApk, "dex_count", 4)
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    *_, error = backend.extract(apk, FAKE_SHA256, string_limit=1)
+    *_, error = backend._extract_symbols(apk, FAKE_SHA256, string_limit=1)
 
     assert error is not None
     assert error.message.count("string limit") == 1
@@ -279,7 +286,7 @@ def test_a_run_that_hit_no_limit_reports_no_truncation(
     """The limits are limits, not a permanent condition."""
     apk = _write_minimal_apk(tmp_path / "fake.apk")
 
-    classes, methods, _fields, _refs, strings, error = backend.extract(apk, FAKE_SHA256)
+    classes, methods, _fields, _refs, strings, error = backend._extract_symbols(apk, FAKE_SHA256)
 
     assert error is None
     assert len(classes) == 2
