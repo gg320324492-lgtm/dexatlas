@@ -8,17 +8,21 @@ Cross-references are recovered by walking bytecode: Androguard 4.x removed the x
 cache, so a call edge is found by scanning each method's instructions for an
 invoke-form opcode and reading the target out of its last operand.
 
-Androguard runs in-process rather than as a subprocess — it is a Python library, so
-there is nothing to shell out to. That is the one exception to the subprocess rule, and
-it is why every step below is wrapped: a malformed DEX raises inside Androguard, and
-that must still land as a recorded :class:`ToolError` rather than kill the run.
+Androguard is a Python library, so there is no tool to shell out to — but the DEX
+files it parses are untrusted, and a library parses them in the process that called it.
+So the parse is put in a process of its own: a worker that the service starts, bounds
+and throws away. A malformed DEX that takes the interpreter down takes down the
+worker, and the service carries on with a recorded parse failure. The index the
+worker produces is the index the service would have produced itself.
+
+See :mod:`dexatlas.tools.androguard.worker` for the worker, and
+``docs/architecture/runtime-isolation.md`` for what the boundary is and why.
 """
 
 from __future__ import annotations
 
 import importlib.util
 import logging
-import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -37,6 +41,7 @@ from dexatlas.core.models import (
     ToolErrorCode,
     canonical_descriptor,
 )
+from dexatlas.tools.androguard.isolation import WorkerJob, run_worker
 from dexatlas.tools.base import Backend
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -93,13 +98,41 @@ def _to_dotted(name: str) -> str:
     return name.lstrip("L").rstrip(";").replace("/", ".")
 
 
+#: The name Loguru files Androguard's records under.
+#:
+#: Loguru takes the name from the module the call was made in, so this covers
+#: ``androguard`` itself and every module under it.
+ANDROGUARD_LOGGER_NAME = "androguard"
+
+
 @contextmanager
-def _quiet_androguard() -> Iterator[None]:
-    """Silence Androguard's loguru output.
+def _suppress_androguard_logging() -> Iterator[None]:
+    """Silence Androguard's loguru output, and nothing else.
 
     On a large APK it emits thousands of parse-trace lines at DEBUG, which buries the
-    CLI's own output. Suppressed here rather than configured globally, because the
-    library may legitimately be used at debug level elsewhere in the process.
+    CLI's own output.
+
+    The suppression is by *name*: Loguru's ``disable``/``enable`` pair turns off the
+    records whose module is ``androguard`` or one of its children, and leaves every
+    handler in the process exactly where it was. The version this replaced called
+    ``logger.remove()``, which deletes *every* handler the process has — including
+    the default one and every handler the host application installed. One analysis
+    was enough to leave the host with no logging at all, and nothing in the library
+    could put it back.
+
+    Two things about the switch are worth knowing, because both are the price of
+    not touching the host's handlers:
+
+    - The switch is global, not per-thread. Two analyses running at once share it,
+      so the first to finish turns it back on for the one still running. The cost
+      is a few extra DEBUG lines in that second analysis.
+    - If the host application had disabled Androguard's logging itself, this turns
+      it back on. Loguru offers no way to read that state back, and leaving it
+      disabled for good would be the worse of the two mistakes.
+
+    Measured on the fixture APK: an analysis emits 200 records, every one of them
+    under ``androguard.``; with the name switched off, none of them reaches a
+    handler.
     """
     try:
         from loguru import logger as loguru_logger
@@ -107,16 +140,23 @@ def _quiet_androguard() -> Iterator[None]:
         yield
         return
 
-    previous = os.environ.get("LOGURU_LEVEL")
-    os.environ["LOGURU_LEVEL"] = "ERROR"
-    loguru_logger.remove()
+    loguru_logger.disable(ANDROGUARD_LOGGER_NAME)
     try:
         yield
     finally:
-        if previous is None:
-            os.environ.pop("LOGURU_LEVEL", None)
-        else:
-            os.environ["LOGURU_LEVEL"] = previous
+        loguru_logger.enable(ANDROGUARD_LOGGER_NAME)
+
+
+def _replay_logs(entries: list[tuple[int, str, str]]) -> None:
+    """Log what the worker logged.
+
+    The worker is a different process, so the records it wrote would never reach
+    the service's log. They come back with the result and are logged here, under
+    the name they were written under, so the service says what it would have said
+    had the parse happened in-process.
+    """
+    for level, name, message in entries:
+        logging.getLogger(name).log(level, message)
 
 
 class AndroguardBackend(Backend):
@@ -126,10 +166,14 @@ class AndroguardBackend(Backend):
     path_env_var = ""
     install_hint = "Install the analysis extra: uv sync --extra analysis"
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, tool_version: str | None = None) -> None:
         super().__init__(settings)
-        self._version: str | None = None
-        self._version_probed = False
+        # The version can be pinned as well as probed. The worker is given the
+        # version the service resolved, so the provenance records it writes carry
+        # the same version the service would have written, even though the two
+        # processes resolved it separately.
+        self._version: str | None = tool_version
+        self._version_probed = tool_version is not None
 
     def resolve(self) -> Path | None:
         """No executable to locate: this backend is a library, so its installed package
@@ -194,10 +238,54 @@ class AndroguardBackend(Backend):
         Returns ``(classes, methods, fields, references, strings, error)``. On failure
         the error is populated and whatever was indexed so far is returned — never an
         exception.
+
+        The DEX files are parsed by a worker process rather than here. Parsing is the
+        part of the analysis that runs on bytes the service did not write, so it is
+        the part that gets a process of its own: a DEX file that takes the
+        interpreter down takes down the worker, and the service sees a recorded
+        parse failure instead of a dead process.
         """
         if not androguard_available():
             return [], [], [], [], [], self.missing_error()
 
+        job = WorkerJob(
+            apk_path=str(apk.resolve()),
+            apk_sha256=apk_sha256,
+            method_limit=method_limit,
+            string_limit=string_limit,
+            instruction_limit=instruction_limit,
+            tool_version=self.version(),
+            log_level=logging.getLogger().getEffectiveLevel(),
+        )
+        outcome = run_worker(self, job, timeout=self._settings.tool_timeout_seconds)
+        if outcome.result is not None:
+            _replay_logs(outcome.result.logs)
+            return outcome.result.as_index()
+        return [], [], [], [], [], outcome.error
+
+    def _extract_symbols(
+        self,
+        apk: Path,
+        apk_sha256: str,
+        *,
+        method_limit: int = DEFAULT_METHOD_LIMIT,
+        string_limit: int = DEFAULT_STRING_LIMIT,
+        instruction_limit: int = DEFAULT_INSTRUCTION_LIMIT,
+    ) -> tuple[
+        list[ClassRef],
+        list[MethodRef],
+        list[FieldRef],
+        list[MethodReference],
+        list[StringConstant],
+        ToolError | None,
+    ]:
+        """Index the APK's DEX files, in this process.
+
+        This is the worker's job, and the only place where untrusted DEX bytes are
+        parsed. The service reaches it through the worker rather than directly, so
+        that a DEX file which takes the interpreter down cannot take the service
+        down with it.
+        """
         try:
             from androguard.core.apk import APK
             from androguard.core.dex import DEX
@@ -232,73 +320,76 @@ class AndroguardBackend(Backend):
         walk_stopped = False
 
         try:
-            with _quiet_androguard():
+            # The suppression covers the whole parse, the DEX reading included.
+            # It used to stop after the archive was opened, and the parse stayed
+            # quiet only because the handler removal it relied on was permanent.
+            with _suppress_androguard_logging():
                 apk_obj = APK(str(apk))
                 # Androguard returns filters here, not sequences.
                 names = list(apk_obj.get_dex_names())
                 blobs = list(apk_obj.get_all_dex())
                 dex_count = len(blobs)
 
-            for index, blob in enumerate(blobs):
-                dex_name = names[index] if index < len(names) else f"classes{index + 1}.dex"
-                locator = f"androguard:{dex_name}"
-                try:
-                    dex = DEX(blob)
-                except Exception as exc:
-                    logger.warning("androguard: %s could not be parsed: %s", dex_name, exc)
-                    failures.append(
-                        ToolError(
-                            tool=self.name,
-                            code=ToolErrorCode.PARSE_ERROR,
-                            message=f"androguard could not parse {dex_name}",
-                            detail=f"{type(exc).__name__}: {exc}"[:2000],
+                for index, blob in enumerate(blobs):
+                    dex_name = names[index] if index < len(names) else f"classes{index + 1}.dex"
+                    locator = f"androguard:{dex_name}"
+                    try:
+                        dex = DEX(blob)
+                    except Exception as exc:
+                        logger.warning("androguard: %s could not be parsed: %s", dex_name, exc)
+                        failures.append(
+                            ToolError(
+                                tool=self.name,
+                                code=ToolErrorCode.PARSE_ERROR,
+                                message=f"androguard could not parse {dex_name}",
+                                detail=f"{type(exc).__name__}: {exc}"[:2000],
+                            )
                         )
-                    )
-                    continue
+                        continue
 
-                try:
-                    literal_sites, instructions_seen, truncation = self._index_dex(
-                        dex,
-                        apk_sha256=apk_sha256,
-                        dex_name=dex_name,
-                        classes=classes,
-                        methods=methods,
-                        fields=fields,
-                        references=references,
-                        method_limit=method_limit,
-                        instruction_limit=instruction_limit,
-                        instructions_seen=instructions_seen,
-                    )
-                    if truncation is not None:
-                        # A walk budget is spent: the files after this one are
-                        # not walked, so nothing of theirs is in the index.
-                        _record_truncation(truncations, truncation)
-                        walk_stopped = True
-                    if strings_indexed < string_limit:
-                        dex_strings, string_truncation = self._index_strings(
+                    try:
+                        literal_sites, instructions_seen, truncation = self._index_dex(
                             dex,
-                            apk_sha256,
-                            locator,
-                            string_limit,
-                            literal_sites,
-                            already_indexed=strings_indexed,
+                            apk_sha256=apk_sha256,
+                            dex_name=dex_name,
+                            classes=classes,
+                            methods=methods,
+                            fields=fields,
+                            references=references,
+                            method_limit=method_limit,
+                            instruction_limit=instruction_limit,
+                            instructions_seen=instructions_seen,
                         )
-                        strings.extend(dex_strings)
-                        strings_indexed += len(dex_strings)
-                        if string_truncation is not None:
-                            _record_truncation(truncations, string_truncation)
-                    if walk_stopped:
-                        break
-                except Exception as exc:
-                    logger.warning("androguard: indexing %s failed: %s", dex_name, exc)
-                    failures.append(
-                        ToolError(
-                            tool=self.name,
-                            code=ToolErrorCode.PARSE_ERROR,
-                            message=f"androguard could not fully index {dex_name}",
-                            detail=f"{type(exc).__name__}: {exc}"[:2000],
+                        if truncation is not None:
+                            # A walk budget is spent: the files after this one are
+                            # not walked, so nothing of theirs is in the index.
+                            _record_truncation(truncations, truncation)
+                            walk_stopped = True
+                        if strings_indexed < string_limit:
+                            dex_strings, string_truncation = self._index_strings(
+                                dex,
+                                apk_sha256,
+                                locator,
+                                string_limit,
+                                literal_sites,
+                                already_indexed=strings_indexed,
+                            )
+                            strings.extend(dex_strings)
+                            strings_indexed += len(dex_strings)
+                            if string_truncation is not None:
+                                _record_truncation(truncations, string_truncation)
+                        if walk_stopped:
+                            break
+                    except Exception as exc:
+                        logger.warning("androguard: indexing %s failed: %s", dex_name, exc)
+                        failures.append(
+                            ToolError(
+                                tool=self.name,
+                                code=ToolErrorCode.PARSE_ERROR,
+                                message=f"androguard could not fully index {dex_name}",
+                                detail=f"{type(exc).__name__}: {exc}"[:2000],
+                            )
                         )
-                    )
         except Exception as exc:
             logger.warning("androguard: analysis of %s failed: %s", apk.name, exc)
             failures.append(
