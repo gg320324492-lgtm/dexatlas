@@ -23,14 +23,14 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:199-225` |
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:130-229` |
 | manifest 的版本号 / SDK（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:417-448` |
-| 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:370-384` |
+| 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:461-475` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:573-734` 的 `class_source_document` / `method_source_document` |
-| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:463-475` |
+| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:554-566` |
 | 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:403-456` |
-| 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:388-397` |
-| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:479-487` |
-| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:576-596` |
-| 字符串常量**出现在哪** | **Androguard**（遍历字节码时记录 `const-string` 的引用点） | `StringConstant.class_name` / `method_name` | `tools/androguard/adapter.py:576-596` |
+| 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:479-488` |
+| 交叉引用（调用边） | **Androguard**（唯一，遍历字节码得到） | `MethodReference` | `tools/androguard/adapter.py:570-578` |
+| 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:667-687` |
+| 字符串常量**出现在哪** | **Androguard**（遍历字节码时记录 `const-string` 的引用点） | `StringConstant.class_name` / `method_name` | `tools/androguard/adapter.py:667-687` |
 | 资源里的**文本**（`res/values*/` 下的 `<string>`、`<string-array>`、`<plurals>`） | **Apktool** | `ResourceString` | `tools/apktool/adapter.py:233-355` |
 
 几条需要注意的推论：
@@ -687,7 +687,7 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   （`tools/androguard/adapter.py:7-9`），所以每条边都是扫指令得到的。
   这条遍历有硬上限：`DEFAULT_METHOD_LIMIT = 200_000`、
   `DEFAULT_INSTRUCTION_LIMIT = 5_000_000`、`DEFAULT_STRING_LIMIT = 50_000`
-  （`tools/androguard/adapter.py:53-57`）。**这三个上限是「一次分析」的预算，
+  （`tools/androguard/adapter.py:58-62`）。**这三个上限是「一次分析」的预算，
   不是「一个 DEX 文件」的预算**：它们在整个 APK 上累计，所以一个 4 个 DEX 的 APK
   拿到的仍然是一份额度，而不是四份。**上限的作用是给一次分析的工作量封顶，
   按文件算的话 DEX 越多的 APK 预算越大——恰好是最需要封顶的那种 APK 拿到最多额度。**
@@ -737,9 +737,9 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   前 64 字符相同的两个字符串会得到**相同的 locator**。
 
 - **它是唯一一个跑在进程内的后端。** JADX 和 Apktool 是子进程（`tools/base.py:138` 的 `run`），
-  Androguard 是 Python 库，直接 import 进我们的进程（`tools/androguard/adapter.py:201-203` 的 `APK` / `DEX`）。
+  Androguard 是 Python 库，直接 import 进我们的进程（`tools/androguard/adapter.py:289-291` 的 `APK` / `DEX`）。
   所以 DEX 解析崩溃会打在**我们**的进程里——代码用 try/except 把它兜成 `ToolError`
-  （`tools/androguard/adapter.py:201-218`），但解析器本身的内存安全风险是继承来的。
+  （`tools/androguard/adapter.py:289-306`），但解析器本身的内存安全风险是继承来的。
 
 - **它答不了「这个方法反编译出来了吗」。** Androguard 读 DEX，能回答「这个方法有没有
   字节码」——但那不是同一个问题，而且几乎每个方法都有字节码，所以这个答案没有信息量。
@@ -956,7 +956,7 @@ com.example.demo.SyncService class
 
 **根因：** Androguard 4.1.4 的 `get_descriptor()` 返回
 `'(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;'`（带空格），
-而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:667-696`）在解析调用目标时
+而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:758-787`）在解析调用目标时
 **去掉了空格**。于是 `methods` 表里存的是带空格的 id，`xrefs` 表里存的是不带空格的 id，
 **两张表按字符串精确相等是连不上的**：
 

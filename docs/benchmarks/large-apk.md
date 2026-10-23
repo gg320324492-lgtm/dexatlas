@@ -47,9 +47,9 @@ The three budgets the adapter enforces, and where they live:
 
 | Constant | Value | Definition |
 |---|---|---|
-| `DEFAULT_METHOD_LIMIT` | 200,000 | `src/dexatlas/tools/androguard/adapter.py:53` |
-| `DEFAULT_STRING_LIMIT` | 50,000 | `src/dexatlas/tools/androguard/adapter.py:55` |
-| `DEFAULT_INSTRUCTION_LIMIT` | 5,000,000 | `src/dexatlas/tools/androguard/adapter.py:57` |
+| `DEFAULT_METHOD_LIMIT` | 200,000 | `src/dexatlas/tools/androguard/adapter.py:58` |
+| `DEFAULT_STRING_LIMIT` | 50,000 | `src/dexatlas/tools/androguard/adapter.py:60` |
+| `DEFAULT_INSTRUCTION_LIMIT` | 5,000,000 | `src/dexatlas/tools/androguard/adapter.py:62` |
 
 | Scale | Classes | Methods/class | Instructions/method | DEX files | Purpose |
 |---|---|---|---|---|---|
@@ -504,7 +504,7 @@ ncalls  tottime  cumtime  filename:lineno(function)
 and the instruction walk — the actual work — took about a second.
 
 **Fixed by:** two changes. The adapter's `version()` now probes once and
-remembers the answer (`src/dexatlas/tools/androguard/adapter.py:144-172`), and
+remembers the answer (`src/dexatlas/tools/androguard/adapter.py:188-216`), and
 the `Provenance` record now takes its version from a single probe per backend
 rather than one per record (`src/dexatlas/tools/base.py:255-274`).
 
@@ -660,4 +660,4 @@ are fixed. What is left is smaller, and none of it is a defect:
   to name — a constant that does not exist — is gone; the three limits the
   adapter actually enforces are `DEFAULT_METHOD_LIMIT`,
   `DEFAULT_STRING_LIMIT` and `DEFAULT_INSTRUCTION_LIMIT` at
-  `src/dexatlas/tools/androguard/adapter.py:53-57`.
+  `src/dexatlas/tools/androguard/adapter.py:58-62`.
