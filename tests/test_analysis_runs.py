@@ -240,7 +240,6 @@ def test_a_failed_re_analysis_leaves_the_published_snapshot_alone(
     before_classes = _published_symbols(analyzer, project_id)
     before_evidence = _published_evidence(analyzer, project_id)
     before_counts = (first.project.class_count, first.project.evidence_count)
-    published = analyzer.store.get_published_run_id(project_id)
 
     def boom(self: Store, project_id: str, evidence: list[Evidence]) -> int:
         raise RuntimeError("the evidence could not be written")
@@ -261,9 +260,37 @@ def test_a_failed_re_analysis_leaves_the_published_snapshot_alone(
     # The failure is still visible: the project says the last attempt failed.
     assert stored.status.value == "failed"
     assert any(error.code is ToolErrorCode.ANALYSIS_FAILED for error in stored.errors)
-    # And the snapshot is still the run that published it.
+
+
+def test_a_failed_re_analysis_leaves_the_published_run_published(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The snapshot that is left behind is still the run that published it.
+
+    The pointer names a run, and a run that failed does not become the
+    published one: the project keeps pointing at the run whose results it
+    still holds.
+    """
+    analyzer = Analyzer(settings)
+    _patch_dex_reader(monkeypatch, "com.fake.First")
+    first = _analyse(analyzer, minimal_apk)
+    project_id = first.project.id
+    published = analyzer.store.get_published_run_id(project_id)
     assert published is not None
+
+    def boom(self: Store, project_id: str, evidence: list[Evidence]) -> int:
+        raise RuntimeError("the evidence could not be written")
+
+    monkeypatch.setattr(Store, "save_evidence", boom)
+    _patch_dex_reader(monkeypatch, "com.fake.Second")
+
+    with pytest.raises(AnalysisFailed):
+        _analyse(analyzer, minimal_apk)
+
     assert analyzer.store.get_published_run_id(project_id) == published
+    failed = analyzer.store.list_runs(project_id)[0]
+    assert failed.status is RunStatus.FAILED
+    assert failed.id != published
 
 
 def test_a_run_that_finds_nothing_does_not_replace_the_published_snapshot(
@@ -280,7 +307,6 @@ def test_a_run_that_finds_nothing_does_not_replace_the_published_snapshot(
     first = _analyse(analyzer, minimal_apk)
     project_id = first.project.id
 
-    published = analyzer.store.get_published_run_id(project_id)
     before_classes = _published_symbols(analyzer, project_id)
     before_evidence = _published_evidence(analyzer, project_id)
 
@@ -290,7 +316,22 @@ def test_a_run_that_finds_nothing_does_not_replace_the_published_snapshot(
     assert not result.succeeded
     assert _published_symbols(analyzer, project_id) == before_classes
     assert _published_evidence(analyzer, project_id) == before_evidence
+
+
+def test_a_run_that_finds_nothing_leaves_the_published_run_published(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run with nothing to publish does not become the published one."""
+    analyzer = Analyzer(settings)
+    _patch_dex_reader(monkeypatch, "com.fake.First")
+    first = _analyse(analyzer, minimal_apk)
+    project_id = first.project.id
+    published = analyzer.store.get_published_run_id(project_id)
     assert published is not None
+
+    _patch_dex_reader(monkeypatch)
+    _analyse(analyzer, minimal_apk)
+
     assert analyzer.store.get_published_run_id(project_id) == published
 
 
