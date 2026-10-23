@@ -520,19 +520,50 @@ class EvidenceKind(StrEnum):
     OBSERVATION = "observation"
 
 
+#: The kinds whose record is a conclusion about a place in the code.
+#:
+#: A declaration is not one of them: a class declaration is the index rather
+#: than a conclusion, and it is the one code record whose provenance may be
+#: empty. An observation is not one either: it is a statement about the
+#: analysis -- how much of the APK was decompiled, which backend failed -- and
+#: it points at the analysis rather than at a place in the code.
+#:
+#: What the two kinds have in common is that they claim something about a
+#: *place*, so a reader who follows the citation arrives somewhere. That is
+#: what makes them the kinds whose provenance has to hold up.
+CODE_FINDING_KINDS = frozenset({EvidenceKind.CODE_LOCATED, EvidenceKind.CROSS_REFERENCE})
+
+#: The kind whose record is a finding *located* in the code.
+#:
+#: A located finding is the one whose whole meaning is the place: it says
+#: "here is the thing, in this file, at this method". So it cannot be
+#: verified without a citation, and it cannot be verified without an analysis
+#: to resolve that citation against. A cross-reference is a fact about the
+#: index, and the index is the analysis's own artifact.
+LOCATED_FINDING_KIND = EvidenceKind.CODE_LOCATED
+
+
 class EvidenceLevel(StrEnum):
     """How much weight a finding carries.
 
-    Model output is never promoted past :attr:`LEAD`. The mechanism is in
-    :class:`Evidence`: a ``BEHAVIOUR`` record may not carry :attr:`VERIFIED`,
-    so a claim that no tool established cannot be rendered as a finding.
+    There are two contracts, and they are separate on purpose.
 
-    ``VERIFIED`` is what a deterministic tool established, with a locatable
-    code location. ``LEAD`` is what a model or a heuristic suspects. Nothing
-    DexAtlas writes today is a suspicion -- every record it writes was read
-    out of a tool's output -- so the level a record carries is ``VERIFIED``.
-    The other two are the ceiling for the claims that are not facts, and the
-    rule above is what keeps them there.
+    A **deterministic observation** is something a tool read. It may be
+    :attr:`VERIFIED`, and a verified observation about code has to carry
+    provenance that resolves inside the analysis -- the mechanism is in
+    :class:`~dexatlas.core.evidence.EvidenceBuilder`, which refuses a
+    verified code finding whose citation names nothing that is there.
+
+    A **model-generated claim** is something a model said. It may never be
+    :attr:`VERIFIED`: the mechanism for that is in :class:`Evidence`, where a
+    ``BEHAVIOUR`` record is refused that level, and in
+    :meth:`~dexatlas.core.evidence.EvidenceBuilder.add_claim`, which does not
+    offer the level in the first place. A claim that a tool later confirms is
+    not that claim promoted: it is the tool's own record, and the two say
+    different things.
+
+    :attr:`LEAD` is what a model or a heuristic suspects, and
+    :attr:`INSUFFICIENT` is what neither kind of evidence settles.
     """
 
     VERIFIED = "verified"
@@ -573,6 +604,31 @@ class Evidence(Sourced):
             raise ValueError(
                 "a behaviour claim may not be verified: only a tool can establish a fact. "
                 "Record the tool's confirmation as its own evidence."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _a_verified_code_finding_carries_its_provenance(self) -> Self:
+        """A verified finding located in the code has to say where in the code.
+
+        ``VERIFIED`` is rendered as "deterministically established by an
+        analysis tool", and the record is what a reader follows to the place
+        the tool read. A located finding with no provenance at all has no
+        place to follow to, so it cannot be what the report says it is.
+
+        This is the half of the rule that needs no context: the shape of the
+        record is checkable wherever it is built. Whether the provenance
+        *resolves* -- whether the locator names something that is really there
+        -- needs the analysis, and that is the builder's rule.
+        """
+        if (
+            self.level is EvidenceLevel.VERIFIED
+            and self.kind is LOCATED_FINDING_KIND
+            and not self.provenance
+        ):
+            raise ValueError(
+                "a verified code finding must carry provenance: verified means a tool "
+                "established this, and the record has to name the place it did"
             )
         return self
 
