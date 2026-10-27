@@ -18,8 +18,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->985<!--/fig--> 个（<!--fig:tests.fast-->849<!--/fig--> 快 + <!--fig:tests.slow-->136<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->90.9%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1055<!--/fig--> 个（<!--fig:tests.fast-->919<!--/fig--> 快 + <!--fig:tests.slow-->136<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->91.2%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -140,9 +140,9 @@ native 库、内存。这些要等下一个手里有真实样本的人。
 | `cross_references_with_evidence` 数的是被调方法数，而 `cross_references` 数的是边数 | 重要 | 已修 |
 | 超过 200 个类时，反编译覆盖率那条证据被挤出报告的证据表 | 重要 | 已修 |
 | API 导出的报告写「Analysis time 0.0s」，与 CLI 导出的同一份不一致 | 中 | 已修 |
-| `xrefs` 表没有主键，同一条调用边可以写进多行 | 重要 | 见 [Phase 2 issue 清单](reports/phase2-issue-list.md) |
-| workspace 并发不安全：同一个 APK 的两次分析共用一个目录 | 重要 | 见 Phase 2 清单 |
-| `EvidenceKind.CODE_LOCATED` / `BEHAVIOUR`、`EvidenceLevel.LEAD` / `INSUFFICIENT` 没有任何生产者 | 中 | 见 Phase 2 清单 |
+| `xrefs` 表没有主键，同一条调用边可以写进多行 | 重要 | 见 [Phase 2 issue 清单](reports/phase2-issue-list.md)（P2-003 待做） |
+| workspace 并发不安全：同一个 APK 的两次分析共用一个目录 | 重要 | 已修（P2-002：每次分析写进自己的目录，发布前不可见） |
+| `EvidenceKind.CODE_LOCATED` / `BEHAVIOUR`、`EvidenceLevel.LEAD` / `INSUFFICIENT` 没有任何生产者 | 中 | 部分已修（P2-004：`BEHAVIOUR` / `LEAD` / `INSUFFICIENT` 现在由 `add_claim` 产出；`CODE_LOCATED` 仍然没有） |
 
 **「已修」的每一条都配一个在旧代码上会红的测试**——不是「测试通过」，
 是「把修复撤掉，测试必须红」。这一轮共验证了 21 处破坏实验。
@@ -175,10 +175,11 @@ M0 有五条，每条带验收标准，都在
 命令行用**自己的退出码**（4），API 用 **409**，
 「没有源码」「请求不对」「分析失败」这几个码仍然各说各的。
 
-**P2-002 / P2-004 / P2-005 在并行做**：分别是 `AnalysisRun` 与事务化结果、
-已验证证据的不变量、运行时隔离。三条的文件归属不重叠，各走各的分支，各自带验收标准。
+**P2-002 / P2-004 / P2-005 已交付**：分别是 `AnalysisRun` 与事务化结果、
+已验证证据的不变量、运行时隔离。三条各走各的分支、文件归属不重叠，
+每一条都配了**在旧实现上会红**的回归测试。
 
-剩下的 **P2-003（CallSite / CallEdge 语义）排在 P2-002 之后**——
+剩下的 **P2-003（CallSite / CallEdge 语义）**是 M0 的最后一条：
 它要动同一张 `xrefs` 表，而那张表上还开着一条旧缺陷
 （`xrefs` 没有主键，同一条调用边可以写进多行，见上表）。
 
@@ -193,6 +194,10 @@ M0 有五条，每条带验收标准，都在
 | 文档里的引用会漂移没人管 | `scripts/check-doc-citations.py` 现在真的校验 94 处引用里的 93 处（原来只查 18 处） |
 | 版本声明检查器在自己的目标场景下失效 | base 提交用它自己的事实重算，判据从「数量」改成「身份」 |
 | 报告里的数字从不重新测量 | 数字改成真测：新增收集的测试数 + coverage 自己解析出的语句数；指纹覆盖 `tests/` 和工具配置 |
+| 重载同名时解析靠猜 | 按完整 DEX descriptor 解析；名字对上多个重载时**明说歧义**并列出候选，CLI 退出码 4、API 409 |
+| 重分析就地覆盖，两个运行的符号和证据混在一起 | 每次分析有**自己的运行身份**，结果先暂存、再一次事务发布；没发布的那次不碰上一个已发布的快照 |
+| 证据的等级是约定，不是机制 | `verified` 的代码结论必须带着**能在分析里解析的引用**；模型的说法走另一条路（`add_claim`），写不成 `verified` |
+| 后端把宿主的日志整个删掉；不受信的 DEX 在服务进程里解析 | 压制改成**按名字**（不动宿主的 handler）；DEX 解析搬进**单独的 worker 进程**，解析失败被记下来而不是服务崩掉 |
 
 那一轮找出三个真缺陷值得单独记一句，因为它们是**产品**的缺陷，不是文档的：
 
