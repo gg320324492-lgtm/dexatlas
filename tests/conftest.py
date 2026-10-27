@@ -6,6 +6,8 @@ markers in it. No third-party APK ever enters this repository or its test suite.
 
 from __future__ import annotations
 
+import os
+import tempfile
 import zipfile
 from pathlib import Path
 
@@ -13,6 +15,24 @@ import pytest
 
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.jadx.adapter import JadxBackend
+
+#: The project's own scratch area, inside the repository.
+#:
+#: A test run writes temporary files, and the temporary directory is a
+#: *machine* setting, not a project one — the default is the system
+#: temporary directory, which on Windows is on the system drive. This
+#: project keeps everything about itself inside its own folder, so the
+#: temporary directory is moved here before anything writes to it.
+#:
+#: The variables are set before the module is imported by anything that
+#: might ask for a temporary file, and ``tempfile.tempdir`` is reset so
+#: that the cached value from an earlier import does not survive.
+SCRATCH_DIR = Path(__file__).resolve().parent.parent / ".scratch" / "tmp"
+
+for _name in ("TMPDIR", "TEMP", "TMP"):
+    os.environ[_name] = str(SCRATCH_DIR)
+tempfile.tempdir = None
+SCRATCH_DIR.mkdir(parents=True, exist_ok=True)
 
 #: A minimal but real AndroidManifest. Not valid on a device — it is here to exercise
 #: manifest parsing, not to be installed.

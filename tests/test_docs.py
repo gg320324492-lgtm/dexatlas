@@ -24,7 +24,19 @@ REPO_ROOT = Path(__file__).parent.parent
 RELATIVE_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)\s]+)")
 
 #: Directories whose contents are generated or third-party.
-SKIP_DIRS = {".git", ".venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache"}
+#: The project's own local state lives in ``.scratch``: the analysis backends,
+#: the helper scripts, the temporary files and the packages uv has fetched.
+#: It is not part of the project, and a checker that walked it would be
+#: reading copies of the documents rather than the documents.
+SKIP_DIRS = {
+    ".git",
+    ".venv",
+    ".scratch",
+    "node_modules",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+}
 
 #: Suffixes that mark a file as an analysis artefact rather than source.
 #:

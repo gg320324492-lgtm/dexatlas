@@ -149,7 +149,10 @@ NOT_SYMBOLS = {
 }
 
 #: Directories that are never part of a citation's target.
-SKIP_DIRECTORIES = {".git", ".venv", "build", ".claude", "node_modules"}
+#: The project's local state: the backends, the helper scripts, the temporary
+#: files and the packages uv has fetched. A citation that resolved to a copy
+#: of a file in there would be a citation to the wrong tree.
+SKIP_DIRECTORIES = {".git", ".venv", "build", ".claude", ".scratch", "node_modules"}
 
 
 @dataclass(frozen=True)

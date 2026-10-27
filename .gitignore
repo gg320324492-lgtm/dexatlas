@@ -81,3 +81,9 @@ Thumbs.db
 # is a full copy of the repository, so leaving it untracked-but-unignored would
 # let a stray `git add .` commit a second copy of the whole project.
 .claude/
+
+# The project's scratch area: the analysis backends, the helper scripts, the
+# temporary files the suite writes, and the leftovers moved off the system
+# drive. It is local state, never committed, and it lives inside the project
+# folder so that nothing about this project lands on the system drive.
+.scratch/

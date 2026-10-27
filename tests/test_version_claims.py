@@ -920,6 +920,27 @@ def test_the_checker_answers_in_a_tree_that_has_no_git(
     assert facts.newest_tag == "0.1.3"
 
 
+def test_git_is_not_asked_about_a_plain_directory_inside_a_checkout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A directory inside a checkout is not that checkout.
+
+    Git answers questions about the *containing* repository: run ``git tag``
+    in a directory that happens to be inside a checkout and it reports that
+    checkout's tags. A tree that is not a checkout of its own has no tags of
+    its own, and a checker that reports another tree's releases is reporting
+    a fact about a different tree.
+
+    This is not a hypothetical. The suite's temporary directory sits inside
+    the project folder, so every tree the checker was pointed at was inside a
+    checkout -- and the checker answered with this repository's tags.
+    """
+    checker = _checker()
+    monkeypatch.setattr(checker, "REPO", REPO_ROOT / "docs")
+
+    assert checker.git_optional("tag", "--list") is None
+
+
 def test_the_checker_finds_a_claim_in_a_tree_that_has_no_git(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

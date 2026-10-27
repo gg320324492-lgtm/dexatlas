@@ -418,8 +418,26 @@ def git_succeeds(*args: str) -> bool:
     return result.returncode == 0
 
 
+def is_a_checkout() -> bool:
+    """Whether the tree is a checkout of a repository, rather than a directory
+    that merely sits inside one.
+
+    Git answers questions about the *containing* repository: run ``git tag``
+    in a directory that happens to be inside a checkout and it reports that
+    checkout's tags. A tree that is not a checkout of its own has no tags of
+    its own, and a checker that answers with another tree's tags is answering
+    a different question than the one it was asked.
+
+    The test is the tree's own ``.git`` entry: a directory for a clone, a file
+    for a worktree. A plain directory inside a checkout has neither.
+    """
+    return (REPO / ".git").exists()
+
+
 def git_optional(*args: str) -> str | None:
     """The output of a git command, or None when the command does not work."""
+    if not is_a_checkout():
+        return None
     result = subprocess.run(
         ["git", *args],
         cwd=REPO,
