@@ -27,11 +27,11 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from dexatlas.core.calls import CallSite
 from dexatlas.core.models import (
     ClassRef,
     FieldRef,
     MethodRef,
-    MethodReference,
     StringConstant,
     ToolError,
     ToolErrorCode,
@@ -66,7 +66,7 @@ SymbolIndex = tuple[
     list[ClassRef],
     list[MethodRef],
     list[FieldRef],
-    list[MethodReference],
+    list[CallSite],
     list[StringConstant],
     ToolError | None,
 ]
@@ -99,7 +99,7 @@ class WorkerResult:
     classes: list[ClassRef]
     methods: list[MethodRef]
     fields: list[FieldRef]
-    references: list[MethodReference]
+    references: list[CallSite]
     strings: list[StringConstant]
     error: ToolError | None = None
     logs: list[tuple[int, str, str]] = field(default_factory=list)
@@ -205,7 +205,7 @@ def decode_result(payload: dict[str, Any]) -> WorkerResult:
         classes=[ClassRef.model_validate(item) for item in raw_classes],
         methods=[MethodRef.model_validate(item) for item in raw_methods],
         fields=[FieldRef.model_validate(item) for item in raw_fields],
-        references=[MethodReference.model_validate(item) for item in raw_references],
+        references=[CallSite.model_validate(item) for item in raw_references],
         strings=[StringConstant.model_validate(item) for item in raw_strings],
         error=ToolError.model_validate(raw_error) if raw_error else None,
         logs=logs,

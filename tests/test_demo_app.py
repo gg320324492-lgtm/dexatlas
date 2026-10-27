@@ -136,7 +136,7 @@ def test_every_declared_callee_is_findable_by_its_own_method_id(
 
     with analyzer.store.transaction() as connection:
         rows = connection.execute(
-            "SELECT caller, callee FROM xrefs WHERE project_id = ?", (project_id,)
+            "SELECT caller, callee FROM call_sites WHERE project_id = ?", (project_id,)
         ).fetchall()
     calls = {(row["caller"], row["callee"]) for row in rows if row["callee"] in declared}
 

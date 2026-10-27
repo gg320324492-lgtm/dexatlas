@@ -8,6 +8,7 @@ from typing import Any
 from dexatlas.core.models import (
     Evidence,
     Project,
+    cross_reference_call_edges,
     cross_reference_call_sites,
     cross_reference_records,
     index_gaps,
@@ -94,6 +95,14 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
     return {
         "classes": result.project.class_count,
         "methods": result.project.method_count,
+        # The two counts, each saying which of the two it is. The old names
+        # are kept: their values did not change, so a reader that knows them
+        # still reads the right number, and a reader that wants to know what
+        # the number means has a name that says it.
+        "call_sites": result.project.reference_count,
+        "call_edges": result.project.call_edge_count,
+        "call_sites_with_evidence": cross_reference_call_sites(result.evidence),
+        "call_edges_with_evidence": cross_reference_call_edges(result.evidence),
         "cross_references": result.project.reference_count,
         # The strings the resource table declared. A separate number from the
         # DEX string pool, because they are separate things: one is what the

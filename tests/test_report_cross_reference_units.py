@@ -1,22 +1,27 @@
-"""The cross-reference numbers in a report are about three different things.
+"""The cross-reference numbers in a report are about two different things.
 
-The report prints the number of indexed cross-references beside the number
-of cross-references that have an evidence record, and the two used to be
-counted in different units: the index holds one row per call *edge*, and a
-record is made per *called method*. A method called from three places is
-three edges and one record, so the report said "1" next to "3" — and a reader
-who took that as "one of the three calls is backed by evidence" was reading a
-ratio that was never there.
+A **call site** is one place in the bytecode where a call happens. A **call
+edge** is the relationship between two methods, aggregated over the sites
+that make it. One method that calls the same target twice is two call sites
+and one call edge, and the report used to print the two kinds of number
+side by side without saying which was which — so a reader who took "1" next
+to "3" for a ratio was reading one that was never there.
 
 The numbers the report states now are:
 
-* ``cross_references`` — the call edges the index holds;
-* ``cross_references_with_evidence`` — the call sites a record covers; one
-  record is made per called method of this APK and it covers every call site
-  of that method, so the sites add up to more than the records;
+* ``call_sites`` — the call sites the index holds, one row per place in the
+  bytecode;
+* ``call_edges`` — the call edges those sites make;
+* ``call_sites_with_evidence`` — the call sites the evidence records cover;
+  one record is made per called method of this APK and it covers every call
+  site of that method, so the sites add up to more than the records;
+* ``call_edges_with_evidence`` — the call edges those records cover;
 * ``cross_reference_records`` — the number of those records.
 
-The expected numbers in these tests are counted from the call edges
+The old names are kept in the JSON report as well: their values did not
+change, so a reader that knows them still reads the right number.
+
+The expected numbers in these tests are counted from the call sites
 themselves. A test that computed the expectation with the same measure the
 report uses would pass whatever the report said.
 """
@@ -29,6 +34,7 @@ from pathlib import Path
 import pytest
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.calls import CallSite
 from dexatlas.core.models import (
     ClassKind,
     ClassRef,
@@ -165,8 +171,13 @@ def test_the_report_counts_the_call_sites_the_records_cover(
 
     report = render_markdown(result)
 
-    assert f"| Cross-references indexed | {_FAN_IN} |" in report
-    assert f"| Cross-references with evidence | {_FAN_IN} |" in report
+    assert f"| Call sites indexed | {_FAN_IN} |" in report
+    assert f"| Call sites with evidence | {_FAN_IN} |" in report
+    # One caller per site here, so the edges and the sites are the same
+    # number. The two are counted apart anyway, and the test that says so
+    # is the one that calls the same method twice.
+    assert f"| Call edges indexed | {_FAN_IN} |" in report
+    assert f"| Call edges with evidence | {_FAN_IN} |" in report
     # And the records themselves: one per called method of this APK.
     assert "| Cross-reference records | 1 |" in report
 
@@ -198,10 +209,7 @@ def test_the_two_reports_state_the_same_number(
     summary = build_json_report(result)["summary"]
     report = render_markdown(result)
 
-    assert (
-        f"| Cross-references with evidence | {summary['cross_references_with_evidence']} |"
-        in report
-    )
+    assert f"| Call sites with evidence | {summary['cross_references_with_evidence']} |" in report
     assert f"| Cross-reference records | {summary['cross_reference_records']} |" in report
 
 
@@ -242,14 +250,14 @@ def test_the_report_says_what_the_three_numbers_count(
 
     report = render_markdown(result)
 
-    assert "call edges the index holds" in report
-    assert "call sites a cross-reference record covers" in report
+    assert "call site" in report
+    assert "call edge" in report
     # The note qualifies the numbers above it, so it has to reach the reader
     # before the report moves on to the next thing.
-    assert report.index("| Cross-references indexed |") < report.index(
-        "The cross-reference counts are three numbers"
+    assert report.index("| Call sites indexed |") < report.index(
+        "The cross-reference counts are about two different things"
     )
-    assert report.index("The cross-reference counts are three numbers") < report.index(
+    assert report.index("The cross-reference counts are about two different things") < report.index(
         "## Evidence levels"
     )
 
@@ -326,18 +334,24 @@ def _one_caller_twice(
             "androguard:classes.dex#com.example.Caller#com.example.Caller.call()V",
         ),
     )
+    # Two calls: the same caller, the same target, at two different places
+    # in the bytecode. Without the offsets the two would be one call site --
+    # and one call site is one row, which is the whole point of the
+    # distinction.
     edges = [
-        MethodReference(
+        CallSite(
             caller=caller.qualified_name,
             callee=callee.qualified_name,
             kind=InvocationKind.STATIC,
+            dex_name="classes.dex",
+            instruction_offset=offset,
             provenance=_provenance(
                 apk_sha256,
                 "androguard:classes.dex#com.example.Caller.call()V->"
                 "com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;",
             ),
         )
-        for _ in range(2)
+        for offset in (0x1A, 0x2C)
     ]
     classes = [
         ClassRef(
@@ -353,12 +367,13 @@ def _one_caller_twice(
 def test_the_number_beside_the_indexed_rows_counts_rows(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One caller, two calls: two indexed rows, and a number that says so.
+    """One caller, two calls: two call sites and one call edge.
 
-    The record names the caller once, so the number of call sites is one
-    while the number of indexed rows is two. The report states the number
-    that can be compared with the rows -- the edges -- and the rows it
-    covers must not exceed them.
+    The two calls are at two different offsets in the caller's bytecode, so
+    they are two call sites -- two rows in the index. They are one call
+    edge, because an edge is the relationship between two methods and the
+    relationship did not change. The report states both, and they are
+    different numbers.
     """
     classes, methods, edges = _one_caller_twice(_hash_of(minimal_apk))
     analyzer = Analyzer(settings)
@@ -369,10 +384,15 @@ def test_the_number_beside_the_indexed_rows_counts_rows(
     monkeypatch.setattr(analyzer._androguard, "extract", extract)
     result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
 
-    assert result.project.reference_count == 2, "the index should hold one row per call"
+    assert result.project.reference_count == 2, "the index should hold one row per call site"
+    assert result.project.call_edge_count == 1, "two calls from one caller are one edge"
 
     summary = build_json_report(result)["summary"]
 
+    assert summary["call_sites"] == 2
+    assert summary["call_edges"] == 1
     assert summary["cross_references"] == 2
     assert summary["cross_references_with_evidence"] == 2
+    assert summary["call_sites_with_evidence"] == 2
+    assert summary["call_edges_with_evidence"] == 1
     assert summary["cross_reference_records"] == 1

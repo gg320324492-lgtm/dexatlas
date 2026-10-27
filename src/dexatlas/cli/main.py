@@ -233,7 +233,8 @@ def analyze(
     console.print(
         f"[bold green]{mark(OK)}[/bold green] {project.id} {mark(DASH)} "
         f"{project.class_count:,} classes, {project.method_count:,} methods, "
-        f"{project.reference_count:,} cross-references, "
+        f"{project.reference_count:,} call sites, "
+        f"{project.call_edge_count:,} call edges, "
         f"{project.resource_count:,} {_resource_word(project.resource_count)} "
         f"([dim]{result.duration_seconds:.1f}s[/dim])"
     )
@@ -664,8 +665,16 @@ def xrefs(
         err_console.print(f"[yellow]No callers of {method_id}.[/yellow]")
         raise ExitCode(code=EXIT_EMPTY)
 
+    # The two counts, because the two are different: a caller that calls the
+    # same method twice is two call sites and one call edge.
+    edges = len({(row.caller, row.kind) for row in rows})
+    console.print(f"[dim]{len(rows)} call site(s), {edges} call edge(s)[/dim]")
     for row in rows:
-        console.print(f"  [bold]{row.caller}[/bold]  {mark(ARROW)} [dim]{row.callee}[/dim]")
+        console.print(
+            f"  [bold]{row.caller}[/bold]  {mark(ARROW)} [dim]{row.callee}[/dim]"
+            f"  [dim]{row.dex_name or '-'}"
+            f"{f'@{row.instruction_offset}' if row.instruction_offset >= 0 else ''}[/dim]"
+        )
 
 
 def main() -> None:

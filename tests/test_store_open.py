@@ -120,9 +120,15 @@ def test_a_new_workspace_is_created(tmp_path: Path) -> None:
     Store.open(path)
 
     assert path.exists()
-    assert {"projects", "classes", "methods", "fields", "xrefs", "strings", "resources"} <= _tables(
-        path
-    )
+    assert {
+        "projects",
+        "classes",
+        "methods",
+        "fields",
+        "call_sites",
+        "strings",
+        "resources",
+    } <= _tables(path)
     assert _version(path) == (SCHEMA_VERSION,)
 
 

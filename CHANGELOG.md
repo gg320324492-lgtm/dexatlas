@@ -43,6 +43,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A cross-reference could not say where a call happened.** The index held one row
+  per call, and the row said who called whom and how — but not *where*. A method
+  that called the same target twice held two rows that said exactly the same thing,
+  and a table keyed on the caller and the callee could not tell "called twice" from
+  "written twice". The rows are **call sites** now: each carries the DEX file it
+  was read out of and the instruction offset it sits at, and the key carries both,
+  so the two kinds of duplication stay apart. A **call edge** — the relationship
+  between two methods — is derived from the sites rather than stored beside them,
+  and the report states the two numbers separately and says which is which
+  (`Call sites indexed` beside `Call edges indexed`), because the review found a
+  report printing two different units side by side and a reader taking a ratio
+  that was never there. The old names stay in the JSON report: their values did
+  not change. The table was rebuilt rather than altered — SQLite cannot change a
+  primary key in place — and the project's count of the rows went with it, because
+  a record that says "23 cross-references" while the table holds nothing is a
+  number a reader cannot check.
+
 - **A method asked for by name could be the wrong one.** `read_method_source` took
   the first declaration whose *name* matched and returned it, so a class with two
   overloads of `sign` answered every request for `sign` with whichever one the

@@ -159,7 +159,7 @@ def test_the_stored_xref_ids_are_canonical(store: Store, tmp_path: Path) -> None
 
     with store.transaction() as connection:
         row = connection.execute(
-            "SELECT caller, callee FROM xrefs WHERE project_id = ?", (project.id,)
+            "SELECT caller, callee FROM call_sites WHERE project_id = ?", (project.id,)
         ).fetchone()
     assert row is not None
     assert row["callee"] == CANONICAL_ID
@@ -195,8 +195,8 @@ def test_a_workspace_indexed_before_canonicalisation_still_resolves(
             ),
         )
         connection.execute(
-            "INSERT INTO xrefs VALUES (?,?,?,?,?)",
-            (project.id, CALLER, stored_callee, "invoke", "[]"),
+            "INSERT INTO call_sites VALUES (?,?,?,?,?,?,?)",
+            (project.id, CALLER, stored_callee, "invoke", "", -1, "[]"),
         )
 
     # The id as the old `dexatlas methods` printed it.
@@ -215,8 +215,8 @@ def test_a_lookup_is_unaffected_by_the_spelling_of_the_stored_callee(
     with store.transaction() as connection:
         for callee in (CANONICAL_ID, SPACED_ID):
             connection.execute(
-                "INSERT INTO xrefs VALUES (?,?,?,?,?)",
-                (project.id, CALLER, callee, "invoke", "[]"),
+                "INSERT INTO call_sites VALUES (?,?,?,?,?,?,?)",
+                (project.id, CALLER, callee, "invoke", "", -1, "[]"),
             )
 
     found = store.get_method_references(project.id, CANONICAL_ID)

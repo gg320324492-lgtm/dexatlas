@@ -436,7 +436,7 @@ def test_the_reported_counts_are_the_rows_in_the_tables(samples: dict[str, objec
 
         assert project.class_count == len(analyzer.store.list_classes(project_id)), name
         assert project.method_count == len(analyzer.store.list_methods(project_id)), name
-        assert project.reference_count == _row_count(analyzer, "xrefs", project_id), name
+        assert project.reference_count == _row_count(analyzer, "call_sites", project_id), name
 
 
 def test_a_class_row_counts_the_rows_its_own_table_holds(samples: dict[str, object]) -> None:
@@ -500,7 +500,7 @@ def test_a_class_defined_in_two_dexes_is_one_method_with_two_sources(
 def _xref_rows(analyzer: Analyzer, project_id: str) -> list[sqlite3.Row]:
     with analyzer.store.transaction() as connection:
         return connection.execute(
-            "SELECT caller, callee, kind FROM xrefs WHERE project_id = ?", (project_id,)
+            "SELECT caller, callee, kind FROM call_sites WHERE project_id = ?", (project_id,)
         ).fetchall()
 
 

@@ -276,6 +276,13 @@ class ProjectResponse(BaseModel):
     class_count: int
     method_count: int
     reference_count: int
+    """How many call *sites* the index holds: one per place in the bytecode
+    where a call happens."""
+
+    call_edge_count: int
+    """How many call *edges* the index holds: one per relationship between
+    two methods, aggregated over the call sites that make it."""
+
     evidence_count: int
     resource_count: int
     tool_versions: dict[str, str | None]
@@ -881,12 +888,19 @@ def get_method_source(
 def get_references(project_id: str, method_id: str, analyzer: AnalyzerDep) -> dict[str, Any]:
     """Callers of a method, addressed as ``com.example.Foo.bar(Ljava/lang/String;)V``."""
     references = analyzer.store.get_method_references(project_id, method_id)
+    # Two numbers, because the two are different: a caller that calls the same
+    # method twice is two call sites and one call edge. The response says
+    # which is which rather than leaving the reader to guess from a number
+    # called "total".
+    edges = len({(r.caller, r.kind) for r in references})
     return {
         "project_id": project_id,
         # The canonical spelling, not whatever the caller typed. A response that
         # echoes the request is less useful than one that can be pasted into the
         # next call, and the two spellings differ in exactly the way that matters.
         "method_id": canonical_method_id(method_id),
+        "call_sites": len(references),
+        "call_edges": edges,
         "total": len(references),
         "references": [r.model_dump(mode="json") for r in references],
     }
@@ -1179,6 +1193,7 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
         class_count=project.class_count,
         method_count=project.method_count,
         reference_count=project.reference_count,
+        call_edge_count=project.call_edge_count,
         evidence_count=project.evidence_count,
         resource_count=project.resource_count,
         tool_versions=project.tool_versions,

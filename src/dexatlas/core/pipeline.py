@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.calls import CallSite
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
 from dexatlas.core.methods import AmbiguousMethodError, MethodCandidate, simple_class_name
@@ -312,6 +313,7 @@ class Analyzer:
             project.class_count = counts.classes
             project.method_count = counts.methods
             project.reference_count = counts.references
+            project.call_edge_count = counts.call_edges
             project.resource_count = counts.resources
             project.status = (
                 ProjectStatus.FAILED if not classes and not manifest else ProjectStatus.COMPLETED
@@ -522,7 +524,7 @@ class Analyzer:
         list[ClassRef],
         list[MethodRef],
         list[FieldRef],
-        list[MethodReference],
+        list[CallSite],
         list[StringConstant],
         ToolError | None,
     ]:

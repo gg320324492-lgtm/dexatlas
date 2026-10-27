@@ -451,7 +451,8 @@ def test_the_caller_count_is_stated_even_when_the_list_is_truncated() -> None:
 
     evidence = builder.items[0]
     assert evidence.detail["truncated"] is True
-    assert evidence.detail["call_count"] == MAX_LISTED_CALLERS + 5
+    assert evidence.detail["call_site_count"] == MAX_LISTED_CALLERS + 5
+    assert evidence.detail["call_edge_count"] == MAX_LISTED_CALLERS + 5
     assert len(evidence.detail["callers"]) == MAX_LISTED_CALLERS
 
 

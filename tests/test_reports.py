@@ -305,13 +305,22 @@ def test_markdown_records_missing_backends() -> None:
     assert "androguard not installed" in report
 
 
-def test_markdown_tells_indexed_cross_references_from_evidence() -> None:
+def test_markdown_tells_call_sites_from_call_edges() -> None:
+    """The two numbers say which of the two they are.
+
+    A call site is one place in the bytecode; a call edge is the
+    relationship between two methods. A report that prints both without
+    saying which is which asks the reader to guess, and a reader who guesses
+    wrong reads a ratio that is not there.
+    """
     result = _result(evidence=[_cross_reference()])
 
     report = render_markdown(result)
 
-    assert "| Cross-references indexed | 3,100 |" in report
-    assert "| Cross-references with evidence | 1 |" in report
+    assert "| Call sites indexed | 3,100 |" in report
+    assert "| Call sites with evidence | 1 |" in report
+    assert "| Call edges indexed |" in report
+    assert "| Call edges with evidence |" in report
 
 
 def test_markdown_explains_which_cross_references_become_evidence() -> None:

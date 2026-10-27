@@ -15,6 +15,7 @@ from dexatlas.core.models import (
     ManifestInfo,
     Project,
     ProjectStatus,
+    cross_reference_call_edges,
     cross_reference_call_sites,
     cross_reference_records,
     index_gaps,
@@ -42,18 +43,19 @@ _XREF_NOTE = (
     "cover add up to more than the number of records."
 )
 
-#: What the three cross-reference numbers count, said where they are.
+#: What the cross-reference numbers count, said where they are.
 #:
-#: They are three numbers about three different things, and they are printed
-#: next to each other. A reader who takes them for the same thing reads a
-#: ratio out of them that is not there: "3 of 23 cross-references have
-#: evidence" is a claim about the same 23 that the third number contradicts.
+#: They are about two different things, and they are printed next to each
+#: other. A reader who takes a call site and a call edge for the same thing
+#: reads a ratio out of them that is not there: "3 of 23 call sites have
+#: evidence" is a claim about the same 23 that the edge count contradicts.
 _XREF_COUNT_NOTE = [
-    "> **The cross-reference counts are three numbers about three things.** The",
-    "> indexed count is the call edges the index holds, one row per call. The",
-    "> count with evidence is the call sites a cross-reference record covers:",
-    "> one record is made per called method of this APK, and it covers every call",
-    "> site of that method. The record count is the number of those records.",
+    "> **The cross-reference counts are about two different things.** A *call site* is",
+    "> one place in the bytecode where a call happens. A *call edge* is the",
+    "> relationship between two methods, aggregated over the sites that make it:",
+    "> one method that calls the same target twice is two call sites and one call",
+    "> edge. A reader who takes the two for the same thing reads a ratio out of",
+    "> them that is not there.",
 ]
 
 #: What an incomplete index means for the numbers beside it.
@@ -114,11 +116,16 @@ def render_markdown(result: AnalysisResult) -> str:
         )
     metrics += [
         ("Resource strings indexed", f"{project.resource_count:,}"),
-        ("Cross-references indexed", f"{project.reference_count:,}"),
+        # The two counts are about two different things, and each of them
+        # says which: a call *site* is one place in the bytecode where a
+        # call happens, a call *edge* is the relationship between two methods.
+        ("Call sites indexed", f"{project.reference_count:,}"),
+        ("Call edges indexed", f"{project.call_edge_count:,}"),
         # The call sites the cross-reference records cover, and the number of
         # records themselves. The two are different numbers about different
         # things: one record covers every call site of the method it is about.
-        ("Cross-references with evidence", f"{cross_reference_call_sites(result.evidence):,}"),
+        ("Call sites with evidence", f"{cross_reference_call_sites(result.evidence):,}"),
+        ("Call edges with evidence", f"{cross_reference_call_edges(result.evidence):,}"),
         ("Cross-reference records", f"{cross_reference_records(result.evidence):,}"),
         ("Evidence records", f"{project.evidence_count:,}"),
         ("DEX files", f"{len(project.apk.dex_files)}"),

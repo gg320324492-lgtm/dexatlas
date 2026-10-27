@@ -358,8 +358,22 @@ def test_a_worker_that_runs_out_of_memory_is_recorded_not_fatal(
 def test_a_worker_that_outlives_its_timeout_is_killed(
     backend: AndroguardBackend, hostile_apk: Path
 ) -> None:
-    """The runtime is bounded, and the bound is enforced rather than hoped for."""
-    outcome = run_worker(backend, _job(hostile_apk, backend), timeout=1)
+    """The runtime is bounded, and the bound is enforced rather than hoped for.
+
+    The bound is a quarter of a second, and that is deliberate. The hostile
+    DEX is half a gigabyte of nothing, and unpacking it costs about half a
+    second — so a bound of a second sits right on the edge between "the
+    worker was killed for running too long" and "the worker finished and
+    reported the error it found", and which one happens depends on the
+    machine and on what the disk has cached. A bound that short is
+    overtaken by neither: the worker cannot have finished, whatever the
+    machine is doing, so the outcome the test asserts is the only outcome
+    there is.
+
+    What the test is about is the *bound* — that a worker which runs past
+    it is killed — and not how long the work takes.
+    """
+    outcome = run_worker(backend, _job(hostile_apk, backend), timeout=0.25)
 
     assert outcome.error is not None
     assert outcome.error.code is ToolErrorCode.TIMEOUT

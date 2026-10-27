@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Self
 
+from dexatlas.core.calls import CallSite, as_call_site
 from dexatlas.core.models import (
     ApkMetadata,
     ClassKind,
@@ -39,7 +40,7 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 #: The tables that hold a project's published snapshot.
 #:
@@ -58,7 +59,7 @@ _PROJECT_TABLES = (
     "classes",
     "methods",
     "fields",
-    "xrefs",
+    "call_sites",
     "strings",
     "resources",
     "search_index",
@@ -81,8 +82,40 @@ class SymbolCounts:
     methods: int
     fields: int
     references: int
+    """The call sites the index holds.
+
+    One row per place in the bytecode where a call happens. Two calls from
+    one method to one target are two rows, and they are two *sites* -- the
+    count is not a count of edges, and the two are different numbers.
+    """
+
+    call_edges: int = 0
+    """The call edges the index holds.
+
+    One per relationship between two methods, aggregated over the call sites
+    that make it up.
+    """
+
     resources: int = 0
 
+
+#: The call-site table, written out by the migration as well as by the schema.
+#:
+#: It is written here as well so that the migration and the schema cannot
+#: drift apart: a table that exists in one and not the other is a workspace
+#: that is rebuilt on every open.
+_CALL_SITES_TABLE = """
+CREATE TABLE IF NOT EXISTS call_sites (
+    project_id         TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    caller             TEXT NOT NULL,
+    callee             TEXT NOT NULL,
+    kind               TEXT NOT NULL DEFAULT 'invoke',
+    dex_name           TEXT NOT NULL DEFAULT '',
+    instruction_offset INTEGER NOT NULL DEFAULT -1,
+    provenance         TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (project_id, caller, callee, kind, dex_name, instruction_offset)
+)
+"""
 
 _RESOURCES_TABLE = """
 CREATE TABLE IF NOT EXISTS resources (
@@ -119,6 +152,7 @@ CREATE TABLE IF NOT EXISTS projects (
     class_count      INTEGER NOT NULL DEFAULT 0,
     method_count     INTEGER NOT NULL DEFAULT 0,
     reference_count  INTEGER NOT NULL DEFAULT 0,
+    call_edge_count  INTEGER NOT NULL DEFAULT 0,
     evidence_count   INTEGER NOT NULL DEFAULT 0,
     resource_count   INTEGER NOT NULL DEFAULT 0,
     duration_seconds REAL,
@@ -185,12 +219,24 @@ CREATE TABLE IF NOT EXISTS fields (
     PRIMARY KEY (project_id, class_name, name, descriptor)
 );
 
-CREATE TABLE IF NOT EXISTS xrefs (
-    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    caller     TEXT NOT NULL,
-    callee     TEXT NOT NULL,
-    kind       TEXT NOT NULL DEFAULT 'invoke',
-    provenance TEXT NOT NULL DEFAULT '[]'
+-- One row per call site: one place in the bytecode where a call happens.
+--
+-- The key carries the DEX file *and* the instruction offset, because those
+-- are what tell two calls apart. Two calls from one method to one target are
+-- two call sites when their offsets differ, and one call site when they do
+-- not; a method defined in two DEX files is one method with two copies of
+-- its body, and each copy holds its own call sites. A key over the caller
+-- and the callee alone would collapse both, and the call sites could not be
+-- recovered from the table.
+CREATE TABLE IF NOT EXISTS call_sites (
+    project_id         TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    caller             TEXT NOT NULL,
+    callee             TEXT NOT NULL,
+    kind               TEXT NOT NULL DEFAULT 'invoke',
+    dex_name           TEXT NOT NULL DEFAULT '',
+    instruction_offset INTEGER NOT NULL DEFAULT -1,
+    provenance         TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (project_id, caller, callee, kind, dex_name, instruction_offset)
 );
 
 CREATE TABLE IF NOT EXISTS strings (
@@ -217,13 +263,13 @@ CREATE TABLE IF NOT EXISTS evidence (
 
 CREATE INDEX IF NOT EXISTS idx_classes_project ON classes(project_id);
 CREATE INDEX IF NOT EXISTS idx_methods_class   ON methods(project_id, class_name);
-CREATE INDEX IF NOT EXISTS idx_refs_caller     ON xrefs(project_id, caller);
+CREATE INDEX IF NOT EXISTS idx_sites_caller    ON call_sites(project_id, caller);
 -- The lookup compares the *canonical* form of a callee, so the index is on that
 -- form. A workspace indexed before descriptors were canonicalised holds the
 -- spaced spelling, and it still has to be found — without this index the
 -- comparison would be a scan of every cross-reference in the project.
-CREATE INDEX IF NOT EXISTS idx_refs_callee_canonical
-    ON xrefs(project_id, REPLACE(callee, ' ', ''));
+CREATE INDEX IF NOT EXISTS idx_sites_callee_canonical
+    ON call_sites(project_id, REPLACE(callee, ' ', ''));
 CREATE INDEX IF NOT EXISTS idx_strings_project ON strings(project_id);
 CREATE INDEX IF NOT EXISTS idx_resources_project ON resources(project_id);
 CREATE INDEX IF NOT EXISTS idx_resources_name ON resources(project_id, name);
@@ -251,9 +297,9 @@ _PROJECT_UPSERT = """
 INSERT INTO projects (
     id, apk_sha256, apk_path, apk_size_bytes, created_at, status,
     tool_versions, errors, class_count, method_count,
-    reference_count, evidence_count, resource_count, duration_seconds,
-    manifest, workspace
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    reference_count, call_edge_count, evidence_count, resource_count,
+    duration_seconds, manifest, workspace
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     apk_path      = excluded.apk_path,
     status        = excluded.status,
@@ -262,6 +308,7 @@ ON CONFLICT(id) DO UPDATE SET
     class_count   = excluded.class_count,
     method_count  = excluded.method_count,
     reference_count = excluded.reference_count,
+    call_edge_count = excluded.call_edge_count,
     evidence_count  = excluded.evidence_count,
     resource_count  = excluded.resource_count,
     duration_seconds = excluded.duration_seconds,
@@ -360,6 +407,32 @@ def _migrate(connection: sqlite3.Connection) -> None:
         # are the published snapshot of an analysis nobody recorded -- so the
         # pointer reads as nothing rather than as a run that never happened.
         connection.execute("ALTER TABLE projects ADD COLUMN published_run_id TEXT")
+    if "call_edge_count" not in columns:
+        # The number of call *edges*, beside the number of call sites. A
+        # workspace analysed before the call sites were distinguished counted
+        # rows, and a row was not an edge: two calls from one method to one
+        # target were two rows and one edge.
+        connection.execute(
+            "ALTER TABLE projects ADD COLUMN call_edge_count INTEGER NOT NULL DEFAULT 0"
+        )
+    site_columns = {row["name"] for row in connection.execute("PRAGMA table_info(call_sites)")}
+    legacy = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'xrefs'"
+    ).fetchone()
+    if legacy is not None or (site_columns and "instruction_offset" not in site_columns):
+        # The cross-reference table used to hold one row per call, and two
+        # calls from the same method to the same target were two rows that
+        # said the same thing. The rows are call sites now: they carry the DEX
+        # file and the instruction offset that tell them apart. SQLite cannot
+        # change a primary key in place, so the table is dropped and created
+        # empty -- and the rows do not survive it, which is affordable
+        # because the table is a cache of an analysis rather than a source of
+        # truth. The project's own count of them goes with them, or the
+        # record would say "23" while the table held nothing.
+        connection.execute("DROP TABLE IF EXISTS xrefs")
+        connection.execute("DROP TABLE IF EXISTS call_sites")
+        connection.execute(_CALL_SITES_TABLE)
+        connection.execute("UPDATE projects SET reference_count = 0, call_edge_count = 0")
 
     resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
     if resource_columns and "position" not in resource_columns:
@@ -821,16 +894,18 @@ class Store:
                 ],
             )
             connection.executemany(
-                "INSERT INTO xrefs VALUES (?,?,?,?,?)",
+                "INSERT OR REPLACE INTO call_sites VALUES (?,?,?,?,?,?,?)",
                 [
                     (
                         project_id,
-                        canonical_method_id(r.caller),
-                        canonical_method_id(r.callee),
-                        r.kind.value,
-                        _dump_provenance(r),
+                        canonical_method_id(site.caller),
+                        canonical_method_id(site.callee),
+                        site.kind.value,
+                        site.dex_name,
+                        site.instruction_offset,
+                        _dump_provenance(site),
                     )
-                    for r in reference_list
+                    for site in (as_call_site(r) for r in reference_list)
                 ],
             )
             connection.executemany(
@@ -868,7 +943,8 @@ class Store:
                 classes=_count_rows(connection, "classes", project_id),
                 methods=_count_rows(connection, "methods", project_id),
                 fields=_count_rows(connection, "fields", project_id),
-                references=_count_rows(connection, "xrefs", project_id),
+                references=_count_rows(connection, "call_sites", project_id),
+                call_edges=_count_call_edges(connection, project_id),
                 resources=_count_rows(connection, "resources", project_id),
             )
 
@@ -902,8 +978,13 @@ class Store:
             rows = connection.execute(query, params).fetchall()
         return [_row_to_method(row) for row in rows]
 
-    def get_method_references(self, project_id: str, method_id: str) -> list[MethodReference]:
-        """Callers of ``method_id``, formatted ``com.foo.Bar.baz(Ljava/lang/String;)V``.
+    def get_method_references(self, project_id: str, method_id: str) -> list[CallSite]:
+        """The call sites of ``method_id``, formatted ``com.foo.Bar.baz(Ljava/lang/String;)V``.
+
+        One row per place in the bytecode where the call happens, so two
+        calls from the same method to the same target are two rows and say
+        so. The caller and the callee are the *edge*; the DEX file and the
+        instruction offset are the *site*.
 
         The comparison is on the canonical form of both sides: the id is
         canonicalised here, and the stored callee is canonicalised by the index. So a
@@ -917,10 +998,12 @@ class Store:
         canonical = canonical_method_id(method_id)
         with self.transaction() as connection:
             rows = connection.execute(
-                "SELECT * FROM xrefs WHERE project_id = ? AND REPLACE(callee, ' ', '') = ?",
+                "SELECT * FROM call_sites "
+                "WHERE project_id = ? AND REPLACE(callee, ' ', '') = ? "
+                "ORDER BY caller, kind, dex_name, instruction_offset",
                 (project_id, canonical),
             ).fetchall()
-        return [_row_to_reference(row) for row in rows]
+        return [_row_to_call_site(row) for row in rows]
 
     def list_resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
         """The resource strings indexed for a project.
@@ -1039,6 +1122,7 @@ def _save_project(
             project.class_count,
             project.method_count,
             project.reference_count,
+            project.call_edge_count,
             project.evidence_count,
             project.resource_count,
             project.duration_seconds,
@@ -1102,6 +1186,22 @@ def _copy_staged_symbols(connection: sqlite3.Connection, project_id: str, staged
 
 def _dump_provenance(item: Any) -> str:
     return json.dumps([p.model_dump(mode="json") for p in item.provenance])
+
+
+def _count_call_edges(connection: sqlite3.Connection, project_id: str) -> int:
+    """How many call edges a project's call sites make.
+
+    An edge is the caller, the callee and the way the call is made. The
+    sites are the rows; the edges are what those rows say *about* each other,
+    and the two are different numbers: a method that calls the same target
+    twice is two sites and one edge.
+    """
+    row = connection.execute(
+        "SELECT COUNT(*) FROM (SELECT DISTINCT caller, callee, kind FROM call_sites "
+        "WHERE project_id = ?)",
+        (project_id,),
+    ).fetchone()
+    return int(row[0]) if row else 0
 
 
 def _count_rows(connection: sqlite3.Connection, table: str, project_id: str) -> int:
@@ -1210,6 +1310,18 @@ def _row_to_reference(row: sqlite3.Row) -> MethodReference:
         caller=row["caller"],
         callee=row["callee"],
         kind=row["kind"],
+        provenance=json.loads(row["provenance"]),
+    )
+
+
+def _row_to_call_site(row: sqlite3.Row) -> CallSite:
+    """The call site a row holds: the edge, and where in the bytecode it is."""
+    return CallSite(
+        caller=row["caller"],
+        callee=row["callee"],
+        kind=row["kind"],
+        dex_name=row["dex_name"],
+        instruction_offset=row["instruction_offset"],
         provenance=json.loads(row["provenance"]),
     )
 

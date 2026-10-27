@@ -363,7 +363,7 @@ def test_the_index_holds_every_cross_reference_the_apk_contains(
     project = analysis["project"]
     with analysis["analyzer"].store.transaction() as connection:
         rows = connection.execute(
-            "SELECT COUNT(*) FROM xrefs WHERE project_id = ?", (project.id,)
+            "SELECT COUNT(*) FROM call_sites WHERE project_id = ?", (project.id,)
         ).fetchone()
 
     reached = _limits_reached(sample)

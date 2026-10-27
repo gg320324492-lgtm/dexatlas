@@ -647,7 +647,7 @@ DECOMPILATION_DETAIL = "decompilation"
 #: here", and the call sites it names are the detail. A record that covered
 #: one call site and a record that covered fifty are the same kind of thing,
 #: and the number of call sites is what tells them apart.
-CROSS_REFERENCE_CALL_COUNT = "call_count"
+CROSS_REFERENCE_SITE_COUNT = "call_site_count"
 
 #: The key under which a cross-reference record's detail states how many
 #: indexed call edges it covers.
@@ -658,7 +658,22 @@ CROSS_REFERENCE_CALL_COUNT = "call_count"
 #: -- so the record states both: the call sites it names, and the edges it
 #: covers. The second is the one that can be compared with the number of
 #: indexed rows.
-CROSS_REFERENCE_EDGE_COUNT = "edge_count"
+CROSS_REFERENCE_EDGE_COUNT = "call_edge_count"
+
+#: The key a record written before the call sites were distinguished used for
+#: the number of distinct callers it covered.
+#:
+#: It is read as a fallback and never written. The number of callers is the
+#: number of edges, near enough: it differs only when one caller makes the
+#: same call in two different ways, which is rare but not impossible.
+LEGACY_CROSS_REFERENCE_CALL_COUNT = "call_count"
+
+#: The key a record written before the call sites were distinguished used for
+#: the number of indexed rows it covered.
+#:
+#: Those rows were calls, so the number was the number of call sites — which
+#: is what the new key says. It is read as a fallback and never written.
+LEGACY_CROSS_REFERENCE_EDGE_COUNT = "edge_count"
 
 
 def cross_reference_records(evidence: Sequence[Evidence]) -> int:
@@ -671,31 +686,62 @@ def cross_reference_records(evidence: Sequence[Evidence]) -> int:
 
 
 def cross_reference_call_sites(evidence: Sequence[Evidence]) -> int:
-    """How many indexed call edges a cross-reference record covers.
+    """How many call sites the cross-reference records cover.
 
     This is the number the two reports state beside the number of indexed
-    cross-references, and it has to be the same unit as that number.
+    call sites, and it has to be the same unit as that number. The indexed
+    call sites are rows, one per place in the bytecode where a call happens,
+    and a record covers the sites of the method it is about. Summing the
+    sites the records cover therefore answers the question the report poses:
+    how many of the indexed call sites are backed by a record.
 
-    The indexed cross-references are rows, one per call, and a record covers
-    the edges of the method it is about. Summing the edges the records cover
-    therefore answers the question the report poses: how many of the indexed
-    calls are backed by a record.
-
-    A record that states no edge count — one written by an older build, or one
-    made by hand — falls back to the call sites it names, and then to one: a
-    record is made from at least one reference, so one is the smallest number
-    it can honestly be.
+    A record that states no site count — one written by an older build, or
+    one made by hand — falls back to the number of indexed rows it covered,
+    then to the number of callers it names, and then to one: a record is made
+    from at least one call site, so one is the smallest number it can honestly
+    be.
     """
+    return _covered_count(
+        evidence,
+        CROSS_REFERENCE_SITE_COUNT,
+        (LEGACY_CROSS_REFERENCE_EDGE_COUNT, LEGACY_CROSS_REFERENCE_CALL_COUNT),
+    )
+
+
+def cross_reference_call_edges(evidence: Sequence[Evidence]) -> int:
+    """How many call edges the cross-reference records cover.
+
+    The same records as :func:`cross_reference_call_sites`, counted the other
+    way: an edge is the relationship between two methods, so a caller that
+    calls the same method twice contributes two call sites and one call edge.
+
+    A record that states no edge count falls back to the number of callers it
+    names — the number of edges, near enough — and then to one.
+    """
+    return _covered_count(
+        evidence,
+        CROSS_REFERENCE_EDGE_COUNT,
+        (LEGACY_CROSS_REFERENCE_CALL_COUNT,),
+    )
+
+
+def _covered_count(evidence: Sequence[Evidence], key: str, fallbacks: Sequence[str]) -> int:
+    """The sum of one count over the cross-reference records."""
     total = 0
     for item in evidence:
         if item.kind is not EvidenceKind.CROSS_REFERENCE:
             continue
-        edges = item.detail.get(CROSS_REFERENCE_EDGE_COUNT)
-        if isinstance(edges, int):
-            total += edges
+        value = item.detail.get(key)
+        if isinstance(value, int):
+            total += value
             continue
-        sites = item.detail.get(CROSS_REFERENCE_CALL_COUNT)
-        total += sites if isinstance(sites, int) else 1
+        for fallback in fallbacks:
+            candidate = item.detail.get(fallback)
+            if isinstance(candidate, int):
+                total += candidate
+                break
+        else:
+            total += 1
     return total
 
 
@@ -725,6 +771,21 @@ class Project(BaseModel):
     class_count: int = 0
     method_count: int = 0
     reference_count: int = 0
+    """How many call *sites* the index holds.
+
+    One per place in the bytecode where a call happens. Two calls from one
+    method to one target are two sites, and the number of the edges they
+    make is a different number -- see ``call_edge_count``.
+    """
+
+    call_edge_count: int = 0
+    """How many call *edges* the index holds.
+
+    One per relationship between two methods, aggregated over the call
+    sites that make it up. A method that calls the same target twice is
+    two call sites and one call edge.
+    """
+
     evidence_count: int = 0
     resource_count: int = 0
     """How many resource strings the resource table held.

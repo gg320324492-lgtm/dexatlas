@@ -523,4 +523,4 @@ def _downgrade_to_schema_3(path: Path) -> None:
         connection.commit()
     finally:
         connection.close()
-    assert SCHEMA_VERSION == 4
+    assert SCHEMA_VERSION == 5

@@ -21,6 +21,8 @@ from dexatlas.core.locators import (
 )
 from dexatlas.core.models import (
     CODE_FINDING_KINDS,
+    CROSS_REFERENCE_EDGE_COUNT,
+    CROSS_REFERENCE_SITE_COUNT,
     LOCATED_FINDING_KIND,
     ClassRef,
     Evidence,
@@ -369,6 +371,16 @@ class EvidenceBuilder:
         if not references:
             return
         callers = sorted({r.caller for r in references})
+        # Two numbers, because the record is about two different things. The
+        # *call sites* are the places in the bytecode where the call happens:
+        # a caller that calls the same method twice contributes two of them.
+        # The *call edges* are the relationships the sites make: the same
+        # caller contributes one, however many times it calls. A record that
+        # stated only one of them would be stating half of what it knows, and
+        # the report cannot put two numbers side by side when one of them
+        # does not say which it is.
+        sites = len(references)
+        edges = len({(r.caller, r.kind) for r in references})
         self.add(
             kind=EvidenceKind.CROSS_REFERENCE,
             # A call edge is read out of the bytecode by a deterministic tool and
@@ -379,12 +391,8 @@ class EvidenceBuilder:
             detail={
                 "callers": callers[:MAX_LISTED_CALLERS],
                 "truncated": len(callers) > MAX_LISTED_CALLERS,
-                "call_count": len(callers),
-                # The indexed cross-references are rows, one per call, and a
-                # caller that calls the same method twice contributes two rows
-                # and one call site. The report states this number beside the
-                # number of indexed rows, so it has to be in the same unit.
-                "edge_count": len(references),
+                CROSS_REFERENCE_SITE_COUNT: sites,
+                CROSS_REFERENCE_EDGE_COUNT: edges,
             },
         )
 
