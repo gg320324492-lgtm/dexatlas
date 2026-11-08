@@ -252,3 +252,31 @@ def test_the_report_carries_the_analysis_it_was_about(demo: Demo, tmp_path: Path
     assert document["analysis"] is not None
     assert document["analysis"]["schema_version"] == 2
     assert document["analysis"]["project"]["id"] == PROJECT_ID
+
+
+def test_the_report_says_what_the_agent_asked(demo: Demo, tmp_path: Path) -> None:
+    """The tool log carries the arguments.
+
+    A reader who wants to reproduce a conclusion has to know what the agent
+    asked: "which query?" and "which method?" are the difference between a
+    check and a guess.
+    """
+    from tests.agent_harness import COLLECT_URL, scripted_provider
+
+    provider = scripted_provider(
+        [
+            (
+                "search_symbols",
+                {"project_id": PROJECT_ID, "query": COLLECT_URL, "limit": 20, "offset": 0},
+            )
+        ],
+        statement="the collect URL is in the index",
+    )
+    orchestrator = make_orchestrator(demo, provider, store=TaskStore(tmp_path / "tasks"))
+
+    state = orchestrator.run("Where is the collect URL used?", project_id=demo.project_id)
+    markdown = render_agent_markdown(orchestrator.report(state))
+
+    assert "search_symbols" in markdown
+    assert "query=" in markdown
+    assert "collect" in markdown

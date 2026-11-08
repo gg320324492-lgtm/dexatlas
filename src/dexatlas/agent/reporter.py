@@ -250,19 +250,27 @@ def _findings_section(title: str, findings: tuple[Evidence, ...]) -> list[str]:
 
 
 def _tool_section(tool_calls: tuple[ToolCallRecord, ...]) -> list[str]:
-    """The tool log: every call, with how it ended."""
+    """The tool log: every call, with what it was asked and how it ended.
+
+    The arguments are in it because a reader who wants to reproduce a
+    conclusion has to know what the agent asked: "which query?" and "which
+    method?" are the difference between a check and a guess.
+    """
     lines = ["", "## What the agent did", ""]
     if not tool_calls:
         lines.append("_No tool was called._")
         return lines
     lines += [
-        "| Tool | Outcome | Detail |",
-        "| --- | --- | --- |",
+        "| Tool | Arguments | Outcome | Detail |",
+        "| --- | --- | --- | --- |",
     ]
     for record in tool_calls:
         outcome = "ok" if record.ok else (record.error_kind or "failed")
         detail = "" if record.ok else (record.error or "")
-        lines.append(f"| `{record.tool}` | {outcome} | {_inline(detail)} |")
+        arguments = ", ".join(
+            f"{name}={value!r}" for name, value in sorted(record.arguments.items())
+        )
+        lines.append(f"| `{record.tool}` | {_inline(arguments)} | {outcome} | {_inline(detail)} |")
     return lines
 
 
