@@ -225,9 +225,11 @@ Four mechanisms, and each of them is tested:
 The test is a real one: the workspace carries an instruction that reads like
 an instruction, and the provider in that test is *deliberately hijackable* —
 it behaves differently depending on whether the injected text reached it as an
-instruction or as data. Removing the mechanism makes the test go red; that is
-demonstrated in the hand-over notes, and the report of it is in the commit
-that carried the property.
+instruction or as data. Removing the mechanism makes the test go red, and
+both ways of removing it were run on the branch: with the channel separation
+taken away the second lock refuses the task outright, and with both locks
+taken away the agent reports exactly what the injected text told it to
+report.
 
 ## The providers
 
