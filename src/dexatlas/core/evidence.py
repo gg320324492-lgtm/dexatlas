@@ -1,8 +1,12 @@
 """Evidence construction.
 
-Evidence ids are stable across re-analysis of the same APK: they are assigned in
-sequence as observations are recorded, so ``E-0007`` in a report resolves back to the
-same row in the database.
+Evidence ids are assigned in sequence as observations are recorded, so ``E-0007``
+in a report resolves back to the same row in the database. They are stable
+across re-analysis of the same APK when the analysis reached the same steps:
+an id is a position in a sequence, and a backend that ran the first time and
+not the second shifts every id after it. An id is therefore a position in one
+run's sequence rather than a property of the APK, and a reader who compares
+two runs has to compare what the runs did, not only the APK.
 
 There are two ways in here, and they are kept apart on purpose: one for what a tool
 read, and one for what a model said. The builder's own docstring says how.
@@ -41,8 +45,11 @@ MAX_LISTED_CALLERS = 50
 
 #: Called methods that get an evidence record. A large app calls thousands of its
 #: own methods, and one record each would bury the findings under index data.
-#: The report's evidence table shows 200 rows, so this leaves room for the class
-#: declarations in the same table.
+#: The report's evidence table shows 200 rows, and the class declarations share
+#: that table: :data:`MAX_EVIDENCE_CLASSES` of them at most. The two limits
+#: together reach 600 records against a table of 200 rows, and the report says
+#: how many it left out. This limit is what keeps the findings from being
+#: drowned by index data; it is not a promise that they all fit.
 MAX_EVIDENCE_CALLED_METHODS = 100
 
 

@@ -34,6 +34,7 @@ from dexatlas.core.pipeline import Analyzer, _merge_classes
 from dexatlas.core.storage import _migrate
 from dexatlas.tools import base
 from dexatlas.tools.androguard.adapter import AndroguardBackend
+from dexatlas.tools.androguard.isolation import run_worker
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.base import Backend
 from dexatlas.tools.jadx.adapter import JadxBackend
@@ -68,9 +69,18 @@ def _class_producers() -> set[str]:
     return {backend.name for backend in BACKENDS if _builds_class_refs(backend)}
 
 
-def _calls_the_subprocess_runner(backend: type[Backend]) -> bool:
-    """Whether an adapter runs a tool through the base class's subprocess runner."""
-    return "self.run(" in inspect.getsource(backend)
+def _parses_where_the_service_stands(backend: type[Backend]) -> bool:
+    """Whether an adapter parses the untrusted input in the service's own process.
+
+    A backend that runs a tool goes through the base class's runner, which
+    starts a process of its own. A backend that is a library has no tool to
+    shell out to, so it has to hand the work to something: either a worker
+    process, or the process it stands in.
+    """
+    source = inspect.getsource(backend)
+    if "self.run(" in source:
+        return False
+    return "run_worker(" not in source
 
 
 # -- the class index --------------------------------------------------------
@@ -136,56 +146,71 @@ def test_the_apktool_step_cannot_contribute_a_class() -> None:
 # -- the backend interface --------------------------------------------------
 
 
-def test_one_backend_parses_in_process_and_the_engines_do_not() -> None:
-    """Androguard is a library, so there is nothing to shell out to.
+def test_no_backend_parses_the_apk_in_the_service_process() -> None:
+    """Every backend reads the APK somewhere else.
 
-    The base class's runner is what puts the engines in a process of their
-    own; a backend that never calls it parses the input where it stands.
+    The DEX reader is a library, so there is no tool to shell out to, and it
+    used to parse the DEX files where the service stood. It parses them in a
+    worker process now, started through the base class's runner, so the
+    service sees a value and never an interpreter that a malformed DEX can
+    take down.
     """
-    in_process = {backend.name for backend in BACKENDS if not _calls_the_subprocess_runner(backend)}
+    in_service = {backend.name for backend in BACKENDS if _parses_where_the_service_stands(backend)}
 
-    assert in_process == {"androguard"}
+    assert not in_service, f"these backends parse the APK in the service's process: {in_service}"
 
 
-def test_the_backend_interface_names_the_backend_that_parses_in_process() -> None:
-    """The base class has to name the exception to its own rule.
+def test_the_dex_reader_hands_its_work_to_a_worker() -> None:
+    """A library has no tool to shell out to, so it starts one of its own.
 
-    The module docstring said that backends are subprocess wrappers and never
-    links, and the Androguard adapter said the opposite two files away. The
-    adapter was right.
+    The worker is started through the base class's runner, so the timeout and
+    the tree kill that bound a backend bound it as well.
     """
-    doc = (base.__doc__ or "").lower()
-    in_process = {backend.name for backend in BACKENDS if not _calls_the_subprocess_runner(backend)}
-
-    missing = sorted(name for name in in_process if name not in doc)
-    assert not missing, f"the backend interface does not name {missing} as the in-process one"
-    assert "in-process" in doc
+    assert "run_worker(" in inspect.getsource(AndroguardBackend)
+    assert "runner.run(" in inspect.getsource(run_worker)
 
 
-def test_the_backend_interface_does_not_say_every_backend_is_a_subprocess() -> None:
-    """The two phrases that made the claim false are gone.
+def test_the_backend_interface_names_the_worker_that_does_it() -> None:
+    """The base class has to say where the DEX reader parses.
 
-    The claim was not wrong in every particular — the engines really are
-    subprocesses — but it was stated as a universal, and one backend is not
-    one.
+    It used to say that the library backend "runs in-process", which stopped
+    being true when the library was given a worker process.
     """
     doc = (base.__doc__ or "").lower()
 
+    assert "androguard" in doc
+    assert "worker" in doc
+    assert "in-process" not in doc, (
+        "the interface still says the DEX reader parses in the service's process"
+    )
+
+
+def test_the_backend_interface_no_longer_carves_the_dex_reader_out() -> None:
+    """The rule covers every backend, so it needs no carve-out.
+
+    The claim was once false in one particular -- the DEX reader parsed
+    where the service stood -- and the interface said so. It parses in a
+    worker process now, so the one rule is the whole rule.
+    """
+    doc = (base.__doc__ or "").lower()
+
+    assert "exception" not in doc, (
+        "the interface still carves the DEX reader out of the rule it states"
+    )
     assert "subprocess wrappers" not in doc
-    assert "never links" not in doc
 
 
-def test_the_backend_interface_says_why_the_in_process_exception_is_safe() -> None:
-    """The exception is only safe because a failure inside it is recorded.
+def test_the_backend_interface_says_what_comes_back_from_the_worker() -> None:
+    """What crosses the boundary is data, and a failure in it is a value.
 
-    A library that raised inside our process would end the run. The adapter
-    wraps every step, so what raises becomes a ``ToolError`` and the run
-    carries on.
+    A worker that dies is a parse failure the pipeline records, not the end
+    of the run -- and that is only safe because the failure comes back as
+    something the pipeline can branch on.
     """
     doc = (base.__doc__ or "").lower()
 
     assert "toolerror" in doc
-    assert "wrapped" in doc
+    assert "data" in doc
 
 
 # -- the schema migration ---------------------------------------------------

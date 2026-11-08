@@ -61,6 +61,15 @@ DEFAULT_STRING_LIMIT = 50_000
 #: Max bytecode instructions walked per APK.
 DEFAULT_INSTRUCTION_LIMIT = 5_000_000
 
+#: The longest a string value may be inside a locator, in characters.
+#:
+#: The locator names the place a value was found, and the value itself is
+#: stored whole in the index, so the locator does not have to carry all of
+#: it. It does have to carry enough of it to say which value is meant -- and
+#: two strings that share these characters share a locator, so the locator
+#: names a place rather than a unique value.
+MAX_LOCATOR_VALUE_CHARS = 64
+
 #: The Dalvik invocation opcodes, and the kind of call each one records. The
 #: target of an invoke opcode is its final operand, and the opcode's own name
 #: says how the call is made: a static call and a virtual call are different
@@ -503,7 +512,9 @@ class AndroguardBackend(Backend):
                         message=(
                             f"method limit {method_limit} reached while indexing {dex_name}: "
                             f"the index is incomplete — {skipped} methods in this file were not "
-                            f"indexed, and the DEX files after it were not walked"
+                            f"indexed, and the DEX files after it were not walked. The limit is "
+                            f"checked between classes rather than inside them, so {len(methods)} "
+                            f"methods were indexed in total"
                         ),
                         detail=(
                             f"{len(methods)} methods were indexed before the limit; the classes "
@@ -671,12 +682,23 @@ class AndroguardBackend(Backend):
                         limit, pool_size, entries_seen, already_indexed + len(constants)
                     )
                     break
+                # The locator names the string by the first
+                # MAX_LOCATOR_VALUE_CHARS characters of it. Two strings that
+                # share those characters therefore share a locator, so the
+                # locator is not a unique name for a value: it names the place
+                # the value was found, and the value itself is stored whole in
+                # the index.
                 uses = sites.get(value, [])
                 if not uses:
                     constants.append(
                         StringConstant(
                             value=value,
-                            provenance=[self.provenance(apk_sha256, f"{locator}#str/{value[:64]}")],
+                            provenance=[
+                                self.provenance(
+                                    apk_sha256,
+                                    f"{locator}#str/{value[:MAX_LOCATOR_VALUE_CHARS]}",
+                                )
+                            ],
                         )
                     )
                 else:
@@ -689,7 +711,8 @@ class AndroguardBackend(Backend):
                                 provenance=[
                                     self.provenance(
                                         apk_sha256,
-                                        f"{locator}#{class_name}.{method_name}#str/{value[:64]}",
+                                        f"{locator}#{class_name}.{method_name}"
+                                        f"#str/{value[:MAX_LOCATOR_VALUE_CHARS]}",
                                     )
                                 ],
                             )

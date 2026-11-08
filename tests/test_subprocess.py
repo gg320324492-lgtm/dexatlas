@@ -165,7 +165,21 @@ def test_missing_error_names_the_tool(settings) -> None:
 
     assert error.code == ToolErrorCode.NOT_INSTALLED
     assert "stub" in error.message
-    assert "DEXATLAS_" in (error.detail or "")
+    # A backend with no environment variable of its own must not be told to
+    # set one. The base class used to carry a placeholder that read like a
+    # real variable name -- DEXATLAS_<BACKEND>_PATH -- and a reader who
+    # followed it had set an environment variable that nothing reads.
+    assert "DEXATLAS_" not in (error.detail or "")
+
+
+def test_a_backend_that_has_an_environment_variable_names_it(settings) -> None:
+    """The hint has to name the variable the operator can actually set."""
+    backend = _backend(settings)
+    backend.path_env_var = "DEXATLAS_STUB_PATH"
+
+    error = backend.missing_error()
+
+    assert "DEXATLAS_STUB_PATH" in (error.detail or "")
 
 
 # -- discovery --------------------------------------------------------------

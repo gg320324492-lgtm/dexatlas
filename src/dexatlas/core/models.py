@@ -557,13 +557,17 @@ class EvidenceLevel(StrEnum):
     A **model-generated claim** is something a model said. It may never be
     :attr:`VERIFIED`: the mechanism for that is in :class:`Evidence`, where a
     ``BEHAVIOUR`` record is refused that level, and in
-    :meth:`~dexatlas.core.evidence.EvidenceBuilder.add_claim`, which does not
-    offer the level in the first place. A claim that a tool later confirms is
-    not that claim promoted: it is the tool's own record, and the two say
-    different things.
+    :meth:`~dexatlas.core.evidence.EvidenceBuilder.add_claim`, which refuses
+    that level as well. A claim that a tool later confirms is not that claim
+    promoted: it is the tool's own record, and the two say different things.
 
     :attr:`LEAD` is what a model or a heuristic suspects, and
-    :attr:`INSUFFICIENT` is what neither kind of evidence settles.
+    :attr:`INSUFFICIENT` is what neither kind of evidence settles. Nothing in
+    the analysis itself produces either of them: they are the levels a model
+    would write through :meth:`add_claim`, and until something calls it, a
+    report's level table says ``lead 0`` and ``insufficient 0``. That is the
+    truth about the analysis -- it settled nothing at those levels -- and it
+    is not a claim that the APK holds nothing suspicious.
     """
 
     VERIFIED = "verified"

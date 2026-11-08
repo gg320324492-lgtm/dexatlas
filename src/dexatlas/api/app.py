@@ -1,7 +1,15 @@
 """FastAPI application.
 
 Thin transport over :class:`~dexatlas.core.pipeline.Analyzer` — the same object the CLI
-uses. No analysis behaviour is defined here, so the two interfaces cannot diverge.
+uses. The *analysis* is not defined here: the pipeline produces the manifest, the
+symbols and the evidence, and both interfaces read the same result out of it.
+
+The transport does have a decision of its own. An upload of an APK that has
+already been analysed is answered with the project that holds the result
+rather than being analysed again, while the CLI re-analyses every APK it is
+given. That is a policy about the work an upload causes, not a difference in
+what an analysis produces — but it is a difference between the two, and a
+reader of this module should not have to find it in the code.
 
 Analysis is synchronous and CPU-bound, so ``/analyze`` is exposed as a background task
 that returns a job id. Phase 3 introduces a proper queue; until then a single-process

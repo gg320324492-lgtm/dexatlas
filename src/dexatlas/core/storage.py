@@ -42,6 +42,14 @@ from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 
 SCHEMA_VERSION = 5
 
+#: The longest a name may be in the search index, in characters.
+#:
+#: The name is a label for the row, and the row's body holds the whole value,
+#: so the name is what a search matches against first and the body is what
+#: finishes the match. Cutting the name keeps a megabyte of base64 out of an
+#: index that is read on every search.
+MAX_SEARCH_NAME_CHARS = 200
+
 #: The tables that hold a project's published snapshot.
 #:
 #: Everything a reader sees about a project's symbols and its evidence lives
@@ -72,10 +80,16 @@ class SymbolCounts:
     """How many rows each symbol table holds for one project.
 
     These are measured after the write, not predicted from the lists that were
-    handed in. The tables collapse duplicate keys — a class defined in two dex
+    handed in. The class, method and field tables collapse duplicate keys — a class defined in two dex
     files is one row — so a count taken from the input is a number the database
     cannot produce, and a report built on it disagrees with every query run
     against it.
+
+    The call sites and the strings do not collapse, and that is deliberate. A
+    call site is a *place*: two calls from one method to one target are two
+    places, and the key says so by carrying the instruction they sit at. A
+    string constant is a *use*: the same text used in two methods is two uses,
+    and the strings table carries no key at all so that both survive.
     """
 
     classes: int
@@ -823,9 +837,12 @@ class Store:
 
         Returns the number of rows each table ended up holding. The count is the
         one a query returns, which is the only count a report may state: the
-        symbol tables key on the symbol, so two dex files that define the same
-        method are one row, and a count taken from the input list would be
-        higher than anything the database can show.
+        class, method and field tables key on the symbol, so two dex files that
+        define the same method are one row, and a count taken from the input
+        list would be higher than anything the database can show. The call
+        sites and the strings are the two tables that do not collapse, so for
+        those a count taken from the input list would be *lower* than what the
+        database holds.
         """
         # The lists are read twice: once for the tables, once for the search
         # index. Materialising them here keeps a caller that passes a generator
@@ -1402,12 +1419,16 @@ def _search_rows(
     # A string constant is one symbol, however many methods use it, so it is
     # indexed once. The use sites live in the strings table; the search index
     # answers "is this text in the APK", and it answers it once.
+    #
+    # The name that goes into the index is cut at MAX_SEARCH_NAME_CHARS
+    # characters. The text itself is not shortened: the body of the row holds
+    # the whole value, so a search for a long string finds it by its body.
     indexed: set[str] = set()
     for constant in strings:
         if constant.value in indexed:
             continue
         indexed.add(constant.value)
-        rows.append(("string", constant.value[:200], project_id, constant.value))
+        rows.append(("string", constant.value[:MAX_SEARCH_NAME_CHARS], project_id, constant.value))
     # A resource string is a declaration site, not a use site: the same text in
     # two languages is two declarations, and both are indexed. The name goes in
     # with the value so that a search for either finds the row.
