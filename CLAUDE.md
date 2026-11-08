@@ -9,6 +9,9 @@ The project's whole point: **a conclusion must trace back to the bytes it came
 from.** A reader who follows a report's citations has to arrive at the code the
 tool read. Every rule below exists to protect that.
 
+`AGENTS.md` is this same file under the name the other agent tools read. The two
+are one file, and a test in `tests/test_docs.py` keeps them that way.
+
 ## The rules that are not negotiable
 
 1. **Every bug fix carries a regression test that fails on the previous
@@ -60,6 +63,13 @@ hand before a push — the three backend configurations are separate
 configurations, not one.
 
 ### Measuring the project
+
+**The order matters.** Change the code, run `ruff format`, and *then*
+measure: the report records a fingerprint of the source tree, and formatting
+moves lines, so a measurement taken before it describes a tree that no longer
+exists. CI recomputes the fingerprint and compares it, and a mismatch is a red
+build. `CLAUDE.md`, `AGENTS.md` and `docs/` are not part of the fingerprint, so
+changing them does not need a re-measurement.
 
 `scripts/refresh-report-figures.py` only writes the figures when the
 measurement is **complete**: every test ran, none was skipped. A partial run
