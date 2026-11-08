@@ -390,3 +390,17 @@ def test_the_agent_answers_about_a_real_analysis(analysed_demo, tmp_path: Path) 
             "the analysis could not answer, and the report says so"
         )
         assert "no evidence behind it" in conclusion.summary
+
+
+def test_the_agent_package_does_not_need_the_mcp_sdk() -> None:
+    """The agent talks to the MCP tools, not to the MCP protocol.
+
+    The tools are the MCP server's own functions, and they are imported
+    without the SDK — so the agent works without the ``mcp`` extra, and a
+    deployment that exposes the analyzer over REST does not need it either.
+    """
+    package = Path(__file__).resolve().parent.parent / "src" / "dexatlas" / "agent"
+    for path in sorted(package.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        assert "from mcp." not in text, f"{path.name} imports the MCP SDK"
+        assert "from mcp import" not in text, f"{path.name} imports the MCP SDK"
