@@ -310,13 +310,24 @@ def test_a_server_that_refuses_is_a_failure_the_orchestration_can_survive(server
 
 
 def test_an_endpoint_that_is_not_there_is_a_failure_too() -> None:
-    """Nothing listening is a failure the orchestration has to survive."""
+    """Nothing listening is a failure the orchestration has to survive.
+
+    There are two ways for a dead endpoint to fail, and which one happens is
+    the machine's business rather than the provider's: the connection can be
+    refused straight away, or it can be left hanging until the timeout. A
+    Linux box answers a dead local port with the second one and a Windows
+    box with the first, and the orchestration has to survive either.
+    """
     provider = OpenAICompatibleProvider(base_url="http://127.0.0.1:1", model="a-model", timeout=0.5)
 
     with pytest.raises(ProviderError) as raised:
         provider.complete(_request())
 
-    assert "could not be reached" in raised.value.message
+    assert raised.value.retryable is True, "a dead endpoint is worth trying again"
+    assert (
+        "could not be reached" in raised.value.message
+        or "did not answer in time" in raised.value.message
+    ), raised.value.message
 
 
 def test_the_transport_rejects_an_answer_that_is_not_json() -> None:
