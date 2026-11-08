@@ -288,11 +288,13 @@ Being straight about the edges:
   place where an analysed APK's contents could leave the machine, and the
   contents do reach it — as data, in the observation channel.
 - **The fixed task suite runs against a workspace built by hand**
-  (`tests/agent_harness.py`), not against a first-party sample. That is what
-  makes it *fixed* — the same classes, the same strings and the same
-  citations on every machine, with no backend installed and no third-party
-  APK anywhere near it. Running the agent against a real analysis of
-  `examples/demo-app` is the next thing M3's benchmark needs.
+  (`tests/agent_harness.py`). That is what makes it *fixed* — the same
+  classes, the same strings and the same citations on every machine, with no
+  backend installed and no third-party APK anywhere near it. Beside it, two
+  of the tests run the same loop over a **real** analysis of
+  `examples/demo-app`, and assert what holds whether or not the backends are
+  installed. What is not measured is the whole suite over a real analysis:
+  M3's benchmark is where that belongs.
 - **The budgets are per task, and there is no global one.** A caller running
   many tasks has to keep the books itself.
 
