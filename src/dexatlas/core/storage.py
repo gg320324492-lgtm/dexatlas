@@ -133,10 +133,6 @@ _RESOURCES_INDEXES = (
 #: the union of theirs: the same call read from two dex files is one edge
 #: with two citations, and a rebuild that kept only the first would lose a
 #: place the call was read.
-#:
-#: The indexes live in this statement rather than in the schema below, because
-#: the migration drops the table and creates it again: an index that is not
-#: recreated with its table is an index that is gone.
 _XREFS_TABLE = """
 CREATE TABLE IF NOT EXISTS xrefs (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
