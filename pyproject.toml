@@ -57,6 +57,12 @@ demo = [
     # scripts/render-demo.py draws each frame with Pillow and encodes with ffmpeg.
     "pillow>=10.0",
 ]
+mcp = [
+    # The Model Context Protocol SDK, for the read-only MCP server. It is an
+    # extra rather than a dependency: the analysis core does not need it, and a
+    # deployment that exposes the analyzer over REST does not either.
+    "mcp>=1.2",
+]
 dev = [
     "pytest>=8.3",
     "pytest-cov>=6.0",
@@ -69,6 +75,9 @@ dev = [
 
 [project.scripts]
 dexatlas = "dexatlas.cli.main:app"
+# The read-only MCP server. It speaks over stdio, so a host starts it as a
+# subprocess; see docs/architecture/mcp-server.md.
+dexatlas-mcp = "dexatlas.mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/gg320324492-lgtm/dexatlas"

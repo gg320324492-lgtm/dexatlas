@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from dexatlas.core.models import (
     MethodRef,
     MethodReference,
     Project,
+    ProjectStatus,
     Provenance,
     StringConstant,
 )
@@ -760,3 +762,35 @@ def test_saving_evidence_again_replaces_the_earlier_records(store: Store, tmp_pa
     loaded = store.list_evidence(project.id)
     assert len(loaded) == 1, "the records of the earlier run were kept"
     assert loaded[0].summary == "the only observation of this run"
+
+
+def test_a_project_survives_the_round_trip(store: Store, tmp_path: Path) -> None:
+    """Every field a project carries comes back as it was written.
+
+    A field that is written and never read is a number that reads as zero
+    for ever, and the report prints it. Two of them were missed this way:
+    the number of call edges, and the time the project was created. The
+    round trip is what catches the next one.
+    """
+    project = Project(
+        id="apk_roundtrip",
+        apk=ApkMetadata(sha256="b" * 64, size_bytes=7, path=Path("app.apk")),
+        created_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+        status=ProjectStatus.COMPLETED,
+        tool_versions={"jadx": "1.5.2", "apktool": None},
+        class_count=3,
+        method_count=5,
+        reference_count=9,
+        call_edge_count=4,
+        evidence_count=2,
+        resource_count=1,
+        duration_seconds=1.25,
+    )
+    store.save_project(project, tmp_path, manifest=None)
+
+    read = store.get_project(project.id)
+
+    assert read is not None
+    assert read.model_dump() == project.model_dump(), (
+        "a field that is written and never read is a number that reads as zero for ever"
+    )

@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1063%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1088%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-91.3%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
@@ -154,6 +154,41 @@ uv run uvicorn dexatlas.api.app:app --reload
 installed and records what it could not do, as evidence in the report. With none
 installed you still get hashing, validation and the APK's own metadata; with all three
 you get a full symbol index, decompiled source and cross-references.
+
+### The MCP server
+
+DexAtlas can serve its analysis over the Model Context Protocol. The
+server is **read-only**: it reads a workspace, and it never writes, never runs a
+shell, and never returns more than a bounded amount of anything. **It needs no
+model provider** — it is a tool server, and a tool server that needed a model
+would not be a tool server.
+
+```bash
+uv sync --extra analysis --extra mcp
+uv run dexatlas-mcp                 # speaks MCP over stdio
+```
+
+The tools, and the three things a caller has to know before it asks them
+anything: **[docs/architecture/mcp-server.md](docs/architecture/mcp-server.md)**.
+
+A client to try it with:
+
+```bash
+uv run --no-sync python examples/mcp_client.py
+```
+
+In an MCP host, add it as a stdio server:
+
+```json
+{
+  "mcpServers": {
+    "dexatlas": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/dexatlas", "run", "dexatlas-mcp"]
+    }
+  }
+}
+```
 
 Docker, with JADX and Apktool preinstalled:
 

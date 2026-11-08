@@ -114,16 +114,39 @@ def test_readme_links_to_the_installation_guide() -> None:
 def test_readme_does_not_overclaim() -> None:
     """The README must not describe unbuilt features as shipped.
 
-    Phase 2 and Phase 3 capabilities are named in the roadmap table, which is fine;
-    the Quick Start section must not tell a reader to use them.
+    The Quick Start section tells a reader what they can do now, so it may
+    only name what is built. The roadmap table may name the rest, which is
+    fine: a plan is not a claim.
+
+    The list below is the milestone list as it stands: the MCP server has
+    landed, and the agent and the workbench have not. When one of them is
+    built, it moves out of this list and into the other side of the same
+    test — which is the point of keeping the test: it says which of the
+    two it is at any moment.
     """
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
-    for unbuilt in ("mcp", "agent", "workbench"):
+    for unbuilt in ("agent", "workbench"):
         assert unbuilt not in quick_start.lower(), (
             f"the Quick Start section references {unbuilt!r}, which is not built yet"
         )
+
+
+def test_the_quick_start_names_the_mcp_server_because_it_is_built() -> None:
+    """The other side of the same claim: what is built is named.
+
+    A check that only forbids things would be satisfied by a README that
+    mentions nothing at all. The MCP server is built and the Quick Start
+    names it, and this says so.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
+
+    assert "mcp" in quick_start.lower(), (
+        "the MCP server is built and the Quick Start does not mention it"
+    )
+    assert (REPO_ROOT / "src" / "dexatlas" / "mcp" / "server.py").is_file()
 
 
 def test_readme_marks_the_project_as_in_development() -> None:
@@ -1305,3 +1328,26 @@ def test_the_refresh_script_does_not_write_the_readme_when_it_is_pointed_elsewhe
     script.main(["--report", str(report)])
 
     assert readme.read_bytes() == before, "the refresh wrote to the project's readme"
+
+
+def test_the_two_copies_of_the_project_rules_are_the_same() -> None:
+    """The rules are written down twice, and the two copies have to agree.
+
+    ``CLAUDE.md`` is what Claude Code reads; ``AGENTS.md`` is the same file
+    under the name the other agent tools read. Two copies of one set of rules
+    are two things that can drift apart, and a rule that one tool sees and
+    the other does not is a rule nobody can rely on.
+    """
+    agents = REPO_ROOT / "AGENTS.md"
+    if not agents.exists():
+        pytest.skip("this checkout has no AGENTS.md")
+
+    def read(path: Path) -> str:
+        # The line endings are normalised: git checks the files out with the
+        # platform's, and a difference in them is not a difference in the rules.
+        return path.read_text(encoding="utf-8").replace("\r\n", "\n")
+
+    assert read(agents) == read(REPO_ROOT / "CLAUDE.md"), (
+        "AGENTS.md and CLAUDE.md have drifted apart: they are the same file "
+        "under two names, and a tool that reads one must read the other"
+    )

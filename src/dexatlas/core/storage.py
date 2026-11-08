@@ -1005,6 +1005,33 @@ class Store:
             ).fetchall()
         return [_row_to_call_site(row) for row in rows]
 
+    def list_callees(self, project_id: str, method_id: str) -> list[CallSite]:
+        """The call sites of the calls *into* ``method_id``.
+
+        The mirror of :meth:`get_method_references`, which answers the other
+        way round. A call site is a place in the bytecode where a call
+        happens, so the two answers together are what a reader needs to see
+        a method's shape: who calls it, and what it calls.
+        """
+        canonical = canonical_method_id(method_id)
+        with self.transaction() as connection:
+            rows = connection.execute(
+                "SELECT * FROM call_sites "
+                "WHERE project_id = ? AND REPLACE(callee, ' ', '') = ? "
+                "ORDER BY caller, kind, dex_name, instruction_offset",
+                (project_id, canonical),
+            ).fetchall()
+        return [_row_to_call_site(row) for row in rows]
+
+    def get_evidence(self, project_id: str, evidence_id: str) -> Evidence | None:
+        """One evidence record, by its id."""
+        with self.transaction() as connection:
+            row = connection.execute(
+                "SELECT * FROM evidence WHERE project_id = ? AND id = ?",
+                (project_id, evidence_id),
+            ).fetchone()
+        return _row_to_evidence(row) if row else None
+
     def list_resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
         """The resource strings indexed for a project.
 
@@ -1252,12 +1279,14 @@ def _row_to_project(row: sqlite3.Row) -> Project:
             size_bytes=row["apk_size_bytes"],
             path=Path(row["apk_path"]),
         ),
+        created_at=datetime.fromisoformat(row["created_at"]),
         status=ProjectStatus(row["status"]),
         tool_versions=json.loads(row["tool_versions"]),
         errors=[ToolError.model_validate(e) for e in json.loads(row["errors"])],
         class_count=row["class_count"],
         method_count=row["method_count"],
         reference_count=row["reference_count"],
+        call_edge_count=row["call_edge_count"],
         evidence_count=row["evidence_count"],
         resource_count=row["resource_count"],
         duration_seconds=row["duration_seconds"],

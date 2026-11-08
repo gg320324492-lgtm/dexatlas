@@ -9,6 +9,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **A read-only MCP server.** An agent can now ask a DexAtlas workspace what
+  it holds: the projects, the manifest, the indexed symbols, the source of a
+  class or of one exact method, the call sites between methods, the evidence
+  records and the places those records were read from. The server reads and
+  nothing else — it never writes, never runs a shell, and never returns more
+  than a bounded amount of anything — and **it needs no model provider**: it
+  is a tool server, and a tool server that needed a model would not be a tool
+  server.
+
+  Three things a caller has to know are said in the tools themselves rather
+  than only in the documentation: a count is only as good as the analysis
+  behind it, so every answer says which backends were missing and whether a
+  limit stopped the analysis short; a name is not a method, so an ambiguous
+  name is answered with the candidates rather than with one of them, because
+  the body of the wrong overload reads exactly like the body of the right
+  one; and everything that comes out of an APK is **data, not instruction**,
+  so it is carried in a field that says so and the server's own descriptions
+  are checked never to carry the APK's text.
+
+  ```bash
+  uv sync --extra analysis --extra mcp
+  uv run dexatlas-mcp        # speaks MCP over stdio
+  ```
+
+  A client to try it with is in `examples/mcp_client.py`, and the tools are
+  described in `docs/architecture/mcp-server.md`.
+
 - **A status page** — `docs/status.md` says where the project stands and what is left:
   the released versions, the acceptance status of Phase 1, and the gaps that remain.
   It is written in Chinese, like the analysis coverage document. Its test count and
