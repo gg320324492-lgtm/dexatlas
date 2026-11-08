@@ -51,6 +51,7 @@ from dexatlas.core.models import (
 from dexatlas.core.paths import display_path, redact_workspace
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.core.runs import AnalysisCancelled, AnalysisRun, CancellationToken
+from dexatlas.core.storage import Store
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 from dexatlas.tools.registry import BackendRegistry
@@ -276,6 +277,17 @@ class ProjectResponse(BaseModel):
     class_count: int
     method_count: int
     reference_count: int
+    """The call **edges** the index holds: one per caller, callee and way of
+    calling."""
+    call_site_count: int = 0
+    """The call **sites** the index holds: one per place in the bytecode.
+
+    The two are different numbers. One method that calls the same target twice
+    is one edge and two sites, and a count that did not say which of the two it
+    was counting was a count a reader could not check.
+    """
+    call_edge_count: int = 0
+    """The call **edges** the index holds, stated under their own name."""
     evidence_count: int
     resource_count: int
     tool_versions: dict[str, str | None]
@@ -553,7 +565,7 @@ def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
 @app.get("/projects", tags=["analysis"])
 def list_projects(analyzer: AnalyzerDep, settings: SettingsDep) -> list[ProjectResponse]:
     """Every analysed project, newest first."""
-    return [_project_response(p, settings) for p in analyzer.store.list_projects()]
+    return [_project_response(p, settings, analyzer.store) for p in analyzer.store.list_projects()]
 
 
 @app.get("/projects/{project_id}", response_model=ProjectResponse, tags=["analysis"])
@@ -562,7 +574,7 @@ def get_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep) -
     project = analyzer.store.get_project(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
-    return _project_response(project, settings)
+    return _project_response(project, settings, analyzer.store)
 
 
 @app.get("/projects/{project_id}/runs", tags=["analysis"])
@@ -879,16 +891,35 @@ def get_method_source(
 
 @app.get("/projects/{project_id}/xrefs/{method_id:path}", tags=["analysis"])
 def get_references(project_id: str, method_id: str, analyzer: AnalyzerDep) -> dict[str, Any]:
-    """Callers of a method, addressed as ``com.example.Foo.bar(Ljava/lang/String;)V``."""
-    references = analyzer.store.get_method_references(project_id, method_id)
+    """Callers of a method, addressed as ``com.example.Foo.bar(Ljava/lang/String;)V``.
+
+    The response states both counts, because they are different numbers and
+    neither is the other:
+
+    * a **call site** is one place in the bytecode where the call happens --
+      one instruction, at one offset, in one dex file;
+    * a **call edge** is the relationship between the two methods -- one
+      caller, one callee, one way of calling.
+
+    One method that calls the same target twice is one edge and two sites. The
+    ``total`` is the number of call edges, which is what the endpoint is
+    about: it answers "who calls this method". The call sites are listed
+    beside it, with the place each one was read from.
+    """
+    edges = analyzer.store.get_method_references(project_id, method_id)
+    sites = analyzer.store.get_method_call_sites(project_id, method_id)
     return {
         "project_id": project_id,
         # The canonical spelling, not whatever the caller typed. A response that
         # echoes the request is less useful than one that can be pasted into the
         # next call, and the two spellings differ in exactly the way that matters.
         "method_id": canonical_method_id(method_id),
-        "total": len(references),
-        "references": [r.model_dump(mode="json") for r in references],
+        "total": len(edges),
+        "total_unit": "call_edges",
+        "call_edge_count": len(edges),
+        "call_site_count": len(sites),
+        "references": [edge.model_dump(mode="json") for edge in edges],
+        "call_sites": [site.model_dump(mode="json") for site in sites],
     }
 
 
@@ -1167,7 +1198,7 @@ def _run_response(run: AnalysisRun, published: bool, settings: Settings) -> RunR
     )
 
 
-def _project_response(project: Any, settings: Settings) -> ProjectResponse:
+def _project_response(project: Any, settings: Settings, store: Store) -> ProjectResponse:
     return ProjectResponse(
         id=project.id,
         status=project.status.value,
@@ -1179,6 +1210,8 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
         class_count=project.class_count,
         method_count=project.method_count,
         reference_count=project.reference_count,
+        call_site_count=store.count_call_sites(project.id),
+        call_edge_count=project.reference_count,
         evidence_count=project.evidence_count,
         resource_count=project.resource_count,
         tool_versions=project.tool_versions,
@@ -1246,6 +1279,7 @@ def _rebuild_result(analyzer: Analyzer, project_id: str) -> AnalysisResult:
         duration_seconds=project.duration_seconds or 0.0,
         run=run,
         latest_attempt_status=latest_attempt_status,
+        call_site_count=analyzer.store.count_call_sites(project_id),
     )
 
 

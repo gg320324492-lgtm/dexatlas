@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from dexatlas.core.calls import cross_reference_edge_count, cross_reference_site_count
 from dexatlas.core.models import (
     Evidence,
     EvidenceKind,
@@ -15,7 +16,6 @@ from dexatlas.core.models import (
     ManifestInfo,
     Project,
     ProjectStatus,
-    cross_reference_call_sites,
     cross_reference_records,
     index_gaps,
 )
@@ -42,18 +42,20 @@ _XREF_NOTE = (
     "cover add up to more than the number of records."
 )
 
-#: What the three cross-reference numbers count, said where they are.
+#: What the cross-reference numbers count, said where they are.
 #:
-#: They are three numbers about three different things, and they are printed
-#: next to each other. A reader who takes them for the same thing reads a
-#: ratio out of them that is not there: "3 of 23 cross-references have
-#: evidence" is a claim about the same 23 that the third number contradicts.
+#: They are numbers about two different things -- the places in the bytecode
+#: where a call happens, and the relationships between two methods -- and they
+#: are printed next to each other. A reader who takes them for the same thing
+#: reads a ratio out of them that is not there.
 _XREF_COUNT_NOTE = [
-    "> **The cross-reference counts are three numbers about three things.** The",
-    "> indexed count is the call edges the index holds, one row per call. The",
-    "> count with evidence is the call sites a cross-reference record covers:",
-    "> one record is made per called method of this APK, and it covers every call",
-    "> site of that method. The record count is the number of those records.",
+    "> **The cross-reference counts are numbers about two different things.** The",
+    "> indexed counts are the call **sites** (one per place in the bytecode) and",
+    "> the call **edges** (one per caller, callee and way of calling): one method",
+    "> that calls the same target twice is one edge and two sites. The counts",
+    "> with evidence cover the calls into this APK's own methods; one record is",
+    "> made per called method and it covers every call site of that method, so",
+    "> the sites the records cover add up to more than the number of records.",
 ]
 
 #: What an incomplete index means for the numbers beside it.
@@ -114,11 +116,18 @@ def render_markdown(result: AnalysisResult) -> str:
         )
     metrics += [
         ("Resource strings indexed", f"{project.resource_count:,}"),
-        ("Cross-references indexed", f"{project.reference_count:,}"),
-        # The call sites the cross-reference records cover, and the number of
-        # records themselves. The two are different numbers about different
-        # things: one record covers every call site of the method it is about.
-        ("Cross-references with evidence", f"{cross_reference_call_sites(result.evidence):,}"),
+        # The two units of the cross-reference index, side by side: the places
+        # in the bytecode where a call happens, and the relationships between
+        # two methods. One method that calls the same target twice is one edge
+        # and two sites, so neither number stands in for the other.
+        ("Call sites indexed", f"{result.call_site_count:,}"),
+        ("Call edges indexed", f"{project.reference_count:,}"),
+        # The call sites and the call edges the cross-reference records cover,
+        # and the number of records themselves. One record covers every call
+        # site of the method it is about, so the sites add up to more than the
+        # records do.
+        ("Call sites with evidence", f"{cross_reference_site_count(result.evidence):,}"),
+        ("Call edges with evidence", f"{cross_reference_edge_count(result.evidence):,}"),
         ("Cross-reference records", f"{cross_reference_records(result.evidence):,}"),
         ("Evidence records", f"{project.evidence_count:,}"),
         ("DEX files", f"{len(project.apk.dex_files)}"),

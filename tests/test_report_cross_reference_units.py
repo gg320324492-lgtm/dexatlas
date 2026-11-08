@@ -1,22 +1,23 @@
-"""The cross-reference numbers in a report are about three different things.
+"""The cross-reference numbers in a report are about two different things.
 
-The report prints the number of indexed cross-references beside the number
-of cross-references that have an evidence record, and the two used to be
-counted in different units: the index holds one row per call *edge*, and a
-record is made per *called method*. A method called from three places is
-three edges and one record, so the report said "1" next to "3" — and a reader
-who took that as "one of the three calls is backed by evidence" was reading a
-ratio that was never there.
+A cross-reference index holds two kinds of number, and they are not the same
+number: the **call sites** (the places in the bytecode where a call happens)
+and the **call edges** (the relationships between two methods). One method
+that calls the same target twice is one edge and two sites, and a report that
+printed one of the numbers under the other's name would let a reader read a
+ratio out of them that is not there.
 
 The numbers the report states now are:
 
-* ``cross_references`` — the call edges the index holds;
-* ``cross_references_with_evidence`` — the call sites a record covers; one
-  record is made per called method of this APK and it covers every call site
-  of that method, so the sites add up to more than the records;
+* ``call_sites`` — the call sites the index holds;
+* ``call_edges`` — the call edges the index holds;
+* ``call_sites_with_evidence`` — the call sites a cross-reference record
+  covers; one record is made per called method of this APK and it covers every
+  call site of that method, so the sites add up to more than the records;
+* ``call_edges_with_evidence`` — the call edges those records cover;
 * ``cross_reference_records`` — the number of those records.
 
-The expected numbers in these tests are counted from the call edges
+The expected numbers in these tests are counted from the call sites
 themselves. A test that computed the expectation with the same measure the
 report uses would pass whatever the report said.
 """
@@ -29,13 +30,13 @@ from pathlib import Path
 import pytest
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.calls import CallSite
 from dexatlas.core.models import (
     ClassKind,
     ClassRef,
     EvidenceKind,
     InvocationKind,
     MethodRef,
-    MethodReference,
     Provenance,
 )
 from dexatlas.core.pipeline import Analyzer
@@ -45,6 +46,8 @@ from dexatlas.reports.markdown import render_markdown
 #: The APK the analysis is given. Its content does not matter: the DEX reader
 #: is replaced by one that returns the symbols the test needs.
 _FAN_IN = 3
+
+_CALLEE = "com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;"
 
 
 def _hash_of(apk: Path) -> str:
@@ -77,9 +80,37 @@ def _provenance(apk_sha256: str, locator: str) -> list[Provenance]:
     ]
 
 
+def _caller(apk_sha256: str, index: int) -> MethodRef:
+    """One calling method of this APK."""
+    return MethodRef(
+        class_name=f"com.example.Caller{index}",
+        name="call",
+        descriptor="()V",
+        provenance=_provenance(
+            apk_sha256,
+            f"androguard:classes.dex#com.example.Caller{index}#com.example.Caller{index}.call()V",
+        ),
+    )
+
+
+def _site(apk_sha256: str, caller: MethodRef, offset: int, callee: str = _CALLEE) -> CallSite:
+    """One call site: a place in the bytecode where a call happens."""
+    return CallSite(
+        caller=caller.qualified_name,
+        callee=callee,
+        kind=InvocationKind.STATIC,
+        dex_name="classes.dex",
+        instruction_offset=offset,
+        provenance=_provenance(
+            apk_sha256,
+            f"androguard:classes.dex#{caller.class_name}#{caller.qualified_name}",
+        ),
+    )
+
+
 def _fan_in(
     apk_sha256: str, callers: int
-) -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
+) -> tuple[list[ClassRef], list[MethodRef], list[CallSite]]:
     """One method of this APK, called from ``callers`` places.
 
     Every edge is a separate caller, so the number of edges and the number of
@@ -98,31 +129,11 @@ def _fan_in(
         ),
     )
     methods = [callee]
-    edges: list[MethodReference] = []
+    sites: list[CallSite] = []
     for index in range(callers):
-        caller = MethodRef(
-            class_name=f"com.example.Caller{index}",
-            name="call",
-            descriptor="()V",
-            provenance=_provenance(
-                apk_sha256,
-                f"androguard:classes.dex#com.example.Caller{index}#"
-                f"com.example.Caller{index}.call()V",
-            ),
-        )
+        caller = _caller(apk_sha256, index)
         methods.append(caller)
-        edges.append(
-            MethodReference(
-                caller=caller.qualified_name,
-                callee=callee.qualified_name,
-                kind=InvocationKind.STATIC,
-                provenance=_provenance(
-                    apk_sha256,
-                    f"androguard:classes.dex#com.example.Caller{index}.call()V->"
-                    f"com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;",
-                ),
-            )
-        )
+        sites.append(_site(apk_sha256, caller, offset=4 * index))
     classes = [
         ClassRef(
             name=method.class_name,
@@ -131,16 +142,16 @@ def _fan_in(
         )
         for method in methods
     ]
-    return classes, methods, edges
+    return classes, methods, sites
 
 
 def _analyse(settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch, callers: int):
     """Analyse an APK whose DEX reader returns a method with a known fan-in."""
-    classes, methods, edges = _fan_in(_hash_of(minimal_apk), callers)
+    classes, methods, sites = _fan_in(_hash_of(minimal_apk), callers)
     analyzer = Analyzer(settings)
 
     def extract(*args: object, **kwargs: object):
-        return classes, methods, [], edges, [], None
+        return classes, methods, [], sites, [], None
 
     monkeypatch.setattr(analyzer._androguard, "extract", extract)
     return analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
@@ -162,11 +173,16 @@ def test_the_report_counts_the_call_sites_the_records_cover(
 
     # The index holds one row per call edge: three of them.
     assert result.project.reference_count == _FAN_IN
+    # And one row per call site: three of them, because each caller calls
+    # once.
+    assert result.call_site_count == _FAN_IN
 
     report = render_markdown(result)
 
-    assert f"| Cross-references indexed | {_FAN_IN} |" in report
-    assert f"| Cross-references with evidence | {_FAN_IN} |" in report
+    assert f"| Call sites indexed | {_FAN_IN} |" in report
+    assert f"| Call edges indexed | {_FAN_IN} |" in report
+    assert f"| Call sites with evidence | {_FAN_IN} |" in report
+    assert f"| Call edges with evidence | {_FAN_IN} |" in report
     # And the records themselves: one per called method of this APK.
     assert "| Cross-reference records | 1 |" in report
 
@@ -180,7 +196,10 @@ def test_the_json_report_counts_the_same_thing(
     summary = build_json_report(result)["summary"]
 
     assert summary["cross_references"] == _FAN_IN
-    assert summary["cross_references_with_evidence"] == _FAN_IN
+    assert summary["call_edges"] == _FAN_IN
+    assert summary["call_sites"] == _FAN_IN
+    assert summary["call_sites_with_evidence"] == _FAN_IN
+    assert summary["call_edges_with_evidence"] == _FAN_IN
     assert summary["cross_reference_records"] == 1
 
 
@@ -198,10 +217,8 @@ def test_the_two_reports_state_the_same_number(
     summary = build_json_report(result)["summary"]
     report = render_markdown(result)
 
-    assert (
-        f"| Cross-references with evidence | {summary['cross_references_with_evidence']} |"
-        in report
-    )
+    assert f"| Call sites with evidence | {summary['call_sites_with_evidence']} |" in report
+    assert f"| Call edges with evidence | {summary['call_edges_with_evidence']} |" in report
     assert f"| Cross-reference records | {summary['cross_reference_records']} |" in report
 
 
@@ -213,8 +230,9 @@ def test_the_number_never_exceeds_the_number_of_indexed_cross_references(
 
     summary = build_json_report(result)["summary"]
 
-    assert summary["cross_references_with_evidence"] <= summary["cross_references"]
-    assert summary["cross_reference_records"] <= summary["cross_references_with_evidence"]
+    assert summary["call_sites_with_evidence"] <= summary["call_sites"]
+    assert summary["call_edges_with_evidence"] <= summary["call_edges"]
+    assert summary["cross_reference_records"] <= summary["call_edges_with_evidence"]
 
 
 def test_a_method_called_once_is_one_call_site(
@@ -226,32 +244,34 @@ def test_a_method_called_once_is_one_call_site(
     summary = build_json_report(result)["summary"]
 
     assert summary["cross_references"] == 1
-    assert summary["cross_references_with_evidence"] == 1
+    assert summary["call_sites"] == 1
+    assert summary["call_sites_with_evidence"] == 1
+    assert summary["call_edges_with_evidence"] == 1
     assert summary["cross_reference_records"] == 1
 
 
-def test_the_report_says_what_the_three_numbers_count(
+def test_the_report_says_what_the_numbers_count(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The numbers are printed next to each other, so the units are stated too.
 
-    Three numbers about three things, side by side, is exactly the place a
+    Numbers about two different things, side by side, is exactly the place a
     reader takes a ratio that is not there.
     """
     result = _analyse(settings, minimal_apk, monkeypatch, _FAN_IN)
 
     report = render_markdown(result)
 
-    assert "call edges the index holds" in report
-    assert "call sites a cross-reference record covers" in report
+    assert "call **sites**" in report
+    assert "call **edges**" in report
     # The note qualifies the numbers above it, so it has to reach the reader
     # before the report moves on to the next thing.
-    assert report.index("| Cross-references indexed |") < report.index(
-        "The cross-reference counts are three numbers"
+    assert report.index("| Call sites indexed |") < report.index(
+        "The cross-reference counts are numbers about two different things"
     )
-    assert report.index("The cross-reference counts are three numbers") < report.index(
-        "## Evidence levels"
-    )
+    assert report.index(
+        "The cross-reference counts are numbers about two different things"
+    ) < report.index("## Evidence levels")
 
 
 def test_only_the_calls_of_this_apps_own_methods_are_counted(
@@ -264,20 +284,16 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
     """
     analyzer = Analyzer(settings)
     digest = _hash_of(minimal_apk)
-    classes, methods, edges = _fan_in(digest, _FAN_IN)
-    library_edge = MethodReference(
-        caller="com.example.Caller0.call()V",
+    classes, methods, sites = _fan_in(digest, _FAN_IN)
+    library_site = _site(
+        digest,
+        _caller(digest, 0),
+        offset=64,
         callee="java.lang.StringBuilder.append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
-        kind=InvocationKind.VIRTUAL,
-        provenance=_provenance(
-            digest,
-            "androguard:classes.dex#com.example.Caller0.call()V->"
-            "java.lang.StringBuilder.append(Ljava/lang/String;)Ljava/lang/StringBuilder;",
-        ),
     )
 
     def extract(*args: object, **kwargs: object):
-        return classes, methods, [], [*edges, library_edge], [], None
+        return classes, methods, [], [*sites, library_site], [], None
 
     monkeypatch.setattr(analyzer._androguard, "extract", extract)
     result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
@@ -287,7 +303,8 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
     # The index holds the call into the library too.
     assert summary["cross_references"] == _FAN_IN + 1
     # The records cover this app's own method only.
-    assert summary["cross_references_with_evidence"] == _FAN_IN
+    assert summary["call_sites_with_evidence"] == _FAN_IN
+    assert summary["call_edges_with_evidence"] == _FAN_IN
     assert summary["cross_reference_records"] == 1
     records = [item for item in result.evidence if item.kind is EvidenceKind.CROSS_REFERENCE]
     assert len(records) == 1
@@ -298,14 +315,14 @@ def test_only_the_calls_of_this_apps_own_methods_are_counted(
 
 def _one_caller_twice(
     apk_sha256: str,
-) -> tuple[list[ClassRef], list[MethodRef], list[MethodReference]]:
+) -> tuple[list[ClassRef], list[MethodRef], list[CallSite]]:
     """One caller that calls the same method twice.
 
-    The index holds one row per call, so this is two rows and one caller.
-    A record covers both calls and names the caller once. The number the
-    report states beside the number of indexed rows has to be in the unit
-    of rows -- otherwise the two numbers beside each other are in different
-    units, which is what the review found.
+    This is the case the two numbers exist for: one edge, two call sites. The
+    record covers both calls and names the caller once, so the number of call
+    sites is two and the number of call edges is one. A report that printed
+    one of them under the other's name would say "two callers" where it meant
+    "one caller, two places".
     """
     callee = MethodRef(
         class_name="com.example.Crypto",
@@ -317,28 +334,8 @@ def _one_caller_twice(
             "([Ljava/lang/String;)Ljava/lang/String;",
         ),
     )
-    caller = MethodRef(
-        class_name="com.example.Caller",
-        name="call",
-        descriptor="()V",
-        provenance=_provenance(
-            apk_sha256,
-            "androguard:classes.dex#com.example.Caller#com.example.Caller.call()V",
-        ),
-    )
-    edges = [
-        MethodReference(
-            caller=caller.qualified_name,
-            callee=callee.qualified_name,
-            kind=InvocationKind.STATIC,
-            provenance=_provenance(
-                apk_sha256,
-                "androguard:classes.dex#com.example.Caller.call()V->"
-                "com.example.Crypto.sign([Ljava/lang/String;)Ljava/lang/String;",
-            ),
-        )
-        for _ in range(2)
-    ]
+    caller = _caller(apk_sha256, 0)
+    sites = [_site(apk_sha256, caller, offset=4), _site(apk_sha256, caller, offset=12)]
     classes = [
         ClassRef(
             name=method.class_name,
@@ -347,32 +344,36 @@ def _one_caller_twice(
         )
         for method in (callee, caller)
     ]
-    return classes, [callee, caller], edges
+    return classes, [callee, caller], sites
 
 
-def test_the_number_beside_the_indexed_rows_counts_rows(
+def test_the_two_numbers_tell_a_repeated_call_apart(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """One caller, two calls: two indexed rows, and a number that says so.
+    """One caller, two calls: two call sites and one call edge.
 
-    The record names the caller once, so the number of call sites is one
-    while the number of indexed rows is two. The report states the number
-    that can be compared with the rows -- the edges -- and the rows it
-    covers must not exceed them.
+    The record names the caller once, so the number of callers is one while
+    the number of call sites is two. The two numbers have to be stated
+    separately, or the reader is told "one place" where the code makes the
+    call twice.
     """
-    classes, methods, edges = _one_caller_twice(_hash_of(minimal_apk))
+    classes, methods, sites = _one_caller_twice(_hash_of(minimal_apk))
     analyzer = Analyzer(settings)
 
     def extract(*args: object, **kwargs: object):
-        return classes, methods, [], edges, [], None
+        return classes, methods, [], sites, [], None
 
     monkeypatch.setattr(analyzer._androguard, "extract", extract)
     result = analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
 
-    assert result.project.reference_count == 2, "the index should hold one row per call"
-
     summary = build_json_report(result)["summary"]
 
-    assert summary["cross_references"] == 2
-    assert summary["cross_references_with_evidence"] == 2
+    assert summary["call_sites"] == 2, "the two calls are two places in the bytecode"
+    assert summary["call_edges"] == 1, "the two calls are one relationship"
+    assert summary["call_sites_with_evidence"] == 2
+    assert summary["call_edges_with_evidence"] == 1
     assert summary["cross_reference_records"] == 1
+
+    report = render_markdown(result)
+    assert "| Call sites indexed | 2 |" in report
+    assert "| Call edges indexed | 1 |" in report

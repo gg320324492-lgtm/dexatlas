@@ -29,13 +29,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.calls import CallSite
 from dexatlas.core.models import (
     ClassKind,
     ClassRef,
     FieldRef,
     InvocationKind,
     MethodRef,
-    MethodReference,
     StringConstant,
     ToolError,
     ToolErrorCode,
@@ -229,7 +229,7 @@ class AndroguardBackend(Backend):
         list[ClassRef],
         list[MethodRef],
         list[FieldRef],
-        list[MethodReference],
+        list[CallSite],
         list[StringConstant],
         ToolError | None,
     ]:
@@ -275,7 +275,7 @@ class AndroguardBackend(Backend):
         list[ClassRef],
         list[MethodRef],
         list[FieldRef],
-        list[MethodReference],
+        list[CallSite],
         list[StringConstant],
         ToolError | None,
     ]:
@@ -307,7 +307,7 @@ class AndroguardBackend(Backend):
         classes: list[ClassRef] = []
         methods: list[MethodRef] = []
         fields: list[FieldRef] = []
-        references: list[MethodReference] = []
+        references: list[CallSite] = []
         strings: list[StringConstant] = []
         failures: list[ToolError] = []
         truncations: list[ToolError] = []
@@ -428,7 +428,7 @@ class AndroguardBackend(Backend):
         classes: list[ClassRef],
         methods: list[MethodRef],
         fields: list[FieldRef],
-        references: list[MethodReference],
+        references: list[CallSite],
         method_limit: int,
         instruction_limit: int,
         instructions_seen: int,
@@ -565,14 +565,22 @@ class AndroguardBackend(Backend):
                     )
                 )
                 instructions_seen, calls, literals = self._scan(method, instructions_seen)
-                for callee, kind in calls:
+                for callee, kind, offset in calls:
                     references.append(
-                        MethodReference(
+                        CallSite(
                             caller=qualified,
                             callee=callee,
                             kind=kind,
+                            dex_name=dex_name,
+                            instruction_offset=offset,
+                            # The citation names the method whose bytecode the
+                            # call was read out of -- a class of this APK, so it
+                            # resolves inside this analysis. The callee is
+                            # recorded beside it; a citation that named the
+                            # callee too would name a class of the JDK as
+                            # often as not, and that names nothing here.
                             provenance=[
-                                self.provenance(apk_sha256, f"{locator_base}#{qualified}->{callee}")
+                                self.provenance(apk_sha256, f"{class_locator}#{qualified}")
                             ],
                         )
                     )
@@ -583,7 +591,7 @@ class AndroguardBackend(Backend):
 
     def _scan(
         self, method: Any, instructions_seen: int
-    ) -> tuple[int, list[tuple[str, InvocationKind]], list[str]]:
+    ) -> tuple[int, list[tuple[str, InvocationKind, int]], list[str]]:
         """The calls and the string constants in ``method``'s bytecode.
 
         Both come out of the same walk. A call is the final operand of an
@@ -592,12 +600,19 @@ class AndroguardBackend(Backend):
         own name says how the call is made. A string constant is the operand
         of a const-string opcode. The walk was already happening for the call
         edges, so the constants cost one set lookup per instruction.
+
+        Each call carries the offset of its instruction in the method's code,
+        counted in bytes from the first instruction. The offset is what tells
+        two calls from the same method to the same target apart: they are two
+        places in the bytecode, and an index that cannot say so holds one of
+        them twice over.
         """
-        calls: list[tuple[str, InvocationKind]] = []
+        calls: list[tuple[str, InvocationKind, int]] = []
         literals: list[str] = []
         if not method.get_code():
             return instructions_seen, calls, literals
 
+        offset = 0
         try:
             for instruction in method.get_instructions():
                 instructions_seen += 1
@@ -606,11 +621,12 @@ class AndroguardBackend(Backend):
                     target = instruction.get_output().rsplit(", ", 1)[-1].strip()
                     qualified = _parse_dalvik_reference(target)
                     if qualified is not None:
-                        calls.append((qualified, INVOKE_KINDS[name]))
+                        calls.append((qualified, INVOKE_KINDS[name], offset))
                 elif name in CONST_STRING_OPCODES:
                     value = _string_operand(instruction)
                     if value:
                         literals.append(value)
+                offset += instruction.get_length()
         except Exception as exc:
             logger.debug("androguard: decoding %s failed: %s", method.get_name(), exc)
         # A method that loads the same constant twice is still one place, so

@@ -152,7 +152,11 @@ def test_the_index_still_holds_the_symbols_of_the_dex_that_parsed(
 
     assert result.project.class_count == 2
     assert result.project.method_count == 6
-    assert result.project.reference_count == 6
+    # The call edges of the DEX file that parsed: five relationships between
+    # two methods. The call sites are six, because one of those methods calls
+    # its target twice.
+    assert result.project.reference_count == 5
+    assert result.call_site_count == 6
 
 
 # -- the failure is recorded once, and it is found -----------------------

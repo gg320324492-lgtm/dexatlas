@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dexatlas.core.calls import CallSite, as_call_site, derive_edges
 from dexatlas.core.locators import (
     InvalidLocatorError,
     LocatorResolver,
@@ -28,7 +29,6 @@ from dexatlas.core.models import (
     EvidenceLevel,
     ManifestComponent,
     MethodRef,
-    MethodReference,
     Provenance,
     Sourced,
     ToolError,
@@ -356,41 +356,50 @@ class EvidenceBuilder:
             },
         )
 
-    def add_method_references(
-        self, method: MethodRef, references: Sequence[MethodReference]
-    ) -> None:
+    def add_method_references(self, method: MethodRef, sites: Sequence[CallSite]) -> None:
         """Record that a method is called, and the call sites that prove it.
 
         The claim is about the call sites, so the provenance points at them: the
-        bytecode scan that found the edge is the evidence for it. The method's own
+        bytecode scan that found the calls is the evidence for it. The method's own
         provenance is kept as well, so a reader can also find where the callee is
         defined — for a method defined in two dex files, that is both of them.
+
+        The record carries both counts: the call **sites** it covers and the
+        call **edges** they add up to. One method that calls the same target
+        twice is one edge and two sites, and a record that stated only one of
+        the two would say "twice" where it meant "once", or the other way
+        round.
         """
-        if not references:
+        # A reference that did not come out of bytecode names no place, and
+        # is a call site whose place is not known.
+        sites = [as_call_site(site) for site in sites]
+        if not sites:
             return
-        callers = sorted({r.caller for r in references})
+        callers = sorted({site.caller for site in sites})
+        edges = derive_edges(sites)
         self.add(
             kind=EvidenceKind.CROSS_REFERENCE,
             # A call edge is read out of the bytecode by a deterministic tool and
             # points at a code location, which is what VERIFIED means here.
             level=EvidenceLevel.VERIFIED,
             summary=f"{method.qualified_name} is called from {len(callers)} location(s)",
-            provenance=[*_call_site_provenance(references), *method.provenance],
+            provenance=[*_call_site_provenance(sites), *method.provenance],
             detail={
                 "callers": callers[:MAX_LISTED_CALLERS],
                 "truncated": len(callers) > MAX_LISTED_CALLERS,
                 "call_count": len(callers),
-                # The indexed cross-references are rows, one per call, and a
-                # caller that calls the same method twice contributes two rows
-                # and one call site. The report states this number beside the
-                # number of indexed rows, so it has to be in the same unit.
-                "edge_count": len(references),
+                # The places the calls were made, and the relationships between
+                # two methods that they add up to.
+                "call_site_count": len(sites),
+                "call_edge_count": len(edges),
+                # The older name for the same number. It is kept because the
+                # shared helper in core.models reads it, and because a reader of
+                # an older report has seen it.
+                "edge_count": len(edges),
             },
         )
 
-    def add_cross_references(
-        self, methods: Sequence[MethodRef], references: Sequence[MethodReference]
-    ) -> None:
+    def add_cross_references(self, methods: Sequence[MethodRef], sites: Sequence[CallSite]) -> None:
         """Record one observation per method that this APK calls.
 
         The unit of evidence is the called method, not the call. A method with
@@ -402,46 +411,46 @@ class EvidenceBuilder:
         of those says nothing about the app under analysis. The calls themselves
         stay queryable in the cross-reference table either way.
         """
-        if not references:
+        if not sites:
             return
 
         index = {method.qualified_name: method for method in methods}
-        by_callee: dict[str, list[MethodReference]] = {}
-        for reference in references:
-            by_callee.setdefault(reference.callee, []).append(reference)
+        by_callee: dict[str, list[CallSite]] = {}
+        for site in sites:
+            by_callee.setdefault(site.callee, []).append(site)
 
-        called = [(index[callee], edges) for callee, edges in by_callee.items() if callee in index]
+        called = [(index[callee], group) for callee, group in by_callee.items() if callee in index]
         # Most-called first: that is the order a reader wants, and it is the same
         # order every run over the same APK produces, so the evidence ids stay
         # stable.
         called.sort(key=lambda item: (-_distinct_callers(item[1]), item[0].qualified_name))
 
-        for method, edges in called[:MAX_EVIDENCE_CALLED_METHODS]:
-            self.add_method_references(method, edges)
+        for method, group in called[:MAX_EVIDENCE_CALLED_METHODS]:
+            self.add_method_references(method, group)
 
     def build(self) -> list[Evidence]:
         return list(self.items)
 
 
-def _distinct_callers(references: Sequence[MethodReference]) -> int:
+def _distinct_callers(sites: Sequence[CallSite]) -> int:
     """How many distinct methods call the callee.
 
     A caller that appears in two dex files is one caller, not two: the same
     method, indexed twice.
     """
-    return len({reference.caller for reference in references})
+    return len({site.caller for site in sites})
 
 
-def _call_site_provenance(references: Sequence[MethodReference]) -> list[Provenance]:
-    """The locators that prove the calls, one per call site.
+def _call_site_provenance(sites: Sequence[CallSite]) -> list[Provenance]:
+    """The locators that prove the calls, one per distinct place.
 
     The locator is what tells two calls apart — the same caller in two dex
     files, the same callee reached from two places — so each distinct locator
     is kept once.
     """
     by_locator: dict[str, Provenance] = {}
-    for reference in references:
-        for provenance in reference.provenance:
+    for site in sites:
+        for provenance in site.provenance:
             by_locator.setdefault(provenance.locator, provenance)
     return list(by_locator.values())[:MAX_LISTED_CALLERS]
 

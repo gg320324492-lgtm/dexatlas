@@ -27,7 +27,13 @@ DEMO_APK = Path(__file__).parent.parent / "examples" / "demo-app" / "demo.apk"
 #: number: Androguard sees the 4 declared classes, and JADX adds synthetic ones such as
 #: the generated R class when it is available.
 EXPECTED_METHODS = 8
-EXPECTED_REFERENCES = 23
+#: The call **edges**: the relationships between two methods. One method that
+#: calls the same target twice is one edge.
+EXPECTED_REFERENCES = 21
+#: The call **sites**: the places in the bytecode where a call happens. The
+#: two demo methods that call the same target twice are what makes the two
+#: numbers different.
+EXPECTED_CALL_SITES = 23
 MIN_CLASSES_FROM_DEX = 4
 
 
@@ -49,6 +55,7 @@ def test_demo_analysis_matches_the_documented_numbers(demo_project) -> None:
 
     assert project.method_count == EXPECTED_METHODS
     assert project.reference_count == EXPECTED_REFERENCES
+    assert demo_project.call_site_count == EXPECTED_CALL_SITES
     assert project.class_count >= MIN_CLASSES_FROM_DEX
 
     # A missing backend is reported, not fatal, so only a *parse* failure is a defect.
@@ -169,8 +176,10 @@ def test_demo_report_is_self_consistent(demo_project) -> None:
     serialised = json.dumps(report)
     summary = json.loads(serialised)["summary"]
 
-    assert json.loads(serialised)["schema_version"] == 2
+    assert json.loads(serialised)["schema_version"] == 3
     assert summary["methods"] == EXPECTED_METHODS
     assert summary["cross_references"] == EXPECTED_REFERENCES
+    assert summary["call_sites"] == EXPECTED_CALL_SITES
+    assert summary["call_edges"] == EXPECTED_REFERENCES
     # Backend gaps are reported, not asserted away.
     assert not [e for e in report["errors"] if e["code"] in {"parse_error", "exit_nonzero"}]

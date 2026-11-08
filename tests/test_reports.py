@@ -101,6 +101,9 @@ def _result(
         duration_seconds=3.5,
         run=run,
         latest_attempt_status=latest_attempt_status,
+        # The call sites and the call edges are different numbers: one method
+        # that calls the same target twice is one edge and two sites.
+        call_site_count=3400,
     )
 
 
@@ -110,7 +113,7 @@ def _result(
 def test_json_report_is_serialisable() -> None:
     report = build_json_report(_result())
 
-    assert json.loads(json.dumps(report))["schema_version"] == 2
+    assert json.loads(json.dumps(report))["schema_version"] == 3
 
 
 # -- the run the report describes -------------------------------------------
@@ -221,6 +224,11 @@ def test_json_report_tells_indexed_cross_references_from_evidence() -> None:
 
     assert summary["cross_references"] == 3100
     assert summary["cross_references_with_evidence"] == 1
+    # The two units are different numbers, and the report says which is which.
+    assert summary["call_edges"] == 3100
+    assert summary["call_sites"] == 3400
+    assert summary["call_sites_with_evidence"] == 1
+    assert summary["call_edges_with_evidence"] == 1
 
 
 # -- Markdown ---------------------------------------------------------------
@@ -310,8 +318,10 @@ def test_markdown_tells_indexed_cross_references_from_evidence() -> None:
 
     report = render_markdown(result)
 
-    assert "| Cross-references indexed | 3,100 |" in report
-    assert "| Cross-references with evidence | 1 |" in report
+    assert "| Call edges indexed | 3,100 |" in report
+    assert "| Call sites indexed | 3,400 |" in report
+    assert "| Call edges with evidence | 1 |" in report
+    assert "| Call sites with evidence | 1 |" in report
 
 
 def test_markdown_explains_which_cross_references_become_evidence() -> None:

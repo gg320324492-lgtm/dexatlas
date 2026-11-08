@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from dexatlas.core.calls import cross_reference_edge_count, cross_reference_site_count
 from dexatlas.core.models import (
     Evidence,
     Project,
-    cross_reference_call_sites,
     cross_reference_records,
     index_gaps,
 )
@@ -28,9 +28,17 @@ def build_json_report(result: AnalysisResult) -> dict[str, Any]:
         # 2 adds the run the report describes, and the status of a later
         # attempt that published nothing. Both are additive; a reader of a
         # version 1 document that ignores unknown keys is unaffected.
-        "schema_version": 2,
+        #
+        # 3 says which of the two things a cross-reference count is counting.
+        # The indexed count is the call **edges** now -- the relationships
+        # between two methods -- and it used to be the rows of the index,
+        # which counted the places in the bytecode where a call happened. The
+        # call sites are counted in their own key, so a reader of a version 2
+        # document that ignores unknown keys is unaffected, and a reader that
+        # reads them has both numbers.
+        "schema_version": 3,
         "generated_at": datetime.now(UTC).isoformat(),
-        "project": _project_block(project),
+        "project": _project_block(project, result),
         "run": _run_block(result),
         "latest_attempt_status": (
             result.latest_attempt_status.value if result.latest_attempt_status is not None else None
@@ -64,7 +72,7 @@ def _run_block(result: AnalysisResult) -> dict[str, Any] | None:
     }
 
 
-def _project_block(project: Project) -> dict[str, Any]:
+def _project_block(project: Project, result: AnalysisResult) -> dict[str, Any]:
     return {
         "id": project.id,
         "apk": {
@@ -83,6 +91,8 @@ def _project_block(project: Project) -> dict[str, Any]:
         "class_count": project.class_count,
         "method_count": project.method_count,
         "reference_count": project.reference_count,
+        "call_site_count": result.call_site_count,
+        "call_edge_count": project.reference_count,
         "evidence_count": project.evidence_count,
         "resource_count": project.resource_count,
     }
@@ -94,18 +104,30 @@ def _summary_block(result: AnalysisResult) -> dict[str, Any]:
     return {
         "classes": result.project.class_count,
         "methods": result.project.method_count,
+        # The indexed call edges. The key keeps its name; the number it holds
+        # is the edges now, which is what the cross-reference table holds.
         "cross_references": result.project.reference_count,
+        # The two units of the index, each under its own name. The call sites
+        # are the places in the bytecode where a call happens; the call edges
+        # are the relationships between two methods. One method that calls the
+        # same target twice is one edge and two sites.
+        "call_sites": result.call_site_count,
+        "call_edges": result.project.reference_count,
         # The strings the resource table declared. A separate number from the
         # DEX string pool, because they are separate things: one is what the
         # code loads, the other is what a person wrote.
         "resource_strings": result.project.resource_count,
         # How many of those cross-references are backed by an evidence record.
-        # The unit is the call site: one record covers every call site of the
-        # method it is about, so the call sites the records cover are the
-        # indexed cross-references that have a record behind them. The two
-        # numbers differ on purpose: an indexed call into library code is a
-        # fact about the JDK, not a conclusion about this app.
-        "cross_references_with_evidence": cross_reference_call_sites(result.evidence),
+        # The unit is the call edge: one record covers every call site of the
+        # method it is about, so the edges the records cover are the indexed
+        # cross-references that have a record behind them. The two numbers
+        # differ on purpose: an indexed call into library code is a fact about
+        # the JDK, not a conclusion about this app.
+        "cross_references_with_evidence": cross_reference_edge_count(result.evidence),
+        # The same records counted the other way: the places in the bytecode
+        # the covered calls were read from.
+        "call_sites_with_evidence": cross_reference_site_count(result.evidence),
+        "call_edges_with_evidence": cross_reference_edge_count(result.evidence),
         # The number of records themselves — one per called method of this APK.
         # It is a different number about a different thing, and it is stated
         # next to the other one so that neither can be read as the other.

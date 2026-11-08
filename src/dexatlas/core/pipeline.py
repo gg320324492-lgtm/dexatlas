@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from dexatlas.config.settings import Settings
+from dexatlas.core.calls import CallSite
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.ingest import ApkValidationError, inspect_apk
 from dexatlas.core.methods import AmbiguousMethodError, MethodCandidate, simple_class_name
@@ -32,7 +33,6 @@ from dexatlas.core.models import (
     FieldRef,
     ManifestInfo,
     MethodRef,
-    MethodReference,
     Project,
     ProjectStatus,
     Provenance,
@@ -88,6 +88,14 @@ class AnalysisResult:
 
     The project says which APK was analysed; the run says which attempt
     produced these results, with which tools.
+    """
+
+    call_site_count: int = 0
+    """The call **sites** the index holds — one per place in the bytecode.
+
+    The call **edges** are counted by :attr:`Project.reference_count`. The two
+    are different numbers: one method that calls the same target twice is one
+    edge and two sites. Every count says which of the two it is.
     """
 
     latest_attempt_status: ProjectStatus | None = None
@@ -217,7 +225,7 @@ class Analyzer:
             classes: list[ClassRef] = []
             methods: list[MethodRef] = []
             fields: list[FieldRef] = []
-            references: list[MethodReference] = []
+            references: list[CallSite] = []
             strings: list[StringConstant] = []
             resources: list[ResourceString] = []
             dex_classes: list[ClassRef] = []
@@ -311,6 +319,10 @@ class Analyzer:
             # disagrees with every query run against it.
             project.class_count = counts.classes
             project.method_count = counts.methods
+            # The call edges and the call sites are different numbers, and
+            # neither is the other: one method that calls the same target
+            # twice is one edge and two sites. The project record counts the
+            # edges, and the result carries both.
             project.reference_count = counts.references
             project.resource_count = counts.resources
             project.status = (
@@ -352,6 +364,7 @@ class Analyzer:
                 workspace=workspace,
                 duration_seconds=elapsed,
                 run=run,
+                call_site_count=counts.call_sites,
             )
         except AnalysisCancelled:
             # Nobody asked for this APK to be analysed any more. That is not a
@@ -522,7 +535,7 @@ class Analyzer:
         list[ClassRef],
         list[MethodRef],
         list[FieldRef],
-        list[MethodReference],
+        list[CallSite],
         list[StringConstant],
         ToolError | None,
     ]:

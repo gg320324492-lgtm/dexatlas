@@ -193,10 +193,11 @@ def test_xrefs_returns_the_canonical_method_id(client: TestClient, tmp_path: Pat
     with spaced argument descriptors did not resolve, so a response carrying one
     could not be used again.
     """
+    from dexatlas.core.calls import CallSite
     from dexatlas.core.models import (
         ApkMetadata,
+        InvocationKind,
         MethodRef,
-        MethodReference,
         Project,
         canonical_method_id,
     )
@@ -220,11 +221,11 @@ def test_xrefs_returns_the_canonical_method_id(client: TestClient, tmp_path: Pat
             )
         ],
         fields=[],
-        references=[
-            MethodReference(
+        call_sites=[
+            CallSite(
                 caller="com.example.Demo.caller()V",
                 callee="com.example.Demo.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;",
-                kind="invoke",
+                kind=InvocationKind.INVOKE,
             )
         ],
         strings=[],
