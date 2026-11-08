@@ -20,7 +20,6 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 
 from dexatlas.agent.state import Budget, Plan, PlanStep
-from dexatlas.agent.tool_executor import SENSITIVE_TOOLS
 
 #: The tools every task may call.
 #:
@@ -249,11 +248,6 @@ class Planner:
         return OBJECTIVES[self.intent(question)]
 
 
-def sensitive_tools() -> frozenset[str]:
-    """The tools whose calls have to be approved by a person."""
-    return SENSITIVE_TOOLS
-
-
 __all__ = [
     "ALWAYS_ALLOWED",
     "DEFAULT_MAX_SENSITIVE_CALLS",
@@ -263,5 +257,4 @@ __all__ = [
     "OBJECTIVES",
     "Intent",
     "Planner",
-    "sensitive_tools",
 ]

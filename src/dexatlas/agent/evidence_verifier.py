@@ -30,7 +30,7 @@ report that says nothing, because the first one looks like a finding.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -254,34 +254,10 @@ class EvidenceVerifier:
         )
 
 
-def collect_limitations(
-    answer: ParsedAnswer,
-    *,
-    extra: Sequence[str] = (),
-) -> list[str]:
-    """What the task could not settle, as a list of sentences."""
-    limitations = list(answer.limitations)
-    limitations.extend(extra)
-    return limitations
-
-
-def unsupported_summaries(findings: Sequence[Evidence]) -> list[str]:
-    """The findings that did not have evidence behind them."""
-    return [item.summary for item in findings if item.level is EvidenceLevel.INSUFFICIENT]
-
-
-def as_mapping(records: Sequence[Evidence]) -> Mapping[str, Evidence]:
-    """The records, keyed by id."""
-    return {record.id: record for record in records}
-
-
 __all__ = [
     "MAX_QUOTED_ANSWER",
     "Conclusion",
     "EvidenceVerifier",
     "ParsedAnswer",
-    "as_mapping",
-    "collect_limitations",
     "parse_answer",
-    "unsupported_summaries",
 ]
