@@ -110,6 +110,7 @@ def seeded_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
         class_count=2,
         method_count=2,
         reference_count=1,
+        tool_versions={"jadx": "1.5.2"},
     )
     manifest = ManifestInfo(
         package="com.example.demo",
@@ -367,6 +368,7 @@ def smali_project(workspace: Path, monkeypatch: pytest.MonkeyPatch) -> str:
         id=Project.new_id(SEEDED_SHA256),
         apk=ApkMetadata(sha256=SEEDED_SHA256, size_bytes=4096, path=Path("demo.apk")),
         status=ProjectStatus.COMPLETED,
+        tool_versions={"apktool": "2.11.1"},
     )
     project_workspace = workspace / "projects" / project.id
     smali = project_workspace / "apktool" / "smali" / "com" / "example" / "demo"

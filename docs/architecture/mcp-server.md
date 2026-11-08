@@ -64,6 +64,11 @@ field of their own that says so, in every response, and the server's own
 descriptions and schemas are checked not to carry the APK's text: an APK that
 could write into the description could write into the caller.
 
+That includes the smaller pieces: a permission name from the manifest, and a
+symbol's name and the excerpt of the index that comes with it. For a string
+symbol the name *is* the string the APK holds, so a caller that reads it as
+a name rather than as data is reading the APK's own words.
+
 ## What it will not do
 
 - **It never writes.** The tools read the workspace through a read view, and
@@ -102,8 +107,29 @@ In an MCP host, add it as a stdio server:
 }
 ```
 
+## When it cannot answer
+
+A request the server cannot answer is an error and not an empty result, and
+the error says which it is. The code is a short word a caller can branch on:
+
+| Code | What it means |
+|---|---|
+| `unknown_project` | The workspace holds no project by that name |
+| `unknown_method` | The method id is not one this project can answer about |
+| `no_manifest` | The project is there, and this analysis holds no manifest |
+
+The last one exists because the two are different. A project whose Apktool
+step never ran has no manifest, and saying "unknown project" about it would
+send a caller looking for a project that is there. The error names the
+backends that did not take part, so the reader knows what would have to
+change for the answer to be there.
+
 ## Where it goes next
 
 This is the M1 server: read-only, local, and over stdio. Remote access is a
-deployment decision rather than a default, and the plan for M2 builds the
-agent **on top of** these tools rather than inside them.
+deployment decision rather than a default.
+
+The agent that M2 asked for is built **on top of** these tools rather than
+inside them: it calls them, it inherits their read-only nature, and it
+checks that every conclusion it reached has something behind it before it
+reports it. That is `docs/architecture/agent.md`.

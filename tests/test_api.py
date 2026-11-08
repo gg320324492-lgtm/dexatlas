@@ -161,6 +161,33 @@ def test_analyze_a_synthetic_apk_end_to_end(client: TestClient, tmp_path: Path) 
     assert "# DexAtlas analysis report" in markdown.text
 
 
+def test_the_project_response_says_which_unit_each_count_counts(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The two cross-reference counts are in the response, and they are named.
+
+    A reader who has seen the report — which prints "Call sites indexed" and
+    "Call edges indexed" — should not have to guess whether the API's
+    ``reference_count`` is the same number under a different name or the
+    other one entirely.
+    """
+    apk = build_apk(tmp_path / "demo.apk")
+    response = client.post(
+        "/analyze",
+        files={"file": ("demo.apk", apk.read_bytes(), "application/vnd.android.package-archive")},
+    )
+    project_id = response.json()["project_id"]
+
+    body = client.get(f"/projects/{project_id}").json()
+
+    assert body["call_site_count"] == body["reference_count"], (
+        "the two names are the same number, under the name the reports use"
+    )
+    assert body["call_edge_count"] <= body["call_site_count"], (
+        "the edges are what the sites add up to, so there cannot be more of them"
+    )
+
+
 def test_store_is_reachable_from_the_api_workspace(client: TestClient, tmp_path: Path) -> None:
     """The API must not write outside its configured workspace."""
     settings = Settings(workspace=tmp_path / "workspace")
@@ -236,6 +263,12 @@ def test_xrefs_returns_the_canonical_method_id(client: TestClient, tmp_path: Pat
     assert response.status_code == 200
     body = response.json()
     assert body["total"] == 1
+    # The unit of `total`, said out loud. Its value did not change, but a
+    # row is a call site now, and a reader who sees "total: 1" with nothing
+    # else would take it for one relationship.
+    assert body["total_unit"] == "call_sites"
+    assert body["call_sites"] == body["total"]
+    assert body["call_edges"] == 1
     assert body["method_id"] == canonical_method_id(spaced)
     assert " " not in body["method_id"], "the returned id still carries whitespace"
 

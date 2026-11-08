@@ -173,6 +173,66 @@ def test_a_missing_table_is_created(tmp_path: Path) -> None:
     assert "resources" in _tables(path)
 
 
+def test_a_rebuilt_table_keeps_its_indexes(tmp_path: Path) -> None:
+    """SQLite drops an index with the table it belongs to.
+
+    The migration rebuilds the call-site table, and the schema script does
+    not run again afterwards — the version matches from then on. A workspace
+    that was rebuilt without the indexes would keep scanning the whole table
+    for the rest of its life, and nothing would ever say so.
+    """
+    path = tmp_path / "dexatlas.db"
+    Store.open(path)
+    with _writing(path) as connection:
+        # The shape an older build wrote: no position columns, so the
+        # migration rebuilds the table.
+        connection.execute("DROP TABLE call_sites")
+        connection.execute(
+            "CREATE TABLE call_sites ("
+            "project_id TEXT NOT NULL, caller TEXT NOT NULL, callee TEXT NOT NULL, "
+            "kind TEXT NOT NULL DEFAULT 'invoke', provenance TEXT NOT NULL DEFAULT '[]')"
+        )
+        connection.execute("UPDATE schema_info SET version = 3")
+
+    Store.open(path)
+
+    with _reading(path) as connection:
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'call_sites'"
+            )
+        }
+    assert "idx_sites_caller" in indexes, "the index on the caller is gone"
+    assert "idx_sites_callee_canonical" in indexes, "the index on the canonical callee is gone"
+
+
+def test_a_rebuilt_resource_table_keeps_its_indexes(tmp_path: Path) -> None:
+    """The same thing about the other table the migration rebuilds."""
+    path = tmp_path / "dexatlas.db"
+    Store.open(path)
+    with _writing(path) as connection:
+        connection.execute("DROP TABLE resources")
+        connection.execute(
+            "CREATE TABLE resources ("
+            "project_id TEXT NOT NULL, name TEXT NOT NULL, value TEXT NOT NULL, "
+            "kind TEXT NOT NULL DEFAULT 'string')"
+        )
+        connection.execute("UPDATE schema_info SET version = 2")
+
+    Store.open(path)
+
+    with _reading(path) as connection:
+        indexes = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'resources'"
+            )
+        }
+    assert "idx_resources_project" in indexes
+    assert "idx_resources_name" in indexes
+
+
 # -- the open that must not write -------------------------------------------
 
 

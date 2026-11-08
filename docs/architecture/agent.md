@@ -142,6 +142,17 @@ analysis. A conclusion that cites nothing, or that cites only things which are
 not there, is recorded as **insufficient evidence**: not enough evidence
 either way, and it needs a human.
 
+**A note about the analysis is not an observation of the thing asked about.**
+The task records that the analysis is incomplete, that a backend did not take
+part, that a limit stopped it short. Those records are worth having — a
+reader needs to know — but they are about the *analysis*, not about the APK,
+and a conclusion that rests on one has nothing behind it. So the record
+carries a flag saying whether it is an observation of the subject
+(`supports_claims`), and the verifier asks two things of a record before it
+will stand under a conclusion: that it **establishes** something (a record
+that says the evidence was insufficient cannot be the ground), and that it is
+an observation of the subject rather than a note about the analysis.
+
 So the report has three sections rather than one list:
 
 | Section | What is in it | Who put it there |

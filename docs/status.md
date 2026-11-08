@@ -18,8 +18,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->1088<!--/fig--> 个（<!--fig:tests.fast-->952<!--/fig--> 快 + <!--fig:tests.slow-->136<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->91.3%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1208<!--/fig--> 个（<!--fig:tests.fast-->1071<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->91.1%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -140,9 +140,9 @@ native 库、内存。这些要等下一个手里有真实样本的人。
 | `cross_references_with_evidence` 数的是被调方法数，而 `cross_references` 数的是边数 | 重要 | 已修 |
 | 超过 200 个类时，反编译覆盖率那条证据被挤出报告的证据表 | 重要 | 已修 |
 | API 导出的报告写「Analysis time 0.0s」，与 CLI 导出的同一份不一致 | 中 | 已修 |
-| `xrefs` 表没有主键，同一条调用边可以写进多行 | 重要 | 见 [Phase 2 issue 清单](reports/phase2-issue-list.md)（P2-003 待做） |
+| `xrefs` 表没有主键，同一条调用边可以写进多行 | 重要 | 已修（P2-003，见 4.6） |
 | workspace 并发不安全：同一个 APK 的两次分析共用一个目录 | 重要 | 已修（P2-002：每次分析写进自己的目录，发布前不可见） |
-| `EvidenceKind.CODE_LOCATED` / `BEHAVIOUR`、`EvidenceLevel.LEAD` / `INSUFFICIENT` 没有任何生产者 | 中 | 部分已修（P2-004：`BEHAVIOUR` / `LEAD` / `INSUFFICIENT` 现在由 `add_claim` 产出；`CODE_LOCATED` 仍然没有） |
+| `EvidenceKind.CODE_LOCATED` / `BEHAVIOUR`、`EvidenceLevel.LEAD` / `INSUFFICIENT` 没有任何生产者 | 中 | 已修（P2-004：`BEHAVIOUR` / `LEAD` / `INSUFFICIENT` 由 `add_claim` 产出；M2：agent 读到带出处的源码时产出 `CODE_LOCATED`） |
 
 **「已修」的每一条都配一个在旧代码上会红的测试**——不是「测试通过」，
 是「把修复撤掉，测试必须红」。这一轮共验证了 21 处破坏实验。
@@ -183,13 +183,26 @@ P2-003 关掉了上表里 `xrefs` 那条缺陷：索引里现在存的是**调�
 （带着它是从哪个 DEX 文件、哪条指令读出来的），**调用边**由调用点派生。
 两个数在报告里分开写，并且各自说清是哪个。
 
-**下一条是 M1**：只读的 MCP 服务器，让 agent 用得上现有的分析。
+**M1 也落地了**：只读的 MCP 服务器。十个工具，读而不写、不跑 shell、
+不需要模型 provider；每一份从 APK 里读出来的文字都带着「这是数据」的标记。
+设计与边界在[架构文档](architecture/mcp-server.md)里。
+
+**M2 也落地了**：单一的 evidence-first agent。一个循环、一份计划、一份预算、
+一份状态、一份报告；结论走项目自己的 `EvidenceBuilder`，所以模型的说法写不成
+`verified`；**APK 里的指令指挥不了 agent**（去掉这条性质，测试就红）。
+设计在[架构文档](architecture/agent.md)里。
+
+**M3 做了一半**：81 个带独立可核对答案的任务集已经就绪
+（[任务集说明](benchmarks/task-set.md)），**还差三个 baseline 的对比与指标**——
+那是 M3 剩下的部分。
 
 ### 4.7 这一轮关掉的
 
 | 原来开着 | 现在 |
 |---|---|
 | 文档与 issue 的发布状态 | 23 处过期陈述改完；issue #1 留了评论（正文没动）；`scripts/check-version-claims.py` 现在自动查这一类 |
+| 「这个方法调用了谁」被答成「谁调用了它」 | `find_callees` 与 `find_callers` 跑的是同一条查询；方向从来没被断言过，所以测试是绿的 |
+| 交叉引用的两个数在五处对不上 | 摘要与自己的 detail 打架；agent 用了报告不读的键；迁移重建表时把索引一起删了；JSON 报告的 project 块只有一个数；`schema_version` 没升 |
 | 资源完全没有覆盖 | 资源表进索引，`dexatlas resources` 和 `GET /projects/{id}/resources` 都能查 |
 | Smali 回退不附带 provenance | `class_source_document` / `method_source_document` 返回带出处的文档，CLI 与 API 都说得出是 Java 还是 Smali |
 | 大型 APK 的性能压测 | 基准跑完了；**顺带找出三个真缺陷并修掉** |

@@ -290,30 +290,11 @@ INDEXED_METHODS: list[tuple[str, str]] = [
 @pytest.fixture
 def workspace_with_sources(tmp_path: Path) -> tuple[Path, str]:
     """A workspace holding both representations of one class, and its index."""
-    workspace = tmp_path / "workspace"
-    project_id = Project.new_id(FAKE_SHA256)
-    project_dir = workspace / "projects" / project_id
-
-    java = project_dir / "jadx" / "sources" / "com" / "example" / "demo" / "Crypto.java"
-    java.parent.mkdir(parents=True)
-    java.write_text(JAVA_SOURCE, encoding="utf-8")
-
-    smali = project_dir / "apktool" / "smali" / "com" / "example" / "demo" / "Crypto.smali"
-    smali.parent.mkdir(parents=True)
-    smali.write_text(SMALI_SOURCE, encoding="utf-8")
+    workspace, project_id = _workspace(tmp_path)
+    _write_java(workspace, project_id)
+    _write_smali(workspace, project_id)
 
     store = Store.open(workspace / "dexatlas.db")
-    store.save_project(
-        Project(
-            id=project_id,
-            apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
-            status=ProjectStatus.COMPLETED,
-            tool_versions={"jadx": "1.5.2", "apktool": "2.11.1"},
-        ),
-        project_dir,
-        manifest=None,
-    )
-
     provenance = [
         Provenance(
             tool="androguard",
@@ -351,6 +332,96 @@ def workspace_with_sources(tmp_path: Path) -> tuple[Path, str]:
 
 
 @pytest.fixture
+def workspace_with_smali_only(tmp_path: Path) -> tuple[Path, str]:
+    """A workspace holding the bytecode but none of the decompiled Java.
+
+    This is the case the fallback exists for: the decompiler ran and did not
+    manage this class, so the only source left is the bytecode. The project
+    records that both backends took part — the fallback is about what a
+    backend produced, not about whether it is installed.
+    """
+    workspace, project_id = _workspace(tmp_path)
+    _write_smali(workspace, project_id)
+
+    store = Store.open(workspace / "dexatlas.db")
+    store.save_symbols(
+        project_id,
+        [
+            ClassRef(
+                name=CLASS_NAME,
+                kind=ClassKind.CLASS,
+                access_flags=["public"],
+                method_count=len(INDEXED_METHODS),
+                provenance=[
+                    Provenance(
+                        tool="androguard",
+                        tool_version="4.1.4",
+                        apk_sha256=FAKE_SHA256,
+                        locator="androguard:classes.dex#com.example.demo.Crypto",
+                    )
+                ],
+            )
+        ],
+        [
+            MethodRef(
+                class_name=CLASS_NAME,
+                name=name,
+                descriptor=descriptor,
+                access_flags=["public"],
+                provenance=[
+                    Provenance(
+                        tool="androguard",
+                        tool_version="4.1.4",
+                        apk_sha256=FAKE_SHA256,
+                        locator="androguard:classes.dex#com.example.demo.Crypto",
+                    )
+                ],
+            )
+            for name, descriptor in INDEXED_METHODS
+        ],
+        [],
+        [],
+        [],
+    )
+    return workspace, project_id
+
+
+def _workspace(tmp_path: Path) -> tuple[Path, str]:
+    """A workspace with a project row that says both backends took part."""
+    workspace = tmp_path / "workspace"
+    project_id = Project.new_id(FAKE_SHA256)
+    project_dir = workspace / "projects" / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+
+    store = Store.open(workspace / "dexatlas.db")
+    store.save_project(
+        Project(
+            id=project_id,
+            apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+            status=ProjectStatus.COMPLETED,
+            tool_versions={"jadx": "1.5.2", "apktool": "2.11.1"},
+        ),
+        project_dir,
+        manifest=None,
+    )
+    return workspace, project_id
+
+
+def _write_java(workspace: Path, project_id: str) -> None:
+    """Put the decompiled Java in the workspace."""
+    java = workspace / "projects" / project_id / "jadx" / "sources" / "com" / "example" / "demo"
+    java.mkdir(parents=True, exist_ok=True)
+    (java / "Crypto.java").write_text(JAVA_SOURCE, encoding="utf-8")
+
+
+def _write_smali(workspace: Path, project_id: str) -> None:
+    """Put the bytecode in the workspace."""
+    smali = workspace / "projects" / project_id / "apktool" / "smali" / "com" / "example" / "demo"
+    smali.mkdir(parents=True, exist_ok=True)
+    (smali / "Crypto.smali").write_text(SMALI_SOURCE, encoding="utf-8")
+
+
+@pytest.fixture
 def opaque_workspace(tmp_path: Path) -> tuple[Path, str]:
     """A workspace whose one class has two overloads with unreadable types."""
     workspace = tmp_path / "workspace"
@@ -366,6 +437,7 @@ def opaque_workspace(tmp_path: Path) -> tuple[Path, str]:
             id=project_id,
             apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("opaque.apk")),
             status=ProjectStatus.COMPLETED,
+            tool_versions={"jadx": "1.5.2", "apktool": "2.11.1"},
         ),
         project_dir,
         manifest=None,
@@ -657,10 +729,10 @@ def test_a_nested_class_parameter_is_matched_by_its_own_name(
 
 
 def test_the_smali_fallback_resolves_by_descriptor(
-    workspace_with_sources: tuple[Path, str], jadx_unavailable: None
+    workspace_with_smali_only: tuple[Path, str],
 ) -> None:
     """Smali carries the descriptor, so the fallback is exact."""
-    workspace, project_id = workspace_with_sources
+    workspace, project_id = workspace_with_smali_only
     analyzer = _analyzer(workspace)
 
     document = analyzer.method_source_document(project_id, CLASS_NAME, "sign", SIGN_TWO)
@@ -671,10 +743,10 @@ def test_the_smali_fallback_resolves_by_descriptor(
 
 
 def test_the_smali_fallback_reports_an_ambiguous_name(
-    workspace_with_sources: tuple[Path, str], jadx_unavailable: None
+    workspace_with_smali_only: tuple[Path, str],
 ) -> None:
     """Two blocks with one name, and no descriptor to tell them apart."""
-    workspace, project_id = workspace_with_sources
+    workspace, project_id = workspace_with_smali_only
     analyzer = _analyzer(workspace)
 
     with pytest.raises(AmbiguousMethodError) as caught:
@@ -688,9 +760,9 @@ def test_the_smali_fallback_reports_an_ambiguous_name(
 
 
 def test_the_smali_fallback_finds_the_constructor(
-    workspace_with_sources: tuple[Path, str], jadx_unavailable: None
+    workspace_with_smali_only: tuple[Path, str],
 ) -> None:
-    workspace, project_id = workspace_with_sources
+    workspace, project_id = workspace_with_smali_only
     analyzer = _analyzer(workspace)
 
     document = analyzer.method_source_document(project_id, CLASS_NAME, "<init>", NO_ARGS)
@@ -700,10 +772,10 @@ def test_the_smali_fallback_finds_the_constructor(
 
 
 def test_the_smali_fallback_keeps_the_two_aliases_apart(
-    workspace_with_sources: tuple[Path, str], jadx_unavailable: None
+    workspace_with_smali_only: tuple[Path, str],
 ) -> None:
     """The bytecode names both classes in full, so it never mixes them up."""
-    workspace, project_id = workspace_with_sources
+    workspace, project_id = workspace_with_smali_only
     analyzer = _analyzer(workspace)
 
     local = analyzer.method_source_document(project_id, CLASS_NAME, "pick", LOCAL_ALIAS)

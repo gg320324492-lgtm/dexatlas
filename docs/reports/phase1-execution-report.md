@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1088<!--/fig-->（<!--fig:tests.fast-->952<!--/fig--> 快 + <!--fig:tests.slow-->136<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.3%<!--/fig-->**（<!--fig:coverage.covered-->4182<!--/fig-->/<!--fig:coverage.total-->4579<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1208<!--/fig-->（<!--fig:tests.fast-->1071<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.1%<!--/fig-->**（<!--fig:coverage.covered-->5510<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -91,15 +91,19 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 |------|--------|------------------|
 | `tools/androguard/worker.py` | 0.0% | 112 / 112 |
 | `mcp/server.py` | 79.2% | 11 / 53 |
+| `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
-| `tools/base.py` | 82.2% | 32 / 180 |
 | `cli/console.py` | 82.4% | 6 / 34 |
-| `mcp/tools/evidence.py` | 86.2% | 4 / 29 |
-| `mcp/errors.py` | 86.7% | 2 / 15 |
-| `tools/androguard/adapter.py` | 87.3% | 35 / 275 |
-| `tools/jadx/adapter.py` | 88.3% | 42 / 360 |
-| `mcp/tools/projects.py` | 88.6% | 5 / 44 |
-| `mcp/tools/references.py` | 89.7% | 3 / 29 |
+| `tools/base.py` | 84.0% | 30 / 188 |
+| `agent/providers/scripted.py` | 85.7% | 6 / 42 |
+| `mcp/errors.py` | 85.7% | 3 / 21 |
+| `agent/tool_executor.py` | 86.9% | 37 / 282 |
+| `agent/reporter.py` | 87.3% | 13 / 102 |
+| `tools/androguard/adapter.py` | 87.3% | 35 / 276 |
+| `agent/providers/openai_compat.py` | 88.4% | 10 / 86 |
+| `agent/orchestrator.py` | 88.4% | 46 / 398 |
+| `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
+| `mcp/tools/evidence.py` | 89.7% | 3 / 29 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
@@ -130,7 +134,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.3%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.1%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -138,9 +142,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->952<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->136<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1088<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1071<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->137<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->1208<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -199,9 +203,19 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_upload_lifecycle.py` | 上传的保留与清理；正在运行的分析可以被取消 |
 | `test_androguard_isolation.py` | 后端的运行时隔离：宿主的日志不被删；不受信的 DEX 在单独的进程里解析；越界的资源被记下来 |
 | `test_evidence_invariants.py` | 已验证证据的不变量：引用落不在分析之内，就不许记成 verified；模型的说法永远不是事实 |
+| `test_agent_task_suite.py` | agent 的固定任务套件：每个问题都有答案，答案背后都有证据 |
+| `test_agent_verifier.py` | lead 与 finding 的界线：没有证据支撑的结论记成证据不足 |
+| `test_agent_untrusted_input.py` | APK 里的指令指挥不了 agent：读完之后的动作不变 |
+| `test_agent_failures.py` | 三种失败都要测：超时、后端失败、模型失败 |
+| `test_agent_executor.py` | 工具调用的超时、重试与熔断 |
+| `test_agent_state.py` | 任务状态机：能走到哪一步、不能走到哪一步 |
+| `test_agent_providers.py` | 模型端点的三种实现，说的是同一种话 |
+| `test_agent_report.py` | 报告的格式：已确立、lead、证据不足，三段分开 |
 | `test_locators.py` | locator 的解析：路径不许越出后端的树；类、方法、描述符都要在分析里找得到 |
 | `test_call_sites.py` | 调用点与调用边：两次数调用是两个调用点、一条边；报告与 API 都说清是哪个 |
 | `test_mcp_tools.py` | MCP 工具：只读、结果有界、APK 里的文字是数据不是指令 |
+| `test_decompiler_absence.py` | 反编译器没有产出时必须记下来，不能当它不存在 |
+| `test_output_truncation.py` | 后端的输出被截断时，截断这件事本身必须被记录 |
 
 ### 2.2 几类值得注意的测试
 
@@ -818,10 +832,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1088<!--/fig--> 个：<!--fig:tests.fast-->952<!--/fig--> 快 + <!--fig:tests.slow-->136<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1208<!--/fig--> 个：<!--fig:tests.fast-->1071<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.3%<!--/fig-->（<!--fig:coverage.covered-->4182<!--/fig-->/<!--fig:coverage.total-->4579<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1088<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.1%<!--/fig-->（<!--fig:coverage.covered-->5510<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1208<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -940,52 +954,65 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
   "coverage": {
     "files": {
       "__init__.py": [3, 0],
+      "agent/__init__.py": [8, 0],
+      "agent/evidence_verifier.py": [97, 6],
+      "agent/orchestrator.py": [398, 46],
+      "agent/planner.py": [46, 1],
+      "agent/providers/__init__.py": [6, 0],
+      "agent/providers/base.py": [80, 5],
+      "agent/providers/local.py": [53, 10],
+      "agent/providers/openai_compat.py": [86, 10],
+      "agent/providers/scripted.py": [42, 6],
+      "agent/providers/transport.py": [30, 2],
+      "agent/reporter.py": [102, 13],
+      "agent/state.py": [197, 7],
+      "agent/tool_executor.py": [282, 37],
       "api/__init__.py": [3, 0],
-      "api/app.py": [446, 34],
+      "api/app.py": [448, 34],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
       "cli/main.py": [258, 6],
       "config/__init__.py": [3, 0],
       "config/settings.py": [39, 1],
       "core/__init__.py": [3, 0],
-      "core/calls.py": [32, 1],
+      "core/calls.py": [32, 0],
       "core/evidence.py": [107, 1],
       "core/ingest.py": [88, 3],
       "core/locators.py": [306, 18],
       "core/methods.py": [218, 10],
       "core/models.py": [323, 6],
       "core/paths.py": [36, 2],
-      "core/pipeline.py": [468, 31],
+      "core/pipeline.py": [483, 34],
       "core/runs.py": [70, 1],
-      "core/storage.py": [347, 7],
+      "core/storage.py": [352, 7],
       "mcp/__init__.py": [2, 0],
-      "mcp/errors.py": [15, 2],
-      "mcp/schemas.py": [152, 0],
+      "mcp/errors.py": [21, 3],
+      "mcp/schemas.py": [153, 0],
       "mcp/security.py": [28, 5],
       "mcp/server.py": [53, 11],
       "mcp/tools/__init__.py": [1, 0],
-      "mcp/tools/evidence.py": [29, 4],
-      "mcp/tools/projects.py": [44, 5],
-      "mcp/tools/references.py": [29, 3],
-      "mcp/tools/symbols.py": [25, 2],
+      "mcp/tools/evidence.py": [29, 3],
+      "mcp/tools/projects.py": [45, 4],
+      "mcp/tools/references.py": [29, 2],
+      "mcp/tools/symbols.py": [27, 2],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
       "reports/json_report.py": [27, 0],
       "reports/markdown.py": [97, 0],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [275, 35],
+      "tools/androguard/adapter.py": [276, 35],
       "tools/androguard/isolation.py": [97, 5],
       "tools/androguard/worker.py": [112, 112],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [211, 12],
-      "tools/base.py": [180, 32],
+      "tools/base.py": [188, 30],
       "tools/jadx/__init__.py": [3, 0],
-      "tools/jadx/adapter.py": [360, 42],
+      "tools/jadx/adapter.py": [360, 41],
       "tools/registry.py": [28, 0]
     },
-    "missing": 397,
-    "statements": 4579
+    "missing": 537,
+    "statements": 6047
   },
   "history": {
     "v0.1.0": {
@@ -1002,10 +1029,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:26ca70bfd7d9c141dbc25aad0153bdde8b307dc494f35cb8558cc36580f7fbc0",
+  "source_fingerprint": "sha256:ccc85d4c5ad1098bd9e2c6d9d28365c5e693ae2bc505ebd9cf65e56df6214c46",
   "suite": {
     "failed": 0,
-    "passed": 1088,
+    "passed": 1208,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1013,8 +1040,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 952,
-    "slow": 136,
-    "total": 1088
+    "fast": 1071,
+    "slow": 137,
+    "total": 1208
   }
 }-->

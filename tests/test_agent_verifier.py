@@ -22,6 +22,7 @@ from pathlib import Path
 import pytest
 
 from dexatlas.agent.evidence_verifier import (
+    SUPPORTS_CLAIMS,
     Conclusion,
     EvidenceVerifier,
     parse_answer,
@@ -93,6 +94,54 @@ def test_a_conclusion_that_names_a_record_the_task_made_is_a_lead(demo: Demo) ->
     assert record.level is EvidenceLevel.LEAD
     assert record.detail["supported_by"] == [established.id]
     assert record.detail["unsupported"] == []
+
+
+def test_a_note_about_the_analysis_cannot_carry_a_conclusion(demo: Demo) -> None:
+    """A record about the analysis is not an observation of the thing asked about.
+
+    "The analysis is incomplete: apktool did not take part" is true and it
+    is worth knowing, but a conclusion that rests on it has nothing behind
+    it. The record that says which backends ran is a note about the
+    analysis; the question was about the APK.
+    """
+    builder = _builder(demo)
+    note = builder.add(
+        kind=EvidenceKind.OBSERVATION,
+        level=EvidenceLevel.VERIFIED,
+        summary="the analysis is incomplete: apktool did not take part",
+        provenance=[],
+        detail={SUPPORTS_CLAIMS: False},
+    )
+    verifier = _verifier(demo, [note], set())
+
+    record = verifier.verify(Conclusion("the app asks for location access", evidence_ids=[note.id]))
+
+    assert record.level is EvidenceLevel.INSUFFICIENT
+    assert record.detail["supported_by"] == []
+    assert "note about the analysis" in record.detail["unsupported"][0]
+
+
+def test_a_record_that_establishes_nothing_cannot_carry_a_conclusion(demo: Demo) -> None:
+    """A record that says the evidence was insufficient cannot be the ground.
+
+    It is a record of a reading that did not come up to much, so a
+    conclusion that cites it is citing the absence of evidence as if it
+    were evidence.
+    """
+    builder = _builder(demo)
+    weak = builder.add(
+        kind=EvidenceKind.OBSERVATION,
+        level=EvidenceLevel.INSUFFICIENT,
+        summary="the tool read something, but its citation does not resolve",
+        provenance=[],
+    )
+    verifier = _verifier(demo, [weak], set())
+
+    record = verifier.verify(Conclusion("the app asks for location access", evidence_ids=[weak.id]))
+
+    assert record.level is EvidenceLevel.INSUFFICIENT
+    assert record.detail["supported_by"] == []
+    assert "note about the analysis" in record.detail["unsupported"][0]
 
 
 def test_a_conclusion_that_names_a_record_that_is_not_there_is_insufficient(

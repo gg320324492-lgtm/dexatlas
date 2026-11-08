@@ -467,7 +467,7 @@ def test_save_symbols_reports_the_rows_it_stored(store: Store, tmp_path: Path) -
     assert counts.classes == len(store.list_classes(project.id))
     assert counts.methods == len(store.list_methods(project.id))
     assert counts.fields == _row_count(store, "fields", project.id)
-    assert counts.references == _row_count(store, "call_sites", project.id)
+    assert counts.call_sites == _row_count(store, "call_sites", project.id)
     # The edges are what the call sites say about each other, and they are a
     # different number: two calls from one method to one target are two sites
     # and one edge.

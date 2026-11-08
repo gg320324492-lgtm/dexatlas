@@ -9,8 +9,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1088%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-91.3%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1208%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-91.1%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
@@ -190,6 +190,20 @@ In an MCP host, add it as a stdio server:
 }
 ```
 
+### The agent
+
+DexAtlas can also answer a question about an APK. The agent takes a question,
+plans a bounded series of tool calls against the MCP server, checks that every
+conclusion it reached has something behind it, and reports what it found —
+**separated into what was established, what is a lead, and what is not
+established**. A model's output is a lead and can never be promoted to a
+finding, and an instruction found inside the APK is data rather than an order.
+
+It is a library rather than a command: there is no `dexatlas agent "..."` yet,
+so a caller builds an `Orchestrator` over a workspace and a model endpoint.
+What it does, what it will not do, and what is not measured yet:
+**[docs/architecture/agent.md](docs/architecture/agent.md)**.
+
 Docker, with JADX and Apktool preinstalled:
 
 ```bash
@@ -218,6 +232,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review, against the code that exists
 - **[Large-APK benchmark](docs/benchmarks/large-apk.md)** — what the analysis does to a
   200,000-method APK, what it refuses to claim, and what it never measured
+- **[The agent](docs/architecture/agent.md)** — the evidence-first agent: the loop, the
+  budgets, the state machine, and where the boundary between a lead and a finding is
 
 The source review is done: 44 findings across three reviews, every one of them
 re-verified against the tree it was found on.

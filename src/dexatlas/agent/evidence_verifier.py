@@ -40,6 +40,31 @@ from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel, Provenan
 #: How much of an answer that is not a conclusion is kept.
 MAX_QUOTED_ANSWER = 400
 
+#: The key in a record's detail that says whether the record is an
+#: observation of the thing the task is about, or a note about the analysis
+#: itself.
+#:
+#: "The analysis is incomplete: apktool did not take part" is true, and it
+#: is worth recording — but it says nothing about the question that was
+#: asked. A conclusion that rests on it has nothing behind it, and the
+#: difference between the two is the difference between a lead and a
+#: sentence that happens to be true.
+SUPPORTS_CLAIMS = "supports_claims"
+
+
+def _supports_claims(record: Evidence) -> bool:
+    """Whether a record can carry a conclusion.
+
+    Two things are asked of a record. It has to establish something — a
+    record that says the evidence was insufficient establishes that there
+    was not enough, and cannot be the ground a conclusion stands on. And it
+    has to be an observation of the thing the task is about rather than a
+    note about the analysis that made the observation.
+    """
+    if record.level is not EvidenceLevel.VERIFIED:
+        return False
+    return bool(record.detail.get(SUPPORTS_CLAIMS, True))
+
 
 @dataclass(frozen=True, slots=True)
 class Conclusion:
@@ -193,6 +218,11 @@ class EvidenceVerifier:
             record = self._record_for(evidence_id)
             if record is None:
                 unsupported.append(f"{evidence_id} (no such record in this task)")
+                continue
+            if not _supports_claims(record):
+                unsupported.append(
+                    f"{evidence_id} (it is a note about the analysis, not an observation of it)"
+                )
                 continue
             if self._record_holds(record):
                 supported.append(evidence_id)

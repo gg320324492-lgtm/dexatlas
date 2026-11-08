@@ -224,9 +224,19 @@ def test_a_backend_name_in_prose_is_not_code_the_citation_has_to_hold(
     """
     checker = _checker()
     document = tmp_path / "doc.md"
+
+    # The line is found rather than written down: the file it points into is
+    # rewritten from time to time, and a test that names a line goes red for
+    # a change that was not about it.
+    source = (REPO_ROOT / "src" / "dexatlas" / "tools" / "base.py").read_text(encoding="utf-8")
+    line = next(
+        number
+        for number, text in enumerate(source.splitlines(), start=1)
+        if text.strip() == "tool=self.name,"
+    )
     document.write_text(
         "| `tool` | `str` | the backend name (`jadx` / `apktool` / `androguard`) "
-        "| `src/dexatlas/tools/base.py:258` |\n",
+        f"| `src/dexatlas/tools/base.py:{line}` |\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(checker, "DOCS", [document])

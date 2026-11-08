@@ -210,9 +210,20 @@ class SymbolView(BaseModel):
     kind: str
     """What kind of symbol it is: a class, a method, a field, a string."""
 
-    name: str
-    detail: str = ""
-    """The extra that tells two symbols of the same kind apart."""
+    name: UntrustedText
+    """The symbol's name.
+
+    A class name, a method name, a field name — and, for a string symbol, the
+    string itself, which is whatever the APK put there. It is carried under
+    the notice for the same reason the source is: it is text that came out
+    of an untrusted file, and it is read as data.
+    """
+
+    detail: UntrustedText = Field(default_factory=lambda: UntrustedText(text=""))
+    """The extra that tells two symbols of the same kind apart.
+
+    This is a slice of the indexed text, so it is text out of the APK as well.
+    """
 
     provenance: list[str] = Field(default_factory=list)
     """The locators that say where it was read from."""

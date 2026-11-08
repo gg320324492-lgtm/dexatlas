@@ -118,10 +118,12 @@ The report prints five numbers, and each says which of the two it is:
 | `Cross-reference records` | the records themselves |
 
 The JSON report keeps the old names as well — `cross_references` and
-`cross_references_with_evidence` — because their values did not change, so a
-reader that knows them still reads the right number, and a reader that wants
-to know what the number means has a name that says it. The schema version
-moved to 2 when the run block was added.
+`cross_references_with_evidence`. **Their values did not change, and what a
+row is did**: the rows used to be the relationships counted twice, and they
+are the places now. So `cross_references` is the number of call sites, and a
+reader who wants the relationships reads `call_edges`. The project block
+carries both under the names that say which of the two they are, and the
+schema version moved to 3 when they were added.
 
 The API's `/projects/{id}/xrefs/{method_id}` answers with `call_sites` and
 `call_edges` beside the old `total`, and each reference in the list carries

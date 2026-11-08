@@ -287,6 +287,14 @@ class ProjectResponse(BaseModel):
     """How many call *sites* the index holds: one per place in the bytecode
     where a call happens."""
 
+    call_site_count: int
+    """How many call *sites* the index holds.
+
+    The same number as ``reference_count``, under the name the reports and
+    the MCP tools use. A reader who has seen one of them should not have to
+    guess whether the other means the same thing.
+    """
+
     call_edge_count: int
     """How many call *edges* the index holds: one per relationship between
     two methods, aggregated over the call sites that make it."""
@@ -910,6 +918,11 @@ def get_references(project_id: str, method_id: str, analyzer: AnalyzerDep) -> di
         "call_sites": len(references),
         "call_edges": edges,
         "total": len(references),
+        # The unit of `total`, spelled out. Its value did not change — it was
+        # the number of indexed rows before and it is the number of call
+        # sites now — but a row is a place now, and a reader who only sees
+        # "total: 4" would still take it for four relationships.
+        "total_unit": "call_sites",
         "references": [r.model_dump(mode="json") for r in references],
     }
 
@@ -1201,6 +1214,7 @@ def _project_response(project: Any, settings: Settings) -> ProjectResponse:
         class_count=project.class_count,
         method_count=project.method_count,
         reference_count=project.reference_count,
+        call_site_count=project.reference_count,
         call_edge_count=project.call_edge_count,
         evidence_count=project.evidence_count,
         resource_count=project.resource_count,

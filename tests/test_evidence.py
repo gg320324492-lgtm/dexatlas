@@ -344,6 +344,33 @@ def test_caller_list_is_truncated() -> None:
     assert len(evidence.detail["callers"]) == MAX_LISTED_CALLERS
 
 
+def test_a_cross_reference_record_says_how_many_callers_and_how_many_sites() -> None:
+    """The summary and the detail count the same things.
+
+    One caller that calls the same method twice is one caller and two call
+    sites, and the two numbers are both in the record. A summary that said
+    "called from one location" beside a detail that said two call sites would
+    make a reader choose between two numbers in one record — and "a location"
+    now means a call site, so the two would not even be about the same thing.
+    """
+    builder = _builder()
+    method = _method()
+
+    builder.add_method_references(
+        method,
+        [
+            _reference("com.a.Caller.run()V", method.qualified_name),
+            _reference("com.a.Caller.run()V", method.qualified_name),
+        ],
+    )
+
+    evidence = builder.items[0]
+    assert evidence.detail["call_site_count"] == 2, "the two places the call happens"
+    assert evidence.detail["call_edge_count"] == 1, "the one relationship they make"
+    assert "1 caller(s)" in evidence.summary
+    assert "2 call site(s)" in evidence.summary
+
+
 def test_no_references_records_nothing() -> None:
     builder = _builder()
 

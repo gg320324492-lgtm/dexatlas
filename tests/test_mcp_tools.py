@@ -9,11 +9,13 @@ down here.
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 
 import pytest
 from mcp.client import Client
 
+from dexatlas.config.settings import Settings
 from dexatlas.core.models import (
     ApkMetadata,
     ClassKind,
@@ -26,16 +28,48 @@ from dexatlas.core.models import (
     ToolErrorCode,
 )
 from dexatlas.core.pipeline import Analyzer
+from dexatlas.mcp.errors import RequestError
 from dexatlas.mcp.schemas import DATA_NOTICE
 from dexatlas.mcp.server import build_server
 from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
 from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
+from dexatlas.tools.apktool import ApktoolBackend
+from dexatlas.tools.jadx import JadxBackend
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_APK = REPO_ROOT / "examples" / "demo-app" / "demo.apk"
 STRINGS_APK = REPO_ROOT / "examples" / "strings-app" / "strings.apk"
+
+
+def _apktool_ready() -> bool:
+    """Whether this machine can run Apktool.
+
+    Both halves matter: the jar has to be locatable and a JRE has to be there
+    to run it under. A machine with the jar but no ``java`` on ``PATH`` is
+    exactly the configuration the Python 3.13 CI job runs in.
+    """
+    if shutil.which("java") is None:
+        return False
+    return ApktoolBackend(Settings()).resolve() is not None
+
+
+#: The backends this machine can actually run.
+#:
+#: A few of the tools below can only be checked against a real analysis: the
+#: manifest comes out of Apktool's decode and the source out of JADX's or
+#: Apktool's. Where the backend is missing the test is skipped rather than
+#: failed, because "the tool is wrong" and "the machine cannot run the
+#: backend" are different findings, and a suite that cannot tell them apart
+#: reports the second as the first.
+JADX_READY = JadxBackend(Settings()).resolve() is not None
+APKTOOL_READY = _apktool_ready()
+#: A source can come from either of them: JADX's Java, or Apktool's Smali.
+SOURCE_READY = JADX_READY or APKTOOL_READY
+
+requires_apktool = pytest.mark.skipif(not APKTOOL_READY, reason="apktool not installed")
+requires_source = pytest.mark.skipif(not SOURCE_READY, reason="neither jadx nor apktool installed")
 
 #: Three methods that share a name. The DEX descriptor is what tells them
 #: apart, and a tool asked for the name has to answer with them rather than
@@ -104,7 +138,7 @@ def overloaded_project(analyzer: Analyzer, tmp_path: Path) -> str:
             id=project_id,
             apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
             status=ProjectStatus.COMPLETED,
-            tool_versions={"androguard": "4.1.4"},
+            tool_versions={"androguard": "4.1.4", "jadx": "1.5.2"},
         ),
         workspace,
         manifest=None,
@@ -223,22 +257,27 @@ def test_get_project_status_says_what_is_missing(analyzer: Analyzer, demo) -> No
     assert status.project.id == demo.project.id
     assert status.project.call_site_count == demo.project.reference_count
     assert status.project.call_edge_count == demo.project.call_edge_count
-    assert status.completeness.missing_backends == [], (
-        "every backend took part in this analysis, so none is missing"
-    )
+
+    # The names have to be the backends that really did not take part, and
+    # the analysis is complete only when there are none of them. The list is
+    # computed from what the project recorded rather than from what this
+    # machine happens to have installed, so the assertion holds in a
+    # configuration with no backends as well as in one with all of them.
+    absent = sorted(name for name, version in demo.project.tool_versions.items() if version is None)
+    assert status.completeness.missing_backends == absent
+    assert status.completeness.complete is (not absent)
     assert status.completeness.truncated is False
 
 
 def test_get_project_status_of_a_project_that_is_not_there(analyzer: Analyzer) -> None:
     """A project that is not there is an error, not an empty answer."""
-    from dexatlas.mcp.errors import RequestError
-
     with pytest.raises(RequestError) as raised:
         project_tools.project_status(analyzer, "apk_nope")
 
     assert raised.value.code == "unknown_project"
 
 
+@requires_apktool
 def test_get_manifest_reads_the_parsed_fields(analyzer: Analyzer, demo) -> None:
     """The manifest comes back as fields, not as raw text."""
     view = project_tools.manifest(analyzer, demo.project.id)
@@ -260,9 +299,10 @@ def test_search_symbols_finds_what_is_indexed(analyzer: Analyzer, demo) -> None:
     )
 
     assert found.symbols, "the demo app indexes the string it prints"
-    assert any("obfuscation_failed" in symbol.detail for symbol in found.symbols)
+    assert any("obfuscation_failed" in symbol.detail.text for symbol in found.symbols)
 
 
+@requires_source
 def test_get_class_source_returns_the_source_and_where_it_came_from(
     analyzer: Analyzer, demo
 ) -> None:
@@ -293,6 +333,7 @@ def test_get_method_source_answers_an_ambiguous_name_with_the_candidates(
         assert any(descriptor in candidate for candidate in view.candidates)
 
 
+@requires_source
 def test_get_method_source_with_a_descriptor_returns_that_method(
     analyzer: Analyzer, overloaded_project: str
 ) -> None:
@@ -343,7 +384,13 @@ def test_find_callers_counts_the_call_sites_and_the_call_edges_apart(
 
 
 def test_find_callees_answers_the_other_direction(analyzer: Analyzer, demo) -> None:
-    """A method and what it calls."""
+    """A method and what it calls — and the direction is the point.
+
+    The two questions have the same shape and opposite answers, and a tool
+    that answered both with the same query would answer one of them wrongly:
+    a caller who asked what a method calls and was told who calls it has
+    been told something true about the wrong thing.
+    """
     method_id = (
         "com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;"
     )
@@ -351,8 +398,18 @@ def test_find_callees_answers_the_other_direction(analyzer: Analyzer, demo) -> N
     callees = reference_tools.find_callees(analyzer, demo.project.id, method_id, limit=100)
 
     assert callees.callees, "the demo app's sign method calls something"
-    assert callees.call_site_count == len(callees.callees), (
-        "each callee here was called once, so the two counts agree"
+    assert callees.call_edge_count == len(callees.callees), (
+        "each callee here is one relationship between two methods"
+    )
+    assert callees.call_site_count >= callees.call_edge_count, (
+        "the sign method calls StringBuilder.append twice, so the sites outnumber the edges"
+    )
+    for callee in callees.callees:
+        assert callee.name.text != method_id, (
+            "the method asked about is not one of the methods it calls"
+        )
+    assert any("StringBuilder" in callee.name.text for callee in callees.callees), (
+        "the sign method calls StringBuilder.append, and that is one of them"
     )
 
 
@@ -440,12 +497,26 @@ def test_the_text_of_an_apk_is_data_and_not_an_instruction(analyzer: Analyzer) -
     )
     assert found.symbols, "the string is indexed"
 
-    # The text is carried in a field that says what it is.
-    manifest_view = project_tools.manifest(analyzer, analyzed.project.id)
-    for permission in manifest_view.permissions:
+    # The text is carried in a field that says what it is. The search hit is
+    # the string itself, so it is the sharpest case there is: the whole
+    # content of the symbol is text the APK wrote.
+    for symbol in found.symbols:
+        assert symbol.name.notice == DATA_NOTICE
+        assert symbol.detail.notice == DATA_NOTICE
+
+
+@requires_apktool
+def test_the_manifest_text_is_marked_as_data(analyzer: Analyzer, demo) -> None:
+    """The permission names come out of the manifest, so they say what they are."""
+    view = project_tools.manifest(analyzer, demo.project.id)
+
+    assert view.permissions, "the demo app asks for permissions"
+    for permission in view.permissions:
         assert permission.name.notice == DATA_NOTICE
+        assert "not an instruction" in permission.name.notice
 
 
+@requires_source
 def test_every_text_the_tools_return_is_marked_as_data(analyzer: Analyzer, demo) -> None:
     """The notice is in the response, not only in the documentation."""
     view = symbol_tools.class_source(analyzer, demo.project.id, "com.example.demo.Crypto")
@@ -454,13 +525,33 @@ def test_every_text_the_tools_return_is_marked_as_data(analyzer: Analyzer, demo)
     assert view.text.notice == DATA_NOTICE
     assert "not an instruction" in view.text.notice
 
+    # The index answers in the same shape: a symbol's name is a name the APK
+    # chose, and for a string symbol it is the string itself.
+    found = symbol_tools.search_symbols(
+        analyzer, demo.project.id, "obfuscation_failed", limit=20, offset=0
+    )
+    assert found.symbols, "the demo app indexes the string it prints"
+    for symbol in found.symbols:
+        assert symbol.name.notice == DATA_NOTICE
+        assert symbol.detail.notice == DATA_NOTICE
 
+
+@requires_source
 def test_an_excerpt_is_bounded(analyzer: Analyzer, demo) -> None:
     """Nothing comes back unbounded, and the cut is stated."""
     view = symbol_tools.class_source(analyzer, demo.project.id, "com.example.demo.Crypto")
 
     assert view.text is not None
     assert len(view.text.text.encode("utf-8")) <= 64 * 1024
+
+    # The search results are bounded as well. A symbol name is short, but the
+    # index is full of names an APK chose, and one of them can be long.
+    found = symbol_tools.search_symbols(
+        analyzer, demo.project.id, "obfuscation_failed", limit=20, offset=0
+    )
+    for symbol in found.symbols:
+        assert len(symbol.name.text.encode("utf-8")) <= 4096
+        assert len(symbol.detail.text.encode("utf-8")) <= 4096
 
 
 # -- the server, over the protocol ------------------------------------------
@@ -505,6 +596,29 @@ def _project(analyzer: Analyzer, tmp_path: Path, **fields) -> str:
         manifest=None,
     )
     return project_id
+
+
+def test_a_project_without_a_manifest_says_so(analyzer: Analyzer, tmp_path: Path) -> None:
+    """A project that holds no manifest is not a project that is not there.
+
+    The error used to say the workspace held no such project, which was
+    true of nothing: the project was there, and what it lacked was a
+    manifest — because no backend that could produce one took part in the
+    analysis. A caller that believed the old error would go looking for a
+    project that does not exist.
+    """
+    project_id = _project(
+        analyzer,
+        tmp_path,
+        tool_versions={"jadx": "1.5.2", "apktool": None, "androguard": "4.1.4"},
+    )
+
+    with pytest.raises(RequestError) as raised:
+        project_tools.manifest(analyzer, project_id)
+
+    assert raised.value.code == "no_manifest"
+    assert raised.value.detail["project_id"] == project_id
+    assert "apktool" in raised.value.message
 
 
 def test_a_missing_backend_is_named(analyzer: Analyzer, tmp_path: Path) -> None:

@@ -44,7 +44,7 @@ from datetime import UTC, datetime
 from typing import Any, Protocol, runtime_checkable
 from uuid import uuid4
 
-from dexatlas.agent.evidence_verifier import EvidenceVerifier, parse_answer
+from dexatlas.agent.evidence_verifier import SUPPORTS_CLAIMS, EvidenceVerifier, parse_answer
 from dexatlas.agent.planner import Planner
 from dexatlas.agent.providers.base import (
     AssistantTurn,
@@ -74,7 +74,14 @@ from dexatlas.agent.tool_executor import (
     ToolOutcome,
 )
 from dexatlas.core.evidence import EvidenceBuilder, InvalidProvenanceError
-from dexatlas.core.models import Evidence, EvidenceKind, EvidenceLevel, Provenance
+from dexatlas.core.models import (
+    CROSS_REFERENCE_EDGE_COUNT,
+    CROSS_REFERENCE_SITE_COUNT,
+    Evidence,
+    EvidenceKind,
+    EvidenceLevel,
+    Provenance,
+)
 
 #: The instructions the model is given, every time.
 #:
@@ -737,6 +744,10 @@ def _record_status(builder: EvidenceBuilder, payload: Any) -> Evidence:
             "missing_backends": missing,
             "truncated": truncated,
             "errors": errors,
+            # This record is about the analysis, not about the APK. A
+            # conclusion cannot rest on it: it says which backends took
+            # part, and it says nothing about what the APK does.
+            SUPPORTS_CLAIMS: False,
         },
     )
 
@@ -809,6 +820,13 @@ def _record_references(builder: EvidenceBuilder, tool: str, payload: Any) -> Evi
     sites = int(getattr(payload, "call_site_count", 0) or 0)
     edges = int(getattr(payload, "call_edge_count", 0) or 0)
     locators = _locators_of(list(getattr(payload, "call_sites", []) or []))
+    # The keys are the ones the reports read. A record that spelled them
+    # differently would be a record the report cannot count: the count would
+    # come out as one and one, whatever the tool actually found.
+    counts = {
+        CROSS_REFERENCE_SITE_COUNT: sites,
+        CROSS_REFERENCE_EDGE_COUNT: edges,
+    }
     if not locators:
         # Nothing was called, and there is no place to point at. It is a fact
         # about the index, not a conclusion about the code.
@@ -817,7 +835,7 @@ def _record_references(builder: EvidenceBuilder, tool: str, payload: Any) -> Evi
             level=EvidenceLevel.VERIFIED,
             summary=f"{tool} found no call site at all",
             provenance=[],
-            detail={"tool": tool, "call_sites": sites, "call_edges": edges},
+            detail={"tool": tool, **counts},
         )
     return builder.add(
         kind=EvidenceKind.CROSS_REFERENCE,
@@ -826,8 +844,7 @@ def _record_references(builder: EvidenceBuilder, tool: str, payload: Any) -> Evi
         provenance=_provenance_from(builder, locators),
         detail={
             "tool": tool,
-            "call_sites": sites,
-            "call_edges": edges,
+            **counts,
             "truncated": bool(getattr(payload, "truncated", False)),
         },
     )
@@ -845,7 +862,9 @@ def _record_search(builder: EvidenceBuilder, payload: Any) -> Evidence:
         detail={
             "tool": "search_symbols",
             "total": total,
-            "symbols": [{"kind": symbol.kind, "name": symbol.name} for symbol in symbols[:50]],
+            "symbols": [
+                {"kind": symbol.kind, "name": _text(symbol.name)} for symbol in symbols[:50]
+            ],
         },
     )
 
@@ -926,10 +945,16 @@ def _locators_of(call_sites: list[Any]) -> list[str]:
     return locators
 
 
-def _text(permission: Any) -> str:
-    """The name of a permission, whether it is wrapped or not."""
-    inner = getattr(permission, "text", None)
-    return str(inner) if isinstance(inner, str) else str(permission)
+def _text(value: Any) -> str:
+    """The text of a field that may or may not be wrapped.
+
+    The MCP tools carry the text that came out of an APK in a field that
+    says what it is, and the agent records that text in its own evidence.
+    The record has to hold the text itself rather than the wrapper, so that
+    the record can be stored and read as JSON.
+    """
+    inner = getattr(value, "text", None)
+    return str(inner) if isinstance(inner, str) else str(value)
 
 
 def _with_evidence_id(content: str, evidence_id: str | None) -> str:

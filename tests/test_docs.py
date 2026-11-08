@@ -118,8 +118,8 @@ def test_readme_does_not_overclaim() -> None:
     only name what is built. The roadmap table may name the rest, which is
     fine: a plan is not a claim.
 
-    The list below is the milestone list as it stands: the MCP server has
-    landed, and the agent and the workbench have not. When one of them is
+    The list below is the milestone list as it stands: the MCP server and
+    the agent have landed, and the workbench has not. When one of them is
     built, it moves out of this list and into the other side of the same
     test — which is the point of keeping the test: it says which of the
     two it is at any moment.
@@ -127,7 +127,7 @@ def test_readme_does_not_overclaim() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
-    for unbuilt in ("agent", "workbench"):
+    for unbuilt in ("workbench",):
         assert unbuilt not in quick_start.lower(), (
             f"the Quick Start section references {unbuilt!r}, which is not built yet"
         )
@@ -147,6 +147,22 @@ def test_the_quick_start_names_the_mcp_server_because_it_is_built() -> None:
         "the MCP server is built and the Quick Start does not mention it"
     )
     assert (REPO_ROOT / "src" / "dexatlas" / "mcp" / "server.py").is_file()
+
+
+def test_the_quick_start_names_the_agent_because_it_is_built() -> None:
+    """The same claim, one milestone on: the agent is built and named.
+
+    The agent is a library rather than a command, so the Quick Start says
+    that too — a reader who is told the agent exists and not that it has no
+    entry point will look for a command that is not there.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
+
+    assert "agent" in quick_start.lower(), (
+        "the agent is built and the Quick Start does not mention it"
+    )
+    assert (REPO_ROOT / "src" / "dexatlas" / "agent" / "orchestrator.py").is_file()
 
 
 def test_readme_marks_the_project_as_in_development() -> None:

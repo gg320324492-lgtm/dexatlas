@@ -5,7 +5,7 @@ from __future__ import annotations
 from dexatlas.core.calls import CallSite
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.mcp.errors import unknown_project
-from dexatlas.mcp.schemas import CalleeView, CallerView, CallSiteView, SymbolView
+from dexatlas.mcp.schemas import CalleeView, CallerView, CallSiteView, SymbolView, UntrustedText
 
 
 def _view(site: CallSite) -> CallSiteView:
@@ -74,8 +74,8 @@ def find_callees(
         callees.append(
             SymbolView(
                 kind="method",
-                name=site.callee,
-                detail=site.kind.value,
+                name=UntrustedText(text=site.callee),
+                detail=UntrustedText(text=site.kind.value),
                 provenance=[entry.locator for entry in site.provenance],
             )
         )

@@ -95,7 +95,7 @@ class SymbolCounts:
     classes: int
     methods: int
     fields: int
-    references: int
+    call_sites: int
     """The call sites the index holds.
 
     One row per place in the bytecode where a call happens. Two calls from
@@ -144,6 +144,29 @@ CREATE TABLE IF NOT EXISTS resources (
     provenance TEXT NOT NULL DEFAULT '[]',
     PRIMARY KEY (project_id, file, name, kind, quantity, position)
 );
+"""
+
+#: The indexes on the call-site table.
+#:
+#: They are written here as well as in the schema, because the migration
+#: rebuilds that table: SQLite drops an index with the table it belongs to,
+#: and a workspace that was rebuilt without them would keep the full-table
+#: scan for good — the schema version matches after the first upgrade, so
+#: the schema script never runs again and never puts them back.
+_CALL_SITES_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_sites_caller ON call_sites(project_id, caller);
+-- The lookup compares the *canonical* form of a callee, so the index is on that
+-- form. A workspace indexed before descriptors were canonicalised holds the
+-- spaced spelling, and it still has to be found — without this index the
+-- comparison would be a scan of every call site in the project.
+CREATE INDEX IF NOT EXISTS idx_sites_callee_canonical
+    ON call_sites(project_id, REPLACE(callee, ' ', ''));
+"""
+
+#: The indexes on the resource table, for the same reason.
+_RESOURCES_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_resources_project ON resources(project_id);
+CREATE INDEX IF NOT EXISTS idx_resources_name ON resources(project_id, name);
 """
 
 #: The whole schema. The resource table is spliced in rather than written out
@@ -277,16 +300,7 @@ CREATE TABLE IF NOT EXISTS evidence (
 
 CREATE INDEX IF NOT EXISTS idx_classes_project ON classes(project_id);
 CREATE INDEX IF NOT EXISTS idx_methods_class   ON methods(project_id, class_name);
-CREATE INDEX IF NOT EXISTS idx_sites_caller    ON call_sites(project_id, caller);
--- The lookup compares the *canonical* form of a callee, so the index is on that
--- form. A workspace indexed before descriptors were canonicalised holds the
--- spaced spelling, and it still has to be found — without this index the
--- comparison would be a scan of every cross-reference in the project.
-CREATE INDEX IF NOT EXISTS idx_sites_callee_canonical
-    ON call_sites(project_id, REPLACE(callee, ' ', ''));
 CREATE INDEX IF NOT EXISTS idx_strings_project ON strings(project_id);
-CREATE INDEX IF NOT EXISTS idx_resources_project ON resources(project_id);
-CREATE INDEX IF NOT EXISTS idx_resources_name ON resources(project_id, name);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     kind UNINDEXED,
@@ -296,6 +310,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
     tokenize = 'unicode61 remove_diacritics 2'
 );
 """
+    + _CALL_SITES_INDEXES
+    + _RESOURCES_INDEXES
 )
 
 #: The tables the schema declares.
@@ -446,6 +462,11 @@ def _migrate(connection: sqlite3.Connection) -> None:
         connection.execute("DROP TABLE IF EXISTS xrefs")
         connection.execute("DROP TABLE IF EXISTS call_sites")
         connection.execute(_CALL_SITES_TABLE)
+        # The indexes go with the table they belong to, and the schema script
+        # will not run again — the version matches from here on. A workspace
+        # that was rebuilt without them would keep scanning the whole table
+        # for the rest of its life.
+        connection.executescript(_CALL_SITES_INDEXES)
         connection.execute("UPDATE projects SET reference_count = 0, call_edge_count = 0")
 
     resource_columns = {row["name"] for row in connection.execute("PRAGMA table_info(resources)")}
@@ -457,6 +478,7 @@ def _migrate(connection: sqlite3.Connection) -> None:
         # created empty rather than migrated row by row.
         connection.execute("DROP TABLE resources")
         connection.execute(_RESOURCES_TABLE)
+        connection.executescript(_RESOURCES_INDEXES)
 
 
 def _table_names(connection: sqlite3.Connection) -> set[str]:
@@ -960,7 +982,7 @@ class Store:
                 classes=_count_rows(connection, "classes", project_id),
                 methods=_count_rows(connection, "methods", project_id),
                 fields=_count_rows(connection, "fields", project_id),
-                references=_count_rows(connection, "call_sites", project_id),
+                call_sites=_count_rows(connection, "call_sites", project_id),
                 call_edges=_count_call_edges(connection, project_id),
                 resources=_count_rows(connection, "resources", project_id),
             )
@@ -1023,7 +1045,7 @@ class Store:
         return [_row_to_call_site(row) for row in rows]
 
     def list_callees(self, project_id: str, method_id: str) -> list[CallSite]:
-        """The call sites of the calls *into* ``method_id``.
+        """The call sites of the calls *out of* ``method_id``.
 
         The mirror of :meth:`get_method_references`, which answers the other
         way round. A call site is a place in the bytecode where a call
@@ -1034,8 +1056,8 @@ class Store:
         with self.transaction() as connection:
             rows = connection.execute(
                 "SELECT * FROM call_sites "
-                "WHERE project_id = ? AND REPLACE(callee, ' ', '') = ? "
-                "ORDER BY caller, kind, dex_name, instruction_offset",
+                "WHERE project_id = ? AND REPLACE(caller, ' ', '') = ? "
+                "ORDER BY callee, kind, dex_name, instruction_offset",
                 (project_id, canonical),
             ).fetchall()
         return [_row_to_call_site(row) for row in rows]

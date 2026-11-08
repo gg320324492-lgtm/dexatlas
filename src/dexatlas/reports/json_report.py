@@ -29,7 +29,7 @@ def build_json_report(result: AnalysisResult) -> dict[str, Any]:
         # 2 adds the run the report describes, and the status of a later
         # attempt that published nothing. Both are additive; a reader of a
         # version 1 document that ignores unknown keys is unaffected.
-        "schema_version": 2,
+        "schema_version": 3,
         "generated_at": datetime.now(UTC).isoformat(),
         "project": _project_block(project),
         "run": _run_block(result),
@@ -84,6 +84,13 @@ def _project_block(project: Project) -> dict[str, Any]:
         "class_count": project.class_count,
         "method_count": project.method_count,
         "reference_count": project.reference_count,
+        # The two cross-reference counts, under the names that say which of
+        # the two they are. The `project` block is read on its own — a
+        # reader looking at the project and not at the summary would
+        # otherwise see one number and not know whether it is the sites or
+        # the edges.
+        "call_site_count": project.reference_count,
+        "call_edge_count": project.call_edge_count,
         "evidence_count": project.evidence_count,
         "resource_count": project.resource_count,
     }

@@ -68,7 +68,99 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   measurement, and it says what it did not measure. The pressure test found three
   real defects, all fixed — see below.
 
+- **One evidence-first agent.** The MCP server can be read by a program; the
+  agent is what turns it into an answer. It takes a question about an APK,
+  plans a bounded series of tool calls, makes them against a workspace, checks
+  that every conclusion it reached has something behind it, and reports what it
+  found — **separated into what was established, what is a lead, and what is
+  not established**. One orchestrator, not a swarm: one loop, one plan, one
+  budget, one state, one report.
+
+  The pieces that make it more than a loop: per-task budgets for tokens,
+  iterations and execution time; tool-call logging with retries and a circuit
+  breaker; a task state that is written down, so an interrupted task can be
+  picked up again; an explicit confirmation before anything sensitive; and
+  three model endpoints behind one interface — an OpenAI-compatible one, a
+  local one, and a scripted one, so the orchestration can be tested without a
+  model key and without a network.
+
+  It routes its conclusions through the project's own `EvidenceBuilder` rather
+  than around it, so a model's output can never become a verified finding. And
+  **it does not read instructions found inside an APK**: the APK is untrusted
+  input, and there is a test for it that goes red when the property is taken
+  away.
+
+  The design is in `docs/architecture/agent.md`.
+
+### Changed
+
+- **The MCP server now says "no manifest" when that is what it means.** A
+  project whose Apktool step never ran has no manifest, and the tool answered
+  `unknown_project` — a project that is not there, said about a project that
+  is. A caller that believed it would go looking for a project that does not
+  exist instead of for the backend that did not run. There is a `no_manifest`
+  error code now, it names the backends that did not take part, and
+  `unknown_project` still means what it says.
+
+- **A symbol's name and detail are marked as data.** `search_symbols` returned
+  the symbol's name and an excerpt of the indexed text as plain strings, and
+  both come out of the APK — for a string symbol the name *is* the string.
+  The other tools carried the same text in a field with a notice on it, and
+  this one did not, so a caller reading the two could not tell that one of
+  them was data. They are carried the same way now, and they are bounded the
+  same way: a symbol's text is cut and the cut is stated.
+
 ### Fixed
+
+- **"What does this method call" was answered with "who calls this method".**
+  `find_callees` and `find_callers` ran the same query — both of them looked
+  the *callee* up — so the tool that answers the other direction answered the
+  same direction twice. An agent that asked what a method calls was told who
+  calls it: **every word of it true, and all of it about another thing**. The
+  test beside it counted the two numbers and never checked the direction, so
+  it was green.
+
+- **Five places where two things did not match, found by an acceptance pass.**
+  Putting the MCP server, the agent and the architecture document together
+  left five mismatches, and each of them was a number or a sentence that was
+  true about one thing and read as if it were about another:
+
+  - a cross-reference record's **summary contradicted its own detail** — the
+    summary said "called from one location" while the detail said two call
+    sites, and "a location" now means a call site;
+  - **the agent wrote its cross-reference records under keys the reports do
+    not read** (`call_sites` rather than `call_site_count`), so the report
+    counted them as one and one whatever the tool had found;
+  - **the migration dropped the table's indexes** — SQLite drops an index with
+    the table it belongs to, and the schema script does not run again once
+    the version matches, so every rebuilt workspace scanned the whole table
+    for good;
+  - **the JSON report's project block held one of the two numbers** with
+    nothing to say which, and the API's `total` had no unit;
+  - **the JSON report's schema version did not move** when keys were added
+    to it.
+
+- **A source was looked for with the wrong question.** Whether a class's
+  source could be read was decided by asking whether JADX was *installed*,
+  rather than whether JADX took part in the analysis. Those are different
+  questions, and the answer belonged to the wrong one: a workspace written on
+  a machine with JADX was read on one without it and served the Smali instead
+  of the Java, and an output tree left over from an earlier analysis was
+  served as if this one had produced it. Reading a source file is a matter of
+  reading a file, and the question is now the one the analysis recorded.
+
+  The Smali fallback follows from it, and it is the better rule for the same
+  reason: the fallback is for a class the decompiler did not manage, not for
+  a decompiler that is not on the machine.
+
+- **A note about the analysis could carry a conclusion.** The agent records
+  "the analysis is incomplete: apktool did not take part" as evidence, which
+  is right — a reader needs to know. But the verifier counted it as support
+  for a conclusion, so a model that cited it produced a **lead** on the
+  strength of a record that says nothing about the APK being asked about. A
+  conclusion has to rest on an observation of the thing the question was
+  about, and on a record that establishes something: a record that says the
+  evidence was insufficient cannot be the ground a conclusion stands on.
 
 - **A cross-reference could not say where a call happened.** The index held one row
   per call, and the row said who called whom and how — but not *where*. A method
@@ -81,8 +173,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the report states the two numbers separately and says which is which
   (`Call sites indexed` beside `Call edges indexed`), because the review found a
   report printing two different units side by side and a reader taking a ratio
-  that was never there. The old names stay in the JSON report: their values did
-  not change. The table was rebuilt rather than altered — SQLite cannot change a
+  that was never there. The old names stay in the JSON report and **their
+  values did not change** — but what a row *is* did, so the two old keys now
+  count the call sites rather than the relationships they used to duplicate.
+  A reader who wants the relationships reads `call_edges`. The table was rebuilt rather than altered — SQLite cannot change a
   primary key in place — and the project's count of the rows went with it, because
   a record that says "23 cross-references" while the table holds nothing is a
   number a reader cannot check.

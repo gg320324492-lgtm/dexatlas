@@ -6,6 +6,14 @@ from dexatlas.core.methods import AmbiguousMethodError
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.mcp.errors import unknown_project
 from dexatlas.mcp.schemas import SourceView, SymbolList, SymbolView, UntrustedText
+from dexatlas.mcp.security import bounded_text
+
+#: How much of a symbol's text comes back.
+#:
+#: A name is one line and an excerpt is a handful, so the limits are tighter
+#: than the ones a source file gets — but the point is the same: nothing
+#: comes back unbounded, and the cut is stated in the response.
+_SYMBOL_TEXT_LIMITS = {"max_lines": 8, "max_bytes": 4096}
 
 
 def search_symbols(
@@ -36,8 +44,8 @@ def search_symbols(
         symbols=[
             SymbolView(
                 kind=str(entry.get("kind", "")),
-                name=str(entry.get("name", "")),
-                detail=str(entry.get("excerpt", "")),
+                name=bounded_text(str(entry.get("name", "")), **_SYMBOL_TEXT_LIMITS),
+                detail=bounded_text(str(entry.get("excerpt", "")), **_SYMBOL_TEXT_LIMITS),
                 provenance=[],
             )
             for entry in page

@@ -504,9 +504,9 @@ ncalls  tottime  cumtime  filename:lineno(function)
 and the instruction walk — the actual work — took about a second.
 
 **Fixed by:** two changes. The adapter's `version()` now probes once and
-remembers the answer (`src/dexatlas/tools/androguard/adapter.py:188-216`), and
+remembers the answer (`src/dexatlas/tools/androguard/adapter.py:197-225`), and
 the `Provenance` record now takes its version from a single probe per backend
-rather than one per record (`src/dexatlas/tools/base.py:255-274`).
+rather than one per record (`src/dexatlas/tools/base.py:311-330`).
 
 **What it cost, measured:** the same `medium` sample, the same limits, the
 pre-fix source tree extracted from git against the current one, in two

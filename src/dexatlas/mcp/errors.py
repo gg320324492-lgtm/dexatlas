@@ -7,6 +7,7 @@ from "there is nothing there". So the error says which it is.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -46,4 +47,27 @@ def unknown_method(method_id: str) -> RequestError:
     )
 
 
-__all__ = ["RequestError", "unknown_method", "unknown_project"]
+def no_manifest(project_id: str, absent: Sequence[str] = ()) -> RequestError:
+    """The project is there, but this analysis holds no manifest.
+
+    A project whose Apktool step never ran has no manifest, and saying
+    "unknown project" about it is a lie twice over: the project is known,
+    and a caller that believes the error will look for a project that does
+    not exist instead of for the backend that did not run.
+
+    The backends that did not take part are named, so that the reader knows
+    what would have to change for the answer to be there.
+    """
+    if absent:
+        because = f"{', '.join(absent)} did not take part in this analysis"
+    else:
+        because = "no backend produced one for this analysis"
+    return RequestError(
+        f"project {project_id!r} holds no manifest: {because}",
+        code="no_manifest",
+        project_id=project_id,
+        missing_backends=list(absent),
+    )
+
+
+__all__ = ["RequestError", "no_manifest", "unknown_method", "unknown_project"]

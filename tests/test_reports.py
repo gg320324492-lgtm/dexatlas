@@ -110,7 +110,7 @@ def _result(
 def test_json_report_is_serialisable() -> None:
     report = build_json_report(_result())
 
-    assert json.loads(json.dumps(report))["schema_version"] == 2
+    assert json.loads(json.dumps(report))["schema_version"] == 3
 
 
 # -- the run the report describes -------------------------------------------
@@ -207,6 +207,25 @@ def test_json_report_carries_provenance_for_each_evidence_record() -> None:
 
     assert report["evidence"][0]["provenance"][0]["tool"] == "androguard"
     assert report["evidence"][0]["provenance"][0]["locator"] == "classes.dex"
+
+
+def test_the_json_report_names_both_cross_reference_counts_in_the_project_block() -> None:
+    """The project block is read on its own, so it has to say which is which.
+
+    The summary block prints the two counts under names that say what they
+    are. The project block is the one a reader looks at when they want to
+    know what the analysis found, and it used to hold one of the numbers
+    with nothing to say which of the two it was.
+    """
+    result = _result()
+    result.project.call_edge_count = 2100
+
+    project = build_json_report(result)["project"]
+
+    assert project["call_site_count"] == project["reference_count"], (
+        "the same number, under the name the summary uses"
+    )
+    assert project["call_edge_count"] == 2100
 
 
 def test_json_report_tells_indexed_cross_references_from_evidence() -> None:

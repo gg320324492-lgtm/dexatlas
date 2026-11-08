@@ -250,7 +250,7 @@ def test_the_report_carries_the_analysis_it_was_about(demo: Demo, tmp_path: Path
     )
 
     assert document["analysis"] is not None
-    assert document["analysis"]["schema_version"] == 2
+    assert document["analysis"]["schema_version"] == 3
     assert document["analysis"]["project"]["id"] == PROJECT_ID
 
 

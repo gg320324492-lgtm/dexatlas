@@ -314,7 +314,7 @@ class Analyzer:
             # disagrees with every query run against it.
             project.class_count = counts.classes
             project.method_count = counts.methods
-            project.reference_count = counts.references
+            project.reference_count = counts.call_sites
             project.call_edge_count = counts.call_edges
             project.resource_count = counts.resources
             project.status = (
@@ -640,7 +640,7 @@ class Analyzer:
             return None
         project, workspace = context
 
-        if self._jadx.available():
+        if _took_part(project, "jadx"):
             output_dir = workspace / "jadx"
             source = self._jadx.read_class_source(class_name, output_dir)
             path = self._jadx.class_source_path(class_name, output_dir)
@@ -653,7 +653,7 @@ class Analyzer:
                     ],
                 )
 
-        if self._apktool.available():
+        if _took_part(project, "apktool"):
             output_dir = workspace / "apktool"
             source = self._apktool.read_smali(class_name, output_dir)
             path = self._apktool.smali_path(class_name, output_dir)
@@ -700,7 +700,7 @@ class Analyzer:
         # name twice. The bytecode carries the descriptor, so the fallback is
         # tried before the ambiguity is reported.
         ambiguity: AmbiguousMethodError | None = None
-        if self._jadx.available():
+        if _took_part(project, "jadx"):
             output_dir = workspace / "jadx"
             try:
                 source = self._jadx.read_method_source(
@@ -738,7 +738,7 @@ class Analyzer:
                     )
 
         # Smali fallback: a method JADX cannot decompile is still present in bytecode.
-        if not self._apktool.available():
+        if not _took_part(project, "apktool"):
             if ambiguity is not None:
                 raise ambiguity
             return None
@@ -863,6 +863,24 @@ class Analyzer:
     def resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
         """The resource strings indexed for a project."""
         return self._store.list_resources(project_id, name=name)
+
+
+def _took_part(project: Project, tool: str) -> bool:
+    """Whether a backend took part in this analysis.
+
+    The question is about the analysis, not about the machine. Reading a
+    source file is a matter of reading a file: the workspace holds JADX's
+    output whether or not JADX is still installed on this computer, and an
+    analysis that ran without JADX has no Java to read no matter what the
+    machine has.
+
+    So the answer comes from what the project recorded about the run that
+    produced it. Asking the machine instead would answer two different
+    questions, and got them mixed up: a workspace written on a machine with
+    JADX would be read on one without it, and a stale output tree left over
+    from an earlier analysis would be served as if this one had produced it.
+    """
+    return project.tool_versions.get(tool) is not None
 
 
 def _check_cancelled(cancellation: CancellationToken | None) -> None:

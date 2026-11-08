@@ -393,7 +393,15 @@ class EvidenceBuilder:
             # A call edge is read out of the bytecode by a deterministic tool and
             # points at a code location, which is what VERIFIED means here.
             level=EvidenceLevel.VERIFIED,
-            summary=f"{method.qualified_name} is called from {len(callers)} location(s)",
+            # Both numbers, because they are two different things and "a
+            # location" now means one of them. A caller that calls the same
+            # method twice is one caller and two call sites, and a summary
+            # that said "called from one location" beside a detail that said
+            # two call sites would make a reader choose between them.
+            summary=(
+                f"{method.qualified_name} is called from {len(callers)} caller(s) "
+                f"at {sites} call site(s)"
+            ),
             provenance=[*_call_site_provenance(references), *method.provenance],
             detail={
                 "callers": callers[:MAX_LISTED_CALLERS],

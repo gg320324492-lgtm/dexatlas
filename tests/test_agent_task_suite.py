@@ -27,7 +27,12 @@ import pytest
 from dexatlas.agent.orchestrator import Orchestrator
 from dexatlas.agent.state import Budget, TaskStatus, TaskStore
 from dexatlas.agent.tool_executor import McpToolClient
-from dexatlas.core.models import EvidenceLevel
+from dexatlas.core.models import (
+    EvidenceKind,
+    EvidenceLevel,
+    cross_reference_call_edges,
+    cross_reference_call_sites,
+)
 from tests.agent_harness import (
     COLLECT_URL,
     CRYPTO,
@@ -404,3 +409,35 @@ def test_the_agent_package_does_not_need_the_mcp_sdk() -> None:
         text = path.read_text(encoding="utf-8")
         assert "from mcp." not in text, f"{path.name} imports the MCP SDK"
         assert "from mcp import" not in text, f"{path.name} imports the MCP SDK"
+
+
+def test_the_agents_cross_reference_record_is_one_the_reports_can_count(
+    demo: Demo, tmp_path: Path
+) -> None:
+    """The record the agent writes has to be one the reports can count.
+
+    The reports read two numbers out of a cross-reference record, under two
+    keys. A record that spelled them differently would be a record the
+    report counts as one and one, whatever the tool actually found — and
+    the number would be wrong in the one place a reader is told it is
+    right.
+    """
+    provider = scripted_provider(
+        [
+            (
+                "find_callers",
+                {"project_id": demo.project_id, "method_id": SIGN_METHOD_ID, "limit": 50},
+            )
+        ]
+    )
+    orchestrator = make_orchestrator(demo, provider, store=TaskStore(tmp_path / "tasks"))
+
+    state = orchestrator.run("Who calls the sign method?", project_id=demo.project_id)
+
+    records = [item for item in state.findings if item.kind is EvidenceKind.CROSS_REFERENCE]
+    assert records, "the task recorded the calls it found"
+    record = records[0]
+    assert record.detail["call_site_count"] == 1, "the one call site of the method"
+    assert record.detail["call_edge_count"] == 1, "the one relationship it makes"
+    assert cross_reference_call_sites(records) == 1, "the report counts the sites"
+    assert cross_reference_call_edges(records) == 1, "the report counts the edges"

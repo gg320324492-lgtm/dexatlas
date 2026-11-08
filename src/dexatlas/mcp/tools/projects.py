@@ -6,7 +6,7 @@ from dexatlas.core.models import Project, ToolErrorCode
 from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.core.runs import AnalysisRun
-from dexatlas.mcp.errors import unknown_project
+from dexatlas.mcp.errors import no_manifest, unknown_project
 from dexatlas.mcp.schemas import (
     Completeness,
     ComponentView,
@@ -116,7 +116,8 @@ def manifest(analyzer: Analyzer, project_id: str) -> ManifestView:
 
     info = analyzer.store.get_manifest(project_id)
     if info is None:
-        raise unknown_project(project_id)
+        absent = sorted(name for name, version in project.tool_versions.items() if version is None)
+        raise no_manifest(project_id, absent)
 
     return ManifestView(
         package=info.package or "",

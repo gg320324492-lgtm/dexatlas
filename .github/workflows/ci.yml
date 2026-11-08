@@ -29,7 +29,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --extra dev --frozen
+        run: uv sync --extra dev --extra mcp --frozen
       - name: Ruff lint
         run: uv run ruff check .
       - name: Ruff format check
@@ -100,7 +100,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra analysis --frozen
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
 
       - name: Fetch test fixtures
         env:
@@ -172,7 +172,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra analysis --frozen
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
 
       - name: Fetch test fixtures
         env:
@@ -247,7 +247,7 @@ jobs:
         with:
           enable-cache: true
       - name: Install dependencies
-        run: uv sync --extra dev --extra analysis --frozen
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
       - name: Export the resolved dependency set
         run: uv export --format requirements-txt --no-hashes --no-emit-project -o requirements.txt
       - name: Audit for known vulnerabilities

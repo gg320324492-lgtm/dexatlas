@@ -35,6 +35,8 @@ from dexatlas.agent.state import Budget, TaskStore
 from dexatlas.agent.tool_executor import McpToolClient, ToolExecutor
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.models import (
+    CROSS_REFERENCE_EDGE_COUNT,
+    CROSS_REFERENCE_SITE_COUNT,
     ApkMetadata,
     ClassKind,
     ClassRef,
@@ -322,7 +324,7 @@ def build_demo(
     )
     project.class_count = counts.classes
     project.method_count = counts.methods
-    project.reference_count = counts.references
+    project.reference_count = counts.call_sites
     project.call_edge_count = counts.call_edges
     project.resource_count = counts.resources
     project.evidence_count = 3
@@ -351,8 +353,19 @@ def build_demo(
     builder.add(
         kind=EvidenceKind.CROSS_REFERENCE,
         level=EvidenceLevel.VERIFIED,
-        summary=f"{SIGN_METHOD_ID} is called from 1 location(s)",
+        summary=(
+            f"{SIGN_METHOD_ID} is called from "
+            f"{len({r.caller for r in references})} caller(s) "
+            f"at {len(references)} call site(s)"
+        ),
         provenance=references[0].provenance,
+        # The keys the reports read. A record without them is a record the
+        # report cannot count, and the tests that use this harness would be
+        # measuring a record that cannot happen in production.
+        detail={
+            CROSS_REFERENCE_SITE_COUNT: len(references),
+            CROSS_REFERENCE_EDGE_COUNT: len({(r.caller, r.kind) for r in references}),
+        },
     )
     builder.add(
         kind=EvidenceKind.CODE_LOCATED,

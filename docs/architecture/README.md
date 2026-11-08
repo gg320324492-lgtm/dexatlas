@@ -393,14 +393,16 @@ src/dexatlas/
 ├── reports/      JSON and Markdown renderers, and the coverage they report
 ├── cli/          Typer commands, plus the console-encoding layer
 ├── api/          FastAPI transport
-└── mcp/          the read-only MCP server
+├── mcp/          the read-only MCP server
+└── agent/        the evidence-first agent
 ```
 
-`mcp/` has landed. `agent/` and `web/` have not — the MCP server hands the analysis to
-an agent, and the agent itself is the next milestone's work. Both would consume this
-core; neither duplicates it.
+`mcp/` and `agent/` have landed. `web/` has not. The agent consumes this core through
+the MCP tools — it calls them, it inherits their read-only nature, and it checks that
+every conclusion it reached has something behind it before it reports it. It does not
+duplicate any of it.
 
 The rest of this directory holds the detail: [Analysis runs](analysis-runs.md),
 [Call sites and call edges](call-sites-and-edges.md),
-[Evidence invariants](evidence-invariants.md), [Runtime isolation](runtime-isolation.md)
-and [The MCP server](mcp-server.md).
+[Evidence invariants](evidence-invariants.md), [Runtime isolation](runtime-isolation.md),
+[The MCP server](mcp-server.md) and [The agent](agent.md).

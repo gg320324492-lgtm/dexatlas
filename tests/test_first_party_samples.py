@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import sqlite3
 import zipfile
-from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -67,19 +66,6 @@ def _sample_apk(name: str) -> Path:
 
 
 @pytest.fixture(scope="module")
-def jadx_unavailable() -> Iterator[None]:
-    """Make JADX report itself unavailable for every test in this module.
-
-    Pointing ``settings.jadx_path`` at a directory that does not exist does not work:
-    ``which_or_none`` falls back to a ``PATH`` lookup, so a JADX installed there is
-    still found and the decompiler answers instead of the fallback being tested.
-    """
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(JadxBackend, "resolve", lambda self: None)
-        yield
-
-
-@pytest.fixture(scope="module")
 def samples(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
     """Analyse every sample once and share the analyzer and the project ids.
 
@@ -111,6 +97,37 @@ def samples(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
         "projects": results,
         "jadx_available": jadx_available,
     }
+
+
+@pytest.fixture(scope="module")
+def samples_without_jadx(tmp_path_factory: pytest.TempPathFactory) -> dict[str, object]:
+    """Every sample, analysed with the decompiler taken away.
+
+    The samples above share one analysis, made under whatever the machine
+    happens to have installed. A missing decompiler is a configuration of its
+    own — the one the Smali fallback exists for — so it is analysed here on
+    every machine, and the workspace holds the bytecode and no Java.
+
+    The decompiler is taken away **for the analysis**, not only for the
+    reading. A workspace written with one and read without it holds both, and
+    which of them a reader gets is a question about what the analysis
+    produced, not about what the machine has installed now.
+    """
+    workspace = tmp_path_factory.mktemp("first-party-samples-no-jadx")
+    settings = Settings(workspace=workspace)
+    analyzer = Analyzer(settings)
+
+    results: dict[str, object] = {}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(JadxBackend, "resolve", lambda self: None)
+        for name in SAMPLE_APKS:
+            apk = _sample_apk(name)
+            if not apk.is_file():
+                pytest.skip(f"sample {name} is missing; run scripts/build-test-apks.sh")
+            result = analyzer.analyze(apk)
+            results[name] = result.project
+
+    return {"analyzer": analyzer, "settings": settings, "projects": results}
 
 
 @pytest.fixture(scope="module")
@@ -288,15 +305,15 @@ def test_a_class_in_the_second_dex_is_found_in_the_right_directory(
 
 
 def test_the_smali_fallback_reaches_the_second_dex_without_jadx(
-    samples: dict[str, object], jadx_unavailable: None
+    samples_without_jadx: dict[str, object],
 ) -> None:
     """With no decompiler, the class in classes2.dex must still be readable.
 
     This is the whole point of the fallback: an APK that defeats JADX still yields
     its bytecode, and a finding that cannot be read is not a finding.
     """
-    analyzer = _analyzer(samples)
-    project_id = _project_id(samples, "multidex-app")
+    analyzer = _analyzer(samples_without_jadx)
+    project_id = _project_id(samples_without_jadx, "multidex-app")
 
     source = analyzer.class_source(project_id, "com.example.multidex.SecondaryHelper")
     assert source is not None, "the class in the second dex was not reachable"
@@ -340,14 +357,18 @@ def test_a_duplicate_class_name_resolves_to_the_same_file_every_time(
 # -- the obfuscated sample -------------------------------------------------
 
 
-def test_obfuscated_names_are_still_indexed_and_locatable(samples: dict[str, object]) -> None:
+def test_obfuscated_names_are_still_indexed_and_locatable(
+    samples_without_jadx: dict[str, object],
+) -> None:
     """One-letter packages, classes and methods carry no information.
 
     A reader cannot guess them, which is why the tool has to hold the exact names
-    and be able to hand them back.
+    and be able to hand them back. The source read here is the bytecode, from an
+    analysis that had no decompiler to answer — the bytecode names the class the
+    way the DEX does, which is the name the index holds.
     """
-    analyzer = _analyzer(samples)
-    project_id = _project_id(samples, "obfuscated-app")
+    analyzer = _analyzer(samples_without_jadx)
+    project_id = _project_id(samples_without_jadx, "obfuscated-app")
 
     classes = {cls.name for cls in analyzer.store.list_classes(project_id)}
     assert "a.a.a" in classes
