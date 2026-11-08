@@ -1,8 +1,12 @@
 """The analysis backend interface.
 
 The rule is that a backend parses untrusted input in a process of its own: the engines
-are invoked, never linked. Androguard is the exception — a Python library, so it runs
-in-process, each step wrapped: a malformed DEX is a ToolError, not the end of the run.
+are invoked, never linked.
+
+Androguard is a library rather than a program, so there is no tool to shell out to. It
+parses the DEX files in a worker process instead, started through this class's runner
+so that the same timeout and the same tree kill apply. What comes back across the
+boundary is data, and a malformed DEX is a ToolError, not the end of the run.
 """
 
 from __future__ import annotations
@@ -26,7 +30,14 @@ from dexatlas.core.models import Provenance, ToolError, ToolErrorCode
 
 logger = logging.getLogger(__name__)
 
-#: Output that exceeds this is treated as a runaway backend rather than a result.
+#: The cap on what one backend may write back, in bytes.
+#:
+#: Nothing reads this constant. The cap a run actually applies is
+#: :attr:`Settings.tool_max_output_bytes`, and what happens past it is
+#: described on :meth:`Backend.run`: the output is cut at the cap, and the run
+#: says that it was cut. A reader who finds this number must not mistake it
+#: for the cap in force -- the two can differ, because the settings can be
+#: changed and this cannot.
 _DEFAULT_MAX_OUTPUT = 256 * 1024 * 1024
 
 #: The signal that ends a process without giving it a chance to react.
@@ -78,6 +89,14 @@ class ToolOutcome:
     duration_seconds: float
     error: ToolError | None = None
     argv: Sequence[str] = field(default_factory=tuple)
+    truncated: tuple[str, ...] = ()
+    """The streams whose output was cut short at the cap.
+
+    A backend that writes more than the cap did not fail: it wrote more than
+    the caller is willing to hold. What is here is the first
+    ``tool_max_output_bytes`` of it and the rest is gone, so a reader of the
+    result has to be told that it is not the whole of it.
+    """
 
     @property
     def ok(self) -> bool:
@@ -87,7 +106,12 @@ class ToolOutcome:
 class Backend(ABC):
     """Base class for an external analysis engine.
 
-    Subclasses declare how to locate and probe their tool, then implement extraction.
+    Subclasses declare how to locate and probe their tool -- :meth:`resolve` and
+    :meth:`version` -- and then implement the step that reads the APK. There is
+    no common ``extract`` to implement: the three backends read different things
+    from an APK, so each one names its own way of doing it, and a pipeline that
+    called all of them through one signature would have to invent a shape that
+    fits none of them.
     """
 
     #: Stable backend name, recorded in provenance and the project's tool versions.
@@ -116,7 +140,13 @@ class Backend(ABC):
         return self.resolve() is not None
 
     #: Environment variable that pins this backend's location, when there is one.
-    path_env_var: str = "DEXATLAS_<BACKEND>_PATH"
+    #:
+    #: Empty means there is no variable to point at, and the not-installed
+    #: message stays quiet about one. A backend that *does* have a variable
+    #: overrides this with its own name: there is no pattern to fill in, because
+    #: a reader told to set ``DEXATLAS_<BACKEND>_PATH`` has been told nothing
+    #: they can act on.
+    path_env_var: str = ""
 
     #: Shell command that installs this backend, shown in the not-installed error.
     install_hint: str = "Install it and make it discoverable on PATH."
@@ -199,8 +229,29 @@ class Backend(ABC):
                     message = _timeout_message(self.name, timeout, _terminate_tree(process))
                     return fail(ToolErrorCode.TIMEOUT, message)
 
-                stdout = self._decode(_read_capped(out_file, self._settings.tool_max_output_bytes))
-                stderr = self._decode(_read_capped(err_file, self._settings.tool_max_output_bytes))
+                stdout_raw, stdout_size = _read_capped(
+                    out_file, self._settings.tool_max_output_bytes
+                )
+                stderr_raw, stderr_size = _read_capped(
+                    err_file, self._settings.tool_max_output_bytes
+                )
+                stdout = self._decode(stdout_raw)
+                stderr = self._decode(stderr_raw)
+                # The cap is a promise about what is read, so exceeding it has
+                # to be said out loud: the output that is here is the first
+                # part of what the backend wrote, and a caller that reads it
+                # without knowing that reads a cut-off thing as if it were
+                # whole.
+                limit = self._settings.tool_max_output_bytes
+                truncated = tuple(
+                    name
+                    for name, size in (("stdout", stdout_size), ("stderr", stderr_size))
+                    if size > limit
+                )
+                for name in truncated:
+                    logger.warning(
+                        "%s: %s output was cut at the %d-byte cap", self.name, name, limit
+                    )
 
                 if process.returncode != 0:
                     return ToolOutcome(
@@ -215,6 +266,7 @@ class Backend(ABC):
                             detail=stderr.strip()[-2000:] or stdout.strip()[-2000:] or None,
                         ),
                         argv=argv,
+                        truncated=truncated,
                     )
 
                 return ToolOutcome(
@@ -223,6 +275,7 @@ class Backend(ABC):
                     stderr=stderr,
                     duration_seconds=time.monotonic() - started,
                     argv=argv,
+                    truncated=truncated,
                 )
         except OSError as exc:
             return fail(ToolErrorCode.EXIT_NONZERO, f"{self.name} could not be executed: {exc}")
@@ -244,10 +297,13 @@ class Backend(ABC):
         )
 
     def _decode(self, raw: bytes) -> str:
-        limit = self._settings.tool_max_output_bytes
-        if len(raw) > limit:
-            logger.warning("%s: output truncated from %d to %d bytes", self.name, len(raw), limit)
-            raw = raw[:limit]
+        """The bytes a backend wrote, as text.
+
+        The bytes have already been cut at the cap by :func:`_read_capped`, so
+        there is nothing left to cut here. A check for it would be a branch
+        that can never be taken, and a truncation nobody can see is the one
+        defect this class exists to prevent.
+        """
         return raw.decode("utf-8", errors="replace")
 
     # -- provenance --------------------------------------------------------
@@ -400,17 +456,48 @@ def _temp_binary_file() -> Iterator[IO[bytes]]:
             os.unlink(path)
 
 
-def _read_capped(handle: IO[bytes], limit: int) -> bytes:
-    """What a backend wrote, up to the cap.
+def _read_capped(handle: IO[bytes], limit: int) -> tuple[bytes, int]:
+    """What a backend wrote, up to the cap, and how much of it there was.
 
     The file is truncated first. A runaway backend can write far more than the
     cap allows, and the cap exists to keep that from becoming the problem.
+
+    The size the file had is handed back as well. A reader that is given the
+    first ``limit`` bytes of a longer file has to be told that the rest is not
+    there, and the only place that knows it is here.
     """
     handle.seek(0, os.SEEK_END)
-    if handle.tell() > limit:
+    size = handle.tell()
+    if size > limit:
         handle.truncate(limit)
     handle.seek(0)
-    return handle.read()
+    return handle.read(), size
+
+
+def truncation_error(tool: str, streams: Sequence[str], limit: int) -> ToolError:
+    """The error that says a backend's output was cut at the cap.
+
+    A backend that wrote more than the cap did not fail, but what came back is
+    not all of it. The caller that turns this into a record on the project is
+    the pipeline; the error is made here so that every backend says the same
+    thing about the same event.
+
+    The cap is named with its value, because a limit a reader cannot check is
+    a claim rather than a limit.
+    """
+    names = ", ".join(streams)
+    return ToolError(
+        tool=tool,
+        code=ToolErrorCode.OUTPUT_TRUNCATED,
+        message=(
+            f"{tool} wrote more than the {limit}-byte output cap: its {names} output was cut "
+            f"short, and what was read is not all of it"
+        ),
+        detail=(
+            f"the cap is Settings.tool_max_output_bytes ({limit} bytes). What was kept is the "
+            f"first {limit} bytes of what the backend wrote; the rest was discarded."
+        ),
+    )
 
 
 def which_or_none(candidates: Sequence[str | None], *, names: Sequence[str] = ()) -> Path | None:

@@ -20,9 +20,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
-#: The longest a path component may be, in bytes. POSIX filesystems cap a
-#: component's name at 255 bytes, and Windows caps it at the same number, so a
-#: longer one cannot name a file anywhere.
+#: The longest a path component may be, in bytes.
+#:
+#: POSIX filesystems cap a component's name at 255 *bytes*. Windows caps it at
+#: 255 UTF-16 code units, which is a different measure: a name of 200 Chinese
+#: characters is 600 UTF-8 bytes but 200 code units. The check is in bytes, and
+#: bytes are the stricter of the two -- UTF-8 never uses fewer bytes than
+#: UTF-16 uses code units -- so a name that passes here is also within the
+#: Windows limit. A name that fails here may still be legal on Windows, and it
+#: is refused anyway: one rule for both platforms is worth more than the names
+#: it lets through.
 #:
 #: The rule is here rather than only in the callers because a name that long
 #: is refused by the *filesystem*, not by the shape of the path: the path is
@@ -56,8 +63,8 @@ def is_single_component(part: str) -> bool:
     """Whether ``part`` is exactly one path component and nothing more.
 
     Callers reach this only for non-empty segments:
-    :func:`class_to_relative_path` rejects a name with any empty segment before
-    it splits into components, so an empty string never arrives here. ``"."``
+    :func:`class_to_relative_path` splits the name into components and refuses
+    the name if any of them is empty, so an empty string never arrives here. ``"."``
     and ``".."`` are refused as well — they are the two components that change
     where a path points, and a rule that refused them only because of what
     the caller happened to filter first would be a rule with a hole in it.

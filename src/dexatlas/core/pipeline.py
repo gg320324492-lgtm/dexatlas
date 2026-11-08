@@ -57,6 +57,7 @@ from dexatlas.core.storage import Store
 from dexatlas.tools.androguard.adapter import AndroguardBackend
 from dexatlas.tools.apktool.adapter import ApktoolBackend
 from dexatlas.tools.apktool.adapter import source_locator as apktool_source_locator
+from dexatlas.tools.base import truncation_error
 from dexatlas.tools.jadx.adapter import ClassDecompilation, JadxBackend, source_locator
 from dexatlas.tools.registry import BackendRegistry
 
@@ -252,12 +253,12 @@ class Analyzer:
 
             if include_jadx:
                 _check_cancelled(cancellation)
-                jadx_classes, error, jadx_status = self._run_jadx(
+                jadx_classes, jadx_errors, jadx_status = self._run_jadx(
                     apk.path, project, workspace, builder
                 )
                 classes.extend(jadx_classes)
-                if error is not None:
-                    project.errors.append(error)
+                for jadx_error in jadx_errors:
+                    project.errors.append(jadx_error)
                 # The decompiler is the only backend that can say whether a method
                 # was decompiled, so the flag is set here — after JADX has run, and
                 # before the symbols are written.
@@ -269,6 +270,7 @@ class Analyzer:
                     methods=methods,
                     status=jadx_status,
                     output_dir=workspace / "jadx",
+                    decompiler_failed=bool(jadx_errors),
                 )
 
             # The class declarations are the index, not a conclusion: a class
@@ -492,6 +494,14 @@ class Analyzer:
         if outcome.error is not None:
             builder.add_error(outcome.error)
             errors.append(outcome.error)
+        if outcome.truncated:
+            # The output was cut at the cap, so what the backend said is not
+            # all of it. A gap that is not recorded reads like an absence.
+            error = truncation_error(
+                backend.name, outcome.truncated, self._settings.tool_max_output_bytes
+            )
+            builder.add_error(error)
+            errors.append(error)
         if parse_error is not None:
             builder.add_error(parse_error)
             errors.append(parse_error)
@@ -563,19 +573,29 @@ class Analyzer:
 
     def _run_jadx(
         self, apk: Path, project: Project, workspace: Path, builder: EvidenceBuilder
-    ) -> tuple[list[ClassRef], ToolError | None, dict[str, ClassDecompilation]]:
+    ) -> tuple[list[ClassRef], list[ToolError], dict[str, ClassDecompilation]]:
         backend = self._jadx
         if not backend.available():
             error = backend.missing_error()
             builder.add_error(error)
-            return [], error, {}
+            return [], [error], {}
 
         output_dir = workspace / "jadx"
         outcome = backend.decompile(apk, output_dir)
         classes, extract_error = backend.extract(project.apk.sha256, output_dir, outcome)
+        errors: list[ToolError] = []
         if extract_error is not None:
             builder.add_error(extract_error)
-        return classes, extract_error, backend.decompilation_status(output_dir)
+            errors.append(extract_error)
+        if outcome.truncated:
+            # The output was cut at the cap, so what the decompiler said is
+            # not all of it.
+            error = truncation_error(
+                backend.name, outcome.truncated, self._settings.tool_max_output_bytes
+            )
+            builder.add_error(error)
+            errors.append(error)
+        return classes, errors, backend.decompilation_status(output_dir)
 
     # -- queries -----------------------------------------------------------
 
@@ -1172,6 +1192,7 @@ def _record_decompilation(
     methods: list[MethodRef],
     status: dict[str, ClassDecompilation],
     output_dir: Path,
+    decompiler_failed: bool = False,
 ) -> None:
     """Record how much of the APK the decompiler could read.
 
@@ -1180,8 +1201,36 @@ def _record_decompilation(
     that is fully readable. It used to be nowhere: JADX wrote no log file, so
     the only trace of a failure was the placeholder in the Java, which nothing
     read.
+
+    ``decompiler_failed`` says whether the decompiler itself failed. A decompiler that
+    failed is already recorded as a failure, and a report that says "jadx did
+    not complete" needs nothing more. A decompiler that ran and produced
+    nothing at all is a different fact, and it was the one that went missing:
+    the report listed the decompiler's version as though it had read the APK,
+    and said nothing about the fact that it had not.
     """
     if not status:
+        if not decompiler_failed:
+            builder.add(
+                kind=EvidenceKind.OBSERVATION,
+                # The decompiler's own output tree is empty, and that is what
+                # the record is about: there was nothing there for it to read.
+                level=EvidenceLevel.VERIFIED,
+                summary="jadx produced no Java for any class",
+                provenance=[
+                    Provenance(
+                        tool="jadx",
+                        tool_version=project.tool_versions.get("jadx"),
+                        apk_sha256=project.apk.sha256,
+                        locator=source_locator(output_dir, output_dir),
+                    )
+                ],
+                detail={
+                    "decompiler": "jadx",
+                    "classes_with_source": 0,
+                    "classes_total": len(classes),
+                },
+            )
         return
 
     decompiled = [method for method in methods if method.decompiled]
