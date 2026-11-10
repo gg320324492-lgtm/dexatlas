@@ -1,6 +1,6 @@
 """M3 的三配置对比: harness, metrics and artifacts.
 
-:mod:`benchmarks.run` validates the 81 tasks' expected answers through
+:mod:`benchmarks.run` validates the 92 tasks' expected answers through
 DexAtlas's own probes. This package runs the same questions against three
 systems under test, records one auditable trace per run, and derives every
 reported figure from those traces.

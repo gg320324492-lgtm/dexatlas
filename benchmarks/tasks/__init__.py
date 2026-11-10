@@ -12,7 +12,7 @@ sample's own sources that establishes the expected answer.
 from __future__ import annotations
 
 from benchmarks.model import Category, Task
-from benchmarks.tasks import manifest, methods, multidex, partial, strings, xrefs
+from benchmarks.tasks import manifest, methods, multidex, partial, strings, wheresource, xrefs
 
 
 def components_tasks() -> tuple[Task, ...]:
@@ -37,6 +37,7 @@ ALL_TASKS: tuple[Task, ...] = (
     *methods.TASKS,
     *multidex.TASKS,
     *partial.TASKS,
+    *wheresource.TASKS,
 )
 
 

@@ -13,7 +13,9 @@ readers in :mod:`benchmarks.axmlreader` and :mod:`benchmarks.dexreader` exist
 so that a second person can check it against the APK's bytes without running
 anything at all.
 
-The categories are the ones the Phase 2 plan names for M3. The last of them —
+The categories are the ones the Phase 2 plan names for M3, plus the
+where-source category that section 10.3 of ``docs/benchmarks/task-set.md``
+asked for. The last of them —
 questions that cannot be answered — is the one that catches a system that
 confabulates, so its tasks are *scored* rather than merely present: an
 unanswerable task has an answer that must be absent, and a system that answers
@@ -65,6 +67,17 @@ class Category(StrEnum):
 
     PROVENANCE = "provenance"
     """Checking where a piece of evidence says it came from."""
+
+    WHERESOURCE = "where-source"
+    """Where an answer was found: which file holds the code the question is about.
+
+    The questions ask for a location — a Smali path, a decompiled source file,
+    a resource file, a DEX — rather than for a value. Section 10.3 of
+    ``docs/benchmarks/task-set.md`` asked for them: a task set for a model
+    with source retrieval needs questions about *where* the answer was found,
+    not only what it was. A provenance task checks what a record claims about
+    its own origin; a where-source task asks what a reader would have to open.
+    """
 
     UNANSWERABLE = "unanswerable"
     """A question the analysis cannot answer, and must not pretend to."""
