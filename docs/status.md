@@ -19,7 +19,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->1208<!--/fig--> 个（<!--fig:tests.fast-->1071<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1223<!--/fig--> 个（<!--fig:tests.fast-->1086<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->91.1%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
@@ -193,9 +193,16 @@ P2-003 关掉了上表里 `xrefs` 那条缺陷：索引里现在存的是**调�
 `verified`；**APK 里的指令指挥不了 agent**（去掉这条性质，测试就红）。
 设计在[架构文档](architecture/agent.md)里。
 
-**M3 做了一半**：81 个带独立可核对答案的任务集已经就绪
-（[任务集说明](benchmarks/task-set.md)），**还差三个 baseline 的对比与指标**——
-那是 M3 剩下的部分。
+**M3 的任务集与对比机械都落地了**：81 个带独立可核对答案的任务
+（[任务集说明](benchmarks/task-set.md)），三配置 harness、八项指标和一份由
+脚本生成的[对比报告](benchmarks/comparison.md)都在仓库里。被测系统只看
+`--emit-questions` 的四个字段，判分器独占 marking scheme；每个报告数字都能
+用 `--input <traces.json> --metrics` 从落盘 trace 重算。
+
+**还没做完的是真模型对照**：这台机器没有 model key，A / B / DexAtlas 三配置
+用的是 scripted provider。报告开头就写明这不是模型基线，也不声称任何配置
+更优。M3 剩下的工作是：等有 key 后换成真实 provider 重跑，并把两组测量分开
+陈述。退出标准里的 95% 工具成功率已披露，本次三配置均为 100%。
 
 ### 4.7 这一轮关掉的
 
