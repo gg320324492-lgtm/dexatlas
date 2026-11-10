@@ -8,6 +8,9 @@ Everything here is derivable from the repository. This document only says
 **where to look**, so that nobody has to read the whole tree to find out
 what state it is in.
 
+The state itself is the tag **`handover-2026-11-10`**, which is the tip of
+`main` at the moment this was written.
+
 ---
 
 ## 1. Where the project stands
