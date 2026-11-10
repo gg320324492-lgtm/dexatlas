@@ -78,6 +78,9 @@ dexatlas = "dexatlas.cli.main:app"
 # The read-only MCP server. It speaks over stdio, so a host starts it as a
 # subprocess; see docs/architecture/mcp-server.md.
 dexatlas-mcp = "dexatlas.mcp.server:main"
+# The M4 web workbench: a browser over the same ten read-only tools, called
+# in-process; see docs/architecture/workbench.md.
+dexatlas-workbench = "dexatlas.workbench.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/gg320324492-lgtm/dexatlas"
@@ -94,6 +97,21 @@ path = "src/dexatlas/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/dexatlas"]
+# The workbench's front-end sources travel with the package so a wheel can
+# build them on first start. npm's install tree and the built bundle are
+# regenerable and must not travel with it.
+exclude = [
+  "src/dexatlas/workbench/web/node_modules/",
+  "src/dexatlas/workbench/web/dist/",
+]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.scratch/",
+  "/.claude/",
+  "src/dexatlas/workbench/web/node_modules/",
+  "src/dexatlas/workbench/web/dist/",
+]
 
 [tool.ruff]
 line-length = 100

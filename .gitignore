@@ -87,3 +87,7 @@ Thumbs.db
 # drive. It is local state, never committed, and it lives inside the project
 # folder so that nothing about this project lands on the system drive.
 .scratch/
+
+# The workbench front end: npm state and the built bundle. The sources under
+# src/dexatlas/workbench/web/src are the real thing; these are regenerable.
+src/dexatlas/workbench/web/node_modules/

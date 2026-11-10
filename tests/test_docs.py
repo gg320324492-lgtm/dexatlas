@@ -118,19 +118,35 @@ def test_readme_does_not_overclaim() -> None:
     only name what is built. The roadmap table may name the rest, which is
     fine: a plan is not a claim.
 
-    The list below is the milestone list as it stands: the MCP server and
-    the agent have landed, and the workbench has not. When one of them is
-    built, it moves out of this list and into the other side of the same
-    test — which is the point of keeping the test: it says which of the
-    two it is at any moment.
+    The list below is the milestone list as it stands: the MCP server, the
+    agent and the workbench's first screen have landed. When something else
+    is built, it moves out of this list and into the other side of the same
+    test — which is the point of keeping the test: it says which of the two
+    it is at any moment.
     """
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
     quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
-    for unbuilt in ("workbench",):
+    for unbuilt in ("upload and analysis progress", "call graph viewer"):
         assert unbuilt not in quick_start.lower(), (
             f"the Quick Start section references {unbuilt!r}, which is not built yet"
         )
+
+
+def test_the_quick_start_names_the_workbench_because_it_is_built() -> None:
+    """The other side of the same claim: what is built is named.
+
+    Only the workbench's first screen exists, so the Quick Start has to name
+    the command that runs it rather than describing the whole screen set as
+    delivered.
+    """
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
+
+    assert "dexatlas-workbench" in quick_start, (
+        "the workbench's first screen is built and the Quick Start does not say how to run it"
+    )
+    assert (REPO_ROOT / "src" / "dexatlas" / "workbench" / "app.py").is_file()
 
 
 def test_the_quick_start_names_the_mcp_server_because_it_is_built() -> None:
