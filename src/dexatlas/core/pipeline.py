@@ -511,6 +511,10 @@ class Analyzer:
             builder.add_error(error)
             errors.append(error)
         if manifest is not None:
+            # The decoded manifest omits <uses-sdk>, and what Apktool wrote in its
+            # place is not the APK's own answer. The levels are reconciled before
+            # the evidence is built, so the record cites the value the APK carries.
+            errors.extend(self._reconcile_sdk_levels(project, manifest, builder))
             builder.add(
                 kind=EvidenceKind.DECLARATION,
                 level=EvidenceLevel.VERIFIED,
@@ -527,6 +531,53 @@ class Analyzer:
             )
 
         return manifest, resources, errors
+
+    def _reconcile_sdk_levels(
+        self, project: Project, manifest: ManifestInfo, builder: EvidenceBuilder
+    ) -> list[ToolError]:
+        """Fill the SDK levels the decoded manifest does not carry, from the APK's bytes.
+
+        Apktool decodes a manifest without ``<uses-sdk>`` — it moves the levels into
+        its own ``apktool.yml`` — and the values it writes there are not the ones the
+        APK declares: it decodes ``examples/wide-app/wide.apk``, whose binary manifest
+        carries ``minSdkVersion=24``, into an ``sdkInfo`` of 25. A level the decoded
+        manifest does carry is a faithful transcription of the binary manifest and
+        stays; a missing one is read from the binary manifest itself, by Androguard.
+        When Androguard cannot read it, the field stays absent and the failure is
+        recorded — a gap that is not recorded reads like an absence of a declaration.
+        """
+        if manifest.min_sdk is not None and manifest.target_sdk is not None:
+            return []
+        if not self._androguard.available():
+            # The levels stay absent; the absence of the backend itself is recorded
+            # by the androguard step, so it is not recorded twice here.
+            return []
+
+        min_sdk, target_sdk, error = self._androguard.read_sdk_levels(project.apk.path)
+        if error is not None:
+            builder.add_error(error)
+            return [error]
+
+        filled: list[str] = []
+        if manifest.min_sdk is None and min_sdk is not None:
+            manifest.min_sdk = min_sdk
+            filled.append(f"minSdk={min_sdk}")
+        if manifest.target_sdk is None and target_sdk is not None:
+            manifest.target_sdk = target_sdk
+            filled.append(f"targetSdk={target_sdk}")
+        if not filled:
+            return []
+
+        builder.add(
+            kind=EvidenceKind.DECLARATION,
+            level=EvidenceLevel.VERIFIED,
+            summary=("SDK levels read from the APK's binary manifest: " + ", ".join(filled)),
+            provenance=[
+                self._androguard.provenance(project.apk.sha256, "androguard:AndroidManifest.xml")
+            ],
+            detail={"min_sdk": manifest.min_sdk, "target_sdk": manifest.target_sdk},
+        )
+        return []
 
     def _run_androguard(
         self, apk: Path, project: Project, builder: EvidenceBuilder

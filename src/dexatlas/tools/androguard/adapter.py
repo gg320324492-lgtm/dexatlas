@@ -102,6 +102,15 @@ def androguard_available() -> bool:
     return importlib.util.find_spec("androguard") is not None
 
 
+def _sdk_text(value: Any) -> str | None:
+    """The SDK level as DexAtlas stores it: the text of the number, or nothing.
+
+    Androguard hands back ``None`` when the manifest declares no level at all —
+    an absence to keep, not a value to invent.
+    """
+    return None if value is None else str(value)
+
+
 def _to_dotted(name: str) -> str:
     """``Lcom/foo/Bar;`` → ``com.foo.Bar``. DexAtlas stores dotted names throughout."""
     return name.lstrip("L").rstrip(";").replace("/", ".")
@@ -271,6 +280,56 @@ class AndroguardBackend(Backend):
             _replay_logs(outcome.result.logs)
             return outcome.result.as_index()
         return [], [], [], [], [], outcome.error
+
+    def read_sdk_levels(self, apk: Path) -> tuple[str | None, str | None, ToolError | None]:
+        """Read the SDK levels the APK's binary manifest declares.
+
+        Returns ``(min_sdk, target_sdk, error)``. This is where an authoritative
+        answer comes from: Apktool decodes a manifest without ``<uses-sdk>`` and
+        writes its own ``sdkInfo`` into ``apktool.yml``, and what it writes there
+        is not what the APK says — it decodes ``examples/wide-app/wide.apk``,
+        whose binary manifest carries ``minSdkVersion=24``, into an ``sdkInfo``
+        of 25. The levels are read back out of the APK's bytes instead.
+
+        The DEX parsing gets a worker process; this reads one small XML tree
+        out of the archive and runs where the service runs. A parse that still
+        manages to fail comes back as an error value, never raised.
+        """
+        if not androguard_available():
+            return (
+                None,
+                None,
+                ToolError(
+                    tool=self.name,
+                    code=ToolErrorCode.UNSUPPORTED,
+                    message="androguard could not be imported",
+                    detail="Install the analysis extra: uv sync --extra analysis",
+                ),
+            )
+        try:
+            with _suppress_androguard_logging():
+                from androguard.core.apk import APK
+
+                apk_obj = APK(str(apk))
+                return (
+                    _sdk_text(apk_obj.get_min_sdk_version()),
+                    _sdk_text(apk_obj.get_target_sdk_version()),
+                    None,
+                )
+        except Exception as exc:
+            return (
+                None,
+                None,
+                ToolError(
+                    tool=self.name,
+                    code=ToolErrorCode.PARSE_ERROR,
+                    message=f"androguard could not read the manifest of {apk.name}: {exc}",
+                    detail=(
+                        "The SDK levels stay unknown rather than being taken from "
+                        "Apktool's sdkInfo, which is not the APK's own answer."
+                    ),
+                ),
+            )
 
     def _extract_symbols(
         self,
