@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1223<!--/fig-->（<!--fig:tests.fast-->1086<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.1%<!--/fig-->**（<!--fig:coverage.covered-->5508<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1229<!--/fig-->（<!--fig:tests.fast-->1092<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.2%<!--/fig-->**（<!--fig:coverage.covered-->5513<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -97,12 +97,12 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `tools/base.py` | 84.0% | 30 / 188 |
 | `agent/providers/scripted.py` | 85.7% | 6 / 42 |
 | `mcp/errors.py` | 85.7% | 3 / 21 |
-| `agent/tool_executor.py` | 86.9% | 37 / 282 |
 | `agent/reporter.py` | 87.3% | 13 / 102 |
 | `tools/androguard/adapter.py` | 87.3% | 35 / 276 |
-| `agent/providers/openai_compat.py` | 88.4% | 10 / 86 |
+| `agent/tool_executor.py` | 87.9% | 34 / 282 |
 | `agent/orchestrator.py` | 88.4% | 46 / 398 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
+| `agent/providers/openai_compat.py` | 89.5% | 9 / 86 |
 | `mcp/tools/evidence.py` | 89.7% | 3 / 29 |
 <!--/fig-->
 
@@ -134,7 +134,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.1%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.2%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -142,9 +142,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1086<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1092<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->137<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1223<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1229<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -217,6 +217,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_decompiler_absence.py` | 反编译器没有产出时必须记下来，不能当它不存在 |
 | `test_output_truncation.py` | 后端的输出被截断时，截断这件事本身必须被记录 |
 | `test_comparison_metrics.py` | M3 对比：指标的分母不能凭空出现，被测系统看不到答案，数字能从落盘 trace 重算 |
+| `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 
 ### 2.2 几类值得注意的测试
 
@@ -833,10 +834,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1223<!--/fig--> 个：<!--fig:tests.fast-->1086<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1229<!--/fig--> 个：<!--fig:tests.fast-->1092<!--/fig--> 快 + <!--fig:tests.slow-->137<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.1%<!--/fig-->（<!--fig:coverage.covered-->5508<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1223<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.2%<!--/fig-->（<!--fig:coverage.covered-->5513<!--/fig-->/<!--fig:coverage.total-->6047<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1229<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -960,14 +961,14 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "agent/orchestrator.py": [398, 46],
       "agent/planner.py": [46, 1],
       "agent/providers/__init__.py": [6, 0],
-      "agent/providers/base.py": [80, 5],
+      "agent/providers/base.py": [80, 4],
       "agent/providers/local.py": [53, 10],
-      "agent/providers/openai_compat.py": [86, 10],
+      "agent/providers/openai_compat.py": [86, 9],
       "agent/providers/scripted.py": [42, 6],
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [102, 13],
       "agent/state.py": [197, 7],
-      "agent/tool_executor.py": [282, 37],
+      "agent/tool_executor.py": [282, 34],
       "api/__init__.py": [3, 0],
       "api/app.py": [448, 36],
       "cli/__init__.py": [3, 0],
@@ -1012,7 +1013,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/jadx/adapter.py": [360, 41],
       "tools/registry.py": [28, 0]
     },
-    "missing": 539,
+    "missing": 534,
     "statements": 6047
   },
   "history": {
@@ -1030,10 +1031,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:d0b647e872e53f88a95afd4de1e40670b0fb4ea40fa1faef9fe1e7a614d0d160",
+  "source_fingerprint": "sha256:53dfb947ecbe57cf2067bd46824d2b48391610f38b0c87dbcfbd3709bea6be99",
   "suite": {
     "failed": 0,
-    "passed": 1223,
+    "passed": 1229,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1041,8 +1042,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1086,
+    "fast": 1092,
     "slow": 137,
-    "total": 1223
+    "total": 1229
   }
 }-->

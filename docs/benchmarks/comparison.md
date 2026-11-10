@@ -32,6 +32,36 @@ Task count: 81. Budget: 2048 `max_tokens` per task, identical for all three conf
 - `n/a` means the denominator was zero. It is not a 0% result.
 - A comparison never claims an improvement the measurements do not support. With a scripted provider, the numbers measure the harness.
 
+## Running with a real model
+
+The scripted provider is a stand-in, not a baseline. The same harness can run all three configurations against a real model: `benchmarks/comparison/run.py` selects it with `--provider`, and the three configurations then share one provider construction — the same model, the same budget, comparable.
+
+```bash
+# An OpenAI-compatible endpoint (hosted API, vLLM, LiteLLM, a gateway).
+export OPENAI_COMPAT_API_KEY="sk-..."
+uv run --no-sync python benchmarks/comparison/run.py \
+  --provider openai-compat \
+  --base-url https://api.example.com/v1 \
+  --model <model-name> \
+  --api-key-env OPENAI_COMPAT_API_KEY \
+  --output .scratch/comparison-real
+
+# A local model endpoint (Ollama, llama.cpp server) speaks the local shape.
+uv run --no-sync python benchmarks/comparison/run.py \
+  --provider local \
+  --base-url http://localhost:11434 \
+  --model qwen3:8b \
+  --output .scratch/comparison-real
+```
+
+The API key convention: `--api-key-env` names an **environment variable**, never a value. The key is read from that variable, held in the provider instance, sent as an `Authorization` header — and it is never written to disk or into a trace. A trace records which provider was used (`openai-compatible` or `local-model`) and which model answered; it never records the key. A local endpoint sends no key at all, so `--api-key-env` with `--provider local` is rejected. The name of the variable is yours to choose; `OPENAI_COMPAT_API_KEY` above is an example, not a required name.
+
+Where the token numbers come from changes with the provider. The scripted provider has no tokenizer, so it estimates: it counts whitespace-split words over the request and the reply. A real provider reports its usage, and the harness takes it — the OpenAI-compatible shape reports `usage.prompt_tokens` and `usage.completion_tokens`, the local shape reports `prompt_eval_count` and `eval_count`, and the agent configuration charges the orchestrator's budget with exactly what the response reported. A trace built on a real provider therefore carries the endpoint's own numbers, not an estimate of them.
+
+**A scripted measurement and a real one must be stated separately and never compared.** The scripted numbers measure the harness; the real ones measure a model reading one of two input shapes. They answer different questions, and a table that puts them side by side invites a conclusion neither row supports. A report that mixes them in one metric table is wrong even if every individual number in it is correct; name the provider and the model of every real measurement in its own table.
+
+Real runs are written to their own output directory (`.scratch/comparison-real` above, not the scripted default), and the checked-in report and traces under `docs/benchmarks/` remain the scripted baseline until an accepted, key-backed run replaces them explicitly.
+
 ## Regenerating
 
 ```bash
