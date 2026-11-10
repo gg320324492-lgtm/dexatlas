@@ -36,6 +36,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
+- **The workflow is in the repository, not in a scratch directory.** The scripts
+  that re-derive the documents' citations, that accept a branch, that prove a
+  regression test goes red without its fix, that run the suite on real Linux
+  and that fetch the decompiler over a slow link all lived in a local folder
+  that was never committed — so they died with the machine that had them.
+  They are `scripts/remap-citations.py`, `scripts/accept-chip.sh`,
+  `scripts/prove-red.sh`, `scripts/linux-check.sh` and
+  `scripts/fetch-jadx.py` now, and [`docs/HANDOVER.md`](docs/HANDOVER.md)
+  says how to rebuild the environment and what to do next.
+
+  The citation remapper is **idempotent** now: it moves a citation only
+  where the checker says the symbol it names has left the cited range, so
+  running it twice does not move every number twice — which is what the
+  older version did, and why it had to be reset before every run. The
+  citation checker walks the tree once instead of once per citation, which
+  is the difference between a second and a quarter of an hour.
+
 - **A status page** — `docs/status.md` says where the project stands and what is left:
   the released versions, the acceptance status of Phase 1, and the gaps that remain.
   It is written in Chinese, like the analysis coverage document. Its test count and

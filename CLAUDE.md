@@ -26,10 +26,12 @@ are one file, and a test in `tests/test_docs.py` keeps them that way.
    script. **Do not hand-edit a number.** Change the code, run the script.
 4. **The documents' `file:line` citations are checked.** After changing
    anything under `src/`, the cited lines have moved. Re-derive them with
-   `python "G:/dexatlas/.scratch/verify/remap_citations.py"`, then run
+   `uv run --no-sync python scripts/remap-citations.py`, then run
    `uv run --no-sync python scripts/check-doc-citations.py` and read its output.
-   The remapper is not idempotent: reset the two documents to their last
-   committed state first, or it will map already-mapped numbers a second time.
+   The remapper moves a citation only where the checker says the symbol it
+   names has left the cited range, so it is safe to run twice; a citation that
+   points at a place rather than at a symbol is left for the checker to
+   report and for a person to decide.
 5. **Public contracts are preserved or explicitly versioned — never silently
    changed.** A status code, a response shape or a count that means something
    different now is a breaking change; say so loudly.

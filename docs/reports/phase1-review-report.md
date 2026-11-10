@@ -2,7 +2,7 @@
 
 **评审对象：** v0.1.3 之后的开发状态（提交 `8df894b` 及后续修复）
 **评审协议：** [`docs/roadmap/ROADMAP.md`](../roadmap/ROADMAP.md) 末尾的「Review protocol」
-**配套材料：** [成熟度评估](phase1-maturity-assessment.md) · [执行报告](phase1-execution-report.md) · [Phase 2 issue 清单](phase2-issue-list.md)
+**配套材料：** [成熟度评估](phase1-maturity-assessment.md) · [执行报告](phase1-execution-report.md) · [Phase 2 issue 清单](phase2-issue-list.md) · [复现台账](phase1-findings-ledger.md)（每一条发现是怎么验的）
 
 ---
 

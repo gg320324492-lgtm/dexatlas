@@ -6,6 +6,7 @@
 
 - 「交付了什么」和「怎么交付的」在[执行报告](reports/phase1-execution-report.md)里
 - 「每条结论由谁支撑、怎么自己核对」在[分析覆盖度与证据来源](analysis-provenance.md)里
+- **换一台机器继续做**看[交接说明](HANDOVER.md)——现状、重建步骤、以及接下来做什么
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里

@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import ast
 import functools
+import os
 import pathlib
 import re
 import sys
@@ -216,6 +217,28 @@ class Report:
         return tuple(f for f in self.findings if f.kind not in {"unresolved", "ambiguous"})
 
 
+@functools.cache
+def _files_by_name() -> dict[str, list[pathlib.Path]]:
+    """Every file in the repository, indexed by its bare name.
+
+    The index is built once and kept: a citation is looked up by name, and
+    looking one up by walking the tree again is what made this checker take
+    minutes over ninety citations. The directories the checker never reads
+    are not walked into at all, which is the other half of the time.
+
+    The names are folded to lower case, because the tree it used to walk was
+    matched that way on Windows and on macOS: a citation that says
+    ``models.py`` finds ``Models.py`` there, and it should find it here too.
+    """
+    index: dict[str, list[pathlib.Path]] = {}
+    for root, directories, files in os.walk(REPO):
+        directories[:] = [name for name in directories if name not in SKIP_DIRECTORIES]
+        for name in files:
+            path = pathlib.Path(root) / name
+            index.setdefault(name.lower(), []).append(path)
+    return index
+
+
 def candidates(rel: str) -> list[pathlib.Path]:
     """Every file in the repository a citation could mean.
 
@@ -233,11 +256,7 @@ def candidates(rel: str) -> list[pathlib.Path]:
         if candidate.is_file():
             return [candidate]
     name = rel.rsplit("/", 1)[-1]
-    return [
-        path
-        for path in REPO.rglob(name)
-        if path.is_file() and not set(path.relative_to(REPO).parts) & SKIP_DIRECTORIES
-    ]
+    return list(_files_by_name().get(name.lower(), []))
 
 
 @functools.cache

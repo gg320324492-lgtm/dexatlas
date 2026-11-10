@@ -222,6 +222,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
 ## Documentation
 
+- **[Handover](docs/HANDOVER.md)** — where the project stands, how to get it running on a
+  new machine, and what to do next
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
 - **[Architecture](docs/architecture/README.md)** — how it fits together and why
 - **[Current status](docs/status.md)** — where the project stands and what is left
