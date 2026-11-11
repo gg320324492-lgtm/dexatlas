@@ -119,10 +119,12 @@ def test_readme_does_not_overclaim() -> None:
     fine: a plan is not a claim.
 
     The list below is the milestone list as it stands: the MCP server, the
-    agent and the workbench's first screen have landed. When something else
-    is built, it moves out of this list and into the other side of the same
-    test — which is the point of keeping the test: it says which of the two
-    it is at any moment.
+    agent, and the workbench's project dashboard and single-method
+    cross-reference view have landed. A whole-workspace call graph browser has
+    not — the screen built here answers one method at a time — so it stays on
+    this side of the test. When something else is built, it moves out of this
+    list and into the other side of the same test, which is the point of
+    keeping the test: it says which of the two it is at any moment.
     """
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -136,17 +138,27 @@ def test_readme_does_not_overclaim() -> None:
 def test_the_quick_start_names_the_workbench_because_it_is_built() -> None:
     """The other side of the same claim: what is built is named.
 
-    Only the workbench's first screen exists, so the Quick Start has to name
-    the command that runs it rather than describing the whole screen set as
-    delivered.
+    Two workbench screens exist, so the Quick Start has to name the command
+    that runs them and the views they serve, rather than describing the whole
+    screen set as delivered or naming only one of the two.
     """
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     quick_start = readme.split("## Quick start", 1)[-1].split("\n## ", 1)[0]
 
     assert "dexatlas-workbench" in quick_start, (
-        "the workbench's first screen is built and the Quick Start does not say how to run it"
+        "the workbench is built and the Quick Start does not say how to run it"
     )
     assert (REPO_ROOT / "src" / "dexatlas" / "workbench" / "app.py").is_file()
+    # The cross-reference view is a claim about a screen, so it has to be
+    # backed by the endpoints that screen reads.
+    assert "cross-reference" in quick_start.lower(), (
+        "the workbench's cross-reference view is built and the README does not name it"
+    )
+    app_source = (REPO_ROOT / "src" / "dexatlas" / "workbench" / "app.py").read_text(
+        encoding="utf-8"
+    )
+    for route in ("/callers", "/callees"):
+        assert route in app_source, f"the workbench serves no {route} endpoint"
 
 
 def test_the_quick_start_names_the_mcp_server_because_it_is_built() -> None:

@@ -9,8 +9,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1234%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-90.3%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1245%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-90.4%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
@@ -196,8 +196,14 @@ DexAtlas can show a workspace in a browser. The workbench is **read-only**
 and sits on the same ten tools the MCP server exposes, called in-process —
 the JSON the browser receives is the shape the MCP server would have
 returned. It is the Phase 2 plan's M4 screen set being built one screen at a
-time; the project dashboard is built on this branch but **not released** —
-a published version does not carry it yet.
+time; two screens are built on this branch but **not released** — a published
+version does not carry them yet:
+
+- the **project dashboard**: the projects a workspace holds, each with the
+  backends that took part and the counts the analysis produced;
+- the **cross-reference view** of one method: who calls it and what it calls,
+  drawn from the call sites — the DEX file and the instruction each call was
+  read out of — and walkable by clicking a caller or a callee.
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp
@@ -205,8 +211,8 @@ uv run dexatlas-workbench            # serves http://127.0.0.1:8618
 ```
 
 The first start builds the front end (npm once); `DEXATLAS_WORKSPACE` points
-it at a workspace, as everywhere else. The screens, and the decisions the
-first one was built under:
+it at a workspace, as everywhere else. The screens, and the decisions they
+were built under:
 **[docs/architecture/workbench.md](docs/architecture/workbench.md)**.
 
 ### The agent

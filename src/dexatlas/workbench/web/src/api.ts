@@ -53,6 +53,50 @@ export interface Health {
   workspace: string;
 }
 
+export interface UntrustedText {
+  text: string;
+  truncated: boolean;
+  bytes: number;
+  notice: string;
+}
+
+export interface SymbolView {
+  kind: string;
+  name: UntrustedText;
+  detail: UntrustedText;
+  provenance: string[];
+}
+
+export interface SymbolList {
+  symbols: SymbolView[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface CallSiteView {
+  caller: string;
+  callee: string;
+  kind: string;
+  dex_name: string;
+  instruction_offset: number;
+  provenance: string[];
+}
+
+export interface CallerView {
+  call_sites: CallSiteView[];
+  call_site_count: number;
+  call_edge_count: number;
+  truncated: boolean;
+}
+
+export interface CalleeView {
+  callees: SymbolView[];
+  call_site_count: number;
+  call_edge_count: number;
+  truncated: boolean;
+}
+
 export class ApiError extends Error {
   code: string;
 
@@ -84,4 +128,40 @@ export function listProjects(offset = 0, limit = 50): Promise<ProjectList> {
 
 export function getProjectStatus(projectId: string): Promise<ProjectStatus> {
   return fetchJson(`/api/projects/${encodeURIComponent(projectId)}`);
+}
+
+// A method id carries `(`, `)` and `;`, and a locator carries `#` and `->`, so
+// every query value goes through URLSearchParams — otherwise a `#` in a method
+// id would be read as the URL's own fragment and the request would ask for
+// something else than the caller named.
+function projectUrl(projectId: string, path: string, params: Record<string, string> = {}): string {
+  const query = new URLSearchParams(params).toString();
+  return `/api/projects/${encodeURIComponent(projectId)}/${path}${query ? `?${query}` : ""}`;
+}
+
+export function searchSymbols(
+  projectId: string,
+  query: string,
+  offset = 0,
+  limit = 50,
+): Promise<SymbolList> {
+  return fetchJson(
+    projectUrl(projectId, "symbols", { q: query, offset: String(offset), limit: String(limit) }),
+  );
+}
+
+export function findCallers(
+  projectId: string,
+  methodId: string,
+  limit = 50,
+): Promise<CallerView> {
+  return fetchJson(projectUrl(projectId, "callers", { method_id: methodId, limit: String(limit) }));
+}
+
+export function findCallees(
+  projectId: string,
+  methodId: string,
+  limit = 50,
+): Promise<CalleeView> {
+  return fetchJson(projectUrl(projectId, "callees", { method_id: methodId, limit: String(limit) }));
 }

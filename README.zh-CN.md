@@ -157,8 +157,12 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 
 DexAtlas 可以在浏览器里展示分析工作区。工作台是**只读**的：它直接 in-process 调用
 MCP server 暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状
-完全相同。这是 [Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的第一屏
-（项目列表 + 单项目状态），已在当前分支实现但**尚未发布**；其余屏幕尚未开始。
+完全相同。这是 [Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的前两屏，
+已在当前分支实现但**尚未发布**；其余屏幕尚未开始：
+
+- **项目面板**：工作区里的项目清单，每项标出参与了分析的后端与产出的各项计数；
+- **单个方法的交叉引用视图**：谁调用它、它调用了谁，数据来自调用点（每次调用被读出时的
+  DEX 文件与指令偏移），点击调用方或被调用方即可沿调用链继续走。
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp
