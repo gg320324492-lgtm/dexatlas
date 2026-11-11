@@ -157,16 +157,20 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 
 DexAtlas 可以在浏览器里展示分析工作区。工作台是**只读**的：它直接 in-process 调用
 MCP server 暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状
-完全相同。这是 [Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的第一屏
-（项目列表 + 单项目状态），已在当前分支实现但**尚未发布**；其余屏幕尚未开始。
+完全相同。这是 [Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的前两屏
+（项目列表 / 单项目状态；符号检索 / 证据溯源），已在当前分支实现但**尚未发布**；
+其余屏幕尚未开始。
 
 ```bash
-uv sync --extra dev --extra analysis --extra mcp
+uv sync --extra dev --extra analysis --extra mcp --extra demo
+uv run dexatlas analyze examples/demo-app/demo.apk   # 准备一个示例工作区
 uv run dexatlas-workbench            # 打开 http://127.0.0.1:8618
 ```
 
 首次启动会用 npm 构建前端（只需一次），之后每次都是这一条命令。工作区仍由
-`DEXATLAS_WORKSPACE` 指定，与其余命令一致。详见
+`DEXATLAS_WORKSPACE` 指定，与其余命令一致。打开项目后进入 **search & evidence**：
+输入 query 搜索索引符号，点开类或方法查看 Java / Smali 源码，再打开 evidence
+记录并解析它的 provenance locator，回到这次分析里的具体位置。详见
 **[Web 工作台架构](docs/architecture/workbench.md)**。
 
 ## 文档

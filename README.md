@@ -196,17 +196,22 @@ DexAtlas can show a workspace in a browser. The workbench is **read-only**
 and sits on the same ten tools the MCP server exposes, called in-process —
 the JSON the browser receives is the shape the MCP server would have
 returned. It is the Phase 2 plan's M4 screen set being built one screen at a
-time; the project dashboard is built on this branch but **not released** —
-a published version does not carry it yet.
+time: the project dashboard and symbol search / evidence tracing are built
+on this branch but **not released** — a published version does not carry
+them yet.
 
 ```bash
-uv sync --extra dev --extra analysis --extra mcp
+uv sync --extra dev --extra analysis --extra mcp --extra demo
+uv run dexatlas analyze examples/demo-app/demo.apk   # one example workspace
 uv run dexatlas-workbench            # serves http://127.0.0.1:8618
 ```
 
 The first start builds the front end (npm once); `DEXATLAS_WORKSPACE` points
-it at a workspace, as everywhere else. The screens, and the decisions the
-first one was built under:
+it at a workspace, as everywhere else. In the workbench, open a project and
+follow **search & evidence**: a query returns indexed symbols, a class or
+method opens its Java / Smali source, and an evidence record's provenance
+locators resolve to places inside that analysis. The screens, and the
+decisions they were built under:
 **[docs/architecture/workbench.md](docs/architecture/workbench.md)**.
 
 ### The agent

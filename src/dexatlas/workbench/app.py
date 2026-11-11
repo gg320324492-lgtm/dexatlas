@@ -4,9 +4,13 @@ The workbench serves the analysis a workspace already holds, over the same
 ten read-only tools the MCP server exposes. The functions under
 :mod:`dexatlas.mcp.tools` are plain Python that takes an
 :class:`~dexatlas.core.pipeline.Analyzer` — no stdio, no framework — so the
-workbench calls them in-process and inherits the contract as it is. This
-first screen calls the two that answer "what is in this workspace":
-``list_projects`` and ``get_project_status``.
+workbench calls them in-process and inherits the contract as it is. The
+dashboard calls the two that answer "what is in this workspace":
+``list_projects`` and ``get_project_status``. The search/evidence screen
+calls five more — ``search_symbols``, ``get_class_source``,
+``get_method_source``, ``get_evidence`` and ``resolve_locator`` — so a
+reader goes from a phrase in the index to the source it names, to the
+evidence record and to the place inside the analysis that record cites.
 
 The workbench adds no analysis, no writes and no second contract: the JSON
 the browser receives is the same shape the MCP server would have returned,
@@ -29,9 +33,20 @@ from starlette.requests import Request
 
 from dexatlas import __version__
 from dexatlas.core.pipeline import Analyzer
-from dexatlas.mcp.errors import RequestError
-from dexatlas.mcp.schemas import DEFAULT_LIMIT, MAX_LIMIT, ProjectList, ProjectStatus
+from dexatlas.mcp.errors import RequestError, unknown_project
+from dexatlas.mcp.schemas import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    EvidenceView,
+    LocatorResolution,
+    ProjectList,
+    ProjectStatus,
+    SourceView,
+    SymbolList,
+)
+from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
+from dexatlas.mcp.tools import symbols as symbol_tools
 
 # The built front end. `npm run build` writes it; `python -m
 # dexatlas.workbench` builds it on first start when npm is available. The
@@ -83,6 +98,72 @@ def create_app(analyzer: Analyzer) -> FastAPI:
     def project_status(project_id: str) -> ProjectStatus:
         """One project: how complete its analysis is, and what it holds."""
         return project_tools.project_status(analyzer, project_id)
+
+    # -- the second screen: index -> source -> evidence -> the place cited --
+    #
+    # Each endpoint calls one plain-Python tool and answers with that tool's
+    # own pydantic shape. A single new endpoint `/evidence` returns a *list*
+    # of the same `EvidenceView` objects: MCP has no list-evidence tool, so
+    # the browser reads the ids from the store and asks `get_evidence` for
+    # each one. No field, count or status code is redefined here.
+
+    @app.get("/api/projects/{project_id}/symbols", response_model=SymbolList)
+    def search_symbols(
+        project_id: str,
+        q: str = Query(..., description="The phrase to look for in the index."),
+        offset: int = Query(0, ge=0),
+        limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    ) -> SymbolList:
+        """A page of index hits, with the excerpt that says why each matched."""
+        return symbol_tools.search_symbols(analyzer, project_id, q, limit=limit, offset=offset)
+
+    @app.get("/api/projects/{project_id}/source/class", response_model=SourceView)
+    def class_source(
+        project_id: str,
+        class_name: str = Query(..., min_length=1),
+    ) -> SourceView:
+        """One class's Java or Smali, and the locator it was read from."""
+        return symbol_tools.class_source(analyzer, project_id, class_name)
+
+    @app.get("/api/projects/{project_id}/source/method", response_model=SourceView)
+    def method_source(
+        project_id: str,
+        class_name: str = Query(..., min_length=1),
+        method_name: str = Query(..., min_length=1),
+        descriptor: str | None = Query(None),
+    ) -> SourceView:
+        """One method's source; an ambiguous name answers with its candidates."""
+        return symbol_tools.method_source(analyzer, project_id, class_name, method_name, descriptor)
+
+    @app.get("/api/projects/{project_id}/evidence", response_model=list[EvidenceView])
+    def list_evidence(project_id: str) -> list[EvidenceView]:
+        """Every evidence record, each one the MCP `get_evidence` answer.
+
+        `get_evidence` takes an id, so a reader needs a way to find the ids.
+        The ids are the store's own records, in the store's own order; this
+        endpoint calls the tool once per id. It adds a collection, not a
+        second shape: an item here is byte-for-byte what `/evidence/{id}`
+        answers with.
+        """
+        if analyzer.store.get_project(project_id) is None:
+            raise unknown_project(project_id)
+        return [
+            evidence_tools.get_evidence(analyzer, project_id, record.id)
+            for record in analyzer.store.list_evidence(project_id)
+        ]
+
+    @app.get("/api/projects/{project_id}/evidence/{evidence_id}", response_model=EvidenceView)
+    def get_evidence(project_id: str, evidence_id: str) -> EvidenceView:
+        """One record, with the locators a reader can go and check."""
+        return evidence_tools.get_evidence(analyzer, project_id, evidence_id)
+
+    @app.get("/api/projects/{project_id}/locators/resolve", response_model=LocatorResolution)
+    def resolve_locator(
+        project_id: str,
+        locator: str = Query(..., min_length=1),
+    ) -> LocatorResolution:
+        """Whether one provenance locator names a place inside this analysis."""
+        return evidence_tools.resolve_locator(analyzer, project_id, locator)
 
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")

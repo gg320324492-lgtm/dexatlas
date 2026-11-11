@@ -53,6 +53,53 @@ export interface Health {
   workspace: string;
 }
 
+export interface UntrustedText {
+  text: string;
+  truncated: boolean;
+  bytes: number;
+  notice: string;
+}
+
+export interface SymbolView {
+  kind: string;
+  name: UntrustedText;
+  detail: UntrustedText;
+  provenance: string[];
+}
+
+export interface SymbolList {
+  symbols: SymbolView[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface SourceView {
+  found: boolean;
+  reason: string;
+  kind: "java" | "smali" | null;
+  text: UntrustedText | null;
+  provenance: string[];
+  candidates: string[];
+}
+
+export interface EvidenceView {
+  id: string;
+  kind: string;
+  level: string;
+  summary: string;
+  detail: Record<string, unknown>;
+  provenance: string[];
+}
+
+export interface LocatorResolution {
+  resolved: boolean;
+  reason: string;
+  kind: "java" | "smali" | null;
+  text: UntrustedText | null;
+  provenance: string[];
+}
+
 export class ApiError extends Error {
   code: string;
 
@@ -84,4 +131,52 @@ export function listProjects(offset = 0, limit = 50): Promise<ProjectList> {
 
 export function getProjectStatus(projectId: string): Promise<ProjectStatus> {
   return fetchJson(`/api/projects/${encodeURIComponent(projectId)}`);
+}
+
+// The second screen asks the same five read-only tools by name. Every query
+// value goes through URLSearchParams, so a symbol or locator that contains
+// `#`, `(` or `->` is not mistaken for part of a URL.
+function projectUrl(projectId: string, path: string, params: Record<string, string> = {}): string {
+  const query = new URLSearchParams(params).toString();
+  return `/api/projects/${encodeURIComponent(projectId)}/${path}${query ? `?${query}` : ""}`;
+}
+
+export function searchSymbols(
+  projectId: string,
+  query: string,
+  offset = 0,
+  limit = 50,
+): Promise<SymbolList> {
+  return fetchJson(
+    projectUrl(projectId, "symbols", { q: query, offset: String(offset), limit: String(limit) }),
+  );
+}
+
+export function getClassSource(projectId: string, className: string): Promise<SourceView> {
+  return fetchJson(projectUrl(projectId, "source/class", { class_name: className }));
+}
+
+export function getMethodSource(
+  projectId: string,
+  className: string,
+  methodName: string,
+  descriptor?: string,
+): Promise<SourceView> {
+  const params: Record<string, string> = { class_name: className, method_name: methodName };
+  if (descriptor !== undefined) params["descriptor"] = descriptor;
+  return fetchJson(projectUrl(projectId, "source/method", params));
+}
+
+export function listEvidence(projectId: string): Promise<EvidenceView[]> {
+  return fetchJson(projectUrl(projectId, "evidence"));
+}
+
+export function getEvidence(projectId: string, evidenceId: string): Promise<EvidenceView> {
+  return fetchJson(
+    projectUrl(projectId, `evidence/${encodeURIComponent(evidenceId)}`),
+  );
+}
+
+export function resolveLocator(projectId: string, locator: string): Promise<LocatorResolution> {
+  return fetchJson(projectUrl(projectId, "locators/resolve", { locator }));
 }
