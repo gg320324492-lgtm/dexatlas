@@ -22,7 +22,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 |---|---|---|---|
 | APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:199-225` |
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:130-229` |
-| manifest 的版本号（Apktool 把它挪走了，从 `apktool.yml` 补） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:417-447` |
+| manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:417-447` |
 | manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `ManifestInfo` | `tools/androguard/adapter.py:284-331`、`core/pipeline.py:535-585` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:528-546` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:602-763` 的 `class_source_document` / `method_source_document` |
@@ -860,11 +860,15 @@ com.example.demo.SyncService class
   带出处的形式是 `class_source_document` / `method_source_document`
   （`core/pipeline.py:627-763`），CLI 和 REST API 用的都是这两个（见 3.3）。
 
-- **manifest 的版本号和 SDK 版本不在 manifest 里。** Apktool 解码时把它们挪进
-  `apktool.yml`（`tools/apktool/adapter.py:417-420`、`tools/apktool/adapter.py:417-448` 的 `_merge_build_metadata`）。
-  只读 `AndroidManifest.xml` 会得到空值，所以实现里从 `apktool.yml` 补齐
-  （manifest 自身的值优先）。**这意味着 manifest 结论的证据链其实跨了两个文件**，
-  而 provenance 只写了 `apktool:AndroidManifest.xml` 一个。
+- **部分 manifest 的版本号和 SDK 版本不在解码后的 manifest 里。** Apktool 2.11.1
+  解码五个自建样本时，`demo-app` 的两个版本属性被挪进 `apktool.yml`，另外四个样本的
+  解码 manifest 仍保留原值；SDK 级别则一律不在解码 manifest 里
+  （`tools/apktool/adapter.py:417-420`、`tools/apktool/adapter.py:417-448` 的 `_merge_build_metadata`）。
+  `versionInfo` 的 `versionCode` / `versionName` 与五个 APK 的二进制 manifest 一致，
+  由 `tests/test_version_fields.py` 对源码、入库 yml、真实解码产物和适配器输出逐一核对；
+  因此只补版本字段的缺口（manifest 自身的值优先）。`sdkInfo` 则不是 APK 字节的答案，
+  改由 pipeline 从 binary manifest 读取。**版本字段从 yml 补齐时，manifest 结论的
+  证据链其实跨了两个文件**，而 provenance 只写了 `apktool:AndroidManifest.xml` 一个。
 
 - **manifest 里的 `exported` 属性只有显式写了才为 `true`。**
   `ManifestComponent.exported` 是 `bool | None`（`models.py:466`），

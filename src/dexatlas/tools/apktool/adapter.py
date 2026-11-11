@@ -186,9 +186,11 @@ class ApktoolBackend(Backend):
             info.min_sdk = uses_sdk.get(ANDROID + "minSdkVersion")
             info.target_sdk = uses_sdk.get(ANDROID + "targetSdkVersion")
 
-        # Apktool moves the version and SDK attributes out of the manifest and into
-        # apktool.yml when it decodes. A manifest-only read therefore reports "—" for
-        # every APK, which is both unhelpful and wrong. Fill the gaps from there.
+        # Apktool 2.11.1 strips the version attributes from some decoded manifests
+        # and keeps them in others. It writes both into apktool.yml; unlike its
+        # rebuilt sdkInfo, those two values agree with the APK's binary manifest in
+        # all five first-party samples (tests/test_version_fields.py checks both the
+        # checked-in and freshly decoded files). Fill only the gaps from that file.
         _merge_build_metadata(info, output_dir / "apktool.yml")
 
         for element in root.findall("uses-permission") + root.findall("uses-permission-sdk-23"):
@@ -417,9 +419,11 @@ def _parse_bool(value: str | None) -> bool | None:
 def _merge_build_metadata(info: ManifestInfo, apktool_yml: Path) -> None:
     """Fill in version values that Apktool relocated to ``apktool.yml``.
 
-    Apktool's decoded manifest omits ``versionCode`` and ``versionName``, keeping
-    them in its own build file instead. Values already present in the manifest win,
-    so this only fills gaps.
+    Some decoded manifests omit ``versionCode`` and ``versionName``, keeping them
+    in Apktool's build file instead; others keep a faithful transcription of the
+    binary manifest. Values already present win, so this only fills gaps. Unlike
+    ``sdkInfo``, the ``versionInfo`` in the five first-party samples agrees with
+    the APK's bytes — ``tests/test_version_fields.py`` pins that agreement.
 
     The SDK levels are deliberately not read from here. Apktool writes its own
     ``sdkInfo`` into that file, and what it writes is not what the APK's bytes
