@@ -433,6 +433,17 @@ _REAL_PROVIDER_SECTION = (
     "response reported. A trace built on a real provider therefore carries "
     "the endpoint's own numbers, not an estimate of them.",
     "",
+    "**A real-model run is not reproducible.** The endpoint is asked at "
+    "temperature 0, but the same question twice does not get the same answer "
+    "twice: two runs of the real-model measurement over the same tasks "
+    "differed by about a percentage point in the correct-answer rate and by "
+    "about one percent in the tokens spent. A report built on a real model "
+    "therefore describes the run whose traces sit beside it, and a rerun is "
+    "not expected to reproduce them to the digit. A difference between "
+    "configurations smaller than that spread is noise, and no such report "
+    "claims one. The scripted measurement has no such spread: its provider is "
+    "a script, so its numbers come back the same on every run.",
+    "",
     "**A scripted measurement and a real one must be stated separately and "
     "never compared.** The scripted numbers measure the harness; the real "
     "ones measure a model reading one of two input shapes. They answer "
