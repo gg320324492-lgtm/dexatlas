@@ -376,3 +376,38 @@ def test_the_agent_gets_enough_iterations_to_answer(tmp_path: Path) -> None:
 
     assert system.max_iterations >= 8
     assert system.total_tokens >= system.max_tokens
+
+
+def test_a_backend_that_did_not_take_part_is_data_not_a_failed_task() -> None:
+    """A missing manifest is a fact about the analysis, not a crashed run.
+
+    The CI smoke run asks the harness questions with no backend installed,
+    and the manifest tool says which backends were absent. That answer has
+    to reach the model as data: a task that raised instead would be recorded
+    as a run that produced nothing, and the model would never get the chance
+    to say "this analysis holds no manifest".
+    """
+    from benchmarks.comparison.retrieval import StructuredTools
+
+    class _Analyzer:
+        """An analyzer whose analysis holds no manifest.
+
+        The project is there -- its Apktool step simply never ran, which is
+        what the error is for.
+        """
+
+        class store:  # stands in for the store the tool reads
+            @staticmethod
+            def get_project(project_id: str) -> object:
+                return SimpleNamespace(tool_versions={"apktool": None, "jadx": None})
+
+            @staticmethod
+            def get_manifest(project_id: str) -> None:
+                return None
+
+    tools = StructuredTools(analyzer=_Analyzer(), project_ids={"demo-app": "apk_1"})
+    payload = tools.call("get_manifest", _questions()[0], "")
+
+    assert payload["error"], "the missing manifest was not reported"
+    assert payload["error_code"] == "no_manifest"
+    assert payload["missing_backends"]

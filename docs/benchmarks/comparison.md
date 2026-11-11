@@ -18,14 +18,14 @@ Task count: 92. Budget: 2048 `max_tokens` per request, identical for all three c
 
 | Metric | A | B | DexAtlas |
 |---|---:|---:|---:|
-| `correct_answer_rate` | 16.3% | 16.3% | 3.3% |
-| `evidence_grounding_rate` | 0.0% | 0.0% | 66.7% |
-| `unsupported_assertion_rate` | 100.0% | 100.0% | 33.3% |
-| `false_positive_rate` | 0.0% | 0.0% | 96.7% |
+| `correct_answer_rate` | 16.3% | 16.3% | 5.4% |
+| `evidence_grounding_rate` | 0.0% | 0.0% | 0.0% |
+| `unsupported_assertion_rate` | 100.0% | 100.0% | 100.0% |
+| `false_positive_rate` | 0.0% | 0.0% | 94.6% |
 | `tool_call_success_rate` | 100.0% | 100.0% | 100.0% |
 | `recovery_rate` | 0.0% | 0.0% | n/a |
 | `token_consumption` | 1153 | 492 | 57461 |
-| `execution_duration` | 0.422 | 0.452 | 2.344 |
+| `execution_duration` | 0.515 | 0.453 | 3.0 |
 
 ## Disclosures
 
@@ -39,7 +39,7 @@ Task count: 92. Budget: 2048 `max_tokens` per request, identical for all three c
 |---|---|---|
 | A | the run failed | 77 |
 | B | the run failed | 77 |
-| DexAtlas | answered, and the answer was wrong | 89 |
+| DexAtlas | answered, and the answer was wrong | 87 |
 
 
 ## Running with a real model

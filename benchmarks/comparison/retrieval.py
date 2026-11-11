@@ -185,19 +185,35 @@ class StructuredTools:
         return "get_manifest"
 
     def call(self, name: str, question: Any, keyword: str) -> dict[str, Any]:
+        from dexatlas.mcp.errors import RequestError
         from dexatlas.mcp.tools import projects, references, symbols
 
         project_id = self._project_ids.get(str(question.sample))
         if project_id is None:
             return {"error": f"no analysis for {question.sample}"}
-        if name == "get_manifest":
-            view = projects.manifest(self._analyzer, project_id)
-        elif name == "search_symbols":
-            view = symbols.search_symbols(self._analyzer, project_id, keyword, limit=50, offset=0)
-        elif name == "find_callers":
-            view = references.find_callers(self._analyzer, project_id, keyword, limit=50)
-        else:
-            view = references.find_callees(self._analyzer, project_id, keyword, limit=50)
+        try:
+            if name == "get_manifest":
+                view = projects.manifest(self._analyzer, project_id)
+            elif name == "search_symbols":
+                view = symbols.search_symbols(
+                    self._analyzer, project_id, keyword, limit=50, offset=0
+                )
+            elif name == "find_callers":
+                view = references.find_callers(self._analyzer, project_id, keyword, limit=50)
+            else:
+                view = references.find_callees(self._analyzer, project_id, keyword, limit=50)
+        except RequestError as exc:
+            # A backend that did not take part is a fact about the analysis,
+            # not a failed task. The error carries which backends were absent,
+            # and the model is told it as data -- which is what lets it answer
+            # "this analysis holds no manifest" instead of the harness
+            # recording a run that produced nothing.
+            detail = getattr(exc, "detail", {}) or {}
+            return {
+                "error": str(exc),
+                "error_code": getattr(exc, "code", ""),
+                "missing_backends": list(detail.get("missing_backends", []) or []),
+            }
         return jsonable(view)
 
 
