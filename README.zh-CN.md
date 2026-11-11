@@ -153,10 +153,27 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 `scripts/build-demo-apk.sh` 重新构建——不是来历不明的二进制文件。体积更大的测试样本
 则通过 `scripts/fetch-fixtures.sh` 获取。
 
+## Web 工作台
+
+DexAtlas 可以在浏览器里展示分析工作区。工作台是**只读**的：它直接 in-process 调用
+MCP server 暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状
+完全相同。这是 [Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的第一屏
+（项目列表 + 单项目状态），已在当前分支实现但**尚未发布**；其余屏幕尚未开始。
+
+```bash
+uv sync --extra dev --extra analysis --extra mcp
+uv run dexatlas-workbench            # 打开 http://127.0.0.1:8618
+```
+
+首次启动会用 npm 构建前端（只需一次），之后每次都是这一条命令。工作区仍由
+`DEXATLAS_WORKSPACE` 指定，与其余命令一致。详见
+**[Web 工作台架构](docs/architecture/workbench.md)**。
+
 ## 文档
 
 - **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
 - **[架构说明](docs/architecture/README.md)** —— 项目如何组织，以及为什么这样设计
+- **[Web 工作台](docs/architecture/workbench.md)** —— 只读浏览器界面：已有的屏幕、启动方式与选型
 - **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置

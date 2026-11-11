@@ -90,6 +90,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
 | `tools/androguard/worker.py` | 0.0% | 112 / 112 |
+| `workbench/__main__.py` | 0.0% | 55 / 55 |
 | `mcp/server.py` | 79.2% | 11 / 53 |
 | `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
@@ -221,6 +222,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_sdk_reconciliation.py` | manifest 的 SDK 级别不采信 Apktool 的重建值，从 binary manifest 读回并只补缺、失败照记（manifest.min-sdk 修复新增） |
 | `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 | `test_version_fields.py` | 五个自建 APK 的 versionCode/versionName：源码、入库 yml、真实解码产物与 ManifestInfo 都和二进制 manifest 一致（同源字段排查新增） |
+| `test_workbench.py` | M4 第一屏：浏览器拿到的列表与状态仍是 MCP 契约的形状，未构建的前端要说明怎么构建 |
 
 ### 2.2 几类值得注意的测试
 
@@ -995,7 +997,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "core/runs.py": [70, 1],
       "core/storage.py": [352, 7],
       "mcp/__init__.py": [2, 0],
-      "mcp/errors.py": [21, 3],
+      "mcp/errors.py": [21, 2],
       "mcp/schemas.py": [153, 0],
       "mcp/security.py": [28, 5],
       "mcp/server.py": [53, 11],
@@ -1018,7 +1020,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/base.py": [188, 30],
       "tools/jadx/__init__.py": [3, 0],
       "tools/jadx/adapter.py": [360, 41],
-      "tools/registry.py": [28, 0]
+      "tools/registry.py": [28, 0],
+      "workbench/__init__.py": [0, 0],
+      "workbench/__main__.py": [55, 55],
+      "workbench/app.py": [38, 0]
     },
     "missing": 541,
     "statements": 6074

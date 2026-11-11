@@ -190,6 +190,25 @@ In an MCP host, add it as a stdio server:
 }
 ```
 
+### The web workbench
+
+DexAtlas can show a workspace in a browser. The workbench is **read-only**
+and sits on the same ten tools the MCP server exposes, called in-process —
+the JSON the browser receives is the shape the MCP server would have
+returned. It is the Phase 2 plan's M4 screen set being built one screen at a
+time; the project dashboard is built on this branch but **not released** —
+a published version does not carry it yet.
+
+```bash
+uv sync --extra dev --extra analysis --extra mcp
+uv run dexatlas-workbench            # serves http://127.0.0.1:8618
+```
+
+The first start builds the front end (npm once); `DEXATLAS_WORKSPACE` points
+it at a workspace, as everywhere else. The screens, and the decisions the
+first one was built under:
+**[docs/architecture/workbench.md](docs/architecture/workbench.md)**.
+
 ### The agent
 
 DexAtlas can also answer a question about an APK. The agent takes a question,
@@ -226,6 +245,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   new machine, and what to do next
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
 - **[Architecture](docs/architecture/README.md)** — how it fits together and why
+- **[The web workbench](docs/architecture/workbench.md)** — the read-only browser UI:
+  the screens that exist, how to start it, and the choices behind them
 - **[Current status](docs/status.md)** — where the project stands and what is left
   (Chinese; 当前状态)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
