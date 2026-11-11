@@ -36,23 +36,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
-- **The web workbench, and two of its screens.** `dexatlas-workbench` serves a
+- **The web workbench, and three of its screens.** `dexatlas-workbench` serves a
   read-only browser over a workspace: the projects it holds, each with the
-  backends that took part and the counts the analysis produced, and — for one
-  method at a time — who calls it and what it calls, with the DEX file and the
-  instruction offset each call was read out of, and clickable callers and
-  callees to walk the chain with.
+  backends that took part and the counts the analysis produced; the search and
+  evidence view, where a query returns indexed symbols, a class or method
+  opens its Java or Smali source and an evidence record's provenance locators
+  resolve to places inside that analysis; and — for one method at a time — who
+  calls it and what it calls, with the DEX file and the instruction offset each
+  call was read out of, and clickable callers and callees to walk the chain
+  with.
 
   It calls the MCP tools' own functions in-process, so the JSON the browser
   receives is the shape the MCP server would have returned, produced by the
   same code: **no added analysis, no writes, and no second contract**. A test
   asserts the response against the tool's own `model_dump()`.
 
-  Two answers the screen refuses to fake: a method nobody calls is `0` call
-  sites, not a 404 — "the analysis read no call into this method" and "this
-  method does not exist" are different answers — and no number is drawn beside
-  a callee, because `find_callees` deduplicates its callees and answers no
-  per-callee count, so such a number would be one no query can re-derive.
+  Two answers the call-graph screen refuses to fake: a method nobody calls is
+  `0` call sites, not a 404 — "the analysis read no call into this method" and
+  "this method does not exist" are different answers — and no number is drawn
+  beside a callee, because `find_callees` deduplicates its callees and answers
+  no per-callee count, so such a number would be one no query can re-derive.
 
   ```bash
   uv sync --extra dev --extra analysis --extra mcp

@@ -217,6 +217,14 @@ M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少�
 「comparison never claims an improvement the measurements do not support」
 本轮以「不声称哪个更好」的方式满足）。
 
+**M4 的 workbench 建了三屏**（未发布）：项目面板、检索与证据追溯（符号 → 类/方法
+源码 → 证据记录 → locator 解析）、单个方法的调用关系视图（谁调用它、它调用
+谁，按调用点画出，点了节点就能跳到下一个方法）。三屏都坐在同一套只读 MCP
+工具上，浏览器拿到的 JSON 就是工具自己的形状，测试逐个端点比对
+`model_dump()`；没有调用者的方法答 0 而不是 404——把「分析没读到调用」
+说成「这个方法不存在」，正是这个项目要避免的混淆。
+设计与取舍在[workbench 架构文档](architecture/workbench.md)里。
+
 ### 4.7 这一轮关掉的
 
 | 原来开着 | 现在 |
