@@ -74,6 +74,8 @@ export interface SymbolList {
   limit: number;
 }
 
+// -- the second screen: the source, the evidence and the place it cites -----
+
 export interface SourceView {
   found: boolean;
   reason: string;
@@ -98,6 +100,31 @@ export interface LocatorResolution {
   kind: "java" | "smali" | null;
   text: UntrustedText | null;
   provenance: string[];
+}
+
+// -- the third screen: the calls into and out of one method ----------------
+
+export interface CallSiteView {
+  caller: string;
+  callee: string;
+  kind: string;
+  dex_name: string;
+  instruction_offset: number;
+  provenance: string[];
+}
+
+export interface CallerView {
+  call_sites: CallSiteView[];
+  call_site_count: number;
+  call_edge_count: number;
+  truncated: boolean;
+}
+
+export interface CalleeView {
+  callees: SymbolView[];
+  call_site_count: number;
+  call_edge_count: number;
+  truncated: boolean;
 }
 
 export class ApiError extends Error {
@@ -133,9 +160,10 @@ export function getProjectStatus(projectId: string): Promise<ProjectStatus> {
   return fetchJson(`/api/projects/${encodeURIComponent(projectId)}`);
 }
 
-// The second screen asks the same five read-only tools by name. Every query
-// value goes through URLSearchParams, so a symbol or locator that contains
-// `#`, `(` or `->` is not mistaken for part of a URL.
+// A method id carries `(`, `)` and `;`, and a locator carries `#` and `->`, so
+// every query value goes through URLSearchParams — otherwise a `#` in a method
+// id would be read as the URL's own fragment and the request would ask for
+// something else than the caller named.
 function projectUrl(projectId: string, path: string, params: Record<string, string> = {}): string {
   const query = new URLSearchParams(params).toString();
   return `/api/projects/${encodeURIComponent(projectId)}/${path}${query ? `?${query}` : ""}`;
@@ -151,6 +179,8 @@ export function searchSymbols(
     projectUrl(projectId, "symbols", { q: query, offset: String(offset), limit: String(limit) }),
   );
 }
+
+// -- the second screen's five tools ----------------------------------------
 
 export function getClassSource(projectId: string, className: string): Promise<SourceView> {
   return fetchJson(projectUrl(projectId, "source/class", { class_name: className }));
@@ -179,4 +209,22 @@ export function getEvidence(projectId: string, evidenceId: string): Promise<Evid
 
 export function resolveLocator(projectId: string, locator: string): Promise<LocatorResolution> {
   return fetchJson(projectUrl(projectId, "locators/resolve", { locator }));
+}
+
+// -- the third screen's two tools ------------------------------------------
+
+export function findCallers(
+  projectId: string,
+  methodId: string,
+  limit = 50,
+): Promise<CallerView> {
+  return fetchJson(projectUrl(projectId, "callers", { method_id: methodId, limit: String(limit) }));
+}
+
+export function findCallees(
+  projectId: string,
+  methodId: string,
+  limit = 50,
+): Promise<CalleeView> {
+  return fetchJson(projectUrl(projectId, "callees", { method_id: methodId, limit: String(limit) }));
 }

@@ -37,6 +37,8 @@ from dexatlas.mcp.errors import RequestError, unknown_project
 from dexatlas.mcp.schemas import (
     DEFAULT_LIMIT,
     MAX_LIMIT,
+    CalleeView,
+    CallerView,
     EvidenceView,
     LocatorResolution,
     ProjectList,
@@ -46,6 +48,7 @@ from dexatlas.mcp.schemas import (
 )
 from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
+from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 
 # The built front end. `npm run build` writes it; `python -m
@@ -107,6 +110,50 @@ def create_app(analyzer: Analyzer) -> FastAPI:
     # the browser reads the ids from the store and asks `get_evidence` for
     # each one. No field, count or status code is redefined here.
 
+    # -- the third screen: the calls into and out of one method --
+    #
+    # Two endpoints, one per direction, each calling one of the two tools that
+    # answer that question and returning that tool's own shape. What a reader
+    # gets per call site is the caller, the callee, the opcode the call was
+    # read from, the DEX file and the instruction offset, plus the locators —
+    # so the graph is drawn from places, not from an inference.
+    #
+    # A method nobody calls answers with zero counts, not with a 404, because
+    # that is what the tool answers: the workspace was searched and found
+    # nothing. A 404 here would turn "no caller was read" into "this method
+    # does not exist", which is the exact confusion this project exists to
+    # prevent. The `unknown_method` error stays in the contract for the
+    # transports that validate the id shape; these tools do not raise it, and
+    # the workbench does not invent an error the tools do not produce.
+
+    @app.get("/api/projects/{project_id}/callers", response_model=CallerView)
+    def find_callers(
+        project_id: str,
+        method_id: str = Query(
+            ...,
+            description="The method's id, e.g. com.example.Foo.bar(Ljava/lang/String;)V.",
+        ),
+        limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    ) -> CallerView:
+        """Who calls a method, and where in the bytecode each call sits."""
+        return reference_tools.find_callers(analyzer, project_id, method_id, limit=limit)
+
+    @app.get("/api/projects/{project_id}/callees", response_model=CalleeView)
+    def find_callees(
+        project_id: str,
+        method_id: str = Query(
+            ...,
+            description="The method's id, e.g. com.example.Foo.bar(Ljava/lang/String;)V.",
+        ),
+        limit: int = Query(DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
+    ) -> CalleeView:
+        """What a method calls, with the call-site and call-edge counts apart."""
+        return reference_tools.find_callees(analyzer, project_id, method_id, limit=limit)
+
+    # The screen needs the method ids it can ask about, and the tool that
+    # finds them is the one the MCP server exposes: an index hit for a method
+    # carries its canonical id, which is exactly what the two endpoints above
+    # take. So this is the MCP tool's own call, unchanged.
     @app.get("/api/projects/{project_id}/symbols", response_model=SymbolList)
     def search_symbols(
         project_id: str,

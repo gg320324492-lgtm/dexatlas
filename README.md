@@ -196,9 +196,17 @@ DexAtlas can show a workspace in a browser. The workbench is **read-only**
 and sits on the same ten tools the MCP server exposes, called in-process —
 the JSON the browser receives is the shape the MCP server would have
 returned. It is the Phase 2 plan's M4 screen set being built one screen at a
-time: the project dashboard and symbol search / evidence tracing are built
-on this branch but **not released** — a published version does not carry
-them yet.
+time; three screens are built on this branch but **not released** — a published
+version does not carry them yet:
+
+- the **project dashboard**: the projects a workspace holds, each with the
+  backends that took part and the counts the analysis produced;
+- the **search and evidence view**: a query returns indexed symbols, a class or
+  method opens its Java / Smali source, and an evidence record's provenance
+  locators resolve to places inside that analysis;
+- the **cross-reference view** of one method: who calls it and what it calls,
+  drawn from the call sites — the DEX file and the instruction each call was
+  read out of — and walkable by clicking a caller or a callee.
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp --extra demo
@@ -208,10 +216,11 @@ uv run dexatlas-workbench            # serves http://127.0.0.1:8618
 
 The first start builds the front end (npm once); `DEXATLAS_WORKSPACE` points
 it at a workspace, as everywhere else. In the workbench, open a project and
-follow **search & evidence**: a query returns indexed symbols, a class or
-method opens its Java / Smali source, and an evidence record's provenance
-locators resolve to places inside that analysis. The screens, and the
-decisions they were built under:
+follow **search & evidence** or **cross-references**: a query returns indexed
+symbols, a class or method opens its Java / Smali source, an evidence record's
+provenance locators resolve to places inside that analysis, and a method's
+callers and callees are drawn from the call sites they were read from. The
+screens, and the decisions they were built under:
 **[docs/architecture/workbench.md](docs/architecture/workbench.md)**.
 
 ### The agent

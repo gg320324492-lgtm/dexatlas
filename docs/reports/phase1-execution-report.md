@@ -95,7 +95,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
 | `cli/console.py` | 82.4% | 6 / 34 |
-| `tools/base.py` | 84.0% | 30 / 188 |
+| `tools/base.py` | 85.6% | 27 / 188 |
 | `agent/providers/scripted.py` | 85.7% | 6 / 42 |
 | `tools/androguard/adapter.py` | 86.8% | 38 / 288 |
 | `agent/reporter.py` | 87.3% | 13 / 102 |
@@ -220,7 +220,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_sdk_reconciliation.py` | manifest 的 SDK 级别不采信 Apktool 的重建值，从 binary manifest 读回并只补缺、失败照记（manifest.min-sdk 修复新增） |
 | `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 | `test_version_fields.py` | 五个自建 APK 的 versionCode/versionName：源码、入库 yml、真实解码产物与 ManifestInfo 都和二进制 manifest 一致（同源字段排查新增） |
-| `test_workbench.py` | M4 前两屏：列表与状态、符号检索、类/方法源码、证据记录与 locator 解析仍是 MCP 契约的形状；未构建的前端要说明怎么构建 |
+| `test_workbench.py` | M4 前三屏：列表与状态、符号检索与源码、证据记录与 locator 解析、调用关系都仍是 MCP 契约的形状；没有调用者的方法答 0 而不是 404 |
 
 ### 2.2 几类值得注意的测试
 

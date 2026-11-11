@@ -25,7 +25,7 @@ The screens, from the plan, and where they stand:
 | 2 | APK upload and analysis progress | not started |
 | 3 | Package / class / method explorer | **search + source viewer** |
 | 4 | Java & Smali source viewer with source-location links | **source + locator resolution** |
-| 5 | Call graph and cross-reference navigation | not started |
+| 5 | Call graph and cross-reference navigation | **built** |
 | 6 | Agent workspace | not started |
 | 7 | Evidence viewer, separating observations from hypotheses | **records + provenance** |
 | 8 | Benchmark and report export | not started |
@@ -65,8 +65,52 @@ place — those are different facts in `resolve_locator`'s answer.
 
 This screen covers the search, source-reading and evidence-record parts of
 plan screens 3, 4 and 7. It does **not** claim the rest of those screens:
-there is no package tree, no editor component, no call-graph viewer, no
-observation/hypothesis workspace and no export yet.
+there is no package tree, no editor component, no observation/hypothesis
+workspace and no export yet. The call-graph part of screen 5 is the next
+screen, below.
+
+Screen 5 calls `find_callers`, `find_callees`, and `search_symbols` for the method id
+it starts from. A screen that needs more calls more tools; it does not add an
+endpoint that answers differently.
+
+## Screen 5: the calls into and out of one method
+
+`#/projects/{id}/calls` answers two questions about one method, one API call
+per question: `GET /api/projects/{id}/callers?method_id=…` is
+`find_callers` and its `CallerView`, `GET /api/projects/{id}/callees?method_id=…`
+is `find_callees` and its `CalleeView`. A test asserts the response is the
+tool's own `model_dump()` — that is the whole contract claim this screen makes.
+
+**Where the method id comes from.** `find_callers` takes a method id, so the
+screen starts from `search_symbols`: an index hit whose kind is `method`
+carries the method's canonical id, which is exactly the string the two
+cross-reference endpoints take. The reader clicks an id and the analysis is
+asked about the same id the analysis indexed.
+
+**What the view draws.** A three-column graph — the callers, the method asked
+about, the callees — over an SVG the component lays out itself, plus the two
+lists underneath it. The left column and the lists come from the call sites, so
+each carries the opcode, the DEX file and the instruction offset the call was
+read out of; clicking a node re-asks the same two tools about that method, so a
+cross-reference walk is one hop per click rather than a new query shape.
+
+Two things the screen deliberately does not draw:
+
+- **No count on a callee node.** `find_callees` deduplicates its callees and
+  answers no per-callee count; its two counts are totals. Drawing a number
+  beside a callee would put on the screen a number no query re-derives, so a
+  callee node carries the opcode and the totals sit above the graph.
+- **No layout library.** The plan asks for "a lightweight graph viewer", and
+  three columns of labelled boxes over a `pipeline`-free SVG is that. A
+  force-directed layout would add a dependency, and a layout that moves the
+  nodes would make a reader's position on the screen unrelated to anything the
+  analysis says.
+
+**A method nobody calls is a zero, not a 404.** `find_callers` returns
+`call_site_count: 0` for a method no call site names, and the screen shows that
+with the sentence that says what it does and does not mean. Turning it into a
+404 would convert "the analysis read no call into this method" into "this
+method does not exist", and that is the confusion the project exists to prevent.
 
 ## Running it
 
@@ -100,18 +144,27 @@ FastAPI generates.
 ## The front end
 
 React + TypeScript + Vite, under `src/dexatlas/workbench/web/` — the
-technology the plan names for M4. Two decisions worth restating:
+technology the plan names for M4. Three decisions worth restating:
 
 - **The built bundle is not committed.** `web/dist` is regenerable from
   `web/src`, and a generated artifact in the repository is one more thing
   that can quietly describe a tree that no longer exists. `python -m
   dexatlas.workbench` builds it on first start; a machine without npm gets
   told so instead of a silent fallback.
-- **No routing library yet.** Three hash routes — `#/`, `#/projects/{id}`
-  and `#/projects/{id}/search` — are matched in a few lines; the router
-  arrives when a screen needs it. Search query values and provenance
-  locators are always passed through `URLSearchParams`, so a `#`, `(` or
-  `->` inside a citation is not mistaken for part of a URL.
+- **No routing library yet.** The hash routes — `#/`, `#/projects/{id}`,
+  `#/projects/{id}/search` and `#/projects/{id}/calls` — are matched in a few
+  lines; the router arrives when a screen needs it. Search query values and
+  provenance locators are always passed through `URLSearchParams`, so a `#`,
+  `(` or `->` inside a citation is not mistaken for part of a URL.
+- **No graph library either.** Screen 5 lays out its three columns itself and
+  draws its edges in an SVG, with the nodes as HTML links over it. The plan
+  asks for "a lightweight graph viewer", and that is what this is: a
+  force-directed layout would add a dependency, and a layout that moves nodes
+  around would make where a reader sees a method unrelated to anything the
+  analysis says. The nodes are HTML rather than SVG shapes because an `<a>` in
+  the SVG namespace is a different element from an `<a>` in HTML, and engines
+  disagree about whether clicking one navigates — a node a reader cannot click
+  is a cross-reference they cannot follow.
 
 For working on the front end itself:
 
@@ -136,3 +189,10 @@ locator resolves to its place inside that analysis while a locator outside
 it says it did not resolve. The unknown-project answers of the five tools
 are kept as they are, and the front end is served when built and says how
 to build it when it is not.
+
+The third screen's tests are in the same file: the callers and the callees
+the browser gets are the MCP contract's shapes unchanged — asserted by
+comparing the response against the tool's own `model_dump()` — the limit is
+bounded like the MCP tool's is, a method nobody calls answers with zero
+counts rather than a 404, and the id the index search offers is the id the
+cross-reference answers about.

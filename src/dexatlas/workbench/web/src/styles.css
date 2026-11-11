@@ -351,3 +351,145 @@ ul.locators li {
 .record {
   margin-top: 0.9rem;
 }
+
+/* The call-graph screen */
+
+ul.targets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.targets li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+/* The graph scrolls rather than shrinks: a method with many callers is wider
+   than the panel, and squashing it would make the labels unreadable, which is
+   the one thing a cross-reference view must not do. */
+.graph-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.4rem;
+}
+
+.graph-wrap {
+  position: relative;
+}
+
+.graph-edges {
+  position: absolute;
+  inset: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The nodes are HTML links laid over the SVG, so that a node is a link in the
+   one sense every browser agrees on. */
+.gnode {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  padding: 0 0.6rem;
+  background: #1d252e;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.gnode:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+
+.gnode.focal {
+  background: #22303d;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.node-label {
+  font: 0.8rem/1.2 Consolas, "Cascadia Mono", monospace;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gnode.focal .node-label {
+  color: var(--accent);
+}
+
+.node-count {
+  color: var(--muted);
+  font: 0.78rem/1.2 Consolas, "Cascadia Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.node-kind {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.graph-edges .edge {
+  fill: none;
+  stroke-width: 1.4;
+}
+
+.graph-edges .edge.in {
+  stroke: var(--warn);
+}
+
+.graph-edges .edge.out {
+  stroke: var(--ok);
+}
+
+.graph-edges .arrow.in {
+  fill: var(--warn);
+}
+
+.graph-edges .arrow.out {
+  fill: var(--ok);
+}
+
+table.sites {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  margin-top: 0.5rem;
+}
+
+table.sites th {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+}
+
+table.sites td {
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+table.sites th.num,
+table.sites td.num {
+  text-align: right;
+}
