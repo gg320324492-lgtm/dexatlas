@@ -198,3 +198,156 @@ ul.gaps {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+
+/* The search / source / evidence screen */
+
+.row-links {
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.data-notice {
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-left: 2px solid var(--line);
+  padding-left: 0.8rem;
+}
+
+.search-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.8rem;
+}
+
+.search-form input {
+  flex: 1 1 auto;
+  min-width: 8rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+}
+
+button {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-align: left;
+}
+
+.link-button:hover {
+  border: none;
+  text-decoration: underline;
+}
+
+ul.symbols,
+ul.evidence-list,
+ul.locators {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+ul.symbols li,
+ul.evidence-list li,
+ul.locators li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.kind {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.detail {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.source {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  padding: 0.7rem 0.85rem;
+  overflow: auto;
+  max-height: 28rem;
+  font: 0.85rem/1.45 Consolas, "Cascadia Mono", monospace;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.provenance {
+  margin-top: 0.9rem;
+}
+
+.provenance h4,
+.record h4 {
+  margin: 0.3rem 0 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.locator {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.resolution {
+  flex-basis: 100%;
+  margin: 0.3rem 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+}
+
+.resolution p {
+  margin: 0 0 0.4rem;
+}
+
+.evidence-button {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+}
+
+.evidence-button.selected {
+  border-color: var(--accent);
+}
+
+.evidence-summary {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.record {
+  margin-top: 0.9rem;
+}

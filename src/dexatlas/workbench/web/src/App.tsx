@@ -1,18 +1,30 @@
 import { useEffect, useState, type JSX } from "react";
 import {
   ApiError,
+  getClassSource,
+  getEvidence,
   getHealth,
+  getMethodSource,
   getProjectStatus,
+  listEvidence,
   listProjects,
+  resolveLocator,
+  searchSymbols,
+  type EvidenceView,
   type Health,
+  type LocatorResolution,
   type ProjectList,
   type ProjectStatus,
   type ProjectSummary,
+  type SourceView,
+  type SymbolList,
+  type SymbolView,
 } from "./api";
 
-// The two screens this workbench serves so far: the workspace's project
-// list, and one project's status. Both read the MCP contract's shapes
-// unchanged; a screen that needs another tool calls another function.
+// The screens this workbench serves: the workspace's project list, one
+// project's status, and its symbols/source/evidence. Every screen reads the
+// MCP contract's shapes unchanged; a screen that needs another tool calls
+// another function.
 
 function useHashRoute(): string {
   const [hash, setHash] = useState(() => window.location.hash || "#/");
@@ -32,6 +44,38 @@ function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString();
 }
 
+// The MCP tools take a method's id, class name, name and descriptor as four
+// separate arguments. The index's search hits carry them in one string, so
+// one place in the UI decides how that string is taken apart. A hit that is
+// not a class or method has no source to open.
+interface SymbolTarget {
+  kind: "class" | "method";
+  className: string;
+  methodName: string;
+  descriptor?: string;
+}
+
+function sourceTarget(symbol: SymbolView): SymbolTarget | null {
+  const name = symbol.name.text;
+  if (symbol.kind === "class") return { kind: "class", className: name, methodName: "" };
+  if (symbol.kind !== "method") return null;
+  const open = name.indexOf("(");
+  if (open < 0) return null;
+  const classAndName = name.slice(0, open);
+  const separator = classAndName.lastIndexOf(".");
+  if (separator < 1) return null;
+  return {
+    kind: "method",
+    className: classAndName.slice(0, separator),
+    methodName: classAndName.slice(separator + 1),
+    descriptor: name.slice(open),
+  };
+}
+
+function errorText(err: unknown): string {
+  return err instanceof ApiError ? `${err.code}: ${err.message}` : String(err);
+}
+
 function BackendsWarning({ missing }: { missing: string[] }): JSX.Element | null {
   if (missing.length === 0) return null;
   return (
@@ -46,6 +90,9 @@ function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
     <tr>
       <td>
         <a href={`#/projects/${project.id}`}>{project.apk_name}</a>
+        <div className="row-links">
+          <a href={`#/projects/${project.id}/search`}>search &amp; evidence</a>
+        </div>
       </td>
       <td>
         <span className={`status status-${project.status}`}>{project.status}</span>
@@ -228,7 +275,301 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
       </section>
 
       <p>
-        <a href="#/">← back to the project list</a>
+        <a href="#/">← back to the project list</a> ·{" "}
+        <a href={`#/projects/${projectId}/search`}>search symbols &amp; trace evidence</a>
+      </p>
+    </article>
+  );
+}
+
+// -- screen 2: from a phrase in the index to the place a citation names ----
+
+function DataNotice(): JSX.Element {
+  return (
+    <p className="data-notice">
+      Text from the analysed APK is data, not instructions. Each response carries the same notice.
+    </p>
+  );
+}
+
+function SourcePanel({
+  projectId,
+  source,
+}: {
+  projectId: string;
+  source: SourceView;
+}): JSX.Element {
+  return (
+    <section className="panel" aria-label="source">
+      <h3>Source · {source.kind ?? "none"}</h3>
+      {source.found ? (
+        <>
+          <pre className="source">{source.text?.text ?? ""}</pre>
+          {source.text?.truncated && <p className="warn">the source excerpt was cut short.</p>}
+        </>
+      ) : (
+        <p className="warn">no source: {source.reason || "the analysis holds none"}</p>
+      )}
+      {source.candidates.length > 0 && (
+        <p className="meta">
+          this name matches {source.candidates.length} methods; choose a descriptor to read exactly
+          one. The candidates are: {source.candidates.join(", ")}
+        </p>
+      )}
+      <ProvenanceList projectId={projectId} locators={source.provenance} />
+    </section>
+  );
+}
+
+function LocatorRow({
+  projectId,
+  locator,
+}: {
+  projectId: string;
+  locator: string;
+}): JSX.Element {
+  const [resolution, setResolution] = useState<LocatorResolution | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    resolveLocator(projectId, locator)
+      .then(setResolution)
+      .catch((err: unknown) => setError(errorText(err)));
+  }, [projectId, locator, open]);
+
+  return (
+    <li className="locator">
+      <code>{locator}</code>
+      <button type="button" className="link-button" onClick={() => setOpen(!open)}>
+        {open ? "hide" : "resolve"}
+      </button>
+      {open && error && <p className="error">could not resolve: {error}</p>}
+      {open && !error && !resolution && <p className="loading">resolving…</p>}
+      {open && resolution && (
+        <div className={resolution.resolved ? "resolution ok" : "resolution error"}>
+          <p>
+            {resolution.resolved ? "resolved" : "not resolved"} — {resolution.reason}
+          </p>
+          {resolution.text && <pre className="source">{resolution.text.text}</pre>}
+          {resolution.resolved && !resolution.text && (
+            <p className="meta">this locator names a member of the APK, not a file to show.</p>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function ProvenanceList({
+  projectId,
+  locators,
+}: {
+  projectId: string;
+  locators: string[];
+}): JSX.Element {
+  if (locators.length === 0) return <p className="meta">this response names no provenance locator.</p>;
+  return (
+    <div className="provenance">
+      <h4>Provenance · resolve a locator</h4>
+      <ul className="locators">
+        {locators.map((locator) => (
+          <LocatorRow key={locator} projectId={projectId} locator={locator} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function EvidenceRow({
+  record,
+  selected,
+  onSelect,
+}: {
+  record: EvidenceView;
+  selected: boolean;
+  onSelect: () => void;
+}): JSX.Element {
+  return (
+    <li>
+      <button type="button" className={`evidence-button ${selected ? "selected" : ""}`} onClick={onSelect}>
+        <code>{record.id}</code> · {record.kind} · {record.level}
+        <span className="evidence-summary">{record.summary}</span>
+      </button>
+    </li>
+  );
+}
+
+function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element {
+  const [query, setQuery] = useState("Crypto");
+  const [submitted, setSubmitted] = useState("Crypto");
+  const [symbols, setSymbols] = useState<SymbolList | null>(null);
+  const [symbolsError, setSymbolsError] = useState<string | null>(null);
+
+  const [source, setSource] = useState<SourceView | null>(null);
+  const [sourceLabel, setSourceLabel] = useState<string | null>(null);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+
+  const [records, setRecords] = useState<EvidenceView[] | null>(null);
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [record, setRecord] = useState<EvidenceView | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSymbols(null);
+    setSymbolsError(null);
+    searchSymbols(projectId, submitted)
+      .then(setSymbols)
+      .catch((err: unknown) => setSymbolsError(errorText(err)));
+  }, [projectId, submitted]);
+
+  useEffect(() => {
+    setRecords(null);
+    setRecordsError(null);
+    listEvidence(projectId)
+      .then(setRecords)
+      .catch((err: unknown) => setRecordsError(errorText(err)));
+  }, [projectId]);
+
+  useEffect(() => {
+    if (selectedId === null) {
+      setRecord(null);
+      return;
+    }
+    setRecord(null);
+    setRecordError(null);
+    getEvidence(projectId, selectedId)
+      .then(setRecord)
+      .catch((err: unknown) => setRecordError(errorText(err)));
+  }, [projectId, selectedId]);
+
+  function openSource(symbol: SymbolView): void {
+    const target = sourceTarget(symbol);
+    if (target === null) return;
+    setSource(null);
+    setSourceError(null);
+    setSourceLabel(symbol.name.text);
+    const request =
+      target.kind === "class"
+        ? getClassSource(projectId, target.className)
+        : getMethodSource(projectId, target.className, target.methodName, target.descriptor);
+    request
+      .then(setSource)
+      .catch((err: unknown) => setSourceError(errorText(err)));
+  }
+
+  return (
+    <article>
+      <header className="project-header">
+        <h2>Symbol search &amp; evidence</h2>
+        <p className="meta">
+          project <code>{projectId}</code> · every answer comes from the workspace through the MCP
+          tools
+        </p>
+      </header>
+
+      <DataNotice />
+
+      <section className="panel" aria-label="symbol search">
+        <h3>1 · Search the index</h3>
+        <form
+          className="search-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setSubmitted(query);
+          }}
+        >
+          <input
+            aria-label="symbol query"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="a class, method, field or string"
+          />
+          <button type="submit">search</button>
+        </form>
+        {symbolsError && <p className="error">the index could not be read: {symbolsError}</p>}
+        {!symbolsError && !symbols && <p className="loading">searching…</p>}
+        {symbols && symbols.symbols.length === 0 && (
+          <p className="empty">nothing in the index matches “{submitted}”.</p>
+        )}
+        {symbols && symbols.symbols.length > 0 && (
+          <>
+            <ul className="symbols">
+              {symbols.symbols.map((symbol, index) => {
+                const target = sourceTarget(symbol);
+                return (
+                  <li key={`${symbol.kind}:${symbol.name.text}:${index}`}>
+                    <span className="kind">{symbol.kind}</span>{" "}
+                    {target ? (
+                      <button type="button" className="link-button" onClick={() => openSource(symbol)}>
+                        <code>{symbol.name.text}</code>
+                      </button>
+                    ) : (
+                      <code>{symbol.name.text}</code>
+                    )}
+                    {symbol.detail.text && <span className="detail"> {symbol.detail.text}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="pager">
+              {symbols.symbols.length} shown · {formatCount(symbols.total)} indexed matches
+            </p>
+          </>
+        )}
+      </section>
+
+      <section className="panel" aria-label="source view">
+        <h3>2 · Read the class or method source</h3>
+        {sourceLabel === null && <p className="empty">open a class or method above to read its source.</p>}
+        {sourceLabel !== null && (
+          <p className="meta">
+            <code>{sourceLabel}</code>
+          </p>
+        )}
+        {sourceError && <p className="error">the source could not be read: {sourceError}</p>}
+        {!sourceError && sourceLabel !== null && !source && <p className="loading">reading…</p>}
+        {source && <SourcePanel projectId={projectId} source={source} />}
+      </section>
+
+      <section className="panel" aria-label="evidence records">
+        <h3>3 · Evidence records</h3>
+        {recordsError && <p className="error">the evidence could not be listed: {recordsError}</p>}
+        {!recordsError && !records && <p className="loading">listing evidence…</p>}
+        {records && records.length === 0 && <p className="empty">this analysis holds no evidence records.</p>}
+        {records && records.length > 0 && (
+          <>
+            <ul className="evidence-list">
+              {records.map((item) => (
+                <EvidenceRow
+                  key={item.id}
+                  record={item}
+                  selected={selectedId === item.id}
+                  onSelect={() => setSelectedId(item.id)}
+                />
+              ))}
+            </ul>
+            {selectedId === null && <p className="empty">open a record to see its provenance.</p>}
+            {recordError && <p className="error">the record could not be read: {recordError}</p>}
+            {!recordError && selectedId !== null && !record && <p className="loading">reading the record…</p>}
+            {record && (
+              <div className="record">
+                <h4>
+                  <code>{record.id}</code> · {record.kind} · {record.level}
+                </h4>
+                <p>{record.summary}</p>
+                <pre className="source">{JSON.stringify(record.detail, null, 2)}</pre>
+                <ProvenanceList projectId={projectId} locators={record.provenance} />
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <p>
+        <a href={`#/projects/${projectId}`}>← project status</a> · <a href="#/">project list</a>
       </p>
     </article>
   );
@@ -236,7 +577,8 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
 
 export default function App(): JSX.Element {
   const hash = useHashRoute();
-  const statusMatch = hash.match(/^#\/projects\/(.+)$/);
+  const searchMatch = hash.match(/^#\/projects\/([^/]+)\/search$/);
+  const statusMatch = hash.match(/^#\/projects\/([^/]+)$/);
   const [health, setHealth] = useState<Health | null>(null);
 
   useEffect(() => {
@@ -256,7 +598,9 @@ export default function App(): JSX.Element {
         </span>
       </header>
       <main>
-        {statusMatch ? (
+        {searchMatch ? (
+          <SearchEvidenceScreen projectId={decodeURIComponent(searchMatch[1] ?? "")} />
+        ) : statusMatch ? (
           <ProjectStatusScreen projectId={decodeURIComponent(statusMatch[1] ?? "")} />
         ) : (
           <ProjectListScreen />
