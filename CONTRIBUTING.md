@@ -8,6 +8,7 @@ what we expect from a pull request, and — importantly — what we will not acc
 - [Hard rules](#hard-rules)
 - [Development setup](#development-setup)
 - [Running the checks](#running-the-checks)
+- [M3 comparison gate](#m3-comparison-gate)
 - [Adding an analysis backend](#adding-an-analysis-backend)
 - [Pull request expectations](#pull-request-expectations)
 - [Issue reports](#issue-reports)
@@ -63,6 +64,18 @@ analysis engine — those need the tool installed and are excluded from the fast
 
 First-party code carries an **80% coverage target**. New code without tests will be asked
 for them.
+
+### M3 comparison gate
+
+The `m3-comparison` CI job guards the M3 harness against two failures: a metric formula
+or reported figure that no longer matches the committed traces, and a harness that no
+longer runs its three configurations. It recomputes all eight figures in
+`docs/benchmarks/comparison.md`, regenerates that report exactly (with platform line
+endings normalised), runs
+`tests/test_comparison_metrics.py::test_committed_traces_regenerate_the_published_report`,
+and checks that `--limit 2` produces two traces each for A, B and DexAtlas. JADX and
+Apktool are explicitly disabled for the smoke run; the analysis records those gaps
+rather than failing.
 
 ## Adding an analysis backend
 

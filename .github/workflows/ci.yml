@@ -228,6 +228,142 @@ jobs:
       - name: Enforce coverage threshold
         run: uv run coverage report --fail-under=80
 
+  m3-comparison:
+    name: M3 comparison stays reproducible
+    runs-on: ubuntu-latest
+    # A two-question smoke run does not need the Java tools: Androguard comes
+    # from the `analysis` extra, and a missing JADX/Apktool is a recorded
+    # ToolError rather than an exception. Disabling both paths keeps this job
+    # independent of backend downloads, JDKs and version pins; the test jobs
+    # above already cover the configurations where those tools are installed.
+    env:
+      # An empty pin disables PATH discovery outright, so a leftover jadx on a
+      # runner cannot make this backend-free configuration a different one.
+      DEXATLAS_JADX_PATH: ""
+      DEXATLAS_APKTOOL_JAR: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Keep the uv-run processes' temporary files and every harness artifact
+      # beside the workspace, as tests/conftest.py does for the test suite.
+      - name: Keep generated files in .scratch
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
+          {
+            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
+          } >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
+
+      # Gate one: the published table is the CLI's recomputed metrics, not a
+      # set of numbers someone typed. Parse the report's eight rows so a change
+      # to one formula cannot pass just because another figure still appears.
+      - name: Recompute the published figures
+        run: |
+          set -euo pipefail
+          uv run --no-sync python benchmarks/comparison/run.py \
+            --input docs/benchmarks/comparison-traces.json --metrics \
+            > .scratch/comparison-metrics.json
+          uv run --no-sync python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from benchmarks.comparison.metrics import METRIC_NAMES, format_value
+
+          metrics = json.loads(
+              Path(".scratch/comparison-metrics.json").read_text(encoding="utf-8")
+          )
+          report = Path("docs/benchmarks/comparison.md").read_text(encoding="utf-8")
+          systems = ("A", "B", "DexAtlas")
+          assert set(metrics) == set(systems), sorted(metrics)
+          header: list[str] = []
+          rows: dict[str, list[str]] = {}
+          for line in report.splitlines():
+              cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+              if cells == ["Metric", *systems]:
+                  header = cells[1:]
+              if len(cells) == 4 and cells[0].startswith("`") and cells[0].endswith("`"):
+                  rows[cells[0].strip("`")] = cells[1:]
+          assert header == list(systems), header
+          assert tuple(rows) == METRIC_NAMES, tuple(rows)
+          for metric in METRIC_NAMES:
+              expected = [format_value(metric, metrics[name][metric]) for name in systems]
+              assert rows[metric] == expected, (metric, rows[metric], expected)
+          print("the eight published metric rows match the committed trace")
+          PY
+
+      # A regenerated report has to be identical to the checked-in one, and
+      # the suite's own regression test states the same contract. Without both,
+      # a hand-edited report or a trace/report pair that drifted apart could
+      # survive a green metrics command. read_text normalises the platform's
+      # line endings; Windows writes CRLF, while the checkout and Linux CI use LF.
+      - name: The published report regenerates from the committed traces
+        run: |
+          set -euo pipefail
+          uv run --no-sync python benchmarks/comparison/run.py \
+            --input docs/benchmarks/comparison-traces.json \
+            --report .scratch/comparison.md
+          uv run --no-sync python - <<'PY'
+          import difflib
+          from pathlib import Path
+
+          published = Path("docs/benchmarks/comparison.md").read_text(encoding="utf-8")
+          generated = Path(".scratch/comparison.md").read_text(encoding="utf-8")
+          if published != generated:
+              print("".join(difflib.unified_diff(
+                  published.splitlines(keepends=True),
+                  generated.splitlines(keepends=True),
+                  fromfile="published",
+                  tofile="regenerated",
+              )))
+              raise SystemExit("the published report does not regenerate exactly")
+          print("the published report regenerates from the committed trace")
+          PY
+          uv run --no-sync pytest -q \
+            tests/test_comparison_metrics.py::test_committed_traces_regenerate_the_published_report
+
+      # Gate two: the harness still runs end to end. An exit code of 0 is not
+      # enough -- a smoke run that silently drops one configuration would
+      # otherwise pass, so count the traces for each of A, B and DexAtlas.
+      - name: Smoke-test the three configurations
+        run: |
+          set -euo pipefail
+          uv run --no-sync python benchmarks/comparison/run.py \
+            --limit 2 --output .scratch/comparison-smoke
+          uv run --no-sync python - <<'PY'
+          import json
+          from pathlib import Path
+
+          output = Path(".scratch/comparison-smoke")
+          document = json.loads((output / "comparison.json").read_text(encoding="utf-8"))
+          traces = json.loads((output / "traces.json").read_text(encoding="utf-8"))["traces"]
+          systems = ("A", "B", "DexAtlas")
+          assert document["kind"] == "m3_comparison", document["kind"]
+          assert document["task_count"] == 2, document["task_count"]
+          assert document["traces"] == traces, "comparison.json and traces.json disagree"
+          assert len(traces) == 6, len(traces)
+          assert {trace["system"] for trace in traces} == set(systems)
+          for system in systems:
+              references = sorted(
+                  trace["reference"] for trace in traces if trace["system"] == system
+              )
+              assert references == ["q001", "q002"], (system, references)
+          failed = sorted(
+              (trace["system"], trace["reference"], trace["result"]["error"])
+              for trace in traces
+              if trace["result"]["failed"] or trace["result"]["error"]
+          )
+          assert not failed, failed
+          print("two questions x three configurations: six usable traces")
+          PY
+
   docker:
     name: Docker image builds
     runs-on: ubuntu-latest
