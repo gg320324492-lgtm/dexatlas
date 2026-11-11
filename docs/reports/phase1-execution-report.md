@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1229<!--/fig-->（<!--fig:tests.fast-->1091<!--/fig--> 快 + <!--fig:tests.slow-->138<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1239<!--/fig-->（<!--fig:tests.fast-->1096<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->91.1%<!--/fig-->**（<!--fig:coverage.covered-->5533<!--/fig-->/<!--fig:coverage.total-->6074<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -143,9 +143,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1091<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->138<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1229<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1096<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->143<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->1239<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -220,6 +220,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_comparison_metrics.py` | M3 对比：指标的分母不能凭空出现，被测系统看不到答案，数字能从落盘 trace 重算 |
 | `test_sdk_reconciliation.py` | manifest 的 SDK 级别不采信 Apktool 的重建值，从 binary manifest 读回并只补缺、失败照记（manifest.min-sdk 修复新增） |
 | `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
+| `test_version_fields.py` | 五个自建 APK 的 versionCode/versionName：源码、入库 yml、真实解码产物与 ManifestInfo 都和二进制 manifest 一致（同源字段排查新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -337,7 +338,11 @@ Rich 的 markup 错误只在 print 时发生。
 **根因：** apktool 解码时会把 versionCode/versionName/uses-sdk 从 manifest
 移到自己的 `apktool.yml`。只读 manifest 必然读不到。
 
-**修复：** 从 apktool.yml 补齐（manifest 自身的值优先）。
+**修复：** 从 apktool.yml 补齐（manifest 自身的值优先）。后来的 SDK 修复发现
+`apktool.yml` 的 `sdkInfo` 可能不是 APK 二进制 manifest 的值，因此 SDK 改为从
+binary manifest 读回；`tests/test_version_fields.py` 对五个自建 APK 的
+`versionInfo` 逐一核对（包括 Apktool 2.11.1 的真实解码产物），确认两个版本字段
+没有同源失真，保留版本字段的缺口补齐。
 
 ### 3.6 轻微：一个 flaky 测试 🟢
 
@@ -836,10 +841,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1229<!--/fig--> 个：<!--fig:tests.fast-->1091<!--/fig--> 快 + <!--fig:tests.slow-->138<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1239<!--/fig--> 个：<!--fig:tests.fast-->1096<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->91.1%<!--/fig-->（<!--fig:coverage.covered-->5533<!--/fig-->/<!--fig:coverage.total-->6074<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1228<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1239<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1033,10 +1038,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:90c8f50e1d1131e1897ba736f51583e8c00eae3771e53fd752b3e0c84e0141ff",
+  "source_fingerprint": "sha256:cb37af17f612a1582952e0d71c29a7b4d48f6d8e1ed933553c14fe80696938e4",
   "suite": {
-    "failed": 1,
-    "passed": 1228,
+    "failed": 0,
+    "passed": 1239,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1044,8 +1049,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1091,
-    "slow": 138,
-    "total": 1229
+    "fast": 1096,
+    "slow": 143,
+    "total": 1239
   }
 }-->
