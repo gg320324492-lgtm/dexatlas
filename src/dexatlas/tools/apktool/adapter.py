@@ -415,11 +415,19 @@ def _parse_bool(value: str | None) -> bool | None:
 
 
 def _merge_build_metadata(info: ManifestInfo, apktool_yml: Path) -> None:
-    """Fill in version and SDK values that Apktool relocated to ``apktool.yml``.
+    """Fill in version values that Apktool relocated to ``apktool.yml``.
 
-    Apktool's decoded manifest omits ``versionCode``, ``versionName`` and the
-    ``uses-sdk`` block, keeping them in its own build file instead. Values already
-    present in the manifest win, so this only fills gaps.
+    Apktool's decoded manifest omits ``versionCode`` and ``versionName``, keeping
+    them in its own build file instead. Values already present in the manifest win,
+    so this only fills gaps.
+
+    The SDK levels are deliberately not read from here. Apktool writes its own
+    ``sdkInfo`` into that file, and what it writes is not what the APK's bytes
+    say: decoding ``examples/wide-app/wide.apk`` — whose binary manifest carries
+    ``minSdkVersion=24`` — produces an ``sdkInfo`` of 25. A value that is not the
+    APK's own answer must not be merged into what the manifest "says". The levels
+    are read from the binary manifest itself, by the Androguard backend, in the
+    pipeline.
     """
     if not apktool_yml.is_file():
         return
@@ -439,13 +447,6 @@ def _merge_build_metadata(info: ManifestInfo, apktool_yml: Path) -> None:
             info.version_code = _as_text(version.get("versionCode"))
         if info.version_name is None:
             info.version_name = _as_text(version.get("versionName"))
-
-    sdk = data.get("sdkInfo")
-    if isinstance(sdk, dict):
-        if info.min_sdk is None:
-            info.min_sdk = _as_text(sdk.get("minSdkVersion"))
-        if info.target_sdk is None:
-            info.target_sdk = _as_text(sdk.get("targetSdkVersion"))
 
 
 def _as_text(value: object) -> str | None:

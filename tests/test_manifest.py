@@ -180,12 +180,21 @@ def test_version_is_recovered_from_apktool_yml(apktool: ApktoolBackend, tmp_path
     assert manifest.version_name == "1.0"
 
 
-def test_sdk_levels_are_recovered_from_apktool_yml(apktool: ApktoolBackend, tmp_path: Path) -> None:
+def test_sdk_levels_are_not_taken_from_apktool_yml(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """Apktool's ``sdkInfo`` is not the APK's own answer.
+
+    Apktool writes rebuilt SDK levels into ``apktool.yml``, and what it writes
+    differs from what the APK's binary manifest carries — decoding
+    ``examples/wide-app/wide.apk``, whose binary manifest declares
+    ``minSdkVersion=24``, produces an ``sdkInfo`` of 25. Merging those numbers
+    into the manifest reported an SDK level the APK never declared; the levels
+    are read from the binary manifest itself, in the pipeline.
+    """
     manifest, _ = apktool.read_manifest(_decode_dir(tmp_path, STRIPPED_MANIFEST, APKTOOL_YML))
 
     assert manifest is not None
-    assert manifest.min_sdk == "9"
-    assert manifest.target_sdk == "16"
+    assert manifest.min_sdk is None
+    assert manifest.target_sdk is None
 
 
 def test_manifest_values_win_over_apktool_yml(apktool: ApktoolBackend, tmp_path: Path) -> None:
