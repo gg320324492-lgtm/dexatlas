@@ -59,9 +59,11 @@ catches the answer that names a plausible caller that the Smali does not.
 
 ---
 
-## 2. The ten categories
+## 2. The eleven categories
 
-The categories are the ones the Phase 2 plan names for M3.
+The categories are the ones the Phase 2 plan names for M3, plus the one
+section 10.3 asked for: `where-source`, whose questions are about *where* an
+answer was found rather than what it was.
 
 | Category | What it asks | Tasks |
 |---|---|---|
@@ -74,12 +76,13 @@ The categories are the ones the Phase 2 plan names for M3.
 | `ambiguity` | Reading code that does not say plainly what it does | 4 |
 | `partial` | What the analysis says when a backend is not there | 8 |
 | `provenance` | Checking where a piece of evidence says it came from | 6 |
+| `where-source` | Where an answer was found: the file, the DEX, the method that holds it | 11 |
 | `unanswerable` | A question the analysis cannot answer, and must not pretend to | 11 |
 
-**81 tasks in all.** They are spread over the five samples — 39 ask about the
-demo application, 14 about the multidex sample, 11 about the obfuscated one,
-9 about the strings sample and 8 about the wide one — and over the three
-backend configurations: 69 are asked with every backend installed, 8 with the
+**92 tasks in all.** They are spread over the five samples — 42 ask about the
+demo application, 15 about the multidex sample, 13 about the obfuscated one,
+12 about the strings sample and 10 about the wide one — and over the three
+backend configurations: 78 are asked with every backend installed, 10 with the
 decompiler absent and 4 with the APK reader absent.
 
 ### 2.1 On "method overloads"
@@ -171,7 +174,7 @@ sentence naming something; for a task that expects evidence, no evidence at
 all — and refuses to run if a task accepts its own wrong answer:
 
 ```
-Self-check: every task rejects an answer that is wrong (81 task(s) checked).
+Self-check: every task rejects an answer that is wrong (92 task(s) checked).
 ```
 
 The check runs before anything is analysed, because a rule that has stopped
@@ -260,10 +263,11 @@ Per-category tally
   ambiguity         4/4
   partial           8/8
   provenance        6/6
+  where-source      11/11
   unanswerable      11/11
 
-Total: 77/81 passed (95.1%)
-Self-check: every task rejects an answer that is wrong (81 task(s) checked).
+Total: 88/92 passed (95.7%)
+Self-check: every task rejects an answer that is wrong (92 task(s) checked).
 ```
 
 The numbers are deterministic. A project's id is the APK's SHA-256, so the
@@ -318,9 +322,10 @@ order, and `smali/` sorts before `smali_classes2/`.
 
 ## 6. What the run measures today
 
-77 of 81 tasks pass. **The four that fail are the SDK-level tasks of section
+88 of 92 tasks pass. **The four that fail are the SDK-level tasks of section
 4.1**, and they fail for one reason: the analysis reports Apktool's number
-where the APK's number is the fact.
+where the APK's number is the fact. The eleven `where-source` tasks of the
+section 10.3 addition all pass, in the configurations they name.
 
 | Task | Expected | Reported |
 |---|---|---|
@@ -471,3 +476,8 @@ Adding a task needs no change anywhere else. The runner finds it through
    configurations are covered by tasks today. A task set for a model with
    source retrieval would need questions about *where* the answer was found,
    not only what it was.
+   **Done** — the `where-source` category carries eleven of them, written
+   against the same five samples. What is not done is the comparison itself:
+   the 81 tasks measured in `comparison-traces.json` are now a subset of the
+   set, and that measurement needs to be re-run before any of the metrics are
+   quoted against the full 92.
