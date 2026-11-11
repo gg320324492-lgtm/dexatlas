@@ -103,6 +103,12 @@ def parse_answer(content: str) -> ParsedAnswer:
     — it is kept, and it is recorded as a conclusion with nothing behind it,
     because "the model said something and it named no evidence" is a fact
     about the task that a reader is entitled to.
+
+    A model that wrote prose and *then* the JSON document is a model that
+    answered. Its document is found inside its answer rather than beside it,
+    because the conclusions in it are the answer and the prose around them
+    is the model thinking out loud. The prose is kept as ``unparsed`` so that
+    a reader still sees it.
     """
     text = content.strip()
     if not text:
@@ -112,17 +118,19 @@ def parse_answer(content: str) -> ParsedAnswer:
     try:
         document = json.loads(text)
     except json.JSONDecodeError:
-        return ParsedAnswer(
-            conclusions=(
-                Conclusion(
-                    statement=(
-                        "the model answered without naming any evidence: "
-                        f"{text[:MAX_QUOTED_ANSWER]}"
-                    )
+        document = _document_inside(text)
+        if document is None:
+            return ParsedAnswer(
+                conclusions=(
+                    Conclusion(
+                        statement=(
+                            "the model answered without naming any evidence: "
+                            f"{text[:MAX_QUOTED_ANSWER]}"
+                        )
+                    ),
                 ),
-            ),
-            unparsed=text,
-        )
+                unparsed=text,
+            )
 
     if not isinstance(document, dict):
         return ParsedAnswer(
@@ -157,7 +165,50 @@ def parse_answer(content: str) -> ParsedAnswer:
         limitations=tuple(str(item) for item in limitations)
         if isinstance(limitations, list)
         else (),
+        unparsed=_prose_around(text),
     )
+
+
+def _prose_around(text: str) -> str:
+    """The text that is not the answer document.
+
+    An answer that is exactly the document has no prose around it, and the
+    reader gets an empty string rather than the document twice.
+    """
+    try:
+        json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    return ""
+
+
+def _document_inside(text: str) -> dict[str, Any] | None:
+    """The answer document inside a longer answer, if there is one.
+
+    A model asked for JSON and nothing else sometimes writes its reasoning
+    first and the document after it. The document is found by scanning for
+    the first ``{`` that opens an object which parses as a document with a
+    ``conclusions`` list.
+
+    The scan is a parse, not a guess: a brace that does not lead to such a
+    document is skipped, and the text that is not JSON is left alone.
+    """
+    decoder = json.JSONDecoder()
+    best: dict[str, Any] | None = None
+    for index, character in enumerate(text):
+        if character != "{":
+            continue
+        try:
+            document, _ = decoder.raw_decode(text, index)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(document, dict):
+            continue
+        if not isinstance(document.get("conclusions"), list):
+            continue
+        if best is None or len(json.dumps(document)) > len(json.dumps(best)):
+            best = document
+    return best
 
 
 def _conclusion(entry: Any) -> Conclusion:

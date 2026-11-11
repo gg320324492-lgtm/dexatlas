@@ -72,7 +72,7 @@ class RetrievalTool(Protocol):
 
     def description(self, name: str) -> str: ...
 
-    def tool_for(self, keyword: str, attempt: int) -> str: ...
+    def tool_for(self, question: Any, keyword: str, attempt: int) -> str: ...
 
     def call(self, name: str, question: Any, keyword: str) -> Any: ...
 
@@ -95,7 +95,7 @@ class SourceTextTools:
     def description(self, name: str) -> str:
         return "Search the sample's decompiled source and smali text for a phrase."
 
-    def tool_for(self, keyword: str, attempt: int) -> str:
+    def tool_for(self, question: Any, keyword: str, attempt: int) -> str:
         return "search_source_text"
 
     def call(self, name: str, question: Any, keyword: str) -> dict[str, Any]:
@@ -128,9 +128,38 @@ class StructuredTools:
     """配置 B:结构化符号搜索与调用引用.
 
     直接调 MCP 的纯 Python 函数 (不经 stdio),只暴露 ``search_symbols``,
-    ``find_callers``,``find_callees``:B 看得到结构,但拿不到 A 的整段源码
-    文本,也没有 D 的溯源/证据验证工具.
+    ``find_callers``,``find_callees`` 和 ``get_manifest``:B 看得到结构,但拿
+    不到 A 的整段源码文本,也没有 D 的溯源/证据验证工具.
+
+    The manifest is in the list because a question about the package or the
+    SDK levels is a question about the manifest, and a structured endpoint
+    answers it. A configuration that could only search symbols would report
+    "nothing found" for every manifest question, which measures the tool
+    list rather than the retrieval.
     """
+
+    #: The words that mean the question is about the manifest rather than
+    #: about a symbol. The question is a reader's own words; the harness has
+    #: to recognise them to route the query, and it recognises nothing else.
+    MANIFEST_WORDS = frozenset(
+        {
+            "package",
+            "packages",
+            "version",
+            "versions",
+            "sdk",
+            "permission",
+            "permissions",
+            "component",
+            "components",
+            "activity",
+            "service",
+            "receiver",
+            "provider",
+            "exported",
+            "manifest",
+        }
+    )
 
     def __init__(self, *, analyzer: Any, project_ids: dict[str, str]) -> None:
         self._analyzer = analyzer
@@ -138,23 +167,32 @@ class StructuredTools:
 
     @property
     def available(self) -> tuple[str, ...]:
-        return ("search_symbols", "find_callers", "find_callees")
+        return ("search_symbols", "find_callers", "find_callees", "get_manifest")
 
     def description(self, name: str) -> str:
         return f"Structured query: {name}."
 
-    def tool_for(self, keyword: str, attempt: int) -> str:
-        if attempt == 0 and keyword:
+    def tool_for(self, question: Any, keyword: str, attempt: int) -> str:
+        """Which structured query answers this question."""
+        if attempt > 0:
+            return "search_symbols"
+        text = str(getattr(question, "question", "") or "")
+        words = {word.strip(".,?").casefold() for word in text.split()}
+        if words & self.MANIFEST_WORDS:
+            return "get_manifest"
+        if keyword:
             return "find_callers" if "(" in keyword else "search_symbols"
-        return "search_symbols"
+        return "get_manifest"
 
     def call(self, name: str, question: Any, keyword: str) -> dict[str, Any]:
-        from dexatlas.mcp.tools import references, symbols
+        from dexatlas.mcp.tools import projects, references, symbols
 
         project_id = self._project_ids.get(str(question.sample))
         if project_id is None:
             return {"error": f"no analysis for {question.sample}"}
-        if name == "search_symbols":
+        if name == "get_manifest":
+            view = projects.manifest(self._analyzer, project_id)
+        elif name == "search_symbols":
             view = symbols.search_symbols(self._analyzer, project_id, keyword, limit=50, offset=0)
         elif name == "find_callers":
             view = references.find_callers(self._analyzer, project_id, keyword, limit=50)

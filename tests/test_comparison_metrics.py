@@ -314,4 +314,21 @@ def test_committed_traces_regenerate_the_published_report() -> None:
     for name, values in run.metrics.items():
         for metric in METRIC_NAMES:
             assert format_value(metric, values[metric]) in report, (name, metric)
-    assert _markdown(run) == report
+    assert _markdown(run, evidence=COMMITTED_TRACES.name) == report
+
+
+def test_the_report_names_the_evidence_it_was_made_from() -> None:
+    """A report that points at the wrong traces cannot be checked against them.
+
+    The scripted and the real-model measurements live in two files, and a
+    report that named the other one would send a reader to numbers that are
+    not its own.
+    """
+    for name, evidence in (
+        ("comparison.md", "comparison-traces.json"),
+        ("comparison-real.md", "comparison-real-traces.json"),
+    ):
+        path = Path(__file__).resolve().parents[1] / "docs/benchmarks" / name
+        assert path.is_file(), f"{name} is missing"
+        text = path.read_text(encoding="utf-8")
+        assert evidence in text, f"{name} does not name its own evidence file"

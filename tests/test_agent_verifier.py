@@ -319,3 +319,30 @@ def test_a_conclusion_may_cite_a_record_the_analysis_already_holds(
         "the analysis holds E-0001 and its citation resolves, so the conclusion is a lead"
     )
     assert findings[0].detail["supported_by"] == ["E-0001"]
+
+
+def test_a_document_written_after_the_prose_is_still_the_answer() -> None:
+    """A model that thinks out loud and then answers has answered.
+
+    It is asked for JSON and nothing else, and it writes its reasoning
+    first. The document is inside the answer rather than beside it, and its
+    conclusions are the answer; the prose around it is kept as unparsed so
+    a reader still sees it.
+    """
+    parsed = parse_answer(
+        "I read the manifest through two independent paths and cross-checked them.\n"
+        '{"conclusions": [{"statement": "The minimum SDK version is 24."}],'
+        ' "limitations": []}'
+    )
+
+    assert len(parsed.conclusions) == 1
+    assert parsed.conclusions[0].statement == "The minimum SDK version is 24."
+    assert "cross-checked" in parsed.unparsed
+
+
+def test_an_answer_with_no_document_in_it_is_still_kept() -> None:
+    """Prose with no document in it is what it was before: an unbacked claim."""
+    parsed = parse_answer("The app looks fine to me. {not json at all}")
+
+    assert len(parsed.conclusions) == 1
+    assert "without naming any evidence" in parsed.conclusions[0].statement

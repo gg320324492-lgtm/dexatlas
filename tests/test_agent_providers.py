@@ -358,3 +358,32 @@ def test_the_transport_rejects_an_answer_that_is_not_json() -> None:
 
     assert raised.value.retryable is False
     assert "not JSON" in raised.value.message
+
+
+def test_an_observation_the_model_did_not_ask_for_is_not_a_tool_message() -> None:
+    """A tool the *plan* called has no assistant tool_call to answer.
+
+    A strict endpoint rejects a ``tool`` message whose ``tool_call_id``
+    matches nothing with a 400 ("tool result's tool id not found"). The
+    observation still has to reach the model as data, so it goes in the user
+    channel with the same data notice -- and it does not claim the model
+    asked for it.
+    """
+    provider = OpenAICompatibleProvider(base_url="https://example.invalid/v1", model="a-model")
+
+    request = ModelRequest(
+        instructions="You are the analysis agent.",
+        question="Which permissions does this APK request?",
+        turns=(
+            Observation(
+                tool="get_manifest",
+                call_id="",
+                content="the manifest says nothing",
+            ),
+        ),
+    )
+
+    messages = provider.build_payload(request)["messages"]
+    assert [message["role"] for message in messages] == ["system", "user", "user"]
+    assert "tool_call_id" not in messages[2]
+    assert "data" in messages[2]["content"]

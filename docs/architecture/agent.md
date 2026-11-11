@@ -261,6 +261,29 @@ The scripted provider is in the package rather than in the test tree on
 purpose: the fixed task suite, the benchmark harness and a reviewer running
 the agent offline all need the same thing.
 
+### Two things a real endpoint taught us
+
+Both of these were found by running the benchmark against a real endpoint, and
+neither is visible against the scripted provider: a scripted answer is always
+exactly the shape the code asked for.
+
+**An observation the model did not ask for is not a tool message.** The
+OpenAI shape reserves the `tool` role for the answer to a call the model
+made, and a strict endpoint rejects a `tool` message whose `tool_call_id`
+matches no assistant `tool_calls` entry with a 400 — "tool result's tool id
+not found". A tool the *plan* called has no such entry, so its answer goes in
+the `user` channel with the same data notice. It still reaches the model as
+data and never as an instruction; it just does not claim the model asked for
+it.
+
+**A model that writes prose and then the document has answered.** The answer
+is asked for as JSON and nothing else, and a model sometimes writes its
+reasoning first. `parse_answer` finds the document inside the answer rather
+than beside it, so the conclusions in it are the answer; the prose around it
+is kept as `unparsed` for a reader. Without this, a real answer was recorded
+as "the model answered without naming any evidence", and the agent's report
+said so.
+
 ## The report
 
 `reporter.py` fills in the project's own report format. The findings are the

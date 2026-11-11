@@ -19,8 +19,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->1256<!--/fig--> 个（<!--fig:tests.fast-->1113<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->90.4%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1264<!--/fig--> 个（<!--fig:tests.fast-->1121<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->90.5%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -195,16 +195,27 @@ P2-003 关掉了上表里 `xrefs` 那条缺陷：索引里现在存的是**调�
 
 **M3 的任务集与对比机械都落地了**：92 个带独立可核对答案的任务
 （[任务集说明](benchmarks/task-set.md)，含 11 个问「答案在哪里找到」的
-where-source 任务），三配置 harness、八项指标和一份由
-脚本生成的[对比报告](benchmarks/comparison.md)都在仓库里。被测系统只看
-`--emit-questions` 的四个字段，判分器独占 marking scheme；每个报告数字都能
-用 `--input <traces.json> --metrics` 从落盘 trace 重算。落盘的
-`comparison-traces.json` 还是 81 题时代的测量，换成 92 题后需重跑。
+where-source 任务），三配置 harness、八项指标和脚本生成的报告都在仓库里。
+被测系统只看 `--emit-questions` 的四个字段，判分器独占 marking scheme；
+每个报告数字都能用 `--input <traces.json> --metrics` 从落盘 trace 重算。
 
-**还没做完的是真模型对照**：这台机器没有 model key，A / B / DexAtlas 三配置
-用的是 scripted provider。报告开头就写明这不是模型基线，也不声称任何配置
-更优。M3 剩下的工作是：等有 key 后换成真实 provider 重跑，并把两组测量分开
-陈述。退出标准里的 95% 工具成功率已披露，本次三配置均为 100%。
+**真模型对照也跑过了**：用 MiniMax-M3.1-Flash（OpenAI 兼容端点）跑完 92 题
+× 3 配置，结果在[真模型报告](benchmarks/comparison-real.md)，证据是
+`comparison-real-traces.json`；scripted 的那组在
+[对比报告](benchmarks/comparison.md)，两份**分开陈述、不并表**。
+本次正确率 A 27.2% / B 22.8% / DexAtlas agent 17.4%，无支撑断言率
+100% / 100% / 2.8%，工具调用成功率 100% / 100% / 99.0%。
+
+**这些数字里有一半是模型行为，不是工具能力**：agent 正确率低的主因是模型
+反复请求工具直到预算耗尽（14 题），以及回答写成散文而非 JSON
+（`parse_answer` 已能提取内嵌文档，见下）。unanswerable 那一类反而是 agent
+最好（12/13，A 9/13、B 8/13）。报告的「Why the failed tasks failed」表把这些
+成因逐条列出——率不带成因就是没有解释。
+
+M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少来自模型的工具
+使用习惯；以及 §5 的两条硬标准目前只满足一条（每个指标可由脚本重算已满足，
+「comparison never claims an improvement the measurements do not support」
+本轮以「不声称哪个更好」的方式满足）。
 
 ### 4.7 这一轮关掉的
 

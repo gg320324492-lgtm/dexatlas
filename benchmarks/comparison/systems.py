@@ -32,6 +32,7 @@ from benchmarks.comparison.retrieval import (
 )
 from dexatlas.agent.orchestrator import Orchestrator
 from dexatlas.agent.providers.base import (
+    AssistantTurn,
     ModelProvider,
     ModelRequest,
     ModelResponse,
@@ -42,7 +43,7 @@ from dexatlas.agent.providers.scripted import ScriptedProvider, answer, conclusi
 from dexatlas.agent.state import Budget, TaskStore
 from dexatlas.agent.tool_executor import McpToolClient, ToolExecutor
 from dexatlas.core.evidence import EvidenceBuilder
-from dexatlas.core.models import EvidenceLevel
+from dexatlas.core.models import EvidenceKind, EvidenceLevel
 
 #: 三个配置共用的回答格式要求. instructions 里没有,也不许有任何来自
 #: marking scheme 的内容;provider 只能看到题目和工具返回的东西.
@@ -53,6 +54,19 @@ INSTRUCTIONS = (
     '"locators":[]}],"limitations":[]}. '
     "If the observations do not establish an answer, say so in limitations "
     "and give no conclusions."
+)
+
+#: A 与 B 共用的 instructions. 这两个配置是「模型 + 一种检索」:检索由 harness
+#: 用固定策略做完,模型只负责读检索结果并组织回答,所以它们不被提供工具
+#: —— 模型若能自己调工具,量到的就是 harness 的工具循环,而不是模型读懂了什么.
+RETRIEVAL_INSTRUCTIONS = (
+    "Answer the question about the analysed Android sample, using only the "
+    "retrieved material given to you. Quote the exact names, values and "
+    "identifiers the material contains. "
+    'Reply with JSON: {"conclusions":[{"statement":"...","evidence_ids":[],'
+    '"locators":[]}],"limitations":[]}. '
+    "If the retrieved material does not establish an answer, say so in "
+    "limitations and give no conclusions."
 )
 
 
@@ -89,10 +103,13 @@ class _BaseSystem:
     def answer(self, question: Question) -> SystemResult:
         started = time.monotonic()
         keyword = keyword_from(question.question)
-        specs = tuple(
-            ToolSpec(name=name, description=self.tools.description(name))
-            for name in self.tools.available
-        )
+        # No tools are offered to the model here, and that is the point of
+        # these two configurations. They are "a model with retrieval": the
+        # retrieval is done by the harness, under one fixed strategy, and its
+        # result is handed to the model. A model offered tools asks for them
+        # instead of answering, which would measure the harness's tool loop
+        # rather than the model reading what the retrieval found.
+        specs: tuple[ToolSpec, ...] = ()
 
         calls: list[ToolCallTrace] = []
         observations: list[str] = []
@@ -101,16 +118,18 @@ class _BaseSystem:
         error = ""
         recovered = False
         content = ""
+        first_retrieval_had_facts = True
 
         # 两个配置跑同一个检索策略. 第一次没拿到事实时用空关键词再试一次,
         # recovery rate 记的是真实发生过的重试,不是纸面能力.
         for index, term in enumerate((keyword, "")[: self.max_calls]):
-            tool_name = self.tools.tool_for(term, index)
+            tool_name = self.tools.tool_for(question, term, index)
             call_started = time.monotonic()
             try:
                 payload = self.tools.call(tool_name, question, term)
                 observation = json.dumps(payload, ensure_ascii=False, default=str)
-                facts = _has_facts(payload)
+                if index == 0:
+                    first_retrieval_had_facts = _has_facts(payload)
                 calls.append(
                     ToolCallTrace(
                         tool=tool_name,
@@ -131,20 +150,55 @@ class _BaseSystem:
                 )
                 observations.append(json.dumps({"error": message}))
                 error = message
-                continue
-
-            request = ModelRequest(
-                instructions=INSTRUCTIONS,
-                question=question.question,
-                tools=specs,
-                turns=tuple(
+                # The model is still asked: a failed retrieval is something
+                # the model should be told about, and it may answer "there is
+                # none" or "the tools failed" -- which is a real answer to a
+                # question about a missing backend.
+                turns = [
                     Observation(
                         tool=tool_name,
-                        call_id=f"call-{index + 1}",
-                        content=observation,
+                        call_id=f"call-{len(observations)}",
+                        content=observations[-1],
                     )
-                    for observation in observations
-                ),
+                ]
+                request = ModelRequest(
+                    instructions=RETRIEVAL_INSTRUCTIONS,
+                    question=question.question,
+                    tools=specs,
+                    turns=tuple(turns),
+                    max_tokens=self.max_tokens,
+                )
+                try:
+                    response = self.provider.complete(request)
+                except Exception as exc:
+                    error = f"{type(exc).__name__}: {exc}"
+                    continue
+                prompt_tokens += response.prompt_tokens
+                completion_tokens += response.completion_tokens
+                if not response.wants_tools and response.content.strip():
+                    content = response.content
+                    break
+                continue
+
+            # The retrieval was made by the harness, not asked for by the
+            # model, so it goes in as an observation the model did not call
+            # for: the provider sends it in the user channel with the data
+            # notice. A strict endpoint rejects a ``role: tool`` message
+            # whose ``tool_call_id`` matches no assistant tool call.
+            turns: list[AssistantTurn | Observation] = []
+            for call_index, observed in enumerate(observations, start=1):
+                turns.append(
+                    Observation(
+                        tool=self.tools.tool_for(question, term, call_index - 1),
+                        call_id=f"call-{call_index}",
+                        content=observed,
+                    )
+                )
+            request = ModelRequest(
+                instructions=RETRIEVAL_INSTRUCTIONS,
+                question=question.question,
+                tools=specs,
+                turns=tuple(turns),
                 max_tokens=self.max_tokens,
             )
             try:
@@ -156,11 +210,15 @@ class _BaseSystem:
             completion_tokens += response.completion_tokens
             if response.wants_tools or not response.content.strip():
                 continue
-            if not facts and index == 0:
-                # 第一次观察没有事实:这是"恢复"要覆盖的情形,再宽检一次.
-                continue
+            # The model answered. An empty retrieval is a fact about the
+            # retrieval, not a reason to discard what the model said: the
+            # answer may well be "there is none", which is the right answer
+            # to an unanswerable question. Only a run with no answer at all
+            # goes on to a wider search.
             content = response.content
-            if index > 0:
+            if index > 0 and not first_retrieval_had_facts:
+                # The first search found nothing and a wider one did answer:
+                # that is the recovery this metric counts.
                 recovered = True
             break
 
@@ -258,12 +316,24 @@ class AgentSystem:
         provider_factory: Callable[[], ModelProvider],
         store_root: Path,
         max_tokens: int = 2048,
+        total_tokens: int | None = None,
+        max_iterations: int = 8,
     ) -> None:
         self._analyzer = analyzer
         self._analyses = analyses
         self._provider_factory = provider_factory
         self._store_root = store_root
         self.max_tokens = max_tokens
+        # The agent's budget is what the whole task may spend, which is not
+        # the same number as what one request may carry: a real model answers
+        # a question about an APK in a few thousand tokens, and a task budget
+        # of one request's worth would stop the task before it answered.
+        self.total_tokens = total_tokens if total_tokens is not None else max_tokens * 10
+        # How many times the task may go round the loop. Four was the first
+        # guess and it was too few: with a real model, 42 of 92 tasks ran out
+        # of iterations before they answered, which measures the budget and
+        # not the agent.
+        self.max_iterations = max_iterations
 
     @property
     def provider_name(self) -> str:
@@ -299,7 +369,11 @@ class AgentSystem:
             client=client,
             builder_for=builder_for,
             store=store,
-            limits=Budget(max_tokens=self.max_tokens, max_iterations=4, max_seconds=30.0),
+            limits=Budget(
+                max_tokens=self.total_tokens,
+                max_iterations=self.max_iterations,
+                max_seconds=120.0,
+            ),
             executor=ToolExecutor(client, timeout=10.0),
             model_attempts=1,
         )
@@ -322,6 +396,16 @@ class AgentSystem:
             )
             for record in report.tool_calls
         )
+        # The report holds two kinds of record: what the tools read, and what
+        # the model concluded from it. Only the second is an answer. A tool
+        # record's summary describes what was read ("the manifest declares
+        # package 'com.example.demo'"), and a task asks a question -- a
+        # question about the SDK level is not answered by the package name.
+        # The model's conclusions are the BEHAVIOUR records; the tool's own
+        # records are the others.
+        conclusions = [
+            record for record in report.findings if record.kind is EvidenceKind.BEHAVIOUR
+        ]
         assertions = tuple(
             Assertion(
                 text=record.summary,
@@ -330,9 +414,9 @@ class AgentSystem:
                 locator=";".join(source.locator for source in record.provenance),
                 verified=record.level is EvidenceLevel.VERIFIED,
             )
-            for record in report.findings
+            for record in conclusions
         )
-        findings = tuple(record.summary for record in report.findings)
+        findings = tuple(record.summary for record in conclusions)
         answer_text = " ".join(assertion.text for assertion in assertions)
         return SystemResult(
             answer_text=answer_text,

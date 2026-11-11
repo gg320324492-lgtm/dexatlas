@@ -36,11 +36,25 @@ def build_messages(request: ModelRequest) -> list[dict[str, Any]]:
     to the model. Everything the tools read arrives afterwards as a ``tool``
     message, which is the channel the protocol reserves for a tool's answer —
     and the answer carries the notice that says it is data.
+
+    One observation does not fit that channel: a tool the *plan* called, rather
+    than one the model asked for. It has no assistant ``tool_calls`` entry to
+    answer, and a strict endpoint rejects a ``tool`` message whose
+    ``tool_call_id`` matches nothing with a 400 ("tool result's tool id not
+    found"). Such an observation is sent as a ``user`` message instead, with
+    the same data notice: it still reaches the model as data and never as an
+    instruction, and it does not claim the model asked for it.
     """
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": request.instructions},
         {"role": "user", "content": request.question},
     ]
+    asked_for = {
+        call.id
+        for turn in request.turns
+        if isinstance(turn, AssistantTurn)
+        for call in turn.tool_calls
+    }
     for turn in request.turns:
         if isinstance(turn, AssistantTurn):
             message: dict[str, Any] = {"role": "assistant", "content": turn.content}
@@ -58,13 +72,16 @@ def build_messages(request: ModelRequest) -> list[dict[str, Any]]:
                 ]
             messages.append(message)
         elif isinstance(turn, Observation):
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": turn.call_id,
-                    "content": turn.as_message(),
-                }
-            )
+            if turn.call_id and turn.call_id in asked_for:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": turn.call_id,
+                        "content": turn.as_message(),
+                    }
+                )
+            else:
+                messages.append({"role": "user", "content": turn.as_message()})
     return messages
 
 

@@ -121,23 +121,30 @@ def test_source_text_tokens_are_the_reported_ones() -> None:
     assert payload["max_tokens"] == system.max_tokens
 
 
-def test_structured_retries_and_sums_reported_tokens() -> None:
+def test_a_failed_retrieval_still_reaches_the_model() -> None:
+    """A retrieval that failed is data, not a crash: the model is asked anyway.
+
+    The two retrieval attempts fail, and the model is asked once with both
+    failures in front of it. It is not asked twice: the first answer is the
+    answer, and asking again would spend the tokens a second time for
+    nothing. The usage the endpoint reported is what the trace records.
+    """
     endpoint = FakeEndpoint()
-    # project_ids 为空:两次检索都拿不到分析,检索失败是数据不是崩溃,
-    # provider 照样被问了两次,token 是两次上报值的和.
+    # project_ids is empty: both retrievals find no analysis, so the
+    # retrieval returns error data rather than raising.
     system = StructuredSystem(analyzer=object(), project_ids={}, provider=_provider(endpoint))
     question = _questions()[0]
 
     result = system.answer(question)
 
     assert not result.failed, result.error
-    assert len(endpoint.calls) == 2
-    assert result.prompt_tokens == PROMPT_TOKENS * 2
-    assert result.completion_tokens == COMPLETION_TOKENS * 2
-    # 检索没有抛异常,但它返回的是 error 数据:两次观察都带着 error,
-    # 而模型照样按上报的 usage 计了账.
+    assert len(endpoint.calls) == 1
+    assert result.prompt_tokens == PROMPT_TOKENS
+    assert result.completion_tokens == COMPLETION_TOKENS
+    # The retrieval did not raise, but what it returned is error data, and
+    # the model was asked with it in front of it.
     assert "error" in json.loads(result.observations[0])
-    assert result.recovered
+    assert result.answer_text, "the model's answer was thrown away"
 
 
 def test_agent_charges_the_reported_usage_to_the_budget(
@@ -295,3 +302,77 @@ def test_cli_provider_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     local = local_factory()
     assert isinstance(local, LocalModelProvider)
     assert local.name == "local-model"
+
+
+def test_a_retrieval_system_does_not_offer_the_model_tools() -> None:
+    """A and B are "a model with retrieval", not "a model with tools".
+
+    The retrieval is done by the harness under one fixed strategy, and its
+    result is handed to the model. A model offered tools asks for them
+    instead of answering -- which measures the harness's tool loop rather
+    than the model reading what the retrieval found.
+    """
+    endpoint = FakeEndpoint()
+    system = SourceTextSystem(sources=_sources(), provider=_provider(endpoint))
+    question = _questions()[0]
+
+    system.answer(question)
+
+    assert endpoint.calls, "the model was never asked"
+    payload = endpoint.calls[0][1]
+    assert "tools" not in payload, "the model was offered tools it must not use"
+    assert payload["messages"][0]["role"] == "system"
+    assert payload["messages"][1]["role"] == "user"
+
+
+def test_the_retrieved_material_reaches_the_model_as_data() -> None:
+    """The retrieval result is in the prompt, marked as data, not as an instruction."""
+    endpoint = FakeEndpoint()
+    system = SourceTextSystem(sources=_sources(), provider=_provider(endpoint))
+    question = _questions()[0]
+
+    system.answer(question)
+
+    messages = endpoint.calls[0][1]["messages"]
+    contents = " ".join(str(message.get("content", "")) for message in messages)
+    assert "data" in contents, "the retrieval is not marked as data"
+    assert "Crypto" in contents or "demo" in contents, "the retrieval is not in the prompt"
+
+
+def test_an_empty_retrieval_does_not_discard_the_models_answer() -> None:
+    """Nothing found is a fact about the retrieval, not a reason to drop the answer.
+
+    The answer may well be "there is none", which is the right answer to an
+    unanswerable question. Discarding it and asking again would lose the
+    answer the model gave.
+    """
+    endpoint = FakeEndpoint()
+    system = StructuredSystem(
+        analyzer=object(),
+        project_ids={},
+        provider=_provider(endpoint),
+    )
+    question = _questions()[0]
+
+    result = system.answer(question)
+
+    assert result.answer_text, "the model's answer was thrown away"
+    assert result.assertions, "the answer produced no claim"
+
+
+def test_the_agent_gets_enough_iterations_to_answer(tmp_path: Path) -> None:
+    """Four iterations stopped the agent before it answered.
+
+    With a real model, 42 of 92 tasks ran out of iterations before they
+    answered, which measured the budget rather than the agent. The default
+    is now the agent's own default of eight, and a caller can raise it.
+    """
+    system = AgentSystem(
+        analyzer=object(),
+        analyses={},
+        provider_factory=lambda: _provider(FakeEndpoint()),
+        store_root=tmp_path / "agent-states",
+    )
+
+    assert system.max_iterations >= 8
+    assert system.total_tokens >= system.max_tokens
