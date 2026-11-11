@@ -103,6 +103,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `agent/providers/openai_compat.py` | 88.4% | 10 / 86 |
 | `agent/orchestrator.py` | 88.4% | 46 / 398 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
+| `agent/providers/openai_compat.py` | 89.5% | 9 / 86 |
 | `mcp/tools/evidence.py` | 89.7% | 3 / 29 |
 <!--/fig-->
 
@@ -134,7 +135,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.1%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.2%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -218,6 +219,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_output_truncation.py` | 后端的输出被截断时，截断这件事本身必须被记录 |
 | `test_comparison_metrics.py` | M3 对比：指标的分母不能凭空出现，被测系统看不到答案，数字能从落盘 trace 重算 |
 | `test_sdk_reconciliation.py` | manifest 的 SDK 级别不采信 Apktool 的重建值，从 binary manifest 读回并只补缺、失败照记（manifest.min-sdk 修复新增） |
+| `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 
 ### 2.2 几类值得注意的测试
 
@@ -961,14 +963,14 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "agent/orchestrator.py": [398, 46],
       "agent/planner.py": [46, 1],
       "agent/providers/__init__.py": [6, 0],
-      "agent/providers/base.py": [80, 5],
+      "agent/providers/base.py": [80, 4],
       "agent/providers/local.py": [53, 10],
-      "agent/providers/openai_compat.py": [86, 10],
+      "agent/providers/openai_compat.py": [86, 9],
       "agent/providers/scripted.py": [42, 6],
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [102, 13],
       "agent/state.py": [197, 7],
-      "agent/tool_executor.py": [282, 37],
+      "agent/tool_executor.py": [282, 34],
       "api/__init__.py": [3, 0],
       "api/app.py": [448, 36],
       "cli/__init__.py": [3, 0],

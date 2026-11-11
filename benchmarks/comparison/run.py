@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
@@ -46,6 +48,9 @@ from benchmarks.run import (  # noqa: E402
     _self_check,
 )
 from benchmarks.tasks import ALL_TASKS  # noqa: E402
+from dexatlas.agent.providers.base import ModelProvider  # noqa: E402
+from dexatlas.agent.providers.local import LocalModelProvider  # noqa: E402
+from dexatlas.agent.providers.openai_compat import OpenAICompatibleProvider  # noqa: E402
 
 DEFAULT_OUTPUT = REPOSITORY_ROOT / ".scratch" / "comparison"
 WORKSPACE_MARKER = ".benchmark-comparison-workspace"
@@ -134,25 +139,108 @@ def _sources() -> dict[str, Path]:
     return {sample.value: sample.source_directory for sample in Sample}
 
 
+def _provider_factory(
+    args: argparse.Namespace,
+) -> Callable[[], ModelProvider] | None:
+    """把 CLI 的 provider 选择变成三个配置共用的同一个构造.
+
+    返回 ``None`` 表示 scripted:三个系统各拿各的替身,现状不变. 真实
+    provider 无状态,所以同一个构造给 A/B 各建一个实例、D 每题建一个,
+    与共用一个实例等效. key 只进 provider 实例,trace 记的是
+    ``provider.name`` 与 ``provider.model``,key 本身永不落盘.
+    """
+    if args.provider == "scripted":
+        if args.base_url or args.model or args.api_key_env:
+            raise SystemExit(
+                "--base-url/--model/--api-key-env belong to a real provider: "
+                "pass --provider openai-compat or --provider local, or drop them"
+            )
+        return None
+    if not args.base_url:
+        raise SystemExit(f"--provider {args.provider} needs --base-url")
+    if not args.model:
+        raise SystemExit(f"--provider {args.provider} needs --model")
+    if args.provider == "local":
+        if args.api_key_env:
+            raise SystemExit(
+                "a local model endpoint sends no key (local.py: headers() returns {}); "
+                "drop --api-key-env"
+            )
+
+        def factory() -> ModelProvider:
+            return LocalModelProvider(base_url=args.base_url, model=args.model)
+
+        return factory
+
+    api_key = ""
+    if args.api_key_env:
+        api_key = os.environ.get(args.api_key_env, "")
+        if not api_key:
+            raise SystemExit(
+                f"--api-key-env names {args.api_key_env}, but that environment "
+                "variable is not set. The key is read from the variable and is "
+                "never written to disk or into a trace."
+            )
+
+    def factory() -> ModelProvider:
+        return OpenAICompatibleProvider(
+            base_url=args.base_url, model=args.model, api_key=api_key or None
+        )
+
+    return factory
+
+
 def _systems(
-    *, analyzer: Any, analyses: dict[str, Any], workspace: Path, budget: int
+    *,
+    analyzer: Any,
+    analyses: dict[str, Any],
+    workspace: Path,
+    budget: int,
+    provider_factory: Callable[[], ModelProvider] | None = None,
 ) -> tuple[System, ...]:
-    """三个配置,同一预算,同一 provider 接口."""
+    """三个配置,同一预算,同一 provider 接口.
+
+    真实 provider 时,三个配置由**同一个**构造拿各自的实例:同一模型,
+    同一预算,可比.
+    """
     project_ids = {name: analysis.result.project.id for name, analysis in analyses.items()}
+    if provider_factory is None:
+        return (
+            SourceTextSystem(sources=_sources(), max_tokens=budget),
+            StructuredSystem(analyzer=analyzer, project_ids=project_ids, max_tokens=budget),
+            AgentSystem(
+                analyzer=analyzer,
+                analyses=analyses,
+                provider_factory=scripted_agent_provider,
+                store_root=workspace / "agent-states",
+                max_tokens=budget,
+            ),
+        )
     return (
-        SourceTextSystem(sources=_sources(), max_tokens=budget),
-        StructuredSystem(analyzer=analyzer, project_ids=project_ids, max_tokens=budget),
+        SourceTextSystem(sources=_sources(), provider=provider_factory(), max_tokens=budget),
+        StructuredSystem(
+            analyzer=analyzer,
+            project_ids=project_ids,
+            provider=provider_factory(),
+            max_tokens=budget,
+        ),
         AgentSystem(
             analyzer=analyzer,
             analyses=analyses,
-            provider_factory=scripted_agent_provider,
+            provider_factory=provider_factory,
             store_root=workspace / "agent-states",
             max_tokens=budget,
         ),
     )
 
 
-def run_comparison(*, workspace: Path, budget: int = 2048, limit: int = 0) -> ComparisonRun:
+def run_comparison(
+    *,
+    workspace: Path,
+    budget: int = 2048,
+    limit: int = 0,
+    provider_factory: Callable[[], ModelProvider] | None = None,
+) -> ComparisonRun:
     """跑一次完整对比,返回可序列化的全部数据.
 
     ``limit`` 只用于冒烟:它截断的是被问的题,不会改变 reference 与题号的
@@ -169,7 +257,13 @@ def run_comparison(*, workspace: Path, budget: int = 2048, limit: int = 0) -> Co
     selected = questions[:limit] if limit > 0 else questions
     needed_samples = {Sample(value) for value in {question.sample for question in selected}}
     analyzer, analyses, _ = _analyse_samples(workspace, samples=needed_samples)
-    systems = _systems(analyzer=analyzer, analyses=analyses, workspace=workspace, budget=budget)
+    systems = _systems(
+        analyzer=analyzer,
+        analyses=analyses,
+        workspace=workspace,
+        budget=budget,
+        provider_factory=provider_factory,
+    )
 
     traces: list[TaskTrace] = []
     for system in systems:
@@ -253,6 +347,71 @@ def _render(run: ComparisonRun, stream: TextIO) -> None:
     )
 
 
+#: The "running with a real model" section, regenerating verbatim. It names no
+#: number, so it can live in the template; the figures around it stay generated.
+_REAL_PROVIDER_SECTION = (
+    "## Running with a real model",
+    "",
+    "The scripted provider is a stand-in, not a baseline. The same harness can "
+    "run all three configurations against a real model: "
+    "`benchmarks/comparison/run.py` selects it with `--provider`, and the "
+    "three configurations then share one provider construction — the same "
+    "model, the same budget, comparable.",
+    "",
+    "```bash",
+    "# An OpenAI-compatible endpoint (hosted API, vLLM, LiteLLM, a gateway).",
+    'export OPENAI_COMPAT_API_KEY="sk-..."',
+    "uv run --no-sync python benchmarks/comparison/run.py \\",
+    "  --provider openai-compat \\",
+    "  --base-url https://api.example.com/v1 \\",
+    "  --model <model-name> \\",
+    "  --api-key-env OPENAI_COMPAT_API_KEY \\",
+    "  --output .scratch/comparison-real",
+    "",
+    "# A local model endpoint (Ollama, llama.cpp server) speaks the local shape.",
+    "uv run --no-sync python benchmarks/comparison/run.py \\",
+    "  --provider local \\",
+    "  --base-url http://localhost:11434 \\",
+    "  --model qwen3:8b \\",
+    "  --output .scratch/comparison-real",
+    "```",
+    "",
+    "The API key convention: `--api-key-env` names an **environment "
+    "variable**, never a value. The key is read from that variable, held in "
+    "the provider instance, sent as an `Authorization` header — and it is "
+    "never written to disk or into a trace. A trace records which provider "
+    "was used (`openai-compatible` or `local-model`) and which model "
+    "answered; it never records the key. A local endpoint sends no key at "
+    "all, so `--api-key-env` with `--provider local` is rejected. The name "
+    "of the variable is yours to choose; `OPENAI_COMPAT_API_KEY` above is an "
+    "example, not a required name.",
+    "",
+    "Where the token numbers come from changes with the provider. The "
+    "scripted provider has no tokenizer, so it estimates: it counts "
+    "whitespace-split words over the request and the reply. A real provider "
+    "reports its usage, and the harness takes it — the OpenAI-compatible "
+    "shape reports `usage.prompt_tokens` and `usage.completion_tokens`, the "
+    "local shape reports `prompt_eval_count` and `eval_count`, and the agent "
+    "configuration charges the orchestrator's budget with exactly what the "
+    "response reported. A trace built on a real provider therefore carries "
+    "the endpoint's own numbers, not an estimate of them.",
+    "",
+    "**A scripted measurement and a real one must be stated separately and "
+    "never compared.** The scripted numbers measure the harness; the real "
+    "ones measure a model reading one of two input shapes. They answer "
+    "different questions, and a table that puts them side by side invites a "
+    "conclusion neither row supports. A report that mixes them in one metric "
+    "table is wrong even if every individual number in it is correct; name "
+    "the provider and the model of every real measurement in its own table.",
+    "",
+    "Real runs are written to their own output directory "
+    "(`.scratch/comparison-real` above, not the scripted default), and the "
+    "checked-in report and traces under `docs/benchmarks/` remain the "
+    "scripted baseline until an accepted, key-backed run replaces them "
+    "explicitly.",
+)
+
+
 def _markdown(run: ComparisonRun) -> str:
     """Render the report with no hand-written numbers.
 
@@ -318,6 +477,8 @@ def _markdown(run: ComparisonRun) -> str:
         "- A comparison never claims an improvement the measurements do not "
         "support. With a scripted provider, the numbers measure the harness.",
         "",
+        *_REAL_PROVIDER_SECTION,
+        "",
         "## Regenerating",
         "",
         "```bash",
@@ -349,6 +510,33 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         "--report",
         type=Path,
         help="Write a Markdown report whose figures all come from this run.",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("scripted", "openai-compat", "local"),
+        default="scripted",
+        help=(
+            "The model behind all three configurations. scripted (default) is "
+            "the offline stand-in; openai-compat and local are real endpoints. "
+            "A scripted measurement and a real one must be reported separately."
+        ),
+    )
+    parser.add_argument(
+        "--base-url",
+        default="",
+        help="Endpoint root for a real provider, e.g. http://localhost:11434/v1.",
+    )
+    parser.add_argument(
+        "--model", default="", help="Model name sent to the endpoint, e.g. qwen3:8b."
+    )
+    parser.add_argument(
+        "--api-key-env",
+        default="",
+        help=(
+            "Name of the environment variable holding the openai-compat API "
+            "key. The key is read from that variable and is never written to "
+            "disk or into a trace."
+        ),
     )
     return parser.parse_args(argv if argv is not None else sys.argv[1:])
 
@@ -397,7 +585,12 @@ def main(argv: list[str] | None = None) -> int:
 
     workspace = args.workspace or args.output / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
-    run = run_comparison(workspace=workspace, budget=args.budget, limit=args.limit)
+    run = run_comparison(
+        workspace=workspace,
+        budget=args.budget,
+        limit=args.limit,
+        provider_factory=_provider_factory(args),
+    )
     args.output.mkdir(parents=True, exist_ok=True)
     document = run.to_dict()
     (args.output / "comparison.json").write_text(
