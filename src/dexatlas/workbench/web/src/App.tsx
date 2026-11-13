@@ -1250,7 +1250,7 @@ export default function App(): JSX.Element {
           <a href="#/">DexAtlas Workbench</a>
         </h1>
         <span className="meta">
-          {health ? `v${health.version} · ${health.workspace}` : "…"}
+          {health ? `v${health.version} · workspace: ${health.workspace}` : "…"}
         </span>
       </header>
       <main>

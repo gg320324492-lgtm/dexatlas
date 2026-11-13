@@ -50,6 +50,8 @@ export interface ProjectStatus {
 
 export interface Health {
   version: string;
+  // The workspace's directory name, not its path: install.md promises the
+  // API redacts the server's own directories.
   workspace: string;
 }
 

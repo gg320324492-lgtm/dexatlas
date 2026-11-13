@@ -285,7 +285,23 @@ def called_project_id(client: TestClient, project_id: str) -> str:
 def test_health_names_the_workspace_and_the_version(client: TestClient, tmp_path: Path) -> None:
     data = client.get("/api/health").json()
     assert data["version"]
-    assert Path(data["workspace"]) == tmp_path / "workspace"
+    assert data["workspace"] == "workspace"
+
+
+def test_health_does_not_leak_the_workspace_path(client: TestClient) -> None:
+    """install.md promises the API redacts the server's own directories.
+
+    ``/api/health`` answers with the workspace's directory *name*, so the
+    absolute path — which names this machine's directory layout, and which
+    the header used to print in full — never crosses the wire. The old
+    response carried ``str(workspace)``; this test goes red against it.
+    """
+    data = client.get("/api/health").json()
+
+    assert data["workspace"] == "workspace"
+    # No separator of any kind: a name, not a path on any platform.
+    assert "/" not in data["workspace"]
+    assert "\\" not in data["workspace"]
 
 
 def test_empty_workspace_lists_no_projects(client: TestClient) -> None:

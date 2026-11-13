@@ -209,8 +209,9 @@ What that buys you, and what it costs:
   invitation to fill the disk. The upload limit below bounds one upload; it
   does not bound how many arrive.
 - **The API answers with paths.** It reports the *name* of each analysed file
-  and redacts the server's own directories from its error messages — but a
-  project listing is still a listing of what you have analysed.
+  and redacts the server's own directories — from its error messages and from
+  the health check, which names the workspace directory but never its path —
+  but a project listing is still a listing of what you have analysed.
 
 If none of that is what you want, the CLI does the same work with no server and
 no network at all:

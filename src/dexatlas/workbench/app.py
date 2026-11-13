@@ -95,10 +95,17 @@ def create_app(analyzer: Analyzer) -> FastAPI:
 
     @app.get("/api/health")
     def health() -> dict[str, Any]:
-        """Where this workbench reads from, and what code is running."""
+        """Where this workbench reads from, and what code is running.
+
+        The workspace is named, never pathed: install.md promises the API
+        redacts the server's own directories, and a health check that
+        answered with the workspace's absolute path would hand that tree to
+        every caller. The directory *name* is enough to tell workspaces
+        apart.
+        """
         return {
             "version": __version__,
-            "workspace": str(analyzer.settings.workspace),
+            "workspace": analyzer.settings.workspace.name,
         }
 
     @app.get("/api/projects", response_model=ProjectList)
