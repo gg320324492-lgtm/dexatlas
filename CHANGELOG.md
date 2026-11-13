@@ -535,10 +535,6 @@ The review report is `docs/reports/phase1-review-report.md`.
   report and through the Markdown report, so it is redacted once rather than
   three times. The workspace root becomes a placeholder and the path inside it
   survives — that is the part that says what was being worked on.
-- **The liveness probe wrote to the database.** `GET /health` built a whole
-  analyzer, which opened the workspace and took the write lock, on every
-  request. Which backends are installed is a fact about the machine, not about
-  the database, and the probe no longer opens one.
 - **Two numbers that sat next to each other counted different things.** The
   report's "cross-references with evidence" counted the called methods that
   got a record, while the "cross-references indexed" beside it counted the
