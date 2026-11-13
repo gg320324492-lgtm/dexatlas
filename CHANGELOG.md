@@ -9,6 +9,28 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The workbench agent workspace (M4 screen 6).** A user can now ask the
+  evidence-first agent a question about an analysed APK from the browser:
+  the workbench accepts the question, runs the agent's own
+  `Orchestrator` in the background (the loop plans, calls the read-only MCP
+  tools, asks the model and checks its conclusions), and the screen polls
+  the task to show the plan, the tool-call timeline and the report the
+  project's own renderer writes — established facts, leads, and
+  insufficient evidence, each finding carrying the evidence id or locator
+  it rests on.
+
+  The model endpoint is configuration, not convention: `DEXATLAS_AGENT_BASE_URL`,
+  `DEXATLAS_AGENT_MODEL`, `DEXATLAS_AGENT_API_KEY` and the optional
+  `DEXATLAS_AGENT_PROVIDER` (`openai-compatible` or `local`) are read from
+  the environment of the process serving the workbench. The key travels in
+  the request headers only — never to disk, never into a task state, an
+  event or a report — and with nothing configured the question is refused
+  with `503 agent_not_configured` rather than answered by a stand-in model.
+  The tool set, the step count and the budgets are the agent's own `Planner`
+  and `Budget`; the task states live under the workspace's `agent-tasks/`
+  directory through the agent's own `TaskStore`, so an interrupted task can
+  be picked up again.
+
 - **A read-only MCP server.** An agent can now ask a DexAtlas workspace what
   it holds: the projects, the manifest, the indexed symbols, the source of a
   class or of one exact method, the call sites between methods, the evidence

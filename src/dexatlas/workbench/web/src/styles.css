@@ -524,3 +524,34 @@ table.sites td.num {
 .panel > .loading {
   margin: 0.4rem 0;
 }
+
+/* The agent workspace */
+
+.agent-timeline {
+  margin: 0;
+  padding-left: 1.4rem;
+}
+
+.agent-timeline li {
+  margin: 0.35rem 0;
+  border-left: 2px solid var(--line);
+  padding-left: 0.7rem;
+}
+
+.agent-call-ok {
+  border-left-color: var(--ok);
+}
+
+.agent-call-failed {
+  border-left-color: var(--error);
+}
+
+.agent-args {
+  color: var(--muted);
+  font-size: 0.82rem;
+  word-break: break-all;
+}
+
+.agent-args code {
+  color: var(--muted);
+}

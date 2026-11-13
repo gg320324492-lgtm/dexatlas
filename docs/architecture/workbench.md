@@ -29,7 +29,7 @@ The screens, from the plan, and where they stand:
 | 3 | Package / class / method explorer | **search + source viewer** |
 | 4 | Java & Smali source viewer with source-location links | **source + locator resolution** |
 | 5 | Call graph and cross-reference navigation | **built** |
-| 6 | Agent workspace | not started |
+| 6 | Agent workspace | **built** |
 | 7 | Evidence viewer, separating observations from hypotheses | **records + provenance** |
 | 8 | Benchmark and report export | **report export built** |
 
@@ -159,6 +159,58 @@ with the sentence that says what it does and does not mean. Turning it into a
 404 would convert "the analysis read no call into this method" into "this
 method does not exist", and that is the confusion the project exists to prevent.
 
+## Screen 6: the agent workspace
+
+One question about one analysed APK, answered by the
+[evidence-first agent](agent.md). The screen follows the same shape the
+upload screen does, because the agent has the same property an analysis has:
+it is a synchronous, CPU- and network-bound loop — it plans, it calls tools,
+it asks a model, it checks its conclusions — and a browser cannot hold a
+request open for that long. So `POST
+/api/projects/{id}/agent/tasks` answers **202 with a task id at once**, the
+loop runs in the background, and the browser polls `GET
+/api/agent/tasks/{task_id}` until the task reaches a terminal status, then
+reads the report from `GET /api/agent/tasks/{task_id}/report`.
+
+What the poll shows is the task's saved state, which the loop writes as it
+goes: the **plan** (which tools the task may call, worked out before any
+model was asked), the **tool-call timeline** (every call, its arguments, its
+duration, and whether it succeeded), the budget spent so far, and the events
+in between. The report is the agent's own document — established facts,
+leads, insufficient evidence — rendered by `render_agent_markdown` and
+`build_agent_json`, the same renderers a CLI task report uses. The screen
+adds no second report shape; `sections` in the JSON is the reporter's own
+three-way grouping, spelled out so the browser need not re-derive it.
+
+Three decisions the screen is built under:
+
+- **The model is configuration, never a default.** The endpoint arrives
+  through `DEXATLAS_AGENT_BASE_URL`, `DEXATLAS_AGENT_MODEL` and, when the
+  endpoint needs one, `DEXATLAS_AGENT_API_KEY` (and optionally
+  `DEXATLAS_AGENT_PROVIDER=openai-compatible|local`). The key is read only
+  into the provider that puts it in a request header — never written to
+  disk, never logged, never placed in a task state, an event or a report.
+  With nothing configured, `POST …/agent/tasks` answers **503
+  `agent_not_configured`**: an agent that quietly substituted a scripted
+  model would be answering with a rehearsal and calling it an answer.
+- **The plan bounds the work; the question authorises the reads.** The tool
+  set, the step count and the budgets are the agent's own `Planner` and
+  `Budget` — the workbench adds no tool and no permission. The one thing the
+  workbench supplies is an approval gate that says yes to the sensitive
+  source reads the plan allows: the person asking the question *is* the
+  authorisation, and the plan's `max_sensitive_calls` still caps how many
+  such reads happen.
+- **A task that dies says so.** The background runner catches what the loop
+  does not, marks the task failed with the reason, and saves it — a browser
+  polling a task that vanished would never stop, and a poll that never ends
+  is worse than a failure that is named.
+
+The task states live under the workspace's `agent-tasks/` directory, one JSON
+file per task, written through the agent's own `TaskStore`; the workbench
+pins every state of a task to the id it was announced with, so the id the
+browser holds from the 202 onward is the id every poll and report answers
+under.
+
 ## Running it
 
 ```bash
@@ -178,7 +230,9 @@ DEXATLAS_WORKSPACE=/path/to/workspace uv run dexatlas analyze examples/demo-app/
 DEXATLAS_WORKSPACE=/path/to/workspace uv run dexatlas-workbench
 ```
 
-Open the project list, choose **search & evidence** on any project (or follow
+Open the project list, choose **ask the agent** on any project to ask the
+agent a question about it (a model endpoint must be configured as above), or
+**search & evidence** (or follow
 the link on its status screen), and use the three numbered panels: search a
 phrase, click a class or method hit, then open an evidence record and click
 **resolve** beside one of its locators. With the demo APK, searching
@@ -200,7 +254,8 @@ technology the plan names for M4. Three decisions worth restating:
   dexatlas.workbench` builds it on first start; a machine without npm gets
   told so instead of a silent fallback.
 - **No routing library yet.** The hash routes — `#/`, `#/projects/{id}`,
-  `#/projects/{id}/search` and `#/projects/{id}/calls` — are matched in a few
+  `#/projects/{id}/search`, `#/projects/{id}/calls` and
+  `#/projects/{id}/agent` — are matched in a few
   lines; the router arrives when a screen needs it. Search query values and
   provenance locators are always passed through `URLSearchParams`, so a `#`,
   `(` or `->` inside a citation is not mistaken for part of a URL.

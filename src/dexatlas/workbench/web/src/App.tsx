@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import {
   ApiError,
+  agentReportUrl,
+  askAgent,
   downloadReport,
   findCallers,
   findCallees,
+  getAgentConfig,
+  getAgentReport,
+  getAgentTask,
   getClassSource,
   getEvidence,
   getHealth,
@@ -14,6 +19,11 @@ import {
   resolveLocator,
   searchSymbols,
   uploadApk,
+  type AgentConfig,
+  type AgentReportDocument,
+  type AgentReportEvidence,
+  type AgentTask,
+  type AgentToolCall,
   type CalleeView,
   type CallerView,
   type CallSiteView,
@@ -237,7 +247,8 @@ function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
         <a href={`#/projects/${project.id}`}>{project.apk_name}</a>
         <div className="row-links">
           <a href={`#/projects/${project.id}/search`}>search &amp; evidence</a> ·{" "}
-          <a href={`#/projects/${project.id}/calls`}>call graph</a>
+          <a href={`#/projects/${project.id}/calls`}>call graph</a> ·{" "}
+          <a href={`#/projects/${project.id}/agent`}>ask the agent</a>
         </div>
       </td>
       <td>
@@ -455,7 +466,320 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
       <p>
         <a href="#/">← back to the project list</a> ·{" "}
         <a href={`#/projects/${projectId}/search`}>search symbols &amp; trace evidence</a> ·{" "}
-        <a href={`#/projects/${projectId}/calls`}>the calls of one method →</a>
+        <a href={`#/projects/${projectId}/calls`}>the calls of one method →</a> ·{" "}
+        <a href={`#/projects/${projectId}/agent`}>ask the agent →</a>
+      </p>
+    </article>
+  );
+}
+
+// -- the agent workspace ----------------------------------------------------
+//
+// One question about one analysed APK. The agent runs in the background, so
+// this screen does what the upload screen does: it asks, then it polls, and
+// it shows what the task has actually done so far -- the plan, the tool log,
+// the events -- rather than an invented progress bar. The report is read from
+// the agent's own document, and its three sections are the reporter's own
+// grouping, not one this screen re-derives.
+
+const AGENT_POLL_INTERVAL_MS = 1500;
+const AGENT_POLL_LIMIT = 400; // ~10 minutes, then the wait is said rather than spun.
+
+// The statuses a poll stops at: the task will not move again on its own.
+const AGENT_TERMINAL_STATUSES = new Set(["completed", "failed", "budget_exhausted", "interrupted"]);
+
+function statusClass(status: string): string {
+  if (status === "completed") return "status status-completed";
+  if (status === "running" || status === "planning" || status === "pending") {
+    return "status status-running";
+  }
+  return "status status-failed";
+}
+
+function AgentEvidenceTable({
+  title,
+  rows,
+}: {
+  title: string;
+  rows: AgentReportEvidence[];
+}): JSX.Element {
+  return (
+    <section className="panel" aria-label={title}>
+      <h3>
+        {title} <span className="meta">({rows.length})</span>
+      </h3>
+      {rows.length === 0 ? (
+        <p className="meta">none.</p>
+      ) : (
+        <table className="projects">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Level</th>
+              <th>Kind</th>
+              <th>Summary</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item) => (
+              <tr key={item.id}>
+                <td>
+                  <code>{item.id}</code>
+                </td>
+                <td>
+                  <code>{item.level}</code>
+                </td>
+                <td>{item.kind}</td>
+                <td>{item.summary}</td>
+                <td>
+                  <code>{item.provenance[0] ?? "-"}</code>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function AgentToolTimeline({ calls }: { calls: AgentToolCall[] }): JSX.Element {
+  return (
+    <section className="panel" aria-label="tool calls">
+      <h3>
+        Tool calls <span className="meta">({calls.length})</span>
+      </h3>
+      {calls.length === 0 ? (
+        <p className="meta">no tool has been called yet.</p>
+      ) : (
+        <ol className="agent-timeline">
+          {calls.map((call, index) => (
+            <li key={index} className={call.ok ? "agent-call-ok" : "agent-call-failed"}>
+              <code>{call.tool}</code>{" "}
+              <span className="meta">
+                {call.ok ? "ok" : `failed (${call.error_kind ?? "error"})`} ·{" "}
+                {call.duration_seconds.toFixed(3)}s
+                {call.attempt > 1 ? ` · attempt ${call.attempt}` : ""}
+              </span>
+              {!call.ok && call.error && <div className="warn">{call.error}</div>}
+              <div className="agent-args">
+                <code>{JSON.stringify(call.arguments)}</code>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function AgentTaskPanel({ taskId }: { taskId: string }): JSX.Element {
+  const [task, setTask] = useState<AgentTask | null>(null);
+  const [report, setReport] = useState<AgentReportDocument | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // The poll is the whole screen while the task runs: the plan, the tool log
+  // and the events are read from the task's saved state, which the loop
+  // writes as it goes. A terminal status stops the poll and fetches the
+  // report once -- a report is a document, not a promise to keep asking.
+  useEffect(() => {
+    let stopped = false;
+    let timer = 0;
+    let polls = 0;
+    const tick = (): void => {
+      polls += 1;
+      getAgentTask(taskId)
+        .then((current) => {
+          if (stopped) return;
+          setTask(current);
+          if (AGENT_TERMINAL_STATUSES.has(current.status) || polls >= AGENT_POLL_LIMIT) {
+            window.clearInterval(timer);
+            return getAgentReport(taskId)
+              .then((document) => {
+                if (!stopped) setReport(document);
+              })
+              .catch((err: unknown) => {
+                if (!stopped) setError(errorText(err));
+              });
+          }
+        })
+        .catch((err: unknown) => {
+          // A state file is written whole, but a poll can land between the
+          // task's creation and its first save; keep asking rather than
+          // failing the screen on one not-found.
+          if (!stopped && polls >= AGENT_POLL_LIMIT) setError(errorText(err));
+        });
+    };
+    tick();
+    timer = window.setInterval(tick, AGENT_POLL_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [taskId]);
+
+  if (error) return <p className="error">the task could not be read: {error}</p>;
+  if (!task) return <p className="loading">reading the task…</p>;
+
+  const running = !AGENT_TERMINAL_STATUSES.has(task.status);
+  return (
+    <>
+      <section className="panel" aria-label="task status">
+        <h3>Task</h3>
+        <p>
+          <span className={statusClass(task.status)}>{task.status}</span> <code>{task.task_id}</code>{" "}
+          · asked {formatWhen(task.created_at)}
+        </p>
+        <p>"{task.question}"</p>
+        {task.error && <p className="error">{task.error}</p>}
+        <p className="meta">
+          budget: {task.usage.tokens}/{task.limits.max_tokens} tokens ·{" "}
+          {task.usage.iterations}/{task.limits.max_iterations} iterations ·{" "}
+          {task.usage.seconds.toFixed(1)}/{task.limits.max_seconds.toFixed(0)}s ·{" "}
+          {task.tool_calls.length} tool call(s)
+          {running ? " · the agent is working — this panel updates as it goes." : ""}
+        </p>
+      </section>
+
+      {task.plan && (
+        <section className="panel" aria-label="the plan">
+          <h3>Plan</h3>
+          <p className="meta">
+            worked out before the model was asked: it bounds which tools the task may call.
+          </p>
+          <p>
+            allowed tools:{" "}
+            {task.plan.allowed_tools.map((tool) => (
+              <code key={tool}>{tool} </code>
+            ))}
+          </p>
+          <p className="meta">
+            up to {task.plan.max_steps} tool calls, {task.plan.max_sensitive_calls} sensitive
+            read(s) before the task stops to ask.
+          </p>
+        </section>
+      )}
+
+      <AgentToolTimeline calls={task.tool_calls} />
+
+      {report && (
+        <>
+          <AgentEvidenceTable title="Established facts" rows={report.sections.established} />
+          <AgentEvidenceTable title="Leads" rows={report.sections.leads} />
+          <AgentEvidenceTable title="Insufficient evidence" rows={report.sections.insufficient} />
+          {report.limitations.length > 0 && (
+            <section className="panel" aria-label="limitations">
+              <h3>Limitations</h3>
+              <ul>
+                {report.limitations.map((item, index) => (
+                  <li key={index}>{item}</li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <section className="panel" aria-label="the report as a document">
+            <h3>The report as a document</h3>
+            <p className="meta">
+              The same report the CLI writes for a task: every finding cites the evidence or the
+              locator it rests on.
+            </p>
+            <p className="report-links">
+              <a href={agentReportUrl(taskId, "markdown")} download>
+                Markdown report
+              </a>{" "}
+              ·{" "}
+              <a href={agentReportUrl(taskId, "json")} download>
+                JSON report
+              </a>
+            </p>
+          </section>
+        </>
+      )}
+    </>
+  );
+}
+
+function AgentWorkspaceScreen({ projectId }: { projectId: string }): JSX.Element {
+  const [config, setConfig] = useState<AgentConfig | null>(null);
+  const [question, setQuestion] = useState("");
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    getAgentConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ configured: false, provider: null, model: null }));
+  }, []);
+
+  function submit(event: FormEvent): void {
+    event.preventDefault();
+    if (!question.trim() || submitting) return;
+    setSubmitting(true);
+    setFailed(null);
+    askAgent(projectId, question.trim())
+      .then((accepted) => setTaskId(accepted.task_id))
+      .catch((err: unknown) => setFailed(errorText(err)))
+      .finally(() => setSubmitting(false));
+  }
+
+  return (
+    <article>
+      <header className="project-header">
+        <h2>Agent workspace</h2>
+        <p className="meta">
+          ask about <code>{projectId}</code> — the agent answers from the analysis's own tools, and
+          every conclusion it reports names the evidence it rests on.
+        </p>
+      </header>
+
+      {config && !config.configured && (
+        <section className="panel" aria-label="no model configured">
+          <h3>No model endpoint is configured</h3>
+          <p className="warn">
+            The agent needs a model to ask its questions of. Set{" "}
+            <code>DEXATLAS_AGENT_BASE_URL</code> and <code>DEXATLAS_AGENT_MODEL</code> (and, when
+            the endpoint needs one, <code>DEXATLAS_AGENT_API_KEY</code>) in the environment of the
+            process serving this workbench. Without them a question is refused rather than answered
+            by a stand-in model.
+          </p>
+        </section>
+      )}
+
+      {config?.configured && (
+        <p className="meta">
+          model: <code>{config.model}</code> via <code>{config.provider}</code>
+        </p>
+      )}
+
+      {taskId === null && (
+        <section className="panel" aria-label="ask the agent">
+          <h3>Ask a question</h3>
+          <form className="search-form" onSubmit={submit}>
+            <input
+              type="text"
+              value={question}
+              maxLength={2000}
+              placeholder="e.g. Which permissions does this APK request?"
+              aria-label="your question about this APK"
+              onChange={(event) => setQuestion(event.target.value)}
+              disabled={!config?.configured || submitting}
+            />
+            <button type="submit" disabled={!question.trim() || !config?.configured || submitting}>
+              {submitting ? "asking…" : "ask the agent"}
+            </button>
+          </form>
+          {failed && <p className="error">{failed}</p>}
+        </section>
+      )}
+
+      {taskId !== null && <AgentTaskPanel taskId={taskId} />}
+
+      <p>
+        <a href={`#/projects/${encodeURIComponent(projectId)}`}>← back to the project</a> ·{" "}
+        <a href={`#/projects/${encodeURIComponent(projectId)}/search`}>search & evidence</a> ·{" "}
+        <a href="#/">project list</a>
       </p>
     </article>
   );
@@ -1296,6 +1620,7 @@ function CallGraphScreen({
 export default function App(): JSX.Element {
   const hash = useHashRoute();
   const callsMatch = hash.match(/^#\/projects\/([^/?#]+)\/calls(?:\?([^#]*))?$/);
+  const agentMatch = hash.match(/^#\/projects\/([^/?#]+)\/agent$/);
   const searchMatch = hash.match(/^#\/projects\/([^/?#]+)\/search$/);
   const statusMatch = hash.match(/^#\/projects\/([^/?#]+)$/);
   const [health, setHealth] = useState<Health | null>(null);
@@ -1327,6 +1652,8 @@ export default function App(): JSX.Element {
             projectId={decodeURIComponent(callsMatch[1] ?? "")}
             methodId={readMethodParam(callsMatch[2])}
           />
+        ) : agentMatch ? (
+          <AgentWorkspaceScreen projectId={decodeURIComponent(agentMatch[1] ?? "")} />
         ) : searchMatch ? (
           <SearchEvidenceScreen projectId={decodeURIComponent(searchMatch[1] ?? "")} />
         ) : statusMatch ? (
