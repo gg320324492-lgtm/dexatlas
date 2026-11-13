@@ -36,23 +36,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
-- **The web workbench, and four of its screens.** `dexatlas-workbench` serves a
-  read-only browser over a workspace: the projects it holds, each with the
-  backends that took part and the counts the analysis produced; the search and
-  evidence view, where a query returns indexed symbols, a class or method
-  opens its Java or Smali source and an evidence record's provenance locators
-  resolve to places inside that analysis; and — for one method at a time — who
-  calls it and what it calls, with the DEX file and the instruction offset each
-  call was read out of, and clickable callers and callees to walk the chain
-  with. The fourth screen is the upload: an APK chosen in the browser is
-  stored with the REST API's own policy — the same staging, the same size
-  limit, the same validation, the same refusals, one shared implementation in
+- **The web workbench, and five of its eight screens.** `dexatlas-workbench`
+  serves a read-only browser over a workspace: the projects it holds, each
+  with the backends that took part and the counts the analysis produced; the
+  upload screen, where an APK chosen in the browser is stored with the REST
+  API's own policy — the same staging, the same size limit, the same
+  validation, the same refusals, one shared implementation in
   `dexatlas.api.uploads` rather than a copy — and analysed in the background,
-  the browser polling the project's status until the run publishes. An APK
-  that was analysed before is answered with its project, not analysed again.
-  The project page exports the report: the Markdown and JSON the existing
-  renderers write over the published snapshot — the same report the CLI and
-  the REST API produce, with no second format and no changed field.
+  the browser polling the project's status until the run publishes, and an
+  APK that was analysed before is answered with its project, not analysed
+  again; the search and evidence view, where a query returns indexed
+  symbols, a class or method opens its Java or Smali source and an evidence
+  record's provenance locators resolve to places inside that analysis; the
+  cross-reference view — for one method at a time — of who calls it and what
+  it calls, with the DEX file and the instruction offset each call was read
+  out of, and clickable callers and callees to walk the chain with; and the
+  report export: the Markdown and JSON the existing renderers write over the
+  published snapshot — the same report the CLI and the REST API produce,
+  with no second format and no changed field.
 
   It calls the MCP tools' own functions in-process, so the JSON the browser
   receives is the shape the MCP server would have returned, produced by the
@@ -70,10 +71,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   uv run dexatlas-workbench      # serves http://127.0.0.1:8618
   ```
 
-  The remaining screens of the M4 set are not built, and the screen here
-  answers one method at a time rather than rendering a whole-workspace call
-  graph. The screens and the decisions they were built under:
-  `docs/architecture/workbench.md`.
+  Two screens of the M4 set are not built — the agent workspace, and the
+  benchmark view whose report-export half is the export above — and the
+  cross-reference screen answers one method at a time rather than rendering
+  a whole-workspace call graph. The screens and the decisions they were
+  built under: `docs/architecture/workbench.md`.
 
 - **The workflow is in the repository, not in a scratch directory.** The scripts
   that re-derive the documents' citations, that accept a branch, that prove a
@@ -180,7 +182,82 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for tools until the budget runs out, and on the questions whose answer is an
   absence it is the best of the three.
 
+  **A real-model run is not reproducible.** Asked at temperature 0, the same
+  question twice still does not get the same answer twice: two runs over the
+  same tasks differed by about a percentage point in the correct-answer rate
+  and by about one percent in the tokens spent. The report describes the run
+  whose traces sit beside it, a rerun is not expected to reproduce them to
+  the digit, and a difference between configurations smaller than that
+  spread is noise no row claims. The scripted measurement has no such
+  spread: its provider is a script, so its numbers come back the same on
+  every run.
+
+- **An M4 acceptance rehearsal, from a new user's chair.**
+  `docs/reports/m4-acceptance.md` walks the repository's own installation,
+  CLI, API and workbench instructions step by step, checks them against the
+  six exit criteria the plan set, and separates what passed from what was
+  missing — including the two screens that were still being built as the
+  rehearsal ran, and the places where the documents understated or
+  overstated what the tree had. The documentation fixes below are its
+  findings, fixed.
+
 ### Changed
+
+- **The health answers name the workspace, not its path.** The workbench's
+  `/api/health` carried the workspace's absolute path, which the header then
+  printed in full — the directory *name* is enough to tell workspaces apart,
+  and it is a name on every platform. This is a contract change stated here:
+  a caller that parsed the field as a path would break, and the field's
+  purpose does not need a path.
+
+- **The report says which run it describes, and whether a later attempt
+  published.** An exported report said `Status: completed` — the status of
+  the snapshot — with no way for a standalone reader to tell that a later
+  analysis had failed. The report names the run it describes and says when
+  a later attempt ended differently; the JSON carries the same two facts,
+  and its schema version moves to 2 (additive keys, a version that says the
+  shape changed rather than a silent change).
+
+- **Untrusted DEX is parsed in a worker, and the host's logging is left
+  alone.** Androguard is a library, so a malformed DEX was parsed in the
+  process that served it — one that takes the interpreter down took the
+  service with it. The parse now happens in a worker the service starts,
+  bounds and throws away, and an unparseable DEX is a recorded failure
+  rather than a dead process. The same adapter also removed *every* loguru
+  handler in the process — the host's included — and nothing could put them
+  back; the suppression is by name now.
+
+- **A deleted project's analysis goes with it.** Every run wrote into a
+  directory of its own, so deleting a project left a directory per run
+  behind it for ever; the workspace belongs to the server.
+
+- **The liveness probe was able to take the service down.** `/health` built
+  an Analyzer, which opened the workspace database — and `Store.open()`
+  wrote the schema version on every open, even when it was already right,
+  so every probe took the one write lock SQLite allows and fought the
+  analysis it was meant to protect; the loser answered 500 with "database
+  is locked". The probe depends on the backend registry alone now, the
+  version is written only when it changed, and the schema only when a
+  table is missing.
+
+- **The manifest's SDK levels come from the APK's bytes.** Apktool writes
+  its own rebuilt values into `apktool.yml`, and what it writes is not what
+  the APK says: a sample whose binary manifest carries `minSdkVersion=24`
+  decoded to an `sdkInfo` of 25. The levels are read back from the binary
+  manifest now, and `apktool.yml` is no longer trusted for them.
+
+- **A measurement of the report's figures starts from nothing.** A run
+  interrupted before pytest-cov erased the coverage file left its partial
+  record behind, and the next measurement added itself to that record — two
+  measurements of the same tree could disagree, and the freshness check
+  blamed the tree. `.coverage*` is removed from the repository root before
+  the script measures.
+
+- **The README's status banners denied what is built.** They said the MCP
+  server, the agent and the workbench were "planned, not shipped" while the
+  server and the agent have landed and the workbench has five of its eight
+  screens. Both banners now say Phase 2 is in progress and name what is
+  built, what is in the tree but unreleased, and what is not built.
 
 - **The MCP server now says "no manifest" when that is what it means.** A
   project whose Apktool step never ran has no manifest, and the tool answered
@@ -288,8 +365,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that was never there. The old names stay in the JSON report and **their
   values did not change** — but what a row *is* did, so the two old keys now
   count the call sites rather than the relationships they used to duplicate.
-  A reader who wants the relationships reads `call_edges`. The table was rebuilt rather than altered — SQLite cannot change a
-  primary key in place — and the project's count of the rows went with it, because
+  A reader who wants the relationships reads `call_edges`. The table was
+  rebuilt rather than altered — SQLite cannot change a primary key in place
+  — and the project's count of the rows went with it, because
   a record that says "23 cross-references" while the table holds nothing is a
   number a reader cannot check.
 
