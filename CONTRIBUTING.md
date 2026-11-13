@@ -40,8 +40,14 @@ JADX or Apktool backends locally.
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
 uv sync --extra dev --extra analysis
+bash scripts/fetch-fixtures.sh
 uv run pytest
 ```
+
+The fixture APKs are not committed to the repository; without
+`fetch-fixtures.sh` the integration tests that need them are **skipped** — and
+a skip is not a pass, so read the skip count in the summary line rather than
+trusting the exit code alone.
 
 Analysis backends are external binaries discovered from `PATH` or set through environment
 variables. DexAtlas degrades gracefully: a backend that is missing or crashes produces a

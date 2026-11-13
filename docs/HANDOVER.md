@@ -27,7 +27,7 @@ Phase 2 has five milestones. Three are done:
 | **M1** | The read-only MCP server | **done** — `src/dexatlas/mcp/`, ten tools, `uv run dexatlas-mcp` over stdio, **no model provider needed** |
 | **M2** | The single evidence-first agent | **done** — `src/dexatlas/agent/`: one loop, one plan, one budget, one state, one report |
 | **M3** | Evaluation and benchmarking | **half done** — 92 tasks with independently checked answers (`benchmarks/`, `docs/benchmarks/task-set.md`); **the three baselines and the metrics are not built** |
-| **M4** | Web workbench and portfolio | **not started** |
+| **M4** | Web workbench and portfolio | **not started** at this tag — **superseded**: three of its eight screens have been built since; see [`docs/status.md`](status.md) for the current state |
 
 The plan is in [`docs/roadmap/phase2-plan.md`](roadmap/phase2-plan.md), and
 the status page — in Chinese — is [`docs/status.md`](status.md). The

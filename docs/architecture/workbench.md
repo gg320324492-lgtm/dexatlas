@@ -182,8 +182,9 @@ Open the project list, choose **search & evidence** on any project (or follow
 the link on its status screen), and use the three numbered panels: search a
 phrase, click a class or method hit, then open an evidence record and click
 **resolve** beside one of its locators. With the demo APK, searching
-`Crypto` finds the class and its `sign` method, and evidence `E-0003` carries
-two Androguard locators that resolve into that analysis.
+`Crypto` finds the class and its `sign` method, and the cross-reference
+evidence `E-0004` carries two Androguard locators — the call site and the
+callee — that resolve into that analysis.
 
 The API is also the app's documentation: `/docs` serves the OpenAPI schema
 FastAPI generates.
