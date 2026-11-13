@@ -61,7 +61,7 @@ CONTRIBUTING.md 的开发设置段（`CONTRIBUTING.md:39-44`）同样没有提 f
 
 | 端点 | 实测 |
 |---|---|
-| `GET /api/health` | ✅ 返回版本与 workspace 路径 |
+| `GET /api/health` | ✅ 返回版本与 workspace 路径（P3-4 已修：现只返回目录名） |
 | `GET /api/projects` | ✅ `ProjectList` 形状，含每项目 missing_backends / truncated |
 | `GET /api/projects/{id}` | ✅ `ProjectStatus` + completeness |
 | `GET /api/projects/{id}/symbols?q=Crypto` | ✅ 每个字符串带 UntrustedText notice；空查询返回空列表而非错误 |
