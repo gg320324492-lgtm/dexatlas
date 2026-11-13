@@ -21,11 +21,13 @@ automation together in one modular, reproducible workflow — built for develope
 researchers and engineers analysing applications they own or are authorized to assess.
 
 > [!IMPORTANT]
-> **Status: early development (Phase 1 — Foundation).** The CLI, analysis core and report
-> pipeline shipped in `v0.1.0` and have been released in every version since; what is
-> outstanding is the Phase 1 source review. Agent orchestration, MCP and the web workbench
-> are *planned*, not shipped — see the [Roadmap](#roadmap). Nothing on this page claims a
-> feature that does not yet run.
+> **Status: early development (Phase 2 in progress).** The CLI, analysis core and report
+> pipeline shipped in `v0.1.0` and have been released in every version since. The MCP
+> server and the evidence-first agent are built, and the web workbench has five of its
+> eight screens (the project dashboard, upload and analysis progress, search and
+> evidence, the cross-reference view, and report export) — in the tree, but not in a
+> release yet; the agent-workspace screen and the benchmark view are not built. See the
+> [Roadmap](#roadmap). Nothing on this page claims a feature that does not yet run.
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas analysing a bundled demo APK: backend discovery, the analysis summary, exported components from the manifest, and the evidence levels in the report" width="900">
@@ -195,9 +197,9 @@ In an MCP host, add it as a stdio server:
 DexAtlas can show a workspace in a browser. The workbench sits on the same
 ten tools the MCP server exposes, called in-process — the JSON the browser
 receives is the shape the MCP server would have returned. It is the Phase 2
-plan's M4 screen set being built one screen at a time; four screens are
-built on this branch but **not released** — a published version does not
-carry them yet:
+plan's M4 screen set being built one screen at a time; five of the eight
+screens are built on this branch but **not released** — a published version
+does not carry them yet:
 
 - the **project dashboard**: the projects a workspace holds, each with the
   backends that took part and the counts the analysis produced;
@@ -210,7 +212,10 @@ carry them yet:
   locators resolve to places inside that analysis;
 - the **cross-reference view** of one method: who calls it and what it calls,
   drawn from the call sites — the DEX file and the instruction each call was
-  read out of — and walkable by clicking a caller or a callee.
+  read out of — and walkable by clicking a caller or a callee;
+- the **report export**: the project page downloads the same Markdown or JSON
+  report the CLI and the REST API write, over the published snapshot — no
+  second format and no changed field.
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp --extra demo
@@ -291,7 +296,7 @@ re-verified against the tree it was found on.
 Issues, bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 The eight tasks that planned Phase 1 are archived under
 [`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/), each carrying the
-design decisions behind it; the live work is the Phase 1 source review.
+design decisions behind it; the live work is the Phase 2 plan.
 
 Please do not open a pull request that includes an APK, decompiled source, or any code from
 an application you are not authorized to analyse. See [SECURITY.md](SECURITY.md).
