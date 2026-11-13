@@ -274,6 +274,27 @@ def read_outcome(output: str) -> Outcome:
     return Outcome(counts=outcome_counts(output), failures=failed_tests(output))
 
 
+def discard_stale_coverage() -> None:
+    """Delete any coverage data left behind by an earlier run.
+
+    A measurement is only ever about one tree, and the coverage file is where
+    a previous measurement leaves its numbers behind. A run that is
+    interrupted before pytest-cov erases the file — a Ctrl-C, a crash, a
+    collection that never got as far as the plugin — leaves those numbers in
+    place, and the next measurement adds itself to them: the report would
+    then describe a tree that no longer exists, and two measurements of the
+    same tree would disagree by whatever the interrupted one had managed to
+    cover. The file is removed before anything runs, so every measurement
+    starts from nothing.
+    """
+    stale = sorted(REPO_ROOT.glob(".coverage*"))
+    if not stale:
+        return
+    for path in stale:
+        path.unlink()
+    print(f"  discarded stale coverage data: {', '.join(path.name for path in stale)}")
+
+
 def read_coverage() -> Coverage:
     """Read the coverage the runs produced."""
     data = json.loads(run(sys.executable, "-m", "coverage", "json", "-o", "-").stdout)
@@ -1032,6 +1053,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {tag}: {entry['tests'] if entry else 'not measured'} tests")
 
     print("Running the suite with coverage (this takes a couple of minutes)...")
+    discard_stale_coverage()
     code = measure_code_tests()
     coverage = read_coverage()
     print(f"  {code.describe()} (the report's own self-checks are measured separately)")
