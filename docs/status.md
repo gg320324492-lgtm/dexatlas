@@ -214,10 +214,20 @@ where-source 任务），三配置 harness、八项指标和脚本生成的报�
 最好（12/13，A 9/13、B 8/13）。报告的「Why the failed tasks failed」表把这些
 成因逐条列出——率不带成因就是没有解释。
 
+**§5 退出标准逐条核对**（2026-11-14，逐条证据见
+[Phase 2 计划 §5](roadmap/phase2-plan.md)原文）：
+
+| 退出标准 | 结论 | 证据 |
+|---|---|---|
+| ≥30 道带可审计答案的任务 | **满足**——92 题（≥30 的三倍），答案取自样例自己的源码，可独立核对 | [任务集说明](benchmarks/task-set.md)、`benchmarks/tasks/` |
+| 每个报告指标可由仓库脚本再生 | **满足**——`--input <traces> --metrics` 重算八项指标，与两份报告逐格一致；`--report` 逐字再生报告，CI 门禁兜底 | [对比报告](benchmarks/comparison.md)、[真模型报告](benchmarks/comparison-real.md) |
+| 至少两种 model/provider 配置实测 | **满足**——scripted 与 MiniMax-M3.1-Flash（openai-compatible）各跑完 92 题 × 3 配置 = 276 条 trace，两份分开陈述 | `comparison-traces.json`、`comparison-real-traces.json` |
+| 工具执行成功率达 95% 或披露缺口 | **满足**——scripted 100%/100%/100%，真模型 100%/100%/98.9%（≥95%）；缺口不在工具调用而在任务完成，报告如实披露 | 两份报告的 The eight metrics 与 Disclosures 段 |
+| 对外代码结论可溯源或标未验证 | **部分满足**——DexAtlas 45 条非空断言中 43 条带 grounded + locator；A/B 的 86 条全部不溯源（0/86），由 `unsupported_assertion_rate` 100% 披露；agent 的 2 条不带 locator 的断言即 4.4% 的无支撑率 | 真模型 `comparison-real-traces.json` 的 assertions 字段 |
+| 对比不声称测量不支持的改进 | **满足**——两份报告均明文「never claims an improvement the measurements do not support」；scripted 报告另声明「not a model baseline」 | 两份报告的 Disclosures 段 |
+
 M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少来自模型的工具
-使用习惯；以及 §5 的两条硬标准目前只满足一条（每个指标可由脚本重算已满足，
-「comparison never claims an improvement the measurements do not support」
-本轮以「不声称哪个更好」的方式满足）。
+使用习惯。
 
 **M4 的 workbench 建了四屏**（未发布）：项目面板、APK 上传与分析进度（上传策略与
 REST API 共用同一份代码，后台分析，前端轮询项目状态）、检索与证据追溯（符号 →
