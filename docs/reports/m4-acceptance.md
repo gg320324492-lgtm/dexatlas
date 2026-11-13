@@ -182,7 +182,7 @@ security`——按「命名 job」数是 6 个，但 `test` 是双 Python 矩阵
 
 `check-version-claims.py --base auto` 报告两处（检查器自己标注「already in b5000103」）：
 `docs/releases/phase1-acceptance-2026-10-21.md:63`（提及尚未存在的 v0.2.0 tag）与
-`docs/status.md:67`（说 v0.1.3 未发布，而 tag 已存在）。M4 退出标准虽只约束 README，
+`docs/status.md:67`（说「v0.1.3 未发布」，而 tag 已存在）。M4 退出标准虽只约束 README，
 但「版本陈述与仓库一致」是本项目自己的门禁。**修法：** 归入 Phase 2 收尾的文档修订。
 
 ### P3-4 WORKSPACE 快照路径泄露为绝对路径（低危信息暴露）
