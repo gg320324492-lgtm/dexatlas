@@ -38,6 +38,17 @@ SKIP_DIRS = {
     ".mypy_cache",
 }
 
+#: Paths that are local working state, not part of the checked-out project.
+#:
+#: Everything under ``.claude/`` is ignored (``.gitignore`` line 83) because a
+#: worktree parked there is a *second* copy of the whole repository, and the
+#: relative links inside it were never written to resolve from where they sit.
+#: Walking into it makes every parallel session look broken while main is fine,
+#: so the walker stops at the directory instead of filtering its files.
+LOCAL_STATE_PATHS = {
+    ".claude",
+}
+
 #: Suffixes that mark a file as an analysis artefact rather than source.
 #:
 #: The list is longer than the five the rule started with, because an APK is not
@@ -76,11 +87,22 @@ REQUIRED_DOCS = [
 
 
 def _markdown_files() -> list[Path]:
-    return [
-        path
-        for path in REPO_ROOT.rglob("*.md")
-        if not SKIP_DIRS & set(path.relative_to(REPO_ROOT).parts)
-    ]
+    """Every markdown file that is part of the checked-out project.
+
+    A plain ``rglob`` would descend into the local working state too — into
+    ``.claude/worktrees/``, where another session's checkout is parked with
+    links that only resolve from its own directories. Those are not this
+    tree's documents, so the walk prunes those directories instead of
+    filtering their files afterwards, the way ``check-doc-citations.py``
+    prunes its own walk.
+    """
+    found: list[Path] = []
+    for root, directories, files in os.walk(REPO_ROOT):
+        directories[:] = [
+            name for name in directories if name not in SKIP_DIRS and name not in LOCAL_STATE_PATHS
+        ]
+        found.extend(Path(root) / name for name in files if name.lower().endswith(".md"))
+    return found
 
 
 @pytest.mark.parametrize("doc", REQUIRED_DOCS)
@@ -102,6 +124,33 @@ def test_all_relative_links_resolve() -> None:
                 broken.append(f"{relative}: {target}")
 
     assert not broken, "broken relative links:\n" + "\n".join(sorted(set(broken)))
+
+
+def test_link_check_ignores_the_local_working_state(tmp_path: Path) -> None:
+    """A worktree parked under ``.claude/`` is not this tree's documentation.
+
+    Another session's checkout carries links written to resolve from *its*
+    directories. When this checker walked into them, every parallel session
+    looked broken while the project's own documents were fine. The walk must
+    stop at ``.claude/`` — but still find the project's own documents, which
+    is what the planted file below asserts: a doc outside the ignored path is
+    always in the sweep, and a broken link inside it always fails this test.
+    """
+    nested = tmp_path / ".claude" / "worktrees" / "some-session"
+    nested.mkdir(parents=True)
+    (nested / "not-checked.md").write_text("[nowhere](.github/no-such-file.md)")
+
+    monkeypatched_root = tmp_path
+    monkeypatched_root.joinpath("README.md").write_text("[install](docs/install.md)")
+    (monkeypatched_root / "docs").mkdir(exist_ok=True)
+    (monkeypatched_root / "docs" / "install.md").write_text("install guide")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("tests.test_docs.REPO_ROOT", monkeypatched_root)
+        files = _markdown_files()
+
+    names = sorted(path.relative_to(monkeypatched_root).as_posix() for path in files)
+    assert names == ["README.md", "docs/install.md"]
 
 
 def test_readme_links_to_the_installation_guide() -> None:
