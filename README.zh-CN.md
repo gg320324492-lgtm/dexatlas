@@ -12,10 +12,11 @@ DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整�
 工作流，面向开发者、安全研究员，以及对自己拥有或已获授权的应用进行分析的工程师。
 
 > [!IMPORTANT]
-> **当前状态：早期开发（Phase 1 — 基础能力）。** CLI、分析内核与报告流水线在 `v0.1.0`
-> 发布，此后每个版本都在交付；未完成的是 Phase 1 的源码审核。Agent 编排、MCP 与 Web
-> 工作台属于**规划中**的能力，尚未实现——详见[路线图](#路线图)。
-> 本文档不会声称任何尚未实际可运行的功能。
+> **当前状态：早期开发（Phase 2 进行中）。** CLI、分析内核与报告流水线在 `v0.1.0`
+> 发布，此后每个版本都在交付。MCP server 与证据优先的 Agent 已经建成；Web 工作台
+> 八屏已建成五屏（项目面板、上传与分析进度、检索与证据溯源、单方法调用关系、
+> 报告导出）——已进仓库，但尚未随任何版本发布；Agent 工作区屏与基准视图尚未建成。
+> 详见[路线图](#路线图)。本文档不会声称任何尚未实际可运行的功能。
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas 分析内置演示 APK：后端发现、分析摘要、manifest 中的导出组件，以及报告中的证据等级" width="900">
@@ -158,9 +159,9 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 DexAtlas 可以在浏览器里展示分析工作区。工作台直接 in-process 调用 MCP server
 暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状完全相同；
 唯一接受输入的是上传屏，它把 APK 交给与 REST API、CLI 相同的分析管线。这是
-[Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单的四屏（项目列表 /
-单项目状态；APK 上传与分析进度；符号检索 / 证据溯源；单方法调用关系），
-已在当前分支实现但**尚未发布**；其余屏幕尚未开始。
+[Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单八屏中的五屏（项目列表 /
+单项目状态；APK 上传与分析进度；符号检索 / 证据溯源；单方法调用关系；报告导出），
+已在当前分支实现但**尚未发布**；Agent 工作区等其余屏幕尚未建成。
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp --extra demo
@@ -201,7 +202,7 @@ uv run dexatlas-workbench            # 打开 http://127.0.0.1:8618
 欢迎提交 Issue、Bug 报告与 Pull Request——详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 规划 Phase 1 的 8 个任务已归档在
 [`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/) 下，每个文件都记着
-背后的设计决策；当前的工作是 Phase 1 的源码审核。
+背后的设计决策；当前的工作是 Phase 2 计划。
 
 请勿提交包含 APK、反编译源码，或任何来自你无权分析的应用程序的代码。参见
 [SECURITY.md](SECURITY.md)。
