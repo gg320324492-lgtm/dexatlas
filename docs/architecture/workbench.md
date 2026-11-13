@@ -31,7 +31,22 @@ The screens, from the plan, and where they stand:
 | 5 | Call graph and cross-reference navigation | **built** |
 | 6 | Agent workspace | not started |
 | 7 | Evidence viewer, separating observations from hypotheses | **records + provenance** |
-| 8 | Benchmark and report export | not started |
+| 8 | Benchmark and report export | **report export built** |
+
+## Screen 8: export the report
+
+The project page carries an "Export the report" panel with two links:
+`GET /api/projects/{id}/report?format=markdown` and
+`GET /api/projects/{id}/report?format=json`. They are the renderers the CLI
+and the REST API already use — `render_markdown` and `build_json_report`
+over the published snapshot — so what the browser downloads is the same
+report `dexatlas analyze` writes to disk, with no second format and no
+changed field. The export describes the published run; a later attempt
+that failed is named by the report, not merged into it.
+
+What the screen does not yet have is the benchmark half of its title: the
+measured runs and the comparison the benchmark suite produces are not
+surfaced here.
 
 ## Screen 2: upload an APK and watch the analysis
 

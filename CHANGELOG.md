@@ -50,6 +50,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `dexatlas.api.uploads` rather than a copy — and analysed in the background,
   the browser polling the project's status until the run publishes. An APK
   that was analysed before is answered with its project, not analysed again.
+  The project page exports the report: the Markdown and JSON the existing
+  renderers write over the published snapshot — the same report the CLI and
+  the REST API produce, with no second format and no changed field.
 
   It calls the MCP tools' own functions in-process, so the JSON the browser
   receives is the shape the MCP server would have returned, produced by the

@@ -195,6 +195,15 @@ function projectUrl(projectId: string, path: string, params: Record<string, stri
   return `/api/projects/${encodeURIComponent(projectId)}/${path}${query ? `?${query}` : ""}`;
 }
 
+// -- the report export screen -----------------------------------------------
+
+// The report is a download, not a JSON answer the browser unpacks: the
+// endpoint returns the renderer's own Markdown text or JSON document, so the
+// link points straight at it and the browser handles the rest.
+export function reportUrl(projectId: string, format: "json" | "markdown"): string {
+  return projectUrl(projectId, "report", { format });
+}
+
 export function searchSymbols(
   projectId: string,
   query: string,
