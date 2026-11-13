@@ -160,6 +160,32 @@ export function getProjectStatus(projectId: string): Promise<ProjectStatus> {
   return fetchJson(`/api/projects/${encodeURIComponent(projectId)}`);
 }
 
+// -- the upload screen: one endpoint, then the project it produces ----------
+
+export interface UploadAccepted {
+  project_id: string;
+  status: string;
+  apk_sha256: string;
+  already_analysed: boolean;
+}
+
+// An upload is a multipart POST, so it goes around fetchJson: the response is
+// the same JSON contract, but the request carries a file the server streams
+// to disk under the shared upload policy.
+export async function uploadApk(file: File): Promise<UploadAccepted> {
+  const body = new FormData();
+  body.append("file", file);
+  const response = await fetch("/api/analyze", { method: "POST", body });
+  const data = (await response.json()) as Record<string, unknown>;
+  if (!response.ok) {
+    throw new ApiError(
+      String(data["code"] ?? "upload_failed"),
+      String(data["detail"] ?? data["message"] ?? response.statusText),
+    );
+  }
+  return data as unknown as UploadAccepted;
+}
+
 // A method id carries `(`, `)` and `;`, and a locator carries `#` and `->`, so
 // every query value goes through URLSearchParams — otherwise a `#` in a method
 // id would be read as the URL's own fragment and the request would ask for

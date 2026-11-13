@@ -24,14 +24,19 @@ points it somewhere else.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Query
+from fastapi import BackgroundTasks, FastAPI, File, Query, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 from starlette.requests import Request
 
 from dexatlas import __version__
+from dexatlas.api.uploads import UploadSizeLimitMiddleware, run_background_analysis, stage_upload
+from dexatlas.core import ingest
+from dexatlas.core.models import Project
+from dexatlas.core.models import ProjectStatus as ProjectState
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.mcp.errors import RequestError, unknown_project
 from dexatlas.mcp.schemas import (
@@ -74,6 +79,11 @@ def create_app(analyzer: Analyzer) -> FastAPI:
         ),
     )
     app.state.analyzer = analyzer
+    # The upload limit sits in front of the routes, as it does on the REST
+    # API: a declared body larger than the policy allows is refused before
+    # the framework reads it. The staging, inspection and storage behind the
+    # upload endpoint are the same shared policy the REST API runs.
+    app.add_middleware(UploadSizeLimitMiddleware, limit=lambda: ingest.MAX_APK_BYTES)
 
     @app.exception_handler(RequestError)
     def request_error(request: Request, exc: RequestError) -> JSONResponse:
@@ -211,6 +221,56 @@ def create_app(analyzer: Analyzer) -> FastAPI:
     ) -> LocatorResolution:
         """Whether one provenance locator names a place inside this analysis."""
         return evidence_tools.resolve_locator(analyzer, project_id, locator)
+
+    # -- the upload screen ---------------------------------------------------
+    #
+    # The one place the workbench accepts bytes. The policy is the REST API's
+    # own -- the same staging, the same size limit, the same inspection, the
+    # same hash-addressed storage -- so a file the API refuses the workbench
+    # refuses with the same status and the same words. What differs is only
+    # what an accepted upload does next: here it analyses in the background
+    # and the browser is pointed at the project it will produce, which the
+    # browser then polls until the run publishes or fails.
+
+    class UploadAccepted(BaseModel):
+        """An upload the workbench took, and where to watch it."""
+
+        project_id: str
+        status: str
+        apk_sha256: str
+        already_analysed: bool = Field(
+            description=(
+                "The workspace already held this APK's analysis; nothing new runs, "
+                "and the browser can open the project at once."
+            )
+        )
+
+    @app.post("/api/analyze", response_model=UploadAccepted, status_code=202)
+    def upload_and_analyze(
+        background: BackgroundTasks,
+        file: Annotated[UploadFile, File(description="An APK you are authorized to analyse.")],
+    ) -> UploadAccepted:
+        """Store an APK with the shared upload policy, and analyse it in the background."""
+        settings = analyzer.settings
+        apk, target, _name = stage_upload(file, settings)
+
+        existing = analyzer.store.find_project_by_hash(apk.sha256)
+        if existing is not None and existing.status is not ProjectState.FAILED:
+            return UploadAccepted(
+                project_id=existing.id,
+                status=existing.status.value,
+                apk_sha256=apk.sha256,
+                already_analysed=True,
+            )
+
+        background.add_task(run_background_analysis, analyzer, target, apk)
+        project_id = Project.new_id(apk.sha256)
+        return UploadAccepted(
+            project_id=project_id,
+            status="pending",
+            apk_sha256=apk.sha256,
+            already_analysed=False,
+        )
 
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")

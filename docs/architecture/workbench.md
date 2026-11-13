@@ -1,8 +1,11 @@
 # The web workbench
 
-DexAtlas can show its analysis in a browser. The workbench is **read-only**:
-it reads a workspace, and it never writes, never analyses, and never runs a
-shell. It is the M4 screen set of the [Phase 2 plan](../roadmap/phase2-plan.md)
+DexAtlas can show its analysis in a browser. The workbench is **read-only
+over an existing analysis**: it reads a workspace, and it never writes,
+never runs a shell, and never analyses an APK on its own schedule. The one
+exception is the upload screen, which hands an APK to exactly the same
+analysis pipeline the REST API and the CLI run. It is the M4 screen set of
+the [Phase 2 plan](../roadmap/phase2-plan.md)
 being built one screen at a time; this document says what exists now, how to
 run it, and the decisions the first two screens were built under.
 
@@ -22,13 +25,42 @@ The screens, from the plan, and where they stand:
 | # | Screen | Status |
 |---|---|---|
 | 1 | Project dashboard with backend status | **built** |
-| 2 | APK upload and analysis progress | not started |
+| 2 | APK upload and analysis progress | **built** |
 | 3 | Package / class / method explorer | **search + source viewer** |
 | 4 | Java & Smali source viewer with source-location links | **source + locator resolution** |
 | 5 | Call graph and cross-reference navigation | **built** |
 | 6 | Agent workspace | not started |
 | 7 | Evidence viewer, separating observations from hypotheses | **records + provenance** |
 | 8 | Benchmark and report export | not started |
+
+## Screen 2: upload an APK and watch the analysis
+
+The upload screen sits above the project list. A file is chosen, handed to
+`POST /api/analyze`, and the analysis runs in a background task; the browser
+polls the project's status until the run publishes or fails, and then moves
+to the project page. Four things were decided deliberately:
+
+- **The policy is the REST API's, not a copy.** The staging, the name
+  sanitising, the size limit, the archive inspection and the
+  hash-addressed storage live in `dexatlas.api.uploads`, and both
+  transports call the same functions. A file the API refuses, the
+  workbench refuses with the same status and the same words: 413 for a
+  body over the limit, 422 for a file that is not an APK, 413 again for
+  a declared length over the limit before the body is read.
+- **An APK that was analysed before is answered with its project.** The
+  response says `already_analysed: true`, and the browser opens the
+  project instead of waiting for an analysis that is not going to run.
+- **The wait is shown as a wait.** Analysis is synchronous and CPU-bound;
+  nothing reports a percentage, so the screen does not invent one. It
+  says the analysis is running, and it polls `get_project_status` — the
+  same read-only tool the dashboard uses — until the project is
+  `completed` or `failed`.
+- **No upload, no analysis, no writes outside the pipeline.** The
+  workbench itself still writes nothing but what the shared upload
+  policy and the analysis pipeline write: the upload lands in the
+  workspace's `uploads/` directory and the run's results in the project's
+  own run directory, exactly as for the REST API.
+
 
 Screen 1 calls `list_projects` and `get_project_status` — the two tools that
 answer what a workspace holds and how complete each analysis is.
