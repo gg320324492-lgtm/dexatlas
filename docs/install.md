@@ -10,6 +10,7 @@ command actually printed.
 | Python          | 3.12+   | 3.12 and 3.13 are tested in CI                             |
 | [uv](https://docs.astral.sh/uv/) | latest | Package manager and environment manager         |
 | JDK             | 21+     | Required by the JADX and Apktool backends                   |
+| [Node.js](https://nodejs.org/) + npm | 18+ | Only to build the web workbench front end; not needed for the CLI, the API or the agent |
 
 Analysis backends are optional and independent — see [Backends](#backends).
 

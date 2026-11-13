@@ -22,16 +22,18 @@
 | 测试 | <!--fig:tests.total-->1303<!--/fig--> 个（<!--fig:tests.fast-->1160<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->90.9%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
-| CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
+| CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
-**CI 的六个 job 各自覆盖一种配置**，不是重复：
+**CI 的六个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
+矩阵，展开后是七个并行运行）：
 
 | Job | 覆盖什么 |
 |---|---|
 | Tests (Python 3.12) | 全部后端 |
 | Tests (Python 3.13) | **两个外部后端都不在**——JADX 和 Apktool 需要 Java，Androguard 是 Python 包，还在 |
 | Tests (Apktool only, no JADX) | **Apktool 在、JADX 不在**——Smali 回退存在的理由 |
+| M3 comparison stays reproducible | 从已提交的 92 题对比 trace 重算八项指标，**报告与数据保持可复现** |
 | Docker image builds | 镜像里三个后端真的能跑 |
 | Dependency audit | 锁文件的已知漏洞 |
 | Lint and format | ruff、mypy、**actionlint**（workflow 文件本身）、**版本状态陈述检查** |
@@ -64,7 +66,7 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 **Phase 1 已于 2026-10-21 验收通过**，基准是固定的提交
 `a1e81ce8ae262b84fa06bc5a3afb995fd0238660`（milestone tag `phase1-acceptance-2026-10-21`）。
-**那不是 v0.1.3**——它比 v0.1.3 领先 76 个提交，评审做出的东西**一个都还没发布**。
+**那不是 v0.1.3**——它比 v0.1.3 领先 76 个提交。评审做出的东西「在 Phase 1 验收时（2026-10-21）一个都尚未发布」；那之后 v0.1.3 才于 2026-10-20 打上 tag（见第 2 节），评审成果的发布状态以 [releases/](releases/) 与 CHANGELOG 为准。
 
 按路线图约定的评审机制，Phase 1 的源码审核是 Phase 2 的准入条件，
 **Phase 2 的任务清单在审核结论之后写**，而不是照搬原计划
