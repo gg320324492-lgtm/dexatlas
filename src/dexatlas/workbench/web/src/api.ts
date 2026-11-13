@@ -263,3 +263,151 @@ export function findCallees(
 ): Promise<CalleeView> {
   return fetchJson(projectUrl(projectId, "callees", { method_id: methodId, limit: String(limit) }));
 }
+
+// -- the agent workspace ----------------------------------------------------
+//
+// One question about one analysed APK. The task is accepted with a 202 and
+// the answer arrives by polling, exactly as an upload's analysis does; the
+// report is the agent's own document, not a shape this file invents.
+
+export interface AgentConfig {
+  configured: boolean;
+  provider: string | null;
+  model: string | null;
+}
+
+export interface AgentTaskAccepted {
+  task_id: string;
+  project_id: string;
+  status: string;
+  question: string;
+}
+
+export interface AgentBudgetUsage {
+  tokens: number;
+  iterations: number;
+  seconds: number;
+}
+
+export interface AgentBudget {
+  max_tokens: number;
+  max_iterations: number;
+  max_seconds: number;
+}
+
+export interface AgentPlan {
+  project_id: string;
+  question: string;
+  allowed_tools: string[];
+  steps: { tool: string; purpose: string; sensitive: boolean }[];
+  max_steps: number;
+  max_sensitive_calls: number;
+  limits: AgentBudget;
+}
+
+export interface AgentToolCall {
+  tool: string;
+  arguments: Record<string, unknown>;
+  ok: boolean;
+  attempt: number;
+  error: string | null;
+  error_kind: string | null;
+  duration_seconds: number;
+  started_at: string;
+}
+
+export interface AgentEvent {
+  at: string;
+  kind: string;
+  message: string;
+}
+
+export interface AgentTask {
+  task_id: string;
+  question: string;
+  status: string;
+  project_id: string | null;
+  run_id: string | null;
+  plan: AgentPlan | null;
+  tool_calls: AgentToolCall[];
+  events: AgentEvent[];
+  usage: AgentBudgetUsage;
+  limits: AgentBudget;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+  findings_count: number;
+}
+
+// The evidence record, as the agent report carries it: the same shape the
+// MCP `get_evidence` tool answers with, under this report's own id.
+export interface AgentReportEvidence {
+  id: string;
+  kind: string;
+  level: string;
+  summary: string;
+  detail: Record<string, unknown>;
+  provenance: string[];
+}
+
+export interface AgentReportDocument {
+  schema_version: number;
+  kind: string;
+  generated_at: string;
+  task: {
+    id: string;
+    question: string;
+    status: string;
+    project_id: string | null;
+    run_id: string | null;
+  };
+  findings: AgentReportEvidence[];
+  findings_by_level: Record<string, number>;
+  tool_calls: AgentToolCall[];
+  budget: { used: AgentBudgetUsage; limits: AgentBudget };
+  limitations: string[];
+  events: AgentEvent[];
+  error: string | null;
+  sections: {
+    established: AgentReportEvidence[];
+    leads: AgentReportEvidence[];
+    insufficient: AgentReportEvidence[];
+  };
+}
+
+export function getAgentConfig(): Promise<AgentConfig> {
+  return fetchJson("/api/agent/config");
+}
+
+// A question is a JSON POST, so it goes around fetchJson like the upload
+// does: the acknowledgement is a 202, and a refused question (no model
+// configured, an unknown project) is the error document in `detail`.
+export async function askAgent(projectId: string, question: string): Promise<AgentTaskAccepted> {
+  const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/agent/tasks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+  });
+  const data = (await response.json()) as Record<string, unknown>;
+  if (!response.ok) {
+    const detail = data["detail"] as Record<string, unknown> | undefined;
+    throw new ApiError(
+      String(detail?.["code"] ?? data["code"] ?? "agent_task_refused"),
+      String(detail?.["message"] ?? data["message"] ?? response.statusText),
+    );
+  }
+  return data as unknown as AgentTaskAccepted;
+}
+
+export function getAgentTask(taskId: string): Promise<AgentTask> {
+  return fetchJson(`/api/agent/tasks/${encodeURIComponent(taskId)}`);
+}
+
+export function getAgentReport(taskId: string): Promise<AgentReportDocument> {
+  return fetchJson(`/api/agent/tasks/${encodeURIComponent(taskId)}/report`);
+}
+
+export function agentReportUrl(taskId: string, format: "json" | "markdown"): string {
+  return `/api/agent/tasks/${encodeURIComponent(taskId)}/report?format=${format}`;
+}
+

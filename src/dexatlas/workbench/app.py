@@ -23,16 +23,19 @@ points it somewhere else.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
+from uuid import uuid4
 
-from fastapi import BackgroundTasks, FastAPI, File, Query, UploadFile
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.requests import Request
 
 from dexatlas import __version__
+from dexatlas.agent.state import TaskState
 from dexatlas.api.uploads import UploadSizeLimitMiddleware, run_background_analysis, stage_upload
 from dexatlas.core import ingest
 from dexatlas.core.models import Project
@@ -57,6 +60,7 @@ from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
+from dexatlas.workbench import agent_tasks as agent
 
 # The built front end. `npm run build` writes it; `python -m
 # dexatlas.workbench` builds it on first start when npm is available. The
@@ -330,6 +334,126 @@ def create_app(analyzer: Analyzer) -> FastAPI:
             return PlainTextResponse(render_markdown(result), media_type="text/markdown")
         return build_json_report(result)
 
+    # -- the agent workspace --------------------------------------------------
+    #
+    # One question about one analysed APK, answered by the evidence-first
+    # agent. The loop is synchronous and slow -- it plans, it calls tools, it
+    # asks a model, it checks its conclusions -- so it runs in the background
+    # exactly as an upload's analysis does: the question is accepted at once,
+    # the browser polls the task, and the report arrives when the loop says
+    # it is finished.
+    #
+    # The model endpoint is configuration, not convention: its address, its
+    # model name and its key arrive through environment variables, the key
+    # never leaves the request headers, and with nothing configured the
+    # endpoint refuses the question rather than quietly answering with a
+    # stand-in model. Tests inject a provider through ``app.state``, which is
+    # also why the factory is read per request rather than at import time.
+
+    @app.get("/api/agent/config", response_model=agent.AgentConfigView)
+    def agent_config() -> agent.AgentConfigView:
+        """Whether a model endpoint is configured — and which one, never its key."""
+        try:
+            config = agent.read_agent_model_config()
+        except RequestError as exc:
+            # A provider kind the project does not speak is a configuration
+            # error worth naming; the screen still shows the unconfigured
+            # state rather than crashing on it.
+            raise HTTPException(status_code=400, detail=exc.as_dict()) from exc
+        if config is None:
+            return agent.AgentConfigView(configured=False)
+        return agent.AgentConfigView(
+            configured=True, provider=config.provider_kind, model=config.model
+        )
+
+    def _agent_provider() -> Any:
+        """The provider to run a task with, from the app's factory or the environment."""
+        factory = getattr(app.state, "agent_provider_factory", None)
+        if factory is not None:
+            return factory()
+        return agent.default_agent_provider_factory()
+
+    def _agent_state(task_id: str) -> TaskState:
+        """One task's state, or the MCP contract's unknown-id error."""
+        state = agent.agent_task_store(analyzer).load(task_id)
+        if state is None:
+            raise RequestError(
+                f"this workspace holds no agent task {task_id!r}",
+                code="unknown_agent_task",
+                task_id=task_id,
+            )
+        return state
+
+    @app.post(
+        "/api/projects/{project_id}/agent/tasks",
+        response_model=agent.AgentTaskAccepted,
+        status_code=202,
+    )
+    def ask_agent(
+        project_id: str,
+        question: agent.AgentQuestion,
+        background: BackgroundTasks,
+    ) -> agent.AgentTaskAccepted:
+        """Ask the agent a question about an analysed APK, and poll for the answer."""
+        if analyzer.store.get_project(project_id) is None:
+            raise unknown_project(project_id)
+        provider = _agent_provider()
+        if provider is None:
+            raise HTTPException(
+                status_code=503,
+                detail={
+                    "code": "agent_not_configured",
+                    "message": (
+                        "no model endpoint is configured; set "
+                        f"{agent.AGENT_BASE_URL_ENV} and {agent.AGENT_MODEL_ENV} "
+                        "(and, when the endpoint needs one, "
+                        f"{agent.AGENT_API_KEY_ENV}) to ask the agent a question"
+                    ),
+                },
+            )
+        store = agent.agent_task_store(analyzer)
+        state = TaskState(
+            task_id=new_agent_task_id(),
+            question=question.question,
+            project_id=project_id,
+            limits=agent.budget_from_env(),
+            created_at=_now_iso(),
+            updated_at=_now_iso(),
+        )
+        store.save(state)
+        background.add_task(
+            agent.run_agent_task,
+            analyzer,
+            task_id=state.task_id,
+            question=question.question,
+            project_id=project_id,
+            provider=provider,
+            store=store,
+            limits=state.limits,
+        )
+        return agent.AgentTaskAccepted(
+            task_id=state.task_id,
+            project_id=project_id,
+            status=state.status.value,
+            question=state.question,
+        )
+
+    @app.get("/api/agent/tasks/{task_id}", response_model=agent.AgentTaskView)
+    def agent_task_status(task_id: str) -> agent.AgentTaskView:
+        """One agent task: its plan, its tool log and its budget, as they stand."""
+        return agent.task_view(_agent_state(task_id))
+
+    @app.get("/api/agent/tasks/{task_id}/report")
+    def agent_task_report(
+        task_id: str,
+        format: Annotated[str, Query(pattern="^(json|markdown)$")] = "json",
+    ) -> Any:
+        """The agent's report, in the project's own JSON or Markdown shape."""
+        state = _agent_state(task_id)
+        if format == "markdown":
+            return PlainTextResponse(agent.agent_report_markdown(state), media_type="text/markdown")
+        return agent.agent_report_payload(state)
+
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")
     else:
@@ -356,6 +480,22 @@ def _published_status_of(run: Any) -> ProjectState:
     if run.status.value in known:
         return ProjectState(run.status.value)
     return ProjectState.FAILED
+
+
+def new_agent_task_id() -> str:
+    """The id one agent task is announced and polled under.
+
+    The orchestrator would mint its own id; the workbench mints it first so
+    the browser holds the same id from the 202 acknowledgement onward. The
+    shape is the orchestrator's own: twelve hex characters, as the task
+    files under the workspace's ``agent-tasks/`` directory are named.
+    """
+    return uuid4().hex[:12]
+
+
+def _now_iso() -> str:
+    """The moment, as the task states and the reports carry it."""
+    return datetime.now(UTC).isoformat()
 
 
 def front_end_is_built() -> bool:
