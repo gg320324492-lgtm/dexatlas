@@ -220,6 +220,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 | `test_version_fields.py` | 五个自建 APK 的 versionCode/versionName：源码、入库 yml、真实解码产物与 ManifestInfo 都和二进制 manifest 一致（同源字段排查新增） |
 | `test_workbench.py` | M4 前四屏：列表与状态、上传与分析进度、符号检索与源码、证据记录与 locator 解析、调用关系都仍是 MCP 契约的形状；没有调用者的方法答 0 而不是 404 |
+| `test_workbench_agent.py` | M4 屏 6：agent 工作区的任务接口——问题被受理为可轮询的任务，报告是 agent reporter 自己的文档，未配置模型时明确拒绝，key 不离开 provider |
 | `test_refresh_coverage_hygiene.py` | 报告测量前清掉残留的 .coverage：被中止的运行不能让同一棵树测出两个数 |
 | `test_backend_timeout_exit.py` | 后端超时分支被测试真实走到，而不是靠覆盖率测量碰巧经过 |
 
