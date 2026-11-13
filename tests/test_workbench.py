@@ -18,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dexatlas.config.settings import Settings
+from dexatlas.core import ingest
 from dexatlas.core.calls import CallSite
 from dexatlas.core.models import (
     ApkMetadata,
@@ -40,6 +41,7 @@ from dexatlas.mcp.schemas import DATA_NOTICE, DEFAULT_LIMIT
 from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 from dexatlas.workbench.app import create_app
+from tests.conftest import build_apk
 
 FAKE_SHA256 = "ab" * 32
 CLASS_NAME = "com.example.demo.Crypto"
@@ -746,3 +748,121 @@ def test_root_serves_the_built_front_end(tmp_path: Path) -> None:
             response = test_client.get("/")
     assert response.status_code == 200
     assert "workbench" in response.text
+
+
+# ---------------------------------------------------------------------------
+# The upload screen
+# ---------------------------------------------------------------------------
+
+
+class _StubAnalyzer:
+    """An Analyzer-shaped stand-in: the upload policy is what is under test.
+
+    The endpoint calls the shared policy with a real Analyzer, and only the
+    background analysis is replaced -- analysis is the CPU-bound part the
+    tests must not run. Everything the policy touches (the workspace, the
+    store, the settings) is the real thing, so a stored upload is a real
+    file in the workspace this client was built around.
+    """
+
+    def __init__(self, analyzer: Analyzer) -> None:
+        self.settings = analyzer.settings
+        self.store = analyzer.store
+        self._analyze_calls: list[Path] = []
+
+    def analyze(self, apk_path: Path, **kwargs: object):
+        self._analyze_calls.append(apk_path)
+        raise AssertionError("the stub analysis should be replaced per test")
+
+
+def _upload_client(tmp_path: Path) -> Iterator[tuple[TestClient, _StubAnalyzer]]:
+    settings = Settings(workspace=tmp_path / "workspace")
+    settings.ensure_workspace()
+    real = Analyzer(settings)
+    stub = _StubAnalyzer(real)
+    with TestClient(create_app(stub)) as test_client:
+        yield test_client, stub
+
+
+def test_upload_stores_and_accepts_an_apk(tmp_path: Path) -> None:
+    """A valid APK is stored under the shared policy and queued for analysis."""
+    client, _stub = next(_upload_client(tmp_path))
+    apk = build_apk(tmp_path / "demo.apk")
+
+    response = client.post(
+        "/api/analyze",
+        files={"file": ("demo.apk", apk.read_bytes(), "application/vnd.android.package-archive")},
+    )
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["status"] == "pending"
+    assert body["already_analysed"] is False
+    assert body["project_id"].startswith("apk_")
+    # The stored upload is a real file in the workspace, in the shared
+    # hash-addressed layout both transports use.
+    stored = list((tmp_path / "workspace" / "uploads").rglob("demo.apk"))
+    assert len(stored) == 1
+    assert body["apk_sha256"] in str(stored[0])
+
+
+def test_upload_rejects_a_non_apk_with_the_shared_words(tmp_path: Path) -> None:
+    """A file that is not an APK is refused before any analysis is queued."""
+    client, _stub = next(_upload_client(tmp_path))
+
+    response = client.post(
+        "/api/analyze", files={"file": ("notes.txt", b"not a zip", "text/plain")}
+    )
+
+    assert response.status_code == 422
+
+
+def test_upload_over_the_limit_is_refused_like_the_api(tmp_path: Path) -> None:
+    """The workbench's limit is the shared limit, enforced in front of the route."""
+    client, _stub = next(_upload_client(tmp_path))
+    limit = 1024
+    original = ingest.MAX_APK_BYTES
+    ingest.MAX_APK_BYTES = limit
+    try:
+        response = client.post(
+            "/api/analyze",
+            files={"file": ("big.apk", b"x" * (limit * 4), "application/octet-stream")},
+        )
+    finally:
+        ingest.MAX_APK_BYTES = original
+
+    assert response.status_code == 413
+    assert str(limit) in response.json()["detail"]
+    uploads = tmp_path / "workspace" / "uploads"
+    assert not uploads.exists() or list(uploads.iterdir()) == []
+
+
+def test_upload_of_an_analysed_apk_answers_the_existing_project(tmp_path: Path) -> None:
+    """The same bytes twice: the second upload opens the first analysis."""
+    iterator = _upload_client(tmp_path)
+    client, stub = next(iterator)
+    apk = build_apk(tmp_path / "demo.apk")
+    files = {"file": ("demo.apk", apk.read_bytes(), "application/vnd.android.package-archive")}
+    first = client.post("/api/analyze", files=files).json()
+
+    # Publish the analysis the way the real background task would, then send
+    # the same bytes again.
+    project_id = first["project_id"]
+    analyzer = Analyzer(stub.settings)
+    analyzer.store.save_project(
+        Project(
+            id=project_id,
+            apk=ApkMetadata(sha256=first["apk_sha256"], size_bytes=apk.stat().st_size, path=apk),
+            status=ProjectState.COMPLETED,
+            tool_versions={},
+        ),
+        stub.settings.workspace / "projects" / project_id,
+        manifest=None,
+    )
+    second = client.post("/api/analyze", files=files)
+
+    assert second.status_code == 202
+    body = second.json()
+    assert body["already_analysed"] is True
+    assert body["project_id"] == project_id
+    assert body["status"] == "completed"

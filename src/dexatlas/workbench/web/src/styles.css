@@ -257,6 +257,18 @@ button:hover {
   text-decoration: underline;
 }
 
+/* The upload panel sits above the project list */
+
+.upload-panel input[type="file"] {
+  color: var(--muted);
+}
+
+.upload-panel .ok,
+.upload-panel .error,
+.upload-panel .loading {
+  margin: 0.2rem 0;
+}
+
 ul.symbols,
 ul.evidence-list,
 ul.locators {

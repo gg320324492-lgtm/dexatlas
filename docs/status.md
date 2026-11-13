@@ -19,8 +19,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->1287<!--/fig--> 个（<!--fig:tests.fast-->1144<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->90.7%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1291<!--/fig--> 个（<!--fig:tests.fast-->1148<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->90.8%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 job 全绿：Python 3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / Lint |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -217,9 +217,10 @@ M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少�
 「comparison never claims an improvement the measurements do not support」
 本轮以「不声称哪个更好」的方式满足）。
 
-**M4 的 workbench 建了三屏**（未发布）：项目面板、检索与证据追溯（符号 → 类/方法
-源码 → 证据记录 → locator 解析）、单个方法的调用关系视图（谁调用它、它调用
-谁，按调用点画出，点了节点就能跳到下一个方法）。三屏都坐在同一套只读 MCP
+**M4 的 workbench 建了四屏**（未发布）：项目面板、APK 上传与分析进度（上传策略与
+REST API 共用同一份代码，后台分析，前端轮询项目状态）、检索与证据追溯（符号 →
+类/方法源码 → 证据记录 → locator 解析）、单个方法的调用关系视图（谁调用它、它调用
+谁，按调用点画出，点了节点就能跳到下一个方法）。四屏都坐在同一套只读 MCP
 工具上，浏览器拿到的 JSON 就是工具自己的形状，测试逐个端点比对
 `model_dump()`；没有调用者的方法答 0 而不是 404——把「分析没读到调用」
 说成「这个方法不存在」，正是这个项目要避免的混淆。

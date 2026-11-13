@@ -1030,7 +1030,7 @@ androguard:classes.dex#com.example.multidex.SharedConfig
 androguard:classes2.dex#com.example.multidex.SharedConfig
 ```
 
-第三条（JADX）被截掉了，而 REST API（`api/app.py:732-745` 返回完整的
+第三条（JADX）被截掉了，而 REST API（`api/app.py:735-759` 返回完整的
 `model_dump`）返回的是**全部三条**——**CLI 看到的比 API 看到的少**。
 
 **现在的行为：** 默认仍然只显示前两条（一个类可能有几十条来源，全倒出来没法看），

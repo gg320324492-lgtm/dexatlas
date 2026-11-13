@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type JSX } from "react";
+import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import {
   ApiError,
   findCallers,
@@ -12,6 +12,7 @@ import {
   listProjects,
   resolveLocator,
   searchSymbols,
+  uploadApk,
   type CalleeView,
   type CallerView,
   type CallSiteView,
@@ -90,6 +91,136 @@ function BackendsWarning({ missing }: { missing: string[] }): JSX.Element | null
   );
 }
 
+// The upload screen lives beside the project list: a file is chosen here,
+// handed to the same endpoint the REST API serves (so the same limits and the
+// same refusals apply), and the analysis runs in the background. The browser
+// polls the project's status until the run publishes or fails, and then moves
+// to the project page. Analysis is synchronous and CPU-bound on the server;
+// the honest front end shows that as a wait, not as a progress bar that
+// invents percentages nothing reports.
+type UploadPhase =
+  | { kind: "idle" }
+  | { kind: "uploading"; name: string }
+  | { kind: "analysing"; name: string; projectId: string }
+  | { kind: "done"; name: string; projectId: string; alreadyAnalysed: boolean }
+  | { kind: "failed"; name: string; message: string };
+
+const POLL_INTERVAL_MS = 1500;
+const POLL_LIMIT = 600; // ~15 minutes, then the wait is reported rather than spun.
+
+function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX.Element {
+  const [phase, setPhase] = useState<UploadPhase>({ kind: "idle" });
+  const [inputValue, setInputValue] = useState("");
+  const fileInput = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (phase.kind !== "analysing") return;
+    let stops = 0;
+    const timer = window.setInterval(() => {
+      stops += 1;
+      getProjectStatus(phase.projectId)
+        .then((status) => {
+          if (status.project.status === "completed" || status.project.status === "failed") {
+            window.clearInterval(timer);
+            setPhase({
+              kind: "done",
+              name: phase.name,
+              projectId: phase.projectId,
+              alreadyAnalysed: false,
+            });
+          }
+        })
+        .catch(() => {
+          // A project row may not be visible to the list until the run
+          // publishes; keep asking rather than failing the screen on a
+          // single not-found.
+        });
+      if (stops >= POLL_LIMIT) {
+        window.clearInterval(timer);
+        setPhase({
+          kind: "failed",
+          name: phase.name,
+          message: "the analysis is still running after a long while; check the project list later",
+        });
+      }
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [phase]);
+
+  function submit(event: FormEvent): void {
+    event.preventDefault();
+    const file = fileInput.current?.files?.[0];
+    if (!file) return;
+    setPhase({ kind: "uploading", name: file.name });
+    uploadApk(file)
+      .then((accepted) => {
+        if (accepted.already_analysed) {
+          setPhase({ kind: "done", name: file.name, projectId: accepted.project_id, alreadyAnalysed: true });
+        } else {
+          setPhase({ kind: "analysing", name: file.name, projectId: accepted.project_id });
+        }
+      })
+      .catch((err: unknown) =>
+        setPhase({ kind: "failed", name: file.name, message: errorText(err) }),
+      );
+  }
+
+  function reset(): void {
+    setPhase({ kind: "idle" });
+    setInputValue("");
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  return (
+    <section className="panel upload-panel" aria-label="upload an APK">
+      <h3>Upload an APK</h3>
+      {phase.kind === "idle" && (
+        <form className="search-form" onSubmit={submit}>
+          <input
+            ref={fileInput}
+            type="file"
+            accept=".apk,application/vnd.android.package-archive"
+            aria-label="the APK file to analyse"
+            value={inputValue}
+            onChange={(event) => setInputValue(event.target.value)}
+          />
+          <button type="submit" disabled={!inputValue}>
+            upload & analyse
+          </button>
+        </form>
+      )}
+      {phase.kind === "uploading" && (
+        <p className="loading">
+          storing <code>{phase.name}</code>…
+        </p>
+      )}
+      {phase.kind === "analysing" && (
+        <p className="loading">
+          <code>{phase.name}</code> is stored; the analysis is running — this can take a while.
+          {" "}
+          <button className="link-button" onClick={reset}>upload another</button>
+        </p>
+      )}
+      {phase.kind === "done" && (
+        <p className="ok">
+          {phase.alreadyAnalysed ? "already analysed: " : "analysis finished: "}
+          <code>{phase.name}</code>{" "}
+          <button className="link-button" onClick={() => onReady(phase.projectId)}>
+            open the project →
+          </button>{" "}
+          <button className="link-button" onClick={reset}>upload another</button>
+        </p>
+      )}
+      {phase.kind === "failed" && (
+        <p className="error">
+          <code>{phase.name}</code> was not analysed: {phase.message}{" "}
+          <button className="link-button" onClick={reset}>try again</button>
+        </p>
+      )}
+    </section>
+  );
+}
+
 function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
   return (
     <tr>
@@ -117,6 +248,10 @@ function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
   );
 }
 
+function openProject(projectId: string): void {
+  window.location.hash = `#/projects/${encodeURIComponent(projectId)}`;
+}
+
 function ProjectListScreen(): JSX.Element {
   const [data, setData] = useState<ProjectList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -131,15 +266,18 @@ function ProjectListScreen(): JSX.Element {
   if (!data) return <p className="loading">reading the workspace…</p>;
   if (data.projects.length === 0) {
     return (
-      <p className="empty">
-        this workspace holds no analysed APK yet. Analyse one with
-        {" "}
-        <code>dexatlas analyze &lt;apk&gt;</code> and it appears here.
-      </p>
+      <>
+        <UploadPanel onReady={openProject} />
+        <p className="empty">
+          this workspace holds no analysed APK yet. Upload one here, or analyse it with{" "}
+          <code>dexatlas analyze &lt;apk&gt;</code> and it appears here.
+        </p>
+      </>
     );
   }
   return (
     <>
+      <UploadPanel onReady={openProject} />
       <table className="projects">
         <thead>
           <tr>

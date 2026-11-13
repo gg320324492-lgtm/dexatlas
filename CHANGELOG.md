@@ -36,7 +36,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
-- **The web workbench, and three of its screens.** `dexatlas-workbench` serves a
+- **The web workbench, and four of its screens.** `dexatlas-workbench` serves a
   read-only browser over a workspace: the projects it holds, each with the
   backends that took part and the counts the analysis produced; the search and
   evidence view, where a query returns indexed symbols, a class or method
@@ -44,7 +44,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   resolve to places inside that analysis; and — for one method at a time — who
   calls it and what it calls, with the DEX file and the instruction offset each
   call was read out of, and clickable callers and callees to walk the chain
-  with.
+  with. The fourth screen is the upload: an APK chosen in the browser is
+  stored with the REST API's own policy — the same staging, the same size
+  limit, the same validation, the same refusals, one shared implementation in
+  `dexatlas.api.uploads` rather than a copy — and analysed in the background,
+  the browser polling the project's status until the run publishes. An APK
+  that was analysed before is answered with its project, not analysed again.
 
   It calls the MCP tools' own functions in-process, so the JSON the browser
   receives is the shape the MCP server would have returned, produced by the

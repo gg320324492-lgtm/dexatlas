@@ -19,15 +19,11 @@ background task is honest about what it is rather than pretending to scale.
 from __future__ import annotations
 
 import logging
-import os
-import threading
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
-from uuid import uuid4
 
 from fastapi import (
     BackgroundTasks,
@@ -41,13 +37,26 @@ from fastapi import (
 )
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
-from starlette.datastructures import Headers
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from dexatlas import __version__
+from dexatlas.api.uploads import (
+    DEFAULT_UPLOAD_NAME,
+    MAX_NAME_BYTES,
+    RUNNING,
+    UPLOAD_DIRNAME,
+    UPLOAD_RETENTION_ENV,
+    UPLOAD_RETENTION_SECONDS,
+    UploadSizeLimitMiddleware,
+    expire_uploads,
+    run_background_analysis,
+    safe_hash,
+    stage_upload,
+    stored_uploads,
+    upload_retention_seconds,
+)
 from dexatlas.config.settings import Settings, get_settings
 from dexatlas.core import ingest
-from dexatlas.core.ingest import ApkValidationError, UploadTooLarge, inspect_apk, save_upload
+from dexatlas.core.ingest import inspect_apk
 from dexatlas.core.methods import AmbiguousMethodError, is_descriptor
 from dexatlas.core.models import (
     ApkMetadata,
@@ -58,48 +67,40 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.paths import display_path, redact_workspace
 from dexatlas.core.pipeline import AnalysisResult, Analyzer
-from dexatlas.core.runs import AnalysisCancelled, AnalysisRun, CancellationToken
+from dexatlas.core.runs import AnalysisRun
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 from dexatlas.tools.registry import BackendRegistry
 
 logger = logging.getLogger(__name__)
 
-#: Uploads land here before analysis. Scoped to the workspace, never executed.
-UPLOAD_DIRNAME = "uploads"
+# The upload policy's names stay importable from this module under their
+# historical spellings: this API published them, the deployment policy and
+# the tests that pin it read them here, and the definitions live in the
+# module the two transports share so they cannot drift.
+UPLOAD_DIRNAME = UPLOAD_DIRNAME
+DEFAULT_UPLOAD_NAME = DEFAULT_UPLOAD_NAME
+MAX_NAME_BYTES = MAX_NAME_BYTES
+UPLOAD_RETENTION_SECONDS = UPLOAD_RETENTION_SECONDS
+UPLOAD_RETENTION_ENV = UPLOAD_RETENTION_ENV
+_EXPIRE = expire_uploads
+_RETENTION = upload_retention_seconds
+_RUNNING = RUNNING
 
-#: The name an upload is stored under when the client did not give one.
-DEFAULT_UPLOAD_NAME = "upload.apk"
 
-#: The longest a stored file name may be, in bytes.
-#:
-#: A file name cannot be longer than this on any filesystem DexAtlas runs on,
-#: so a longer name cannot name anything -- and a name that is stored is a
-#: name somebody may try to use.
-MAX_NAME_BYTES = 255
+def _expire_uploads(settings: Settings, *, now: float | None = None) -> list[Path]:
+    """Remove expired uploads -- the shared sweep, under its old name."""
+    return expire_uploads(settings, now=now)
 
-#: The upload is larger than the limit.
-#:
-#: Starlette renamed this constant and deprecated the old name, so the number
-#: is written out rather than imported from a version-dependent place.
-HTTP_CONTENT_TOO_LARGE = 413
 
-#: How long an uploaded APK is kept, in seconds.
-#:
-#: The upload is the bytes the analysis was given, and it is kept for a
-#: while so that the operator can look at the file the analysis actually
-#: read. It is not kept for ever: the workspace belongs to the server, and
-#: an unbounded pile of APKs is how it fills up. The window is counted from
-#: the end of the analysis that used the upload, so an APK that is analysed
-#: again is kept for another window.
-UPLOAD_RETENTION_SECONDS = 24 * 60 * 60
+def _upload_retention_seconds() -> int:
+    """How long an uploaded APK is kept -- the shared policy's window."""
+    return upload_retention_seconds()
 
-#: The environment variable that overrides the retention window.
-#:
-#: The project's settings live in ``config/settings.py``, and this change
-#: does not touch them, so the variable is read here. It uses the same
-#: ``DEXATLAS_`` prefix every other setting uses.
-UPLOAD_RETENTION_ENV = "DEXATLAS_UPLOAD_RETENTION_SECONDS"
+
+def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
+    """Analyse an APK in the background -- the shared policy, by its old name."""
+    run_background_analysis(analyzer, apk_path, apk)
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -136,61 +137,6 @@ def get_backends(settings: SettingsDep) -> BackendRegistry:
 BackendRegistryDep = Annotated[BackendRegistry, Depends(get_backends)]
 
 
-@dataclass
-class _RunningAnalysis:
-    """One analysis that is running, and the way to stop it."""
-
-    token: CancellationToken
-    apk_path: Path
-
-
-class _RunningAnalyses:
-    """The analyses that are running.
-
-    The analysis runs in a background task, so "stop it" cannot be a call
-    into it: it has to be a fact the running code can observe. The token is
-    that fact -- the request sets it, and the analysis stops at the next
-    point where stopping cannot leave half-written results behind.
-
-    The registry is keyed by the project id, which is the handle the API
-    already gave the caller when it accepted the upload.
-    """
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._analyses: dict[str, _RunningAnalysis] = {}
-
-    def start(self, project_id: str, apk_path: Path) -> CancellationToken:
-        """Register an analysis that is starting, and hand back its token."""
-        token = CancellationToken()
-        with self._lock:
-            self._analyses[project_id] = _RunningAnalysis(token=token, apk_path=apk_path)
-        return token
-
-    def finish(self, project_id: str) -> None:
-        """Forget an analysis that has ended."""
-        with self._lock:
-            self._analyses.pop(project_id, None)
-
-    def cancel(self, project_id: str) -> bool:
-        """Ask an analysis to stop. Whether one was running."""
-        with self._lock:
-            running = self._analyses.get(project_id)
-        if running is None:
-            return False
-        running.token.cancel()
-        return True
-
-    def apk_paths(self) -> set[Path]:
-        """The uploads the running analyses are reading."""
-        with self._lock:
-            return {running.apk_path for running in self._analyses.values()}
-
-
-#: The analyses this process is running.
-_RUNNING = _RunningAnalyses()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Expire the uploads the retention window has passed, when the server starts.
@@ -200,7 +146,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     after it, so the workspace is already in the state the policy says it
     should be in.
     """
-    removed = _expire_uploads(get_settings())
+    removed = expire_uploads(get_settings())
     if removed:
         logger.info("removed %d expired upload(s)", len(removed))
     yield
@@ -216,37 +162,6 @@ app = FastAPI(
     license_info={"name": "Apache-2.0"},
     lifespan=lifespan,
 )
-
-
-class UploadSizeLimitMiddleware:
-    """Refuse an upload that declares more than the limit, before it is read.
-
-    The framework parses a request's body before the handler ever sees it, so
-    the only place a declared size can be refused is in front of the route.
-    A request that declares no length — a chunked upload — is caught by the
-    counter in the handler instead, which stops the copy while it streams.
-    """
-
-    def __init__(self, app: ASGIApp, limit: Callable[[], int]) -> None:
-        self.app = app
-        self.limit = limit
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope.get("method") not in {"POST", "PUT", "PATCH"}:
-            await self.app(scope, receive, send)
-            return
-
-        max_bytes = self.limit()
-        declared = Headers(scope=scope).get("content-length")
-        if declared is not None and declared.isdigit() and int(declared) > max_bytes:
-            response = JSONResponse(
-                {"detail": f"the upload is larger than the {max_bytes}-byte limit"},
-                status_code=HTTP_CONTENT_TOO_LARGE,
-            )
-            await response(scope, receive, send)
-            return
-
-        await self.app(scope, receive, send)
 
 
 app.add_middleware(UploadSizeLimitMiddleware, limit=lambda: ingest.MAX_APK_BYTES)
@@ -460,59 +375,12 @@ def analyze(
     file: Annotated[UploadFile, File(description="An APK you are authorized to analyse.")],
 ) -> AnalyzeJobResponse:
     """Accept an APK and analyse it in the background."""
-    upload_root = settings.workspace / UPLOAD_DIRNAME
-    upload_root.mkdir(parents=True, exist_ok=True)
-    # The sweep runs on the way in as well: a deployment that receives
-    # uploads but analyses none of them would otherwise never expire any.
-    _expire_uploads(settings)
-    # The name the client gave, kept for the reader: it is what the report
-    # shows and what a rejection names.
-    name = _stored_name(file.filename)
-    # The upload is staged under a name of this server's choosing. The name the
-    # client gave is not used for the path: two uploads that happen to carry
-    # the same name must not be able to write over one another, because the
-    # analysis of the first one reads the path the second one would replace.
-    staged = upload_root / f".incoming-{uuid4().hex}"
-
-    try:
-        save_upload(file.file, staged)
-    except UploadTooLarge as exc:
-        # Refused while it streamed: the bytes over the limit were never
-        # written, and the partial file has already been removed.
-        raise HTTPException(
-            status_code=HTTP_CONTENT_TOO_LARGE,
-            detail=f"the APK is larger than the {exc.limit}-byte limit",
-        ) from exc
-    except OSError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"could not store the upload: {exc}",
-        ) from exc
-
-    try:
-        apk = inspect_apk(staged)
-    except ApkValidationError as exc:
-        staged.unlink(missing_ok=True)
-        # The validator names the absolute path; a remote caller has no business
-        # learning the server's filesystem layout. What it is told instead is
-        # the name it gave the file -- which is the name it has to recognise.
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=str(exc).replace(str(staged), name),
-        ) from exc
-
-    # The bytes are known and valid, so the file can go where it belongs: in a
-    # directory named after its own hash. Two uploads can then share a path
-    # only when they are the same bytes, and a project can only ever hold the
-    # classes of the file that was hashed into its name.
-    #
-    # The name the client gave is kept as the name of the file inside, because
-    # that is the name a reader of the report wants to see.
-    stored_dir = upload_root / apk.sha256
-    stored_dir.mkdir(parents=True, exist_ok=True)
-    target = stored_dir / name
-    staged.replace(target)
-    apk.path = target
+    # The staging, the naming, the inspection and the hash-addressed store are
+    # the shared upload policy; this transport only decides what an accepted
+    # upload causes (a background analysis) and what the caller is told. The
+    # inspector is passed by name from this module so a test that counts calls
+    # to ``inspect_apk`` here counts the calls the policy makes.
+    apk, target, _name = stage_upload(file, settings, inspector=inspect_apk)
 
     existing = analyzer.store.find_project_by_hash(apk.sha256)
     if existing is not None and existing.status is not ProjectStatus.FAILED:
@@ -529,48 +397,12 @@ def analyze(
 
     # The APK has already been inspected, so the analysis is handed the
     # metadata rather than inspecting it a second time.
-    background.add_task(_run_analysis, analyzer, target, apk)
+    background.add_task(run_background_analysis, analyzer, target, apk)
     return AnalyzeJobResponse(
         project_id=f"apk_{apk.sha256[:16]}",
         status="pending",
         detail=f"/projects/{Project.new_id(apk.sha256)}",
     )
-
-
-def _run_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
-    """Analyse an APK in the background.
-
-    Three things can happen, and the log has to tell them apart: the
-    analysis can fail, it can be cancelled, or it can finish and find
-    nothing. The first two are errors and the third is an answer, and a log
-    that says "failed" for all three sends the reader looking for a fault
-    that is not there.
-    """
-    project_id = Project.new_id(apk.sha256)
-    token = _RUNNING.start(project_id, apk_path)
-    try:
-        result = analyzer.analyze(apk_path, metadata=apk, cancellation=token)
-    except AnalysisCancelled:
-        # The operator asked for it to stop. That is not a failure of the
-        # analysis, and the log should not say it is.
-        logger.info("background analysis of %s was cancelled", apk_path)
-        return
-    except Exception:
-        # The pipeline records the failure on the project before it raises, so
-        # the project is failed rather than running, and its errors say what
-        # happened. The log says the same thing.
-        logger.exception("background analysis of %s failed", apk_path)
-        return
-    finally:
-        _RUNNING.finish(project_id)
-        # The retention window is counted from the end of the analysis that
-        # used the upload, so the clock starts again now.
-        _touch(apk_path)
-        # The sweep runs here as well as when the server starts, so a
-        # deployment that is never restarted still expires its uploads.
-        _expire_uploads(analyzer.settings)
-    if not result.succeeded:
-        logger.warning("background analysis of %s completed but produced no symbols", apk_path)
 
 
 @app.get("/projects", tags=["analysis"])
@@ -639,7 +471,7 @@ def cancel_analysis(project_id: str) -> dict[str, Any]:
     stopped. A backend that is half way through reading the APK finishes
     reading it first -- the stop happens between the steps.
     """
-    if not _RUNNING.cancel(project_id):
+    if not RUNNING.cancel(project_id):
         raise HTTPException(status_code=404, detail=f"no analysis is running for {project_id!r}")
     return {"project_id": project_id, "status": "cancelling"}
 
@@ -652,10 +484,10 @@ def list_uploads(settings: SettingsDep) -> list[UploadResponse]:
     analysis: an uploaded APK is kept for a while after the analysis that
     used it, and the sweep removes it when the window has passed.
     """
-    window = _upload_retention_seconds()
+    window = upload_retention_seconds()
     moment = time.time()
     uploads: list[UploadResponse] = []
-    for path in _stored_uploads(settings):
+    for path in stored_uploads(settings):
         try:
             stat = path.stat()
         except OSError:
@@ -712,7 +544,7 @@ def cleanup_uploads(settings: SettingsDep) -> dict[str, Any]:
     This endpoint runs it now, for an operator who wants the workspace
     back to what the policy says it should be without waiting for one.
     """
-    removed = _expire_uploads(settings)
+    removed = expire_uploads(settings)
     return {"removed": len(removed), "names": sorted(path.name for path in removed)}
 
 
@@ -970,23 +802,6 @@ def delete_project(project_id: str, analyzer: AnalyzerDep, settings: SettingsDep
     _remove_project_workspace(project_id, settings)
 
 
-def _stored_name(filename: str | None) -> str:
-    """The name the upload is stored under.
-
-    The client's name is kept, because a reader of the report wants to know
-    what the file was called. It is made safe first: a name may not name a
-    directory, may not be empty, and may not be longer than a file name can
-    be -- a name that is stored is a name somebody may try to use.
-    """
-    name = Path(filename or "").name
-    if not name or name in {".", ".."}:
-        return DEFAULT_UPLOAD_NAME
-    encoded = name.encode("utf-8", errors="replace")
-    if len(encoded) > MAX_NAME_BYTES:
-        name = encoded[:MAX_NAME_BYTES].decode("utf-8", errors="ignore")
-    return name or DEFAULT_UPLOAD_NAME
-
-
 def _redact(message: str, secret: str) -> str:
     """Replace a server-side path with its basename, for messages shown to a caller."""
     return message.replace(secret, Path(secret).name)
@@ -1039,95 +854,6 @@ def _source_payload(
 # ---------------------------------------------------------------------------
 
 
-def _upload_retention_seconds() -> int:
-    """How long an uploaded APK is kept.
-
-    Read from the environment so that a deployment can choose its own
-    window without a code change. A value that is not a number, or that is
-    negative, falls back to the default: a retention policy that cannot be
-    read is not one that should be guessed at.
-    """
-    raw = os.environ.get(UPLOAD_RETENTION_ENV)
-    if raw is None:
-        return UPLOAD_RETENTION_SECONDS
-    try:
-        value = int(raw)
-    except ValueError:
-        logger.warning("%s is not a number; using the default retention", UPLOAD_RETENTION_ENV)
-        return UPLOAD_RETENTION_SECONDS
-    if value < 0:
-        logger.warning("%s is negative; using the default retention", UPLOAD_RETENTION_ENV)
-        return UPLOAD_RETENTION_SECONDS
-    return value
-
-
-def _stored_uploads(settings: Settings) -> list[Path]:
-    """The uploads that are stored, one per file, in their hash-named directory.
-
-    The staging files -- the ones a request is still writing -- live in the
-    upload root itself rather than in a hash-named directory, so they are
-    not uploads and are not listed.
-    """
-    root = settings.workspace / UPLOAD_DIRNAME
-    if not root.is_dir():
-        return []
-    found: list[Path] = []
-    for directory in sorted(root.iterdir()):
-        if not directory.is_dir():
-            continue
-        for path in sorted(directory.iterdir()):
-            if path.is_file():
-                found.append(path)
-    return found
-
-
-def _expire_uploads(settings: Settings, *, now: float | None = None) -> list[Path]:
-    """Remove the uploads the retention window has passed, and say which.
-
-    The uploads of the analyses that are running are never removed: the
-    analysis reads the file it was given, and a file that disappears under
-    it is a failure of the analysis rather than of the cleanup.
-    """
-    root = settings.workspace / UPLOAD_DIRNAME
-    if not root.is_dir():
-        return []
-    window = _upload_retention_seconds()
-    moment = time.time() if now is None else now
-    in_use = _RUNNING.apk_paths()
-    removed: list[Path] = []
-    for path in _stored_uploads(settings):
-        if path in in_use:
-            continue
-        try:
-            age = moment - path.stat().st_mtime
-        except OSError:
-            continue
-        if age < window:
-            continue
-        try:
-            path.unlink()
-        except OSError:
-            logger.warning("could not remove the expired upload %s", path.name)
-            continue
-        removed.append(path)
-    for directory in sorted(root.iterdir()):
-        if not directory.is_dir():
-            continue
-        # Not empty: something else lives there, and it is not the sweep's
-        # to remove.
-        with suppress(OSError):
-            directory.rmdir()
-    return removed
-
-
-def _touch(path: Path) -> None:
-    """Mark a file as used now, so that the retention window starts again."""
-    try:
-        os.utime(path, None)
-    except OSError:
-        logger.warning("could not mark the upload %s as used", path.name)
-
-
 def _remove_project_workspace(project_id: str, settings: Settings) -> None:
     """Remove the directories a deleted project's runs wrote into.
 
@@ -1163,11 +889,13 @@ def _safe_hash(sha256: str) -> str:
 
     The hash comes from the request, and a request is not trusted to name a
     directory: a name that is not a SHA-256 cannot be one, whatever else it
-    might be.
+    might be. The validation is the shared policy's; this transport turns a
+    rejection into the 400 its callers know.
     """
-    if len(sha256) != 64 or any(char not in "0123456789abcdef" for char in sha256):
-        raise HTTPException(status_code=400, detail=f"{sha256!r} is not a SHA-256 hash")
-    return sha256
+    try:
+        return safe_hash(sha256)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"{sha256!r} is not a SHA-256 hash") from exc
 
 
 def _run_response(run: AnalysisRun, published: bool, settings: Settings) -> RunResponse:
