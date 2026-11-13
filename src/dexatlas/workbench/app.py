@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import BackgroundTasks, FastAPI, File, Query, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.requests import Request
@@ -37,7 +37,7 @@ from dexatlas.api.uploads import UploadSizeLimitMiddleware, run_background_analy
 from dexatlas.core import ingest
 from dexatlas.core.models import Project
 from dexatlas.core.models import ProjectStatus as ProjectState
-from dexatlas.core.pipeline import Analyzer
+from dexatlas.core.pipeline import AnalysisResult, Analyzer
 from dexatlas.mcp.errors import RequestError, unknown_project
 from dexatlas.mcp.schemas import (
     DEFAULT_LIMIT,
@@ -55,6 +55,8 @@ from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
 from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
+from dexatlas.reports.json_report import build_json_report
+from dexatlas.reports.markdown import render_markdown
 
 # The built front end. `npm run build` writes it; `python -m
 # dexatlas.workbench` builds it on first start when npm is available. The
@@ -272,6 +274,62 @@ def create_app(analyzer: Analyzer) -> FastAPI:
             already_analysed=False,
         )
 
+    # -- the report export screen --------------------------------------------
+    #
+    # The report is the project's deliverable, and the renderers that write
+    # it are the ones the CLI and the REST API already use — this endpoint
+    # adds no second format and changes no field. What the browser downloads
+    # here is byte-for-byte what `dexatlas analyze` would have written to
+    # disk, for the same published snapshot.
+
+    @app.get("/api/projects/{project_id}/report")
+    def export_report(
+        project_id: str,
+        format: Annotated[str, Query(pattern="^(json|markdown)$")] = "json",
+    ) -> Any:
+        """Export the analysis as the JSON or Markdown report the project ships."""
+        with analyzer.store.reading() as view:
+            project = view.get_project(project_id)
+            if project is None:
+                raise unknown_project(project_id)
+            run = view.get_published_run(project_id)
+            manifest = view.get_manifest(project_id)
+            evidence = view.list_evidence(project_id)
+            workspace = view.get_workspace(project_id)
+
+        if run is not None:
+            # The project's own row says how the *latest* attempt ended; the
+            # published run says how the attempt this report describes ended.
+            # They are the same thing until somebody re-analyses the APK, and
+            # then they are not -- and a report that said "completed" without
+            # saying so would be stating the status of the snapshot as if it
+            # were the status of the project.
+            published_status = _published_status_of(run)
+            latest_attempt_status = (
+                project.status if project.status is not published_status else None
+            )
+            project = project.model_copy(
+                update={
+                    "status": published_status,
+                    "errors": list(run.errors),
+                }
+            )
+        else:
+            latest_attempt_status = None
+
+        result = AnalysisResult(
+            project=project,
+            manifest=manifest,
+            evidence=evidence,
+            workspace=workspace,
+            duration_seconds=project.duration_seconds or 0.0,
+            run=run,
+            latest_attempt_status=latest_attempt_status,
+        )
+        if format == "markdown":
+            return PlainTextResponse(render_markdown(result), media_type="text/markdown")
+        return build_json_report(result)
+
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")
     else:
@@ -284,6 +342,20 @@ def create_app(analyzer: Analyzer) -> FastAPI:
             )
 
     return app
+
+
+def _published_status_of(run: Any) -> ProjectState:
+    """The status a published run's project carries.
+
+    A run that was cancelled is never published -- it published nothing --
+    so the only statuses that reach here are the ones the project already
+    has. The mapping is written out rather than assumed so that a run
+    status added later cannot raise in the middle of an export.
+    """
+    known = {status.value for status in ProjectState}
+    if run.status.value in known:
+        return ProjectState(run.status.value)
+    return ProjectState.FAILED
 
 
 def front_end_is_built() -> bool:

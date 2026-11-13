@@ -10,6 +10,7 @@ import {
   getProjectStatus,
   listEvidence,
   listProjects,
+  reportUrl,
   resolveLocator,
   searchSymbols,
   uploadApk,
@@ -396,6 +397,30 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
       </section>
 
       <CountsGrid project={project} />
+
+      <section className="panel" aria-label="report export">
+        <h3>Export the report</h3>
+        <p className="meta">
+          The report the CLI writes: every number cites the run it came from, and every piece of
+          evidence carries its source tool, version and locator.{" "}
+          {status.published_run ? (
+            <>
+              The report describes the published run <code>{status.published_run.id}</code>.
+            </>
+          ) : (
+            <>No run has been published yet, so the report describes the project as it stands.</>
+          )}
+        </p>
+        <p className="report-links">
+          <a href={reportUrl(projectId, "markdown")} download>
+            Markdown report
+          </a>{" "}
+          ·{" "}
+          <a href={reportUrl(projectId, "json")} download>
+            JSON report
+          </a>
+        </p>
+      </section>
 
       <section className="panel" aria-label="runs">
         <h3>Runs</h3>

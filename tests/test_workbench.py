@@ -722,6 +722,184 @@ def test_method_id_is_taken_from_the_index_search_the_screen_offers(
     assert callers["call_site_count"] == 3
 
 
+# ---------------------------------------------------------------------------
+# The report export screen
+# ---------------------------------------------------------------------------
+
+
+def test_report_export_is_the_renderers_own_markdown(client: TestClient, project_id: str) -> None:
+    """The workbench exports the analysis report the project already renders.
+
+    The point of the endpoint is that the browser reads the same report the
+    CLI writes to disk -- not a second report in a second format. So the
+    response is compared against the renderer itself, called the same way
+    the export path calls it: the snapshot read back out of the workspace.
+    """
+
+    response = client.get(f"/api/projects/{project_id}/report", params={"format": "markdown"})
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/markdown")
+    assert response.text == _expected_markdown(client, project_id)
+    assert "# DexAtlas analysis report" in response.text
+    # The one piece of evidence the fixture wrote is in the table.
+    assert "E-0001" in response.text
+
+
+def test_report_export_is_the_renderers_own_json(client: TestClient, project_id: str) -> None:
+    """The JSON report is the same document the REST API's export returns.
+
+    ``generated_at`` is the moment the renderer ran, so the two documents
+    are compared without it -- everything else has to be identical.
+    """
+
+    response = client.get(f"/api/projects/{project_id}/report")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/json")
+    served = response.json()
+    expected = _expected_json(client, project_id)
+    served.pop("generated_at")
+    expected.pop("generated_at")
+    assert served == expected
+    assert served["schema_version"] == 3
+
+
+def test_report_export_defaults_to_json(client: TestClient, project_id: str) -> None:
+    """No format parameter: the JSON report, as on the REST API.
+
+    ``generated_at`` differs between two renders, so it is dropped here too.
+    """
+    first = client.get(f"/api/projects/{project_id}/report").json()
+    second = client.get(f"/api/projects/{project_id}/report", params={"format": "json"}).json()
+    first.pop("generated_at")
+    second.pop("generated_at")
+    assert first == second
+
+
+def test_report_export_of_an_unknown_project_is_the_contract_error(
+    client: TestClient,
+) -> None:
+    """An unknown project is the MCP contract's ``unknown_project``, as a 404."""
+    response = client.get("/api/projects/apk_missing/report")
+    assert response.status_code == 404
+    assert response.json()["code"] == "unknown_project"
+
+
+def test_report_export_rejects_an_unknown_format(client: TestClient, project_id: str) -> None:
+    """A format the reports do not have is refused before anything renders."""
+    response = client.get(f"/api/projects/{project_id}/report", params={"format": "pdf"})
+    assert response.status_code == 422
+
+
+def test_report_export_describes_the_published_run(client: TestClient, tmp_path: Path) -> None:
+    """A re-analysis that failed leaves the published snapshot as the report.
+
+    The report describes the last run that completed. The project's own row
+    says how the latest attempt ended, which is a different thing -- and the
+    exported report has to keep saying what the snapshot said, with the
+    later attempt named, not silently promoted to the report's status.
+    """
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+    from dexatlas.core.storage import Store
+
+    analyzer: Analyzer = client.app.state.analyzer
+    pid = Project.new_id(FAKE_SHA256)
+    workspace = analyzer.settings.workspace / "projects" / pid
+    project = Project(
+        id=pid,
+        apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectState.FAILED,
+        tool_versions={"androguard": "4.1.4"},
+        duration_seconds=1.5,
+    )
+    # The project row exists first; the run references it.
+    analyzer.store.save_project(project, workspace, manifest=None)
+    published = AnalysisRun.start(pid, FAKE_SHA256, workspace=workspace)
+    published.status = RunStatus.COMPLETED
+    analyzer.store.create_run(published)
+    # A staged database of the project's own rows, the way the pipeline
+    # publishes: the snapshot the report describes, not the project's row.
+    staged = workspace / "staging.db"
+    staged_store = Store.open(staged)
+    staged_store.save_project(project, workspace, manifest=None)
+    staged_store.save_evidence(
+        pid,
+        [
+            Evidence(
+                id="E-0001",
+                kind=EvidenceKind.OBSERVATION,
+                level=EvidenceLevel.VERIFIED,
+                summary="the published snapshot's one fact",
+            )
+        ],
+    )
+    analyzer.store.publish_run(project, published, staged, None)
+
+    markdown = client.get(f"/api/projects/{pid}/report", params={"format": "markdown"})
+    assert markdown.status_code == 200
+    assert f"**Run:** `{published.id}`" in markdown.text
+    # The snapshot's status, not the latest attempt's.
+    assert "**Status:** completed" in markdown.text
+    # ...and the later attempt is named where the report is read.
+    assert "ended as `failed`" in markdown.text
+
+    json_report = client.get(f"/api/projects/{pid}/report").json()
+    assert json_report["run"]["id"] == published.id
+    assert json_report["latest_attempt_status"] == "failed"
+
+
+def _expected_markdown(client: TestClient, project_id: str) -> str:
+    """The markdown the renderer itself writes for the stored snapshot."""
+    from dexatlas.reports.markdown import render_markdown
+
+    return render_markdown(_stored_result(client, project_id))
+
+
+def _expected_json(client: TestClient, project_id: str) -> dict:
+    from dexatlas.reports.json_report import build_json_report
+
+    return build_json_report(_stored_result(client, project_id))
+
+
+def _stored_result(client: TestClient, project_id: str):
+    """The analysis result as the workspace holds it, for the renderer.
+
+    The same reconstruction the export endpoint performs; spelled out here
+    so the tests compare the endpoint's answer against the renderer's own
+    output for the same snapshot, not against a hand-written expectation.
+    """
+    from dexatlas.core.models import ProjectStatus as ProjectState
+    from dexatlas.core.pipeline import AnalysisResult
+
+    analyzer: Analyzer = client.app.state.analyzer
+    with analyzer.store.reading() as view:
+        project = view.get_project(project_id)
+        run = view.get_published_run(project_id)
+        manifest = view.get_manifest(project_id)
+        evidence = view.list_evidence(project_id)
+        workspace = view.get_workspace(project_id)
+
+    assert project is not None
+    latest_attempt_status = None
+    if run is not None:
+        known = {status.value for status in ProjectState}
+        published_status = (
+            ProjectState(run.status.value) if run.status.value in known else ProjectState.FAILED
+        )
+        latest_attempt_status = project.status if project.status is not published_status else None
+        project = project.model_copy(
+            update={"status": published_status, "errors": list(run.errors)}
+        )
+    return AnalysisResult(
+        project=project,
+        manifest=manifest,
+        evidence=evidence,
+        workspace=workspace,
+        duration_seconds=project.duration_seconds or 0.0,
+        run=run,
+        latest_attempt_status=latest_attempt_status,
+    )
+
+
 # -- the front end -----------------------------------------------------------
 
 

@@ -1023,7 +1023,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/registry.py": [28, 0],
       "workbench/__init__.py": [0, 0],
       "workbench/__main__.py": [55, 55],
-      "workbench/app.py": [88, 0]
+      "workbench/app.py": [114, 1]
     },
     "missing": 575,
     "statements": 6285
