@@ -131,23 +131,36 @@ export interface CalleeView {
 
 export class ApiError extends Error {
   code: string;
+  // The HTTP status, so the UI can tell a refusal written for the caller
+  // (4xx) from the server's own failure (5xx), whose detail may name
+  // server-side paths and should be summarised, not echoed.
+  status: number;
 
-  constructor(code: string, message: string) {
+  constructor(code: string, message: string, status: number) {
     super(message);
     this.code = code;
+    this.status = status;
   }
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
-  const data = (await response.json()) as Record<string, unknown>;
   if (!response.ok) {
-    throw new ApiError(
-      String(data["code"] ?? "request_failed"),
-      String(data["message"] ?? response.statusText),
-    );
+    // The contract answers with JSON, but a proxy or a crashed worker may
+    // not; the status then says what the body cannot.
+    let code = "request_failed";
+    let message = response.statusText || `the server answered ${response.status}`;
+    try {
+      const data = (await response.json()) as Record<string, unknown>;
+      if (typeof data["code"] === "string") code = data["code"];
+      if (typeof data["message"] === "string") message = data["message"];
+      else if (typeof data["detail"] === "string") message = data["detail"];
+    } catch {
+      // Not JSON; the status and reason carry the rest.
+    }
+    throw new ApiError(code, message, response.status);
   }
-  return data as T;
+  return (await response.json()) as T;
 }
 
 export function getHealth(): Promise<Health> {
@@ -183,6 +196,7 @@ export async function uploadApk(file: File): Promise<UploadAccepted> {
     throw new ApiError(
       String(data["code"] ?? "upload_failed"),
       String(data["detail"] ?? data["message"] ?? response.statusText),
+      response.status,
     );
   }
   return data as unknown as UploadAccepted;
@@ -199,10 +213,31 @@ function projectUrl(projectId: string, path: string, params: Record<string, stri
 
 // -- the report export screen -----------------------------------------------
 
-// The report is a download, not a JSON answer the browser unpacks: the
-// endpoint returns the renderer's own Markdown text or JSON document, so the
-// link points straight at it and the browser handles the rest.
-export function reportUrl(projectId: string, format: "json" | "markdown"): string {
+// The report is a download, not a JSON answer the browser unpacks, but a
+// plain link cannot say why a download failed. The fetch reads the contract's
+// error body on a refusal, and hands the browser the bytes on success.
+export async function downloadReport(
+  projectId: string,
+  format: "json" | "markdown",
+): Promise<Blob> {
+  const response = await fetch(reportUrl(projectId, format));
+  if (!response.ok) {
+    let code = "request_failed";
+    let message = response.statusText || `the server answered ${response.status}`;
+    try {
+      const data = (await response.json()) as Record<string, unknown>;
+      if (typeof data["code"] === "string") code = data["code"];
+      if (typeof data["message"] === "string") message = data["message"];
+      else if (typeof data["detail"] === "string") message = data["detail"];
+    } catch {
+      // The body was not the contract's error shape; the status will do.
+    }
+    throw new ApiError(code, message, response.status);
+  }
+  return response.blob();
+}
+
+function reportUrl(projectId: string, format: "json" | "markdown"): string {
   return projectUrl(projectId, "report", { format });
 }
 

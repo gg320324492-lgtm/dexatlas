@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import {
   ApiError,
+  downloadReport,
   findCallers,
   findCallees,
   getClassSource,
@@ -10,7 +11,6 @@ import {
   getProjectStatus,
   listEvidence,
   listProjects,
-  reportUrl,
   resolveLocator,
   searchSymbols,
   uploadApk,
@@ -80,7 +80,15 @@ function sourceTarget(symbol: SymbolView): SymbolTarget | null {
 }
 
 function errorText(err: unknown): string {
-  return err instanceof ApiError ? `${err.code}: ${err.message}` : String(err);
+  if (!(err instanceof ApiError)) return String(err);
+  // A 5xx detail is the server's own failure, and its message may name
+  // server-side paths the browser has no business reading. The 4xx details
+  // are written for the caller ("not an APK", "larger than the limit") and
+  // are the actionable part, so they are kept as-is.
+  if (err.status >= 500) {
+    return "the server could not answer this — try again, and check the server log if it persists";
+  }
+  return err.message;
 }
 
 function BackendsWarning({ missing }: { missing: string[] }): JSX.Element | null {
@@ -256,14 +264,25 @@ function openProject(projectId: string): void {
 function ProjectListScreen(): JSX.Element {
   const [data, setData] = useState<ProjectList | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setError(null);
     listProjects()
       .then(setData)
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
-  }, []);
+      .catch((err: unknown) => setError(errorText(err)));
+  }, [tick]);
 
-  if (error) return <p className="error">the list could not be read: {error}</p>;
+  if (error) {
+    return (
+      <p className="error">
+        the list could not be read: {error}{" "}
+        <button type="button" className="link-button" onClick={() => setTick(tick + 1)}>
+          try again
+        </button>
+      </p>
+    );
+  }
   if (!data) return <p className="loading">reading the workspace…</p>;
   if (data.projects.length === 0) {
     return (
@@ -344,15 +363,13 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
   useEffect(() => {
     getProjectStatus(projectId)
       .then(setStatus)
-      .catch((err: unknown) => {
-        setError(err instanceof ApiError ? `${err.code}: ${err.message}` : String(err));
-      });
+      .catch((err: unknown) => setError(errorText(err)));
   }, [projectId]);
 
   if (error) {
     return (
       <p className="error">
-        {error} — <a href="#/">back to the project list</a>
+        this project could not be read: {error} — <a href="#/">back to the project list</a>
       </p>
     );
   }
@@ -411,15 +428,7 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
             <>No run has been published yet, so the report describes the project as it stands.</>
           )}
         </p>
-        <p className="report-links">
-          <a href={reportUrl(projectId, "markdown")} download>
-            Markdown report
-          </a>{" "}
-          ·{" "}
-          <a href={reportUrl(projectId, "json")} download>
-            JSON report
-          </a>
-        </p>
+        <ReportLinks projectId={projectId} />
       </section>
 
       <section className="panel" aria-label="runs">
@@ -454,6 +463,47 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
 
 // -- screen 2: from a phrase in the index to the place a citation names ----
 
+// The report is a download the server writes in one response, so a failed
+// export used to be invisible: the browser saved a bare error page or
+// nothing. A small fetch makes the refusal visible next to the link that
+// asked for it, and the success hands the browser the bytes.
+type ReportFormat = "json" | "markdown";
+
+function ReportLinks({ projectId }: { projectId: string }): JSX.Element {
+  const [busy, setBusy] = useState<ReportFormat | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  function download(format: ReportFormat): void {
+    setBusy(format);
+    setError(null);
+    downloadReport(projectId, format)
+      .then((blob) => {
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `${projectId}.${format === "json" ? "json" : "md"}`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      })
+      .catch((err: unknown) => setError(`${format}: ${errorText(err)}`))
+      .finally(() => setBusy(null));
+  }
+
+  return (
+    <>
+      <p className="report-links">
+        <button type="button" className="link-button" disabled={busy !== null} onClick={() => download("markdown")}>
+          {busy === "markdown" ? "writing…" : "Markdown report"}
+        </button>{" "}
+        ·{" "}
+        <button type="button" className="link-button" disabled={busy !== null} onClick={() => download("json")}>
+          {busy === "json" ? "writing…" : "JSON report"}
+        </button>
+      </p>
+      {error && <p className="error">the report could not be written: {error}</p>}
+    </>
+  );
+}
+
 function DataNotice(): JSX.Element {
   return (
     <p className="data-notice">
@@ -478,7 +528,11 @@ function SourcePanel({
           {source.text?.truncated && <p className="warn">the source excerpt was cut short.</p>}
         </>
       ) : (
-        <p className="warn">no source: {source.reason || "the analysis holds none"}</p>
+        <p className="empty">
+          no source is held for this {source.kind === "smali" ? "smali" : "class or method"}:{" "}
+          {source.reason || "the analysis holds none"}. The index, the manifest and the evidence
+          records are still there — read those, or pick another symbol above.
+        </p>
       )}
       {source.candidates.length > 0 && (
         <p className="meta">
@@ -701,7 +755,9 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
 
       <section className="panel" aria-label="source view">
         <h3>2 · Read the class or method source</h3>
-        {sourceLabel === null && <p className="empty">open a class or method above to read its source.</p>}
+        {sourceLabel === null && (
+          <p className="empty">no source is open — choose a class or method above to read it.</p>
+        )}
         {sourceLabel !== null && (
           <p className="meta">
             <code>{sourceLabel}</code>
@@ -808,7 +864,7 @@ function MethodPicker({ projectId }: { projectId: string }): JSX.Element {
       const page = await searchSymbols(projectId, query.trim(), 0, 50);
       setHits(page.symbols.filter((symbol) => symbol.kind === "method"));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
     }
   }
 
@@ -825,7 +881,7 @@ function MethodPicker({ projectId }: { projectId: string }): JSX.Element {
         />
         <button type="submit">search the index</button>
       </form>
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error">the index could not be read: {error}</p>}
       {hits === null ? (
         <p className="meta">
           the search runs over the index, so it finds a method by the text the analysis read. A
@@ -1091,10 +1147,17 @@ function CallScreen({ projectId, methodId }: { projectId: string; methodId: stri
         setCallers(inbound);
         setCallees(outbound);
       })
-      .catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+      .catch((err: unknown) => setError(errorText(err)));
   }, [projectId, methodId]);
 
-  if (error) return <p className="error">{error}</p>;
+  if (error) {
+    return (
+      <p className="error">
+        the calls could not be read: {error} —{" "}
+        <a href={callUrl(projectId, methodId)}>try again</a> · <a href="#/">project list</a>
+      </p>
+    );
+  }
   if (!callers || !callees) return <p className="loading">reading the calls…</p>;
 
   return (
@@ -1236,11 +1299,12 @@ export default function App(): JSX.Element {
   const searchMatch = hash.match(/^#\/projects\/([^/?#]+)\/search$/);
   const statusMatch = hash.match(/^#\/projects\/([^/?#]+)$/);
   const [health, setHealth] = useState<Health | null>(null);
+  const [healthError, setHealthError] = useState(false);
 
   useEffect(() => {
     getHealth()
       .then(setHealth)
-      .catch(() => setHealth(null));
+      .catch(() => setHealthError(true));
   }, []);
 
   return (
@@ -1250,7 +1314,11 @@ export default function App(): JSX.Element {
           <a href="#/">DexAtlas Workbench</a>
         </h1>
         <span className="meta">
-          {health ? `v${health.version} · workspace: ${health.workspace}` : "…"}
+          {health
+            ? `v${health.version} · workspace: ${health.workspace}`
+            : healthError
+              ? "the server is not answering — is the workbench running?"
+              : "…"}
         </span>
       </header>
       <main>

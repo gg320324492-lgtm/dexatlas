@@ -506,6 +506,21 @@ table.sites td.num {
   text-align: right;
 }
 
-.report-links a {
+.report-links a,
+.report-links button {
   font-weight: 600;
+}
+
+.report-links button:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* A state line that stands alone: a little air above the panel's text, so an
+   error or an empty note does not sit flush against a heading. */
+.panel > .error,
+.panel > .empty,
+.panel > .loading {
+  margin: 0.4rem 0;
 }
