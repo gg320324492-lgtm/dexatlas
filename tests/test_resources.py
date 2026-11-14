@@ -7,6 +7,11 @@ lived in ``strings.xml`` was invisible to ``dexatlas search``.
 The parsing tests write their own ``res/`` tree, so they do not depend on
 which backends the machine happens to have. The end-to-end test runs against
 the real demo APK and skips itself when Apktool is not installed.
+
+The layout tests cover the other place a reader meets text: written
+straight into a layout as ``android:text="..."``. Those are literals, not
+declarations, but a key pasted into a layout is exactly as invisible as one
+pasted into ``strings.xml`` used to be, so they are indexed the same way.
 """
 
 from __future__ import annotations
@@ -48,10 +53,32 @@ STRINGS_XML = """<?xml version="1.0" encoding="utf-8"?>
 
 def _values_file(output_dir: Path, relative: str, body: str) -> Path:
     """Write one file into the decoded resource tree."""
+    return _res_file(output_dir, relative, body)
+
+
+def _res_file(output_dir: Path, relative: str, body: str) -> Path:
+    """Write one file into the decoded ``res/`` tree."""
     path = output_dir / "res" / relative
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(body, encoding="utf-8")
     return path
+
+
+LAYOUT_XML = """<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hardcoded Hello" />
+    <EditText
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Type your key here"
+        android:contentDescription="Input field" />
+</LinearLayout>
+"""
 
 
 # -- reading the tree --------------------------------------------------------
@@ -438,6 +465,234 @@ def test_a_resource_string_is_searchable(store: Store, tmp_path: Path) -> None:
     assert hits[0]["name"] == "app_name"
 
 
+# -- layouts: the text written straight into them -----------------------------
+
+
+def test_a_hardcoded_layout_text_is_indexed(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """``android:text="..."`` is a literal, not a declaration, but it is text
+    a person reads and a key pasted into a layout is as invisible as one pasted
+    into ``strings.xml`` used to be. It is indexed, under the element that
+    carries it."""
+    _res_file(tmp_path, "layout/activity_main.xml", LAYOUT_XML)
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    assert [(row.name, row.value, row.kind, row.attribute) for row in rows] == [
+        ("TextView", "Hardcoded Hello", ResourceKind.LAYOUT_TEXT, "text"),
+        ("EditText", "Type your key here", ResourceKind.LAYOUT_TEXT, "hint"),
+        ("EditText", "Input field", ResourceKind.LAYOUT_TEXT, "contentDescription"),
+    ]
+
+
+def test_a_layout_row_points_at_its_file_and_line(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """The provenance has to land the reader on the element the text was
+    written into: the file it was decoded from, and where in that file the
+    element starts."""
+    _res_file(tmp_path, "layout/activity_main.xml", LAYOUT_XML)
+
+    rows, _ = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    text_row = rows[0]
+    assert text_row.file == "res/layout/activity_main.xml"
+    assert text_row.provenance[0].tool == "apktool"
+    assert text_row.provenance[0].apk_sha256 == FAKE_SHA256
+    locator = text_row.provenance[0].locator
+    assert locator.startswith("apktool:res/layout/activity_main.xml#"), locator
+    assert "line" in locator, locator
+
+
+def test_a_layout_text_from_a_qualified_directory_is_a_separate_row(
+    apktool: ApktoolBackend, tmp_path: Path
+) -> None:
+    """A layout variant is its own declaration, the way a translated string
+    is: the same text in two directories is two rows, each pointing at its
+    own file."""
+    _res_file(tmp_path, "layout/activity_main.xml", LAYOUT_XML)
+    _res_file(tmp_path, "layout-land/activity_main.xml", LAYOUT_XML)
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    files = sorted(row.file for row in rows)
+    assert files == [
+        "res/layout-land/activity_main.xml",
+        "res/layout-land/activity_main.xml",
+        "res/layout-land/activity_main.xml",
+        "res/layout/activity_main.xml",
+        "res/layout/activity_main.xml",
+        "res/layout/activity_main.xml",
+    ]
+    qualifiers = {row.file: row.qualifier for row in rows}
+    assert qualifiers["res/layout/activity_main.xml"] is None
+    assert qualifiers["res/layout-land/activity_main.xml"] == "land"
+
+
+def test_a_layout_with_no_visible_text_is_silent(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """Widths, ids and gravity are not text a person reads. A layout that
+    carries none of the text attributes yields no rows, and an empty
+    ``android:text=""`` is no text at all."""
+    _res_file(
+        tmp_path,
+        "layout/empty.xml",
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"\n'
+        '    android:layout_width="match_parent"\n'
+        '    android:id="@+id/container">\n'
+        '    <TextView android:text="" android:layout_width="wrap_content" />\n'
+        "</FrameLayout>",
+    )
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    assert rows == []
+
+
+def test_a_text_attribute_from_an_unknown_namespace_is_not_indexed(
+    apktool: ApktoolBackend, tmp_path: Path
+) -> None:
+    """``app:text`` or a library namespace is not the platform attribute.
+    Only ``android:text`` and its siblings count, whatever namespace prefix
+    the file happens to bind to ``http://schemas.android.com/apk/res/android``."""
+    _res_file(
+        tmp_path,
+        "layout/namespaced.xml",
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"\n'
+        '    xmlns:app="http://schemas.android.com/apk/res-auto">\n'
+        '    <TextView a:text="Platform prefix" app:text="Library prefix" />\n'
+        "</LinearLayout>",
+    )
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    assert [(row.name, row.value) for row in rows] == [("TextView", "Platform prefix")]
+
+
+def test_a_menu_title_is_indexed(apktool: ApktoolBackend, tmp_path: Path) -> None:
+    """``res/menu`` carries ``android:title`` the same way a layout carries
+    ``android:text`` — user-visible text written as a literal."""
+    _res_file(
+        tmp_path,
+        "menu/main_menu.xml",
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<menu xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <item android:id="@+id/action_settings"\n'
+        '          android:title="Settings" />\n'
+        "</menu>",
+    )
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    assert [(row.name, row.value, row.kind, row.attribute) for row in rows] == [
+        ("item", "Settings", ResourceKind.LAYOUT_TEXT, "title")
+    ]
+
+
+def test_a_broken_layout_is_recorded_and_does_not_stop_the_rest(
+    apktool: ApktoolBackend, tmp_path: Path
+) -> None:
+    """One layout that will not parse is one error, and the layouts around it
+    are still read — the same bargain the values directories strike."""
+    _res_file(tmp_path, "layout/broken.xml", "<LinearLayout><TextView")
+    _res_file(tmp_path, "layout/fine.xml", LAYOUT_XML)
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert len(errors) == 1
+    assert "res/layout/broken.xml" in errors[0].message
+    assert len(rows) == 3
+
+
+def test_two_siblings_of_one_kind_are_distinct_rows(
+    apktool: ApktoolBackend, tmp_path: Path
+) -> None:
+    """Two ``TextView`` elements with the same text in one file are two
+    declarations: the line each element starts on is what tells them apart,
+    the way an array item's position does."""
+    _res_file(
+        tmp_path,
+        "layout/twins.xml",
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <TextView android:text="Same words" />\n'
+        '    <TextView android:text="Same words" />\n'
+        "</LinearLayout>",
+    )
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert errors == []
+    assert [row.position for row in rows] == [3, 4]
+    assert len({(row.file, row.name, row.position, row.attribute) for row in rows}) == 2
+
+
+def test_a_hostile_layout_does_not_reach_the_parser(
+    apktool: ApktoolBackend, tmp_path: Path
+) -> None:
+    """A DOCTYPE is refused the way it is refused in the values files, and
+    the layout it was smuggled into yields no rows."""
+    _res_file(
+        tmp_path,
+        "layout/hostile.xml",
+        '<?xml version="1.0"?>\n'
+        '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>\n'
+        '<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <TextView android:text="&xxe;" />\n'
+        "</LinearLayout>",
+    )
+
+    rows, errors = apktool.read_resources(tmp_path, FAKE_SHA256)
+
+    assert rows == []
+    assert len(errors) == 1
+    assert errors[0].code.value == "parse_error"
+
+
+def test_a_layout_text_is_searchable(store: Store, tmp_path: Path) -> None:
+    """The point of reading the layouts: the text written into one is
+    findable, and the hit names the element it came from."""
+    project = Project.create(
+        ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=tmp_path / "demo.apk")
+    )
+    store.save_project(project, tmp_path / "workspace", manifest=None)
+    store.save_symbols(
+        project.id,
+        [],
+        [],
+        [],
+        [],
+        [],
+        [
+            ResourceString(
+                name="TextView",
+                value="Hardcoded Hello",
+                kind=ResourceKind.LAYOUT_TEXT,
+                position=7,
+                attribute="text",
+                file="res/layout/activity_main.xml",
+                provenance=[
+                    Provenance(
+                        tool="apktool",
+                        tool_version="2.11.1",
+                        apk_sha256=FAKE_SHA256,
+                        locator="apktool:res/layout/activity_main.xml#line=7;TextView",
+                    )
+                ],
+            )
+        ],
+    )
+
+    hits = store.search(project.id, "Hardcoded Hello")
+
+    assert hits, "the layout text was not found by its value"
+    assert hits[0]["kind"] == "resource"
+    assert hits[0]["name"] == "TextView"
+
+
 # -- the pipeline, end to end ------------------------------------------------
 
 
@@ -464,6 +719,28 @@ def test_the_demo_app_resource_is_indexed(analyzer: Analyzer) -> None:
     assert rows[0].value == DEMO_RESOURCE_VALUE
     assert rows[0].file == "res/values/strings.xml"
     assert rows[0].provenance[0].locator == "apktool:res/values/strings.xml"
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(ApktoolBackend(Settings()).resolve() is None, reason="apktool not installed")
+def test_a_layout_text_reaches_the_index_end_to_end(analyzer: Analyzer, tmp_path: Path) -> None:
+    """A decoded tree with a layout in it: the layout's text lands in the same
+    ``resources`` table, with a locator into the layout file."""
+    tree = tmp_path / "decoded"
+    (tree / "res" / "layout").mkdir(parents=True)
+    (tree / "res" / "layout" / "activity_main.xml").write_text(LAYOUT_XML, encoding="utf-8")
+
+    rows, errors = ApktoolBackend(analyzer.settings).read_resources(tree, FAKE_SHA256)
+
+    assert errors == []
+    values = sorted(row.value for row in rows)
+    assert values == ["Hardcoded Hello", "Input field", "Type your key here"]
+    assert all(row.kind is ResourceKind.LAYOUT_TEXT for row in rows)
+    assert all(row.file == "res/layout/activity_main.xml" for row in rows)
+    assert all(
+        row.provenance[0].locator.startswith("apktool:res/layout/activity_main.xml#")
+        for row in rows
+    )
 
 
 @pytest.mark.slow

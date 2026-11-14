@@ -102,6 +102,26 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 ### 4.1 真实加固 APK
 
+`obfuscated-app` 覆盖了短类名和短方法名，但它是**手写的**混淆，
+不是有控制流混淆的真实加固产物。真实的加固 APK 需要外部样本。
+
+### 4.2 布局里硬编码的文本（已覆盖）
+
+资源表读了：`res/values*/` 里的文本声明（`<string>`、
+`<string-array>` 的每一项、`<plurals>` 的每一项）进了索引，
+`dexatlas search` 搜得到 `DexAtlas Demo`，每一条都指回声明它的那个文件。
+
+布局 XML 里 `android:text="..."` 这种**硬编码**的文本现在也进了索引：
+`res/layout*`、`res/menu`、`res/xml` 里 `android:text`、`android:hint`、
+`android:contentDescription`、`android:title`、`android:summary`、
+`android:label` 的字面量按 `layout_text` 入 `resources` 表和全文索引，
+locator 指回布局文件与元素起始行
+（详见[分析覆盖度与证据来源](analysis-provenance.md) §5.4）。
+仍然不在索引里的是 `@string/app_name` 这种**引用**——资源 ID 的图
+是另一个问题。
+
+### 4.3 压测没有覆盖的部分
+
 [大型 APK 基准](benchmarks/large-apk.md) 记了它测了什么，也记了**没测什么**：
 评审（协议第 2 步，三份审核共 44 条发现）挖出来的产品缺陷，
 按严重程度排：

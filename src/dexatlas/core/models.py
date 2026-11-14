@@ -835,10 +835,12 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
 class ResourceKind(StrEnum):
     """What kind of resource declaration a string came from.
 
-    The kind matters because the three are declared differently and mean
+    The kind matters because the kinds are declared differently and mean
     different things: a ``<string>`` is one named piece of text, the items of a
-    ``<string-array>`` share a name and differ only by position, and the items
-    of a ``<plurals>`` differ by the quantity they answer.
+    ``<string-array>`` share a name and differ only by position, the items
+    of a ``<plurals>`` differ by the quantity they answer, and a layout
+    attribute is text written straight into a view rather than declared
+    anywhere at all.
     """
 
     STRING = "string"
@@ -850,16 +852,27 @@ class ResourceKind(StrEnum):
     PLURAL = "plural"
     """One ``<item>`` of a ``<plurals>`` — the text for one quantity."""
 
+    LAYOUT_TEXT = "layout_text"
+    """A literal written into a layout as ``android:text`` and its siblings.
+
+    Not a declaration — the resource table holds no name for it — but it is
+    text a person reads, and a key pasted into a layout is as invisible to a
+    reader as one pasted into ``strings.xml`` would be. The ``name`` of such
+    a row is the element the attribute was written on, e.g. ``TextView``.
+    """
+
 
 class ResourceString(Sourced):
-    """A string declared in the APK's resource table.
+    """A string declared in the APK's resource table, or written into a layout.
 
     The DEX string pool and the resource table are two different things, and
     they are indexed as two different things. A pool entry is a symbol the code
     loads; a resource is a declaration a person wrote, which the code may
     reference by id and never by value. A hard-coded key that lives in
     ``strings.xml`` is in neither the pool nor the code, and until the resource
-    table was read it was in no index at all.
+    table was read it was in no index at all. The same is true of a key pasted
+    straight into a layout as ``android:text="..."`` — there is no declaration
+    anywhere, so it is indexed as a literal, under the element that carries it.
 
     One row per declaration site. The same text in two languages is two rows,
     because they are two declarations, and each points at its own file.
@@ -887,7 +900,19 @@ class ResourceString(Sourced):
     The items of a ``<string-array>`` share a name and differ only by
     position, so the position is part of what makes a row a distinct row: two
     items of the same array are two declarations, not one declaration read
-    twice. Every kind that is not an array or a plural leaves it at zero.
+    twice. Every kind that is not an array or a plural leaves it at zero —
+    except a layout row, where the position is the line the element starts
+    on, counting from one: two ``TextView`` elements in one file are two
+    declarations, and the line is what tells them apart.
+    """
+
+    attribute: str = ""
+    """The ``android:`` attribute the text was read from, e.g. ``hint``.
+
+    Set only for layout rows — a values declaration *is* the text, and names
+    no attribute. Together with the position it is part of what makes two
+    rows of one layout file distinct: the hint and the content description
+    of one ``EditText`` are two rows, not one.
     """
 
     qualifier: str | None = None
@@ -895,7 +920,8 @@ class ResourceString(Sourced):
 
     ``None`` for the unqualified ``res/values/`` directory. A qualifier is
     part of a resource's identity: the same name in two languages is two
-    resources, and only one of them is the default.
+    resources, and only one of them is the default. The same word separates
+    one layout variant from another, ``land`` for ``res/layout-land/``.
     """
 
     file: str = ""

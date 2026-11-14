@@ -7,7 +7,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing changed yet.
+### Added
+
+- **布局 XML 里硬编码的文本进入符号索引。** `res/layout*`、`res/menu`、`res/xml`
+  里的 `android:text`、`android:hint`、`android:contentDescription`、`android:title`、
+  `android:summary`、`android:label` 字面量，现在按 `layout_text` 类型进 `resources`
+  表和全文索引，`dexatlas search` 搜得到，`dexatlas resources` 列得出来。行的
+  `name` 是携带属性的元素（如 `TextView`），`attribute` 记录属性名，`position`
+  是元素起始行号，provenance locator 形如
+  `apktool:res/layout/activity_main.xml#line=7;TextView`，指回布局文件与元素所在行。
+  `res/values*` 字符串资源的行为不变；`resources` 表新增 `attribute` 列（可空），
+  旧工作区自动迁移。`@string/...` 引用仍不在索引——资源 ID 图是另一件事。
 
 ## [0.2.0] — 2026-11-14
 

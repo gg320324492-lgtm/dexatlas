@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from xml.etree.ElementTree import Element, ParseError
+from xml.parsers import expat
 
 import yaml
 from defusedxml.ElementTree import parse as safe_parse
@@ -50,6 +51,24 @@ MAX_RESOURCE_ERRORS = 10
 #: how the app looks, not what it says, and a "string index" full of them would
 #: answer no question a reader asked.
 _TEXT_ELEMENTS = ("string", "string-array", "plurals")
+
+#: The ``res/`` directories whose XML carries text *written into it* rather
+#: than declared as a resource. A layout shows text on screen; a menu names
+#: its actions; the ``xml/`` directory holds preferences and shortcuts whose
+#: titles a user reads. A drawable is a picture, ``raw/`` is binary, and
+#: neither says anything.
+_TEXT_DIRECTORIES = ("layout", "menu", "xml")
+
+#: The ``android:`` attributes whose value is text a person reads. Every other
+#: attribute — a width, an id, a gravity — describes the view, not the words
+#: on it, and indexing those would fill the string index with layout noise.
+_TEXT_ATTRIBUTES = ("text", "hint", "contentDescription", "title", "summary", "label")
+
+#: The XML namespace the platform's attributes live in, as ElementTree spells
+#: it. A layout binds the prefix ``android`` to this namespace, but nothing
+#: requires that spelling — what makes an attribute an Android one is the
+#: namespace, not the prefix.
+_ANDROID_NAMESPACE = "{http://schemas.android.com/apk/res/android}"
 
 
 def source_locator(output_dir: Path, path: Path) -> str:
@@ -242,10 +261,12 @@ class ApktoolBackend(Backend):
         would honour entity declarations and external references, which is a
         denial-of-service waiting to happen.
 
-        Only the values directories are read. A layout or a drawable is a
-        different kind of file — one describes a screen, the other is a picture —
-        and neither is a declaration of text. See the module docstring of
-        :mod:`dexatlas.core.models` for what a row here means.
+        The ``values*`` directories are read for the text they *declare* —
+        strings, string arrays, plurals. The layout, menu and xml directories
+        are read for the text *written into them* — ``android:text`` and its
+        siblings, which no resource table names but a reader still meets on
+        the screen. A drawable is a picture and is not read. See the module
+        docstring of :mod:`dexatlas.core.models` for what a row here means.
 
         A file that will not parse is recorded as an error and the rest are
         still read: one broken file in a hostile APK must not cost the whole
@@ -264,6 +285,13 @@ class ApktoolBackend(Backend):
                 found.extend(rows)
                 if error is not None:
                     errors.append(error)
+        for pattern in _TEXT_DIRECTORIES:
+            for text_dir in sorted(p for p in res_dir.glob(f"{pattern}*") if p.is_dir()):
+                for xml_file in sorted(text_dir.glob("*.xml")):
+                    rows, error = self._read_layout_file(xml_file, output_dir, apk_sha256)
+                    found.extend(rows)
+                    if error is not None:
+                        errors.append(error)
 
         if len(errors) > MAX_RESOURCE_ERRORS:
             hidden = len(errors) - MAX_RESOURCE_ERRORS
@@ -353,6 +381,89 @@ class ApktoolBackend(Backend):
                         qualifier=qualifier,
                         file=relative,
                         provenance=provenance,
+                    )
+                )
+        return rows, None
+
+    def _read_layout_file(
+        self,
+        path: Path,
+        output_dir: Path,
+        apk_sha256: str,
+    ) -> tuple[list[ResourceString], ToolError | None]:
+        """Read one layout, menu or xml file: the text written into it.
+
+        The values files are *declarations* — each string has a name the
+        resource table knows. A layout carries literals instead: whatever was
+        typed into ``android:text`` when the screen was written. Those have
+        no name, so the row is named after the element that carries the
+        attribute, and the locator points at the element's line so a reader
+        lands on the view the words are written on.
+        """
+        relative = _relative_to(path, output_dir)
+        try:
+            root = safe_parse(path).getroot()
+        except ParseError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} is not well-formed XML: {exc}",
+                detail=relative,
+            )
+        except OSError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"could not read {relative}: {exc}",
+                detail=relative,
+            )
+        except ValueError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} was rejected as unsafe XML: {exc}",
+                detail=relative,
+            )
+
+        if root is None:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} has no root element",
+                detail=relative,
+            )
+
+        # The safe parse above has already refused anything with a DTD or an
+        # entity in it, so this second pass sees only the XML that survived.
+        # It can still fail on a document that is well-formed under one
+        # parser and not under another, and a failure there costs the line
+        # numbers, not the text: the rows are written without positions.
+        # Both walks go in document order, so the nth element of the tree is
+        # the nth element expat announced.
+        lines = _element_lines(path)
+
+        qualifier = _layout_qualifier(path.parent.name)
+        rows: list[ResourceString] = []
+        for order, element in enumerate(root.iter(), start=1):
+            tag = _local_name(element.tag)
+            for attribute in _TEXT_ATTRIBUTES:
+                value = element.get(f"{_ANDROID_NAMESPACE}{attribute}")
+                if not value:
+                    continue
+                line = lines.get(order, 0)
+                locator = source_locator(output_dir, path)
+                if line:
+                    locator = f"{locator}#line={line};{tag}"
+                rows.append(
+                    ResourceString(
+                        name=tag,
+                        value=value,
+                        kind=ResourceKind.LAYOUT_TEXT,
+                        position=line,
+                        attribute=attribute,
+                        qualifier=qualifier,
+                        file=relative,
+                        provenance=[self.provenance(apk_sha256, locator)],
                     )
                 )
         return rows, None
@@ -470,6 +581,54 @@ def _values_qualifier(directory_name: str) -> str | None:
         return None
     _, separator, qualifier = directory_name.partition("-")
     return qualifier if separator else None
+
+
+def _layout_qualifier(directory_name: str) -> str | None:
+    """The qualifier of a layout directory: ``layout-land`` → ``land``.
+
+    ``layout/`` itself has none. The same word that separates a translated
+    string from its default separates a landscape layout from its default,
+    and a layout's text in two variants is two declarations for the same
+    reason two languages are.
+    """
+    if directory_name == "layout":
+        return None
+    _, separator, qualifier = directory_name.partition("-")
+    return qualifier if separator else None
+
+
+def _element_lines(path: Path) -> dict[int, int]:
+    """The source line each element of one XML file starts on.
+
+    ElementTree stopped carrying ``sourceline`` in Python 3.8, so the lines
+    come from a second pass with the expat parser underneath it: expat calls
+    back with the line each ``StartElementHandler`` fires on, and the
+    handler tags each element with a token that survives the round trip.
+    Only the id-to-line map is returned — the parsed elements are discarded.
+
+    A document whose DTD survived the safe parse above, or that expat reads
+    differently from the safe parser, yields an empty map: the rows are then
+    written without line numbers, which loses the precision of the pointer
+    but not the fact itself. The safe parse has already refused every
+    document this parser would read unsafely.
+    """
+    lines: dict[int, int] = {}
+    token = 0
+    parser = expat.ParserCreate()
+    parser.buffer_text = True
+
+    def start(name: str, _attrs: dict[str, str]) -> None:
+        nonlocal token
+        token += 1
+        lines[token] = parser.CurrentLineNumber
+
+    parser.StartElementHandler = start
+    try:
+        with path.open("rb") as handle:
+            parser.ParseFile(handle)
+    except (expat.ExpatError, OSError, ValueError):
+        return {}
+    return {token: line for token, line in lines.items() if token <= token}
 
 
 def _relative_to(path: Path, root: Path) -> str:
