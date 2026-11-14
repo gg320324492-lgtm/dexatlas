@@ -489,6 +489,20 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
 const AGENT_POLL_INTERVAL_MS = 1500;
 const AGENT_POLL_LIMIT = 400; // ~10 minutes, then the wait is said rather than spun.
 
+// A provenance entry is a locator string in the evidence views the MCP tools
+// answer with, but the agent report's own findings carry the full provenance
+// object (tool, version, sha256, locator). Reading the locator off either
+// shape keeps the table a table: an object in a React child throws and takes
+// the whole tree down with it.
+function provenanceRef(entry: unknown): string | null {
+  if (typeof entry === "string") return entry;
+  if (entry && typeof entry === "object" && "locator" in entry) {
+    const locator = (entry as { locator?: unknown }).locator;
+    if (typeof locator === "string") return locator;
+  }
+  return null;
+}
+
 // The statuses a poll stops at: the task will not move again on its own.
 const AGENT_TERMINAL_STATUSES = new Set(["completed", "failed", "budget_exhausted", "interrupted"]);
 
@@ -537,7 +551,7 @@ function AgentEvidenceTable({
                 <td>{item.kind}</td>
                 <td>{item.summary}</td>
                 <td>
-                  <code>{item.provenance[0] ?? "-"}</code>
+                  <code>{provenanceRef(item.provenance[0]) ?? "-"}</code>
                 </td>
               </tr>
             ))}

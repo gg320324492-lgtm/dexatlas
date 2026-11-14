@@ -35,12 +35,13 @@ researchers and engineers analysing applications they own or are authorized to a
 
 Every frame above is a real run against [`examples/demo-app/demo.apk`](examples/demo-app/),
 an application built from the smali sources committed beside it — not a staged recording.
-
-The same recording is available as a [video](docs/assets/demo.mp4) — it is encoded from
-the identical frames, so the two cannot drift apart.
+The full 85-second session — upload, analysis, symbol search, evidence, the call graph,
+the agent workspace and the report export — is available as a
+[video](docs/assets/demo.mp4) and as the [GIF](docs/assets/demo.gif) below, both cut
+from the same recording.
 
 <details>
-<summary><b>Full session</b> — search, cross-references, decompiled source and the report</summary>
+<summary><b>Full session</b> — upload, analysis, search, evidence, the call graph, the agent and the report</summary>
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="Full DexAtlas session showing code search, method cross-references, decompiled Java source and the generated analysis report" width="900">

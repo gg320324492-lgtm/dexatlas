@@ -23,10 +23,12 @@ DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整�
 </p>
 
 上面每一帧都是针对 [`examples/demo-app/demo.apk`](examples/demo-app/) 的真实运行结果——
-该应用由同目录下的 smali 源码构建而成，不是预先编排的录像。
+该应用由同目录下的 smali 源码构建而成，不是预先编排的录像。完整的 85 秒端到端会话——
+上传、分析、符号检索、证据溯源、调用关系、Agent 工作区与报告导出——见
+[视频](docs/assets/demo.mp4)与下方 [GIF](docs/assets/demo.gif)，两者出自同一次录制。
 
 <details>
-<summary><b>完整流程</b> —— 代码检索、方法交叉引用、反编译源码与报告</summary>
+<summary><b>完整流程</b> —— 上传、分析、检索、证据、调用关系、Agent 与报告</summary>
 
 <p align="center">
   <img src="docs/assets/demo.gif" alt="DexAtlas 完整会话：代码检索、方法交叉引用、反编译的 Java 源码以及生成的分析报告" width="900">
