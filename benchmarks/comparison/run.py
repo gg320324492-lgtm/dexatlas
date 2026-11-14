@@ -167,10 +167,10 @@ def _provider_factory(
                 "drop --api-key-env"
             )
 
-        def factory() -> ModelProvider:
+        def local_factory() -> ModelProvider:
             return LocalModelProvider(base_url=args.base_url, model=args.model)
 
-        return factory
+        return local_factory
 
     api_key = ""
     if args.api_key_env:
@@ -182,12 +182,12 @@ def _provider_factory(
                 "never written to disk or into a trace."
             )
 
-    def factory() -> ModelProvider:
+    def openai_factory() -> ModelProvider:
         return OpenAICompatibleProvider(
             base_url=args.base_url, model=args.model, api_key=api_key or None
         )
 
-    return factory
+    return openai_factory
 
 
 def _systems(
@@ -205,8 +205,9 @@ def _systems(
     同一预算,可比.
     """
     project_ids = {name: analysis.result.project.id for name, analysis in analyses.items()}
+    systems: tuple[System, ...]
     if provider_factory is None:
-        return (
+        systems = (
             SourceTextSystem(sources=_sources(), max_tokens=budget),
             StructuredSystem(analyzer=analyzer, project_ids=project_ids, max_tokens=budget),
             AgentSystem(
@@ -218,23 +219,25 @@ def _systems(
                 total_tokens=total_tokens,
             ),
         )
-    return (
-        SourceTextSystem(sources=_sources(), provider=provider_factory(), max_tokens=budget),
-        StructuredSystem(
-            analyzer=analyzer,
-            project_ids=project_ids,
-            provider=provider_factory(),
-            max_tokens=budget,
-        ),
-        AgentSystem(
-            analyzer=analyzer,
-            analyses=analyses,
-            provider_factory=provider_factory,
-            store_root=workspace / "agent-states",
-            max_tokens=budget,
-            total_tokens=total_tokens,
-        ),
-    )
+    else:
+        systems = (
+            SourceTextSystem(sources=_sources(), provider=provider_factory(), max_tokens=budget),
+            StructuredSystem(
+                analyzer=analyzer,
+                project_ids=project_ids,
+                provider=provider_factory(),
+                max_tokens=budget,
+            ),
+            AgentSystem(
+                analyzer=analyzer,
+                analyses=analyses,
+                provider_factory=provider_factory,
+                store_root=workspace / "agent-states",
+                max_tokens=budget,
+                total_tokens=total_tokens,
+            ),
+        )
+    return systems
 
 
 def run_comparison(

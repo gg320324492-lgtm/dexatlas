@@ -170,8 +170,9 @@ class ProviderError(Exception):
 class ModelProvider(Protocol):
     """What the orchestration needs from a model endpoint."""
 
-    name: str
-    """How the provider is named in a report and in a log."""
+    @property
+    def name(self) -> str:
+        """How the provider is named in a report and in a log."""
 
     def complete(self, request: ModelRequest) -> ModelResponse:
         """Answer one request.

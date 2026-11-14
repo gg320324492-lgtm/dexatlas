@@ -32,7 +32,6 @@ from benchmarks.comparison.retrieval import (
 )
 from dexatlas.agent.orchestrator import Orchestrator
 from dexatlas.agent.providers.base import (
-    AssistantTurn,
     ModelProvider,
     ModelRequest,
     ModelResponse,
@@ -74,10 +73,17 @@ RETRIEVAL_INSTRUCTIONS = (
 class System(Protocol):
     """三个配置都必须实现的接口."""
 
-    kind: SystemKind
-    provider_name: str
-    model_name: str
-    max_tokens: int
+    @property
+    def kind(self) -> SystemKind: ...
+
+    @property
+    def max_tokens(self) -> int: ...
+
+    @property
+    def provider_name(self) -> str: ...
+
+    @property
+    def model_name(self) -> str: ...
 
     def answer(self, question: Question) -> SystemResult: ...
 
@@ -94,11 +100,11 @@ class _BaseSystem:
 
     @property
     def provider_name(self) -> str:
-        return self.provider.name
+        return str(self.provider.name)
 
     @property
     def model_name(self) -> str:
-        return getattr(self.provider, "model", "")
+        return str(getattr(self.provider, "model", ""))
 
     def answer(self, question: Question) -> SystemResult:
         started = time.monotonic()
@@ -169,7 +175,7 @@ class _BaseSystem:
                     max_tokens=self.max_tokens,
                 )
                 try:
-                    response = self.provider.complete(request)
+                    response: ModelResponse = self.provider.complete(request)
                 except Exception as exc:
                     error = f"{type(exc).__name__}: {exc}"
                     continue
@@ -185,7 +191,7 @@ class _BaseSystem:
             # for: the provider sends it in the user channel with the data
             # notice. A strict endpoint rejects a ``role: tool`` message
             # whose ``tool_call_id`` matches no assistant tool call.
-            turns: list[AssistantTurn | Observation] = []
+            turns = []
             for call_index, observed in enumerate(observations, start=1):
                 turns.append(
                     Observation(
@@ -202,7 +208,7 @@ class _BaseSystem:
                 max_tokens=self.max_tokens,
             )
             try:
-                response: ModelResponse = self.provider.complete(request)
+                response = self.provider.complete(request)
             except Exception as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 continue
@@ -337,11 +343,11 @@ class AgentSystem:
 
     @property
     def provider_name(self) -> str:
-        return self._provider_factory().name
+        return str(self._provider_factory().name)
 
     @property
     def model_name(self) -> str:
-        return getattr(self._provider_factory(), "model", "")
+        return str(getattr(self._provider_factory(), "model", ""))
 
     def answer(self, question: Question) -> SystemResult:
         started = time.monotonic()

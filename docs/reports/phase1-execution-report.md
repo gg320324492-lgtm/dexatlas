@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | <!--fig:tests.total-->1325<!--/fig-->（<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.0%<!--/fig-->**（<!--fig:coverage.covered-->5945<!--/fig-->/<!--fig:coverage.total-->6536<!--/fig--> 行） | ≥80% |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.0%<!--/fig-->**（<!--fig:coverage.covered-->6015<!--/fig-->/<!--fig:coverage.total-->6608<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -845,8 +845,8 @@ uv run python scripts/refresh-report-figures.py
 ```bash
 uv run pytest          # 收集 <!--fig:tests.total-->1325<!--/fig--> 个：<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.0%<!--/fig-->（<!--fig:coverage.covered-->5945<!--/fig-->/<!--fig:coverage.total-->6536<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1321<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.0%<!--/fig-->（<!--fig:coverage.covered-->6015<!--/fig-->/<!--fig:coverage.total-->6608<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1325<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1025,10 +1025,11 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/__init__.py": [0, 0],
       "workbench/__main__.py": [55, 55],
       "workbench/agent_tasks.py": [177, 20],
-      "workbench/app.py": [162, 4]
+      "workbench/app.py": [166, 4],
+      "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 591,
-    "statements": 6536
+    "missing": 593,
+    "statements": 6608
   },
   "history": {
     "v0.1.0": {
@@ -1045,10 +1046,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:34fd700fe34cc3ea61bac3ba4feb38b7dfd1f065ed190e52634534bb87be672c",
+  "source_fingerprint": "sha256:6c917de18bd258325ea5b0b9828fa10b18748a4f1f4d3482441632a2c530cb5a",
   "suite": {
     "failed": 0,
-    "passed": 1321,
+    "passed": 1325,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,

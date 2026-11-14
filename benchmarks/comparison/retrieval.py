@@ -59,7 +59,7 @@ def keyword_from(question: str) -> str:
         if word.casefold() in _STOPWORDS:
             continue
         if "." in word or any(character.isupper() for character in word[1:]):
-            return word
+            return str(word)
     return ""
 
 
@@ -186,22 +186,24 @@ class StructuredTools:
 
     def call(self, name: str, question: Any, keyword: str) -> dict[str, Any]:
         from dexatlas.mcp.errors import RequestError
-        from dexatlas.mcp.tools import projects, references, symbols
+        from dexatlas.mcp.tools.projects import manifest as manifest_tool
+        from dexatlas.mcp.tools.references import find_callees as find_callees_tool
+        from dexatlas.mcp.tools.references import find_callers as find_callers_tool
+        from dexatlas.mcp.tools.symbols import search_symbols as search_symbols_tool
 
         project_id = self._project_ids.get(str(question.sample))
         if project_id is None:
             return {"error": f"no analysis for {question.sample}"}
         try:
+            view: Any
             if name == "get_manifest":
-                view = projects.manifest(self._analyzer, project_id)
+                view = manifest_tool(self._analyzer, project_id)
             elif name == "search_symbols":
-                view = symbols.search_symbols(
-                    self._analyzer, project_id, keyword, limit=50, offset=0
-                )
+                view = search_symbols_tool(self._analyzer, project_id, keyword, limit=50, offset=0)
             elif name == "find_callers":
-                view = references.find_callers(self._analyzer, project_id, keyword, limit=50)
+                view = find_callers_tool(self._analyzer, project_id, keyword, limit=50)
             else:
-                view = references.find_callees(self._analyzer, project_id, keyword, limit=50)
+                view = find_callees_tool(self._analyzer, project_id, keyword, limit=50)
         except RequestError as exc:
             # A backend that did not take part is a fact about the analysis,
             # not a failed task. The error carries which backends were absent,
