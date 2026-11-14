@@ -267,6 +267,12 @@ Orchestrator 在后台任务里回答，屏上轮询计划、工具时间线与�
 满足但带 agent 预算缺口，判定**有条件通过**——待 agent 提问在某明确配置下
 可复现、双语 README 补齐 agent 展示后完全关闭。
 
+**「模型能力可禁用」退出标准已系统验证**（2026-11-14，基准 `1f1d883`，见
+[模型能力可禁用性验证报告](reports/model-disable-verification.md)）：不配置任何
+`DEXATLAS_AGENT_*` 环境变量时，CLI 12 项、REST API 4 项、workbench 16 项、
+MCP 11 项全部正常，agent 提问端点按设计返回 503 + `agent_not_configured`——
+该条退出标准判定满足。
+
 ### 4.7 这一轮关掉的
 
 | 原来开着 | 现在 |
