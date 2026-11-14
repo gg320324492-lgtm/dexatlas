@@ -38,7 +38,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from dexatlas.agent import Budget, Orchestrator, TaskState, TaskStatus, TaskStore
+from dexatlas.agent import Budget, Orchestrator, Planner, TaskState, TaskStatus, TaskStore
 from dexatlas.agent.providers import (
     LocalModelProvider,
     ModelProvider,
@@ -73,6 +73,12 @@ PROVIDER_KINDS = ("openai-compatible", "local")
 AGENT_MAX_TOKENS_ENV = "DEXATLAS_AGENT_MAX_TOKENS"
 AGENT_MAX_ITERATIONS_ENV = "DEXATLAS_AGENT_MAX_ITERATIONS"
 AGENT_MAX_SECONDS_ENV = "DEXATLAS_AGENT_MAX_SECONDS"
+
+#: How many tool calls a task may make — the plan's step count. A model that
+#: asks for several tools in one turn spends the budget several times faster
+#: than one tool per turn, so this is the override an operator is most likely
+#: to need.
+AGENT_MAX_STEPS_ENV = "DEXATLAS_AGENT_MAX_STEPS"
 
 #: How long one tool call may take before it is abandoned. The tools are
 #: reads against a local workspace; a call that takes half a minute has
@@ -180,6 +186,17 @@ def budget_from_env() -> Budget:
         max_iterations=_int_env(AGENT_MAX_ITERATIONS_ENV, default.max_iterations),
         max_seconds=_float_env(AGENT_MAX_SECONDS_ENV, default.max_seconds),
     )
+
+
+def max_steps_from_env() -> int:
+    """The task's tool-call step count: the planner's default, overridable by env.
+
+    The step count is a property of the *plan*, not of the loop's budget, so
+    it is read separately and handed to the planner that writes it into
+    ``Plan.max_steps`` — the same field the orchestrator checks against the
+    tool-call log.
+    """
+    return _int_env(AGENT_MAX_STEPS_ENV, Planner().max_steps)
 
 
 def _int_env(name: str, default: int) -> int:
@@ -292,6 +309,7 @@ def run_agent_task(
     provider: ModelProvider,
     store: TaskStore,
     limits: Budget,
+    max_steps: int | None = None,
 ) -> None:
     """Run one agent task in the background.
 
@@ -308,6 +326,7 @@ def run_agent_task(
         builder_for=builder_for_project(analyzer, project_id),
         store=PinnedTaskStore(store.directory, task_id),
         executor=ToolExecutor(client, timeout=TOOL_CALL_TIMEOUT_SECONDS),
+        planner=Planner(limits=limits, max_steps=max_steps or Planner().max_steps),
         limits=limits,
         approvals=_WorkbenchApprovalGate(),
     )

@@ -125,6 +125,15 @@ Three, and they are checked **before** each piece of work rather than after:
 
 A plan also bounds the number of **tool calls** a task may make.
 
+All four are configuration, not convention. A transport may override them
+through the environment: `DEXATLAS_AGENT_MAX_TOKENS`,
+`DEXATLAS_AGENT_MAX_ITERATIONS`, `DEXATLAS_AGENT_MAX_SECONDS` and
+`DEXATLAS_AGENT_MAX_STEPS` (the plan's tool-call count) replace the agent's
+own defaults — the workbench reads them in `budget_from_env` and
+`max_steps_from_env` and hands them to the same `Planner` and `Budget` it
+would use anyway. An unparseable value is refused with `agent_env_invalid`,
+never silently ignored.
+
 A task that runs out of a budget stops, and says that it ran out of budget. It
 does not say it found nothing: that is a different claim, and a much worse
 one. The report's status line says *did not finish* for every status but

@@ -19,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from dexatlas.agent.orchestrator import Orchestrator
+from dexatlas.agent.planner import DEFAULT_MAX_STEPS
 from dexatlas.agent.providers import OpenAICompatibleProvider, ScriptedProvider
 from dexatlas.agent.reporter import build_agent_json, render_agent_markdown
 from dexatlas.agent.state import Budget
@@ -36,15 +37,19 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.models import ProjectStatus as ProjectState
 from dexatlas.core.pipeline import Analyzer
+from dexatlas.mcp.errors import RequestError
 from dexatlas.workbench.agent_tasks import (
     AGENT_API_KEY_ENV,
     AGENT_BASE_URL_ENV,
+    AGENT_MAX_STEPS_ENV,
     AGENT_MODEL_ENV,
     PinnedTaskStore,
     agent_report_of,
     default_agent_provider_factory,
+    max_steps_from_env,
     provider_from_config,
     read_agent_model_config,
+    run_agent_task,
 )
 from dexatlas.workbench.app import create_app
 from tests.agent_harness import DEX_FILE, MANIFEST_XML, TOOL_VERSIONS
@@ -555,3 +560,76 @@ def test_the_pinned_store_and_the_loop_agree_on_one_task(tmp_path: Path) -> None
     assert final.task_id == "announced"
     assert final.status.value == "completed"
     assert store.load("announced") is not None
+
+
+# -- the step budget, from the environment to the plan ------------------------
+
+
+def test_the_step_budget_comes_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``DEXATLAS_AGENT_MAX_STEPS`` widens the plan's tool-call budget.
+
+    A model that asks for several tools in one turn spends the step budget
+    several times faster than one call per turn, so the operator who runs
+    such a model needs to raise the count without rebuilding the agent.
+    """
+    monkeypatch.delenv(AGENT_MAX_STEPS_ENV, raising=False)
+    assert max_steps_from_env() == DEFAULT_MAX_STEPS
+
+    monkeypatch.setenv(AGENT_MAX_STEPS_ENV, "40")
+    assert max_steps_from_env() == 40
+
+
+def test_an_invalid_step_budget_is_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A step count that is not a whole number is refused, not ignored."""
+    monkeypatch.setenv(AGENT_MAX_STEPS_ENV, "twelve")
+    with pytest.raises(RequestError, match="DEXATLAS_AGENT_MAX_STEPS") as excinfo:
+        max_steps_from_env()
+    assert excinfo.value.code == "agent_env_invalid"
+
+
+def test_the_environment_step_budget_bounds_the_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A task run through ``run_agent_task`` carries the env step count into its plan."""
+    from dexatlas.agent.providers.scripted import answer, conclusion, tool_call
+
+    settings = Settings(workspace=tmp_path / "workspace")
+    analyzer = Analyzer(settings)
+    workspace = analyzer.settings.workspace / "projects" / PROJECT_ID
+    (workspace / "apktool").mkdir(parents=True, exist_ok=True)
+    (workspace / "apktool" / "AndroidManifest.xml").write_text(MANIFEST_XML, encoding="utf-8")
+    analyzer.store.save_project(
+        Project(
+            id=PROJECT_ID,
+            apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+            status=ProjectState.COMPLETED,
+            tool_versions=dict(TOOL_VERSIONS),
+        ),
+        workspace,
+        manifest=None,
+    )
+
+    store = PinnedTaskStore(tmp_path / "tasks", "announced")
+    provider = ScriptedProvider(
+        responses=[
+            tool_call("get_manifest", {"project_id": PROJECT_ID}, call_id="call-1"),
+            answer([conclusion("the manifest is the only source read", evidence_ids=["E-0001"])]),
+        ]
+    )
+    run_agent_task(
+        analyzer,
+        task_id="announced",
+        question="Which permissions?",
+        project_id=PROJECT_ID,
+        provider=provider,
+        store=store,
+        limits=Budget(max_tokens=4000, max_iterations=6, max_seconds=30.0),
+        max_steps=40,
+    )
+    final = store.load("announced")
+    assert final is not None and final.plan is not None
+    assert final.plan.max_steps == 40

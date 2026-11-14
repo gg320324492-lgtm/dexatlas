@@ -173,10 +173,14 @@ MiniMax-M3.1-Flash，默认 `Budget`（20000 tokens / 8 iterations / 120s）与
 `DEXATLAS_AGENT_MAX_TOKENS/MAX_ITERATIONS/MAX_SECONDS`，步数写死在
 `DEFAULT_MAX_STEPS=12`）；② 或在 system prompt/协议层抑制同轮多工具并行请求；
 ③ 或在 demo/验收场景使用更「先答后读」的模型配置。
-**进展（2026-11-14）：** ② 已实现——orchestrator 每轮只执行模型请求的第一个工具
-调用，其余调用以 `one tool call per round` 的 observation 回绝（计入 transcript，
-不破坏 resume 与审批语义），并在 system prompt 中要求逐个请求；回归测试见
-`tests/test_agent_serial_tools.py`。
+**进展（2026-11-14）：** ① 与 ② 均已实现——① `DEXATLAS_AGENT_MAX_STEPS` 由
+`max_steps_from_env()` 读取并传入 `Planner`（见
+[src/dexatlas/workbench/agent_tasks.py](../../src/dexatlas/workbench/agent_tasks.py)）；
+② orchestrator 每轮只执行模型请求的第一个工具调用，其余调用以
+`one tool call per round` 的 observation 回绝（计入 transcript，不破坏 resume
+与审批语义），并在 system prompt 中要求逐个请求。回归测试见
+`tests/test_agent_serial_tools.py` 与 `tests/test_workbench_agent.py`。
+方向③ 仍留待后续。
 
 ### P2 · 浏览器下载的报告文件名不带项目标识（小，可用性）
 

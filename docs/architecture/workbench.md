@@ -218,7 +218,14 @@ Three decisions the screen is built under:
   workbench supplies is an approval gate that says yes to the sensitive
   source reads the plan allows: the person asking the question *is* the
   authorisation, and the plan's `max_sensitive_calls` still caps how many
-  such reads happen.
+  such reads happen. The budgets are configuration, not convention:
+  `DEXATLAS_AGENT_MAX_TOKENS`, `DEXATLAS_AGENT_MAX_ITERATIONS`,
+  `DEXATLAS_AGENT_MAX_SECONDS` and `DEXATLAS_AGENT_MAX_STEPS` (the plan's
+  tool-call count) override the agent's own defaults; an unparseable value is
+  refused with `agent_env_invalid`, never silently ignored. A model that asks
+  for several tools in one turn spends the step budget that much faster, so
+  `DEXATLAS_AGENT_MAX_STEPS` is the override an operator of such a model is
+  most likely to need.
 - **A task that dies says so.** The background runner catches what the loop
   does not, marks the task failed with the reason, and saves it — a browser
   polling a task that vanished would never stop, and a poll that never ends
