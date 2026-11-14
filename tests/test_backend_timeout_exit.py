@@ -70,10 +70,13 @@ def launcher_dies_before_the_kill(monkeypatch: pytest.MonkeyPatch) -> None:
         # On POSIX the tree kill is os.kill over the process group, not a
         # subprocess call. Making the group empty before the kill arrives is
         # the same window: the kill then reports the launcher as already
-        # gone instead of claiming it was terminated.
+        # gone instead of claiming it was terminated. The real os.kill is
+        # captured first -- the patched name must not recurse into itself.
+        real_kill = os.kill
+
         def _kill_group_when_empty(pid: int, sig: int) -> None:
             with suppress(OSError):
-                os.kill(pid, signal.SIGTERM)
+                real_kill(pid, signal.SIGTERM)
             raise ProcessLookupError
 
         monkeypatch.setattr(base.os, "kill", _kill_group_when_empty)
