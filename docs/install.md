@@ -149,6 +149,25 @@ That output is the degradation promise made visible: with no external tools at a
 still get 340 classes, 2,600 methods and 6,033 cross-references from the in-process
 Androguard index, and the report says exactly which steps did not run.
 
+### Exit codes
+
+`dexatlas analyze` — and every other command — answers with one of these:
+
+| Code | Meaning |
+| ---- | ------- |
+| `0` | The command did what was asked: a whole, complete analysis. |
+| `1` | The answer is empty: no classes matched, no callers, no source. |
+| `2` | The request was wrong: no such project, or the input is not an APK. |
+| `3` | The analysis itself failed: a step raised, or the workspace could not be written. |
+| `4` | The method name matches several overloads and no descriptor was given; the candidates are named. |
+| `5` | The analysis finished, but a limit cut a step short (`output_truncated`), so the report describes a shortened index. |
+
+Code 5 is the difference between "the run fell over" (3) and "the run finished
+on a shortened index": a truncated run still completes, still writes its
+report, and every number in it is exactly what was indexed — but a caller that
+reads only the exit code can now tell a clipped run from a whole one without
+opening the project record.
+
 ## Query the result
 
 ```bash

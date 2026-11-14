@@ -19,6 +19,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `res/values*` 字符串资源的行为不变；`resources` 表新增 `attribute` 列（可空），
   旧工作区自动迁移。`@string/...` 引用仍不在索引——资源 ID 图是另一件事。
 
+### Changed
+
+- **`dexatlas analyze` 在分析被截断时返回退出码 5（新退出码 `EXIT_TRUNCATED`）。**
+  分析跑完、报告照常写出，但只要有一步被上限截短（`output_truncated` 记在
+  项目上），退出码就是 5——调用方只看退出码就能区分「干净完成（0）」「部分
+  完成/被截断（5）」「失败（3）」。0/1/2/3/4 的含义不变；此前截断的运行
+  退出码是 0，依赖旧退出码的调用方需注意这一公共契约变更。
+
 ## [0.2.0] — 2026-11-14
 
 The agent layer, open to a caller. Phase 2's first four milestones, in one

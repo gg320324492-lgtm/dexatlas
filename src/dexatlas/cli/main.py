@@ -22,6 +22,13 @@ code :data:`EXIT_AMBIGUOUS`, and it names the candidates rather than choosing
 one — the body of the wrong overload reads like evidence, and a caller that
 pipes it into a report would be citing the wrong method.
 
+And a fifth that is not a failure either: the analysis ran to the end, but a
+limit stopped one of its steps part-way through, so the report describes a
+shortened index. That is exit code :data:`EXIT_TRUNCATED` — the run is
+finished, and the gaps are named on the project and in the report, but a
+caller that reads only the exit code has to be able to tell a clipped run
+from a whole one without opening the project record.
+
 A limit is a bound on what is shown, never a way to get a wrong answer. ``--limit 0``
 and ``--limit -1`` are refused rather than quietly listing nothing — or, worse,
 listing everything but the last row, because a negative index counts from the end.
@@ -44,8 +51,14 @@ from dexatlas.cli.console import ARROW, DASH, OK, WARN, make_console, mark
 from dexatlas.config.settings import get_settings
 from dexatlas.core.ingest import ApkValidationError
 from dexatlas.core.methods import AmbiguousMethodError, is_descriptor
-from dexatlas.core.models import Project, ResourceKind, SourceDocument, canonical_method_id
-from dexatlas.core.pipeline import AnalysisFailed, Analyzer
+from dexatlas.core.models import (
+    Project,
+    ResourceKind,
+    SourceDocument,
+    ToolErrorCode,
+    canonical_method_id,
+)
+from dexatlas.core.pipeline import AnalysisFailed, AnalysisResult, Analyzer
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 
@@ -56,7 +69,8 @@ app = typer.Typer(
         "Exit codes: 0 the command did what was asked; 1 the answer is empty; "
         "2 the request was wrong (no such project, or an input that is not an APK); "
         "3 the analysis itself failed; 4 the request was right and the answer is "
-        "ambiguous (the method name matches several overloads)."
+        "ambiguous (the method name matches several overloads); 5 the analysis "
+        "finished but a limit cut a step short, so the report has gaps in it."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -94,6 +108,16 @@ EXIT_FAILED = 3
 #: answered again with a descriptor.
 EXIT_AMBIGUOUS = 4
 
+#: The analysis ran to the end, but a limit stopped one of its steps
+#: part-way through, so the report describes a shortened index.
+#:
+#: This is not :data:`EXIT_FAILED`: the run finished, the project completed,
+#: and every number in the report is exactly what was indexed — it is the
+#: *index* that is short of the APK, not the run that fell over. It is not 0
+#: either: a caller that reads only the exit code has to be able to tell a
+#: clipped run from a whole one without opening the project record.
+EXIT_TRUNCATED = 5
+
 #: What a project id looks like, for the message that says "there is no such project".
 PROJECT_ID_SHAPE = "apk_0123456789abcdef"
 
@@ -116,6 +140,22 @@ def _more(count: int, singular: str, plural: str | None = None) -> str:
 def _resource_word(count: int) -> str:
     """``resource string`` or ``resource strings``, to fit the count."""
     return "resource string" if count == 1 else "resource strings"
+
+
+def _truncated(result: AnalysisResult) -> bool:
+    """Whether a limit cut a completed analysis short.
+
+    A completed run with an ``output_truncated`` error on it is a report
+    that describes a shortened index: the analysis finished, the numbers in
+    the report are exactly what was indexed, and what was indexed is short
+    of the APK. That is its own answer — not a failure (the run did not fall
+    over) and not clean (a whole run records no truncation).
+
+    The error code is the fact, not the tool: every backend that hits a cap
+    records the same code, and a report with any of them on it is a report
+    a caller should not read as the whole APK.
+    """
+    return any(error.code is ToolErrorCode.OUTPUT_TRUNCATED for error in result.project.errors)
 
 
 def _require_project(analyzer: Analyzer, project_id: str) -> Project:
@@ -247,6 +287,20 @@ def analyze(
             "[red]Analysis produced no symbols.[/red] Install at least one backend "
             "(`dexatlas backends`) and re-run."
         )
+        exit_code = EXIT_EMPTY
+    elif _truncated(result):
+        # The run finished, but a limit cut a step short: the report is
+        # written, and the gaps are named in it and on the project. The exit
+        # code is the part a caller reads without reading either, so it says
+        # "partial" here too.
+        err_console.print(
+            f"[yellow]{mark(WARN)}[/yellow] The analysis finished, but part of it "
+            f"was cut short by a limit — the report is incomplete (exit code "
+            f"{EXIT_TRUNCATED})."
+        )
+        exit_code = EXIT_TRUNCATED
+    else:
+        exit_code = 0
 
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -261,7 +315,7 @@ def analyze(
         )
         console.print(f"JSON report {mark(ARROW)} [bold]{json_output}[/bold]")
 
-    raise ExitCode(code=0 if result.succeeded else EXIT_EMPTY)
+    raise ExitCode(code=exit_code)
 
 
 @app.command()

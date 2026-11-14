@@ -506,7 +506,7 @@ and the instruction walk — the actual work — took about a second.
 **Fixed by:** two changes. The adapter's `version()` now probes once and
 remembers the answer (`src/dexatlas/tools/androguard/adapter.py:197-225`), and
 the `Provenance` record now takes its version from a single probe per backend
-rather than one per record (`src/dexatlas/tools/base.py:311-330`).
+rather than one per record (`src/dexatlas/tools/base.py:301-320`).
 
 **What it cost, measured:** the same `medium` sample, the same limits, the
 pre-fix source tree extracted from git against the current one, in two
@@ -650,10 +650,11 @@ are fixed. What is left is smaller, and none of it is a defect:
   measured here.
 - **A truncated index is a completed analysis.** The status is `completed`
   and the error is on the project, which is the right contract, and the CLI
-  prints the error as a warning. But the CLI's exit code is 0 and the summary
-  line counts only what was indexed, so a caller that reads the exit code — or
-  a reader of the summary line alone — still cannot tell a clipped run from a
-  whole one. Nothing in this document claims otherwise.
+  prints the error as a warning. The summary line counts only what was
+  indexed, so a reader of the summary line alone still cannot tell a clipped
+  run from a whole one — but the exit code now can: a clipped run exits 5
+  (it used to exit 0, which is why this document once said the exit code
+  could not tell the two apart). Nothing in this document claims otherwise.
 - **`docs/status.md` now points at this document.** The status page's §4
   records that the large-APK pressure test is closed, names the three defects
   it found, and says what was not measured. The `MAX_INSTRUCTION_LIMIT` it used

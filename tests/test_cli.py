@@ -1221,3 +1221,51 @@ def test_the_three_failures_have_three_exit_codes(
 
     monkeypatch.setattr(Analyzer, "analyze", broken)
     assert _run("analyze", str(apk)).exit_code == 3
+
+
+# -- a run that was cut short is its own answer -------------------------------
+
+
+def test_a_truncated_run_exits_with_its_own_code(
+    workspace: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run that hit a limit is not a clean run, and the exit code says so.
+
+    A limit that stopped the index part-way through does not fail the
+    analysis: the project still completes, the report is still written,
+    and the numbers in it are still exactly what was indexed. But they are
+    the numbers of a shortened index, and a caller that reads only the exit
+    code used to read 0 — the same code as a whole run — and could not tell
+    a clipped run from a whole one without opening the project record.
+
+    The truncation is its own answer, distinct from all four of the others:
+    0 whole, 1 empty, 2 the request was wrong, 3 the analysis broke,
+    4 the answer is ambiguous, and now 5 the run finished with gaps in it.
+    """
+    from dexatlas.tools.androguard.adapter import AndroguardBackend
+
+    def truncated(self: AndroguardBackend, apk: Path, apk_sha256: str, **kwargs: object):
+        from dexatlas.core.models import ClassKind, ClassRef
+        from dexatlas.tools.base import truncation_error
+
+        # One class made it into the index before the limit fell: the run
+        # completes, and what it completed on is a shortened index.
+        one_class = [ClassRef(name="com.fake.Remaining", kind=ClassKind.CLASS)]
+        error = truncation_error("androguard", ("stdout",), 1024)
+        return one_class, [], [], [], [], error
+
+    monkeypatch.setattr(AndroguardBackend, "extract", truncated)
+
+    apk = tmp_path / "truncated.apk"
+    with zipfile.ZipFile(apk, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("AndroidManifest.xml", "<?xml version='1.0'?><manifest/>")
+        archive.writestr("classes.dex", b"dex\n035\x00")
+
+    result = _run("analyze", str(apk))
+
+    assert result.exit_code == 5
+    # The run is not a failure and not an empty answer, so it says what it
+    # is: finished, with gaps.
+    flat = " ".join(result.output.split())
+    assert "incomplete" in flat
+    assert "exit code 5" in flat

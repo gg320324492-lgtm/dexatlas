@@ -138,7 +138,8 @@ copy of the analysis.
 
 - `docs/status.md` §4 lists the gaps that are not milestones: real hardened
   APKs, the text hard-coded in layouts (the resource *table* is read, the
-  `android:text="…"` in a layout is not), a truncated run still exits 0, and
+  `android:text="…"` in a layout is not), a truncated run now exits 5
+  (fixed; it used to exit 0), and
   the parts of the large-APK benchmark that were never measured.
 - `docs/reports/phase2-issue-list.md` lists the review's findings. F8 (dead
   code in `tools/base.py` and elsewhere) is still open; the rest are fixed.
