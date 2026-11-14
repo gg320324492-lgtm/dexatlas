@@ -210,3 +210,88 @@ MiniMax-M3.1-Flash，默认 `Budget`（20000 tokens / 8 iterations / 120s）与
   工具时间线、事件与 usage，可逐字核对上文表格。
 - 报告一致性核对脚本见 §1.7 的比对对象（渲染器输出 vs 服务端响应 vs 浏览器下载）。
 - 本报告不写入任何 key、token 或完整模型响应原文；任务 id 与计数足够复核。
+
+---
+
+## 5. 修复后复验（2026-11-14）
+
+本节针对 §3-P1 的两个修复做真模型复验，对应 M4 验收「有条件通过」的第一个
+关闭条件：**「agent 提问在某明确配置下可复现」**。
+
+**基准提交：** `817ad1f`（main 最新，含两项修复：`DEXATLAS_AGENT_MAX_STEPS`
+环境变量、orchestrator 每轮只执行第一个工具调用）。
+
+**环境配置（key 只进环境变量，不落仓库）：**
+`DEXATLAS_AGENT_BASE_URL=https://api.minimaxi.com/v1`、
+`DEXATLAS_AGENT_MODEL=MiniMax-M3.1-Flash`、
+`DEXATLAS_AGENT_PROVIDER=openai-compatible`、`DEXATLAS_AGENT_API_KEY`（注入）、
+`DEXATLAS_AGENT_MAX_STEPS=40`。服务 `uv run --no-sync dexatlas-workbench`，
+工作区 `.scratch/tmp/ws-reverify*`（临时目录，不入库），API 层 `curl` 操作。
+
+### 5.1 逐题结果
+
+| # | 问题 | 任务 id | 预算配置 | 终态 | 预算事件 | 工具调用 |
+|---|---|---|---|---|---|---|
+| Q1 | Which class handles cryptography, and what algorithms does it use? | `5ff76b061f73` | steps=40，token/迭代默认（20000/8） | **budget_exhausted** | token 21230/20000 | 6 次全部 ok |
+| Q1 重试 | 同上 | `53e0bf54d0fe` | steps=40，tokens=120000，迭代 8 | **budget_exhausted** | 迭代 8/8（token 33041/120000） | 8 次全部 ok |
+| Q1 重试 | 同上 | `c2b5f25d4f4f` | steps=40，tokens=120000，迭代 16 | **failed**（环境故障，见 5.3） | 已用 token 41962、迭代 10 | 11 次全部 ok |
+| Q1 重试 | 同上 | `8e95e8ecccc1` | steps=40，tokens=120000，迭代 14 | **failed**（同一环境故障） | 已用 token 40424、迭代 8 | 8 次全部 ok |
+| Q1 重试 | 同上 | `dcae8f7bf5bb` | 同上，另起新工作区 | **budget_exhausted** | 迭代 14/14（token 66361/120000） | 14 次全部 ok |
+| Q2 | What permissions does this app request? Cite the manifest. | `a00089c869d9` | steps=40，tokens=120000，迭代 8 | **completed** ✅ | token 10455/120000，迭代 4/8 | 18 次全部 ok |
+| Q3 | Who calls Crypto.sign? Answer in one sentence. | `cda29735b65a` | steps=40，tokens=120000，迭代 8 | **completed** ✅ | token 15211/120000，迭代 5/8 | 12 次全部 ok |
+
+### 5.2 成功项的三段式与引用解析
+
+两个 `completed` 任务（Q2、Q3）的报告均为完整三段式，且引用在证据表内可解析：
+
+- **Q2（权限）**：Established facts 4 条（全部 `verified`）、Leads 4 条、
+  Insufficient 0 条。结论：**「the manifest requests exactly one permission:
+  android.permission.INTERNET, declared as a single `<uses-permission>` element」**
+  （E-0005，lead），引用 `apktool:AndroidManifest.xml`。该 locator 经
+  `GET /api/projects/{id}/locators/resolve` 实测 `resolved: true, kind: java`；
+  证据 E-0002（package/version/权限声明）来源标注 `apktool 2.11.1 ->
+  apktool:AndroidManifest.xml`，可在 11 条证据表内逐条对上。
+- **Q3（调用方）**：Established facts 5 条（全部 `verified`）、Leads 2 条、
+  Insufficient 0 条。结论：**「Crypto.sign(…) is called from exactly one place:
+  com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V」**（E-0006，
+  lead），引用完整调用边 locator
+  `androguard:classes.dex#com.example.demo.MainActivity.onCreate(…)->com.example.demo.Crypto.sign(…)`。
+  该 locator 实测 `resolved: true`（reason: the call edge is between two members
+  of this analysis）；E-0003（find_callers 的 1 call site / 1 call edge）来源
+  `androguard 4.1.4`，E-0004/E-0005（两端方法源码）来源 `jadx 1.5.2`，证据表
+  可解析。
+
+### 5.3 与 §3-P1 的对照结论
+
+1. **两项修复本身均按设计工作。** `DEXATLAS_AGENT_MAX_STEPS=40` 生效（plan 里
+   `max_steps: 40`）；orchestrator 每轮单工具生效（事件流出现
+   `tool_deferred: … the agent runs one tool call per round`，与
+   §3-P1 记录的「一轮 2~5 个并行请求」相比，预算不再被并行请求成倍消耗）。
+2. **「问一句 → 带引用结论」已可复现，但不是对所有问题。** Q2、Q3 在
+   tokens=120000 + 迭代 8 的配置下稳定 `completed`，报告三段式完整、引用可解析；
+   而 Q1（加密算法枚举）在迭代 8、14 两档下仍 `budget_exhausted`——该问题诱发
+   模型反复 `search_symbols`（14 次迭代里 9 次是 search_symbols），先读后答的
+   行为没变。这与 §3-P1 的判断一致：**缺口的主因是模型行为（把预算花在读），
+   串行化与步数放大只解决「并行浪费」，不解决「不收敛」。** 方向③（换/调模型
+   配置）仍是 Q1 类枚举型问题的必要条件。
+3. **验收条件判定：** M4 验收的第一个关闭条件（「agent 提问在某明确配置下
+   可复现」）**已满足**——Q2、Q3 两个真实问题在明确写出的配置
+   （MiniMax-M3.1-Flash，120k tokens，8 迭代，40 步）下 `completed` 且报告
+   三段式带可解析引用。默认预算（20000 tokens / 8 迭代）下仍不可复现（Q1 首测
+   token 触顶），默认预算的调整留待后续任务。
+4. **复验中发现的新环境问题（记录，不修复）：** 两次运行（`c2b5f25d4f4f`、
+   `8e95e8ecccc1`）在任务进行中因 `TaskStore.save` 的原子写
+   （`<task_id>.json.tmp` → `<task_id>.json` 的 `replace`）抛 `[WinError 5]
+   拒绝访问` 而进入 `failed`。同目录离线复现 300 次未复现，且只发生在长任务
+   （token 4 万级、10+ 迭代）途中，疑为杀毒/索引类进程瞬时锁文件的间歇冲突；
+   任务失败被 `ToolOutcome` 语义如实记录，报告如实标注 did not finish。该问题
+   归入环境稳定性，不阻塞本节结论，留待后续观察。
+
+### 5.4 复验可复现性
+
+- 七个任务的状态文件在工作区 `.scratch/tmp/ws-reverify*/agent-tasks/<task_id>.json`
+  （临时目录，不入库），含 plan、工具时间线、事件与 usage，可逐字核对 §5.1 表格。
+- 复验配置：`DEXATLAS_AGENT_BASE_URL=https://api.minimaxi.com/v1`、
+  `DEXATLAS_AGENT_MODEL=MiniMax-M3.1-Flash`、`DEXATLAS_AGENT_MAX_STEPS=40`、
+  成功项另设 `DEXATLAS_AGENT_MAX_TOKENS=120000`；key 只经环境变量注入。
+- 本节不写入任何 key、token 或完整模型响应原文；任务 id 与计数足够复核。

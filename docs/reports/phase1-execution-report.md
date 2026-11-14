@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1335<!--/fig-->（<!--fig:tests.fast-->1192<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.1%<!--/fig-->**（<!--fig:coverage.covered-->6029<!--/fig-->/<!--fig:coverage.total-->6617<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1338<!--/fig-->（<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.5%<!--/fig-->**（<!--fig:coverage.covered-->6069<!--/fig-->/<!--fig:coverage.total-->6631<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -90,7 +90,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
 | `tools/androguard/worker.py` | 0.0% | 112 / 112 |
-| `workbench/__main__.py` | 0.0% | 55 / 55 |
+| `workbench/__main__.py` | 58.0% | 29 / 69 |
 | `mcp/server.py` | 79.2% | 11 / 53 |
 | `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
@@ -132,7 +132,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.1%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.5%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -140,9 +140,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1192<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1195<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->143<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1335<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1338<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -843,10 +843,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1335<!--/fig--> 个：<!--fig:tests.fast-->1192<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1338<!--/fig--> 个：<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.1%<!--/fig-->（<!--fig:coverage.covered-->6029<!--/fig-->/<!--fig:coverage.total-->6617<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1335<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.5%<!--/fig-->（<!--fig:coverage.covered-->6069<!--/fig-->/<!--fig:coverage.total-->6631<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1338<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1023,13 +1023,13 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/jadx/adapter.py": [360, 41],
       "tools/registry.py": [28, 0],
       "workbench/__init__.py": [0, 0],
-      "workbench/__main__.py": [55, 55],
+      "workbench/__main__.py": [69, 29],
       "workbench/agent_tasks.py": [180, 16],
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 588,
-    "statements": 6617
+    "missing": 562,
+    "statements": 6631
   },
   "history": {
     "v0.1.0": {
@@ -1046,10 +1046,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:82ff555a157ba0785b6b76bd7e39caed3c6ffd005e9e05324c6a23ba842b37f3",
+  "source_fingerprint": "sha256:e8e2514a9e9810f04af0f9d6c1fccde888ebf581eb2676013d36eb5ebb93e455",
   "suite": {
     "failed": 0,
-    "passed": 1335,
+    "passed": 1338,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1057,8 +1057,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1192,
+    "fast": 1195,
     "slow": 143,
-    "total": 1335
+    "total": 1338
   }
 }-->

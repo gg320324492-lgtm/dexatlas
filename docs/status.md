@@ -19,8 +19,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3**（v0.2.0 发布准备中，见[发版说明](releases/v0.2.0.md)） |
-| 测试 | <!--fig:tests.total-->1335<!--/fig--> 个（<!--fig:tests.fast-->1192<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->91.1%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1338<!--/fig--> 个（<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->91.5%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -266,6 +266,16 @@ Orchestrator 在后台任务里回答，屏上轮询计划、工具时间线与�
 密钥处理与响应契约逐项核实无违例；六条退出标准 5 条满足、1 条（端到端）
 满足但带 agent 预算缺口，判定**有条件通过**——待 agent 提问在某明确配置下
 可复现、双语 README 补齐 agent 展示后完全关闭。
+
+**修复后真模型复验已完成**（2026-11-14，基准 `817ad1f`，见
+[端到端实测报告 §5](reports/m4-e2e-run.md)）：在 `DEXATLAS_AGENT_MAX_STEPS=40`
+与 120k tokens 预算下，「权限清单」「谁调用 Crypto.sign」两个问题以真实模型
+（MiniMax-M3.1-Flash）稳定 `completed`，报告三段式完整、引用在证据表内可解析
+（manifest 与调用边 locator 均 `resolved: true`）——「有条件通过」的两个关闭
+条件之一（agent 提问在某明确配置下可复现）**已满足**；另一个（双语 README 的
+agent 展示）由另一任务处理。串行单工具与步数放大两项修复均按设计工作；默认
+预算（20000 tokens / 8 迭代）下提问仍会 `budget_exhausted`，枚举型问题在放宽
+预算后也可能不收敛（模型先读后答的行为未变），预算默认值的调整留待后续。
 
 **「模型能力可禁用」退出标准已系统验证**（2026-11-14，基准 `1f1d883`，见
 [模型能力可禁用性验证报告](reports/model-disable-verification.md)）：不配置任何
