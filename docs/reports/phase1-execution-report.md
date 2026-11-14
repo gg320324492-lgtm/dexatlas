@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1321<!--/fig-->（<!--fig:tests.fast-->1178<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1325<!--/fig-->（<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->91.0%<!--/fig-->**（<!--fig:coverage.covered-->5945<!--/fig-->/<!--fig:coverage.total-->6536<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -141,9 +141,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1178<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1182<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->143<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1321<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1325<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -843,7 +843,7 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1321<!--/fig--> 个：<!--fig:tests.fast-->1178<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1325<!--/fig--> 个：<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->91.0%<!--/fig-->（<!--fig:coverage.covered-->5945<!--/fig-->/<!--fig:coverage.total-->6536<!--/fig--> 行）
                       # 完整环境下的结果：<!--fig:suite.passed-->1321<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
@@ -1056,8 +1056,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1178,
+    "fast": 1182,
     "slow": 143,
-    "total": 1321
+    "total": 1325
   }
 }-->

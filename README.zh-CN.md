@@ -14,8 +14,8 @@ DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整�
 > [!IMPORTANT]
 > **当前状态：早期开发（Phase 2 进行中）。** CLI、分析内核与报告流水线在 `v0.1.0`
 > 发布，此后每个版本都在交付。MCP server 与证据优先的 Agent 已经建成；Web 工作台
-> 八屏已建成五屏（项目面板、上传与分析进度、检索与证据溯源、单方法调用关系、
-> 报告导出）——已进仓库，但尚未随任何版本发布；Agent 工作区屏与基准视图尚未建成。
+> 八屏已建成六屏（项目面板、上传与分析进度、检索与证据溯源、单方法调用关系、
+> 报告导出、M3 基准视图）——已进仓库，但尚未随任何版本发布；Agent 工作区屏尚未建成。
 > 详见[路线图](#路线图)。本文档不会声称任何尚未实际可运行的功能。
 
 <p align="center">
@@ -159,8 +159,9 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 DexAtlas 可以在浏览器里展示分析工作区。工作台直接 in-process 调用 MCP server
 暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状完全相同；
 唯一接受输入的是上传屏，它把 APK 交给与 REST API、CLI 相同的分析管线。这是
-[Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单八屏中的五屏（项目列表 /
-单项目状态；APK 上传与分析进度；符号检索 / 证据溯源；单方法调用关系；报告导出），
+[Phase 2 计划](docs/roadmap/phase2-plan.md) 里 M4 屏幕清单八屏中的六屏（项目列表 /
+单项目状态；APK 上传与分析进度；符号检索 / 证据溯源；单方法调用关系；报告导出；
+M3 基准视图），
 已在当前分支实现但**尚未发布**；Agent 工作区等其余屏幕尚未建成。
 
 ```bash

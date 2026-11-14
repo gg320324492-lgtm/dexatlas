@@ -449,3 +449,46 @@ export function agentReportUrl(taskId: string, format: "json" | "markdown"): str
   return `/api/agent/tasks/${encodeURIComponent(taskId)}/report?format=${format}`;
 }
 
+// -- the benchmark screen ---------------------------------------------------
+// The M3 comparison's committed measurements, recomputed server-side from the
+// traces the repository carries. The shapes mirror the pydantic models in
+// dexatlas.workbench.benchmarks; the screen adds no field of its own.
+
+export interface ConfigurationMetrics {
+  configuration: string;
+  provider: string;
+  model: string;
+  // The eight metrics by their harness names. A `null` rate means the
+  // denominator was zero — it is "n/a", not a 0% result, and the screen has
+  // to say so rather than render a number that was never measured.
+  metrics: Record<string, number | null>;
+  // The same metrics as the harness's own `format_value` writes them into
+  // the docs/benchmarks reports; the screen renders these verbatim.
+  display: Record<string, string>;
+}
+
+export interface FailureCause {
+  configuration: string;
+  cause: string;
+  tasks: number;
+}
+
+export interface BenchmarkMeasurement {
+  kind: string;
+  label: string;
+  traces_file: string;
+  task_count: number;
+  budget: number;
+  configurations: ConfigurationMetrics[];
+  failure_causes: FailureCause[];
+}
+
+export interface BenchmarkSet {
+  measurements: BenchmarkMeasurement[];
+  disclosures: string[];
+}
+
+export function getBenchmarks(): Promise<BenchmarkSet> {
+  return fetchJson("/api/benchmarks/m3");
+}
+

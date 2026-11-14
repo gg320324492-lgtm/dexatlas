@@ -61,6 +61,7 @@ from dexatlas.mcp.tools import symbols as symbol_tools
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 from dexatlas.workbench import agent_tasks as agent
+from dexatlas.workbench import benchmarks as benchmark_view
 
 # The built front end. `npm run build` writes it; `python -m
 # dexatlas.workbench` builds it on first start when npm is available. The
@@ -460,6 +461,19 @@ def create_app(analyzer: Analyzer) -> FastAPI:
         if format == "markdown":
             return PlainTextResponse(agent.agent_report_markdown(state), media_type="text/markdown")
         return agent.agent_report_payload(state)
+
+    # -- the benchmark screen -------------------------------------------------
+    #
+    # The M3 comparison's committed traces, recomputed the way the reports
+    # were. This endpoint reads two files and returns their derivation; it
+    # adds no analysis, caches nothing and writes nothing. The disclosures
+    # travel with the numbers because the numbers alone invite the reading
+    # the M3 rules forbid.
+
+    @app.get("/api/benchmarks/m3", response_model=benchmark_view.BenchmarkSet)
+    def benchmark_m3() -> benchmark_view.BenchmarkSet:
+        """The committed M3 comparison measurements, recomputed from their traces."""
+        return benchmark_view.benchmark_set()
 
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")

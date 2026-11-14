@@ -31,7 +31,7 @@ The screens, from the plan, and where they stand:
 | 5 | Call graph and cross-reference navigation | **built** |
 | 6 | Agent workspace | **built** |
 | 7 | Evidence viewer, separating observations from hypotheses | **records + provenance** |
-| 8 | Benchmark and report export | **report export built** |
+| 8 | Benchmark and report export | **built** (report export + benchmark view) |
 
 ## Screen 8: export the report
 
@@ -47,6 +47,25 @@ that failed is named by the report, not merged into it.
 What the screen does not yet have is the benchmark half of its title: the
 measured runs and the comparison the benchmark suite produces are not
 surfaced here.
+
+## Screen 8, continued: the benchmark view
+
+`#/benchmarks` presents the M3 comparison's two committed measurements —
+the scripted-provider run and the MiniMax-M3.1-Flash run — each with its
+eight metrics, its "why the failed tasks failed" table, and the three
+disclosures the M3 rules require. `GET /api/benchmarks/m3` derives every
+figure from the traces committed under `docs/benchmarks/` with the
+comparison harness's own `_run_from_document` + `compare`, and formats them
+with the harness's own `format_value`, so a cell on the screen and the
+line in `docs/benchmarks/comparison.md` are two renderings of one
+computation — the screen adds no number, caches nothing, and writes
+nothing. The disclosures travel in the same response as the numbers: a
+scripted provider is not a model baseline, a real-model run is not
+reproducible to the digit, and neither measurement claims that one
+configuration is better than another. A checkout without the trace files
+answers with an empty measurement list and the disclosures, not an error;
+the benchmark suite itself is a repository tool, not a workbench feature,
+and this screen does not run it.
 
 ## Screen 2: upload an APK and watch the analysis
 
@@ -253,8 +272,8 @@ technology the plan names for M4. Three decisions worth restating:
   that can quietly describe a tree that no longer exists. `python -m
   dexatlas.workbench` builds it on first start; a machine without npm gets
   told so instead of a silent fallback.
-- **No routing library yet.** The hash routes — `#/`, `#/projects/{id}`,
-  `#/projects/{id}/search`, `#/projects/{id}/calls` and
+- **No routing library yet.** The hash routes — `#/`, `#/benchmarks`,
+  `#/projects/{id}`, `#/projects/{id}/search`, `#/projects/{id}/calls` and
   `#/projects/{id}/agent` — are matched in a few
   lines; the router arrives when a screen needs it. Search query values and
   provenance locators are always passed through `URLSearchParams`, so a `#`,

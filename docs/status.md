@@ -19,7 +19,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3** |
-| 测试 | <!--fig:tests.total-->1321<!--/fig--> 个（<!--fig:tests.fast-->1178<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1325<!--/fig--> 个（<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->91.0%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
@@ -237,6 +237,14 @@ REST API 共用同一份代码，后台分析，前端轮询项目状态）、�
 `model_dump()`；没有调用者的方法答 0 而不是 404——把「分析没读到调用」
 说成「这个方法不存在」，正是这个项目要避免的混淆。
 设计与取舍在[workbench 架构文档](architecture/workbench.md)里。
+
+**Benchmark 视图也已落地**（屏 8 的另一半，未发布）：`#/benchmarks` 呈现 M3
+对比的两份测量——scripted 与 MiniMax-M3.1-Flash——各自的八项指标、失败成因表，
+以及「scripted 不是模型基线」「真模型运行不可复现」「不声称哪个配置更优」三条
+披露。`GET /api/benchmarks/m3` 用对比 harness 自己的 `_run_from_document` +
+`compare` 从仓库内 `docs/benchmarks/` 的 trace 实时重算、用 `format_value` 出
+报告同款文本——屏幕不加一个数字、不落盘、不缓存；trace 文件缺失时答空列表加
+披露，不报错。浏览器上的每格数字与两份报告逐字一致。
 
 ### 4.7 这一轮关掉的
 
