@@ -438,6 +438,7 @@ def create_app(analyzer: Analyzer) -> FastAPI:
             provider=provider,
             store=store,
             limits=state.limits,
+            max_steps=agent.max_steps_from_env(),
         )
         return agent.AgentTaskAccepted(
             task_id=state.task_id,
