@@ -9,6 +9,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **The workbench benchmark screen (M4 screen 8).** The benchmark half of
+  the report-export screen: a `#/benchmarks` view that presents the M3
+  comparison's two committed measurements — the scripted-provider run and
+  the MiniMax-M3.1-Flash run — each with its eight metrics, its
+  "why the failed tasks failed" table, and the disclosures the M3 rules
+  require (a scripted provider is not a model baseline; a real-model run is
+  not reproducible to the digit; neither measurement claims that one
+  configuration is better than another).
+
+  The screen serves no stored numbers and adds no second derivation: the
+  new read-only endpoint `GET /api/benchmarks/m3` recomputes every figure
+  from the traces committed under `docs/benchmarks/` with the comparison
+  harness's own `_run_from_document` + `compare`, formats them with the
+  harness's own `format_value`, and reads nothing into a workspace. A
+  checkout without the trace files answers with an empty measurement list
+  and the disclosures, not an error.
+
 - **The workbench agent workspace (M4 screen 6).** A user can now ask the
   evidence-first agent a question about an analysed APK from the browser:
   the workbench accepts the question, runs the agent's own
@@ -58,7 +75,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
-- **The web workbench, and five of its eight screens.** `dexatlas-workbench`
+- **The web workbench, and six of its eight screens.** `dexatlas-workbench`
   serves a read-only browser over a workspace: the projects it holds, each
   with the backends that took part and the counts the analysis produced; the
   upload screen, where an APK chosen in the browser is stored with the REST
@@ -277,7 +294,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **The README's status banners denied what is built.** They said the MCP
   server, the agent and the workbench were "planned, not shipped" while the
-  server and the agent have landed and the workbench has five of its eight
+  server and the agent have landed and the workbench has six of its eight
   screens. Both banners now say Phase 2 is in progress and name what is
   built, what is in the tree but unreleased, and what is not built.
 

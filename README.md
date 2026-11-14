@@ -23,10 +23,10 @@ researchers and engineers analysing applications they own or are authorized to a
 > [!IMPORTANT]
 > **Status: early development (Phase 2 in progress).** The CLI, analysis core and report
 > pipeline shipped in `v0.1.0` and have been released in every version since. The MCP
-> server and the evidence-first agent are built, and the web workbench has five of its
+> server and the evidence-first agent are built, and the web workbench has six of its
 > eight screens (the project dashboard, upload and analysis progress, search and
-> evidence, the cross-reference view, and report export) — in the tree, but not in a
-> release yet; the agent-workspace screen and the benchmark view are not built. See the
+> evidence, the cross-reference view, report export, and the M3 benchmark view) — in
+> the tree, but not in a release yet; the agent-workspace screen is not built. See the
 > [Roadmap](#roadmap). Nothing on this page claims a feature that does not yet run.
 
 <p align="center">
@@ -197,7 +197,7 @@ In an MCP host, add it as a stdio server:
 DexAtlas can show a workspace in a browser. The workbench sits on the same
 ten tools the MCP server exposes, called in-process — the JSON the browser
 receives is the shape the MCP server would have returned. It is the Phase 2
-plan's M4 screen set being built one screen at a time; five of the eight
+plan's M4 screen set being built one screen at a time; six of the eight
 screens are built on this branch but **not released** — a published version
 does not carry them yet:
 
@@ -215,7 +215,12 @@ does not carry them yet:
   read out of — and walkable by clicking a caller or a callee;
 - the **report export**: the project page downloads the same Markdown or JSON
   report the CLI and the REST API write, over the published snapshot — no
-  second format and no changed field.
+  second format and no changed field;
+- the **benchmark view**: `#/benchmarks` presents the M3 comparison's two
+  committed measurements (scripted provider and a real model) with their
+  eight metrics, their failure causes, and the disclosures that bound them —
+  every figure recomputed from the committed traces by the comparison
+  harness itself, never restated.
 
 ```bash
 uv sync --extra dev --extra analysis --extra mcp --extra demo

@@ -9,6 +9,7 @@ import {
   getAgentConfig,
   getAgentReport,
   getAgentTask,
+  getBenchmarks,
   getClassSource,
   getEvidence,
   getHealth,
@@ -24,9 +25,12 @@ import {
   type AgentReportEvidence,
   type AgentTask,
   type AgentToolCall,
+  type BenchmarkMeasurement,
+  type BenchmarkSet,
   type CalleeView,
   type CallerView,
   type CallSiteView,
+  type ConfigurationMetrics,
   type EvidenceView,
   type Health,
   type LocatorResolution,
@@ -1617,12 +1621,187 @@ function CallGraphScreen({
   );
 }
 
+// -- the benchmark screen ---------------------------------------------------
+//
+// The M3 comparison's two committed measurements, recomputed server-side
+// from the traces the repository carries. Nothing on this screen is
+// hardcoded: every figure comes from `/api/benchmarks/m3`, which derives it
+// the same way `docs/benchmarks/*.md` were derived.
+
+// The eight metrics in the plan's order, with the harness's own names. The
+// cells are rendered from the server's `display` strings — the harness's
+// own `format_value` output — so a cell and the report line it mirrors read
+// the same.
+const METRIC_NAMES = [
+  "correct_answer_rate",
+  "evidence_grounding_rate",
+  "unsupported_assertion_rate",
+  "false_positive_rate",
+  "tool_call_success_rate",
+  "recovery_rate",
+  "token_consumption",
+  "execution_duration",
+] as const;
+
+function ConfigurationHeaderCells({ configs }: { configs: ConfigurationMetrics[] }): JSX.Element {
+  return (
+    <>
+      {configs.map((config) => (
+        <th key={config.configuration} className="num">
+          {config.configuration}
+          <span className="bench-sub">
+            {config.provider}
+            {config.model ? ` · ${config.model}` : ""}
+          </span>
+        </th>
+      ))}
+    </>
+  );
+}
+
+function BenchmarkMetricsTable({ measurement }: { measurement: BenchmarkMeasurement }): JSX.Element {
+  const bySystem = new Map(
+    measurement.configurations.map((config) => [config.configuration, config]),
+  );
+  const configs = measurement.configurations;
+  return (
+    <table className="projects benchmarks">
+      <thead>
+        <tr>
+          <th>metric</th>
+          <ConfigurationHeaderCells configs={configs} />
+        </tr>
+      </thead>
+      <tbody>
+        {METRIC_NAMES.map((name) => (
+          <tr key={name}>
+            <td>
+              <code>{name}</code>
+            </td>
+            {configs.map((config) => {
+              const display = bySystem.get(config.configuration)?.display ?? {};
+              return (
+                <td key={config.configuration} className="num">
+                  {display[name] ?? "n/a"}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function FailureCausesTable({ measurement }: { measurement: BenchmarkMeasurement }): JSX.Element {
+  if (measurement.failure_causes.length === 0) {
+    return <p className="ok">no task failed in this measurement.</p>;
+  }
+  return (
+    <table className="projects benchmarks">
+      <thead>
+        <tr>
+          <th>configuration</th>
+          <th>why the failed tasks failed</th>
+          <th className="num">tasks</th>
+        </tr>
+      </thead>
+      <tbody>
+        {measurement.failure_causes.map((cause) => (
+          <tr key={`${cause.configuration}-${cause.cause}`}>
+            <td>{cause.configuration}</td>
+            <td>{cause.cause}</td>
+            <td className="num">{formatCount(cause.tasks)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function BenchmarkMeasurementPanel({ measurement }: { measurement: BenchmarkMeasurement }): JSX.Element {
+  return (
+    <section className="panel" aria-label={`benchmark: ${measurement.kind}`}>
+      <h3>{measurement.label}</h3>
+      <p className="meta">
+        {formatCount(measurement.task_count)} tasks · budget {formatCount(measurement.budget)}{" "}
+        max_tokens/request · traces: <code>{measurement.traces_file}</code> — every figure below
+        is recomputed from that file by the comparison harness, the way{" "}
+        <code>docs/benchmarks/</code> reports were derived.
+      </p>
+      <BenchmarkMetricsTable measurement={measurement} />
+      <h4 className="bench-causes-title">Why the failed tasks failed</h4>
+      <FailureCausesTable measurement={measurement} />
+    </section>
+  );
+}
+
+function BenchmarksScreen(): JSX.Element {
+  const [data, setData] = useState<BenchmarkSet | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    setError(null);
+    getBenchmarks()
+      .then(setData)
+      .catch((err: unknown) => setError(errorText(err)));
+  }, [tick]);
+
+  if (error) {
+    return (
+      <p className="error">
+        the benchmark measurements could not be read: {error}{" "}
+        <button type="button" className="link-button" onClick={() => setTick(tick + 1)}>
+          try again
+        </button>
+      </p>
+    );
+  }
+  if (!data) return <p className="loading">recomputing the benchmark metrics…</p>;
+
+  return (
+    <article>
+      <header className="project-header">
+        <h2>M3 baseline comparison</h2>
+        <p className="meta">
+          Two measurements of the same 92 tasks under three configurations — A (source-text
+          retrieval), B (structured index) and DexAtlas (the agent). Both are derived from the
+          traces committed under <code>docs/benchmarks/</code>; neither is cached or restated by
+          this screen.
+        </p>
+      </header>
+      {data.measurements.length === 0 ? (
+        <p className="empty">
+          this checkout carries no committed comparison traces
+          (<code>docs/benchmarks/comparison-traces.json</code>), so there is nothing to show here
+          yet. The measurement is produced by{" "}
+          <code>benchmarks/comparison/run.py</code>.
+        </p>
+      ) : (
+        data.measurements.map((measurement) => (
+          <BenchmarkMeasurementPanel key={measurement.kind} measurement={measurement} />
+        ))
+      )}
+      <section className="panel" aria-label="benchmark disclosures">
+        <h3>What these numbers do not claim</h3>
+        <ul className="gaps">
+          {data.disclosures.map((disclosure) => (
+            <li key={disclosure}>{disclosure}</li>
+          ))}
+        </ul>
+      </section>
+    </article>
+  );
+}
+
 export default function App(): JSX.Element {
   const hash = useHashRoute();
   const callsMatch = hash.match(/^#\/projects\/([^/?#]+)\/calls(?:\?([^#]*))?$/);
   const agentMatch = hash.match(/^#\/projects\/([^/?#]+)\/agent$/);
   const searchMatch = hash.match(/^#\/projects\/([^/?#]+)\/search$/);
   const statusMatch = hash.match(/^#\/projects\/([^/?#]+)$/);
+  const benchmarksMatch = hash.match(/^#\/benchmarks\/?$/);
   const [health, setHealth] = useState<Health | null>(null);
   const [healthError, setHealthError] = useState(false);
 
@@ -1638,6 +1817,11 @@ export default function App(): JSX.Element {
         <h1>
           <a href="#/">DexAtlas Workbench</a>
         </h1>
+        <nav className="topnav" aria-label="workbench screens">
+          <a href="#/benchmarks" className={benchmarksMatch ? "active" : undefined}>
+            Benchmarks
+          </a>
+        </nav>
         <span className="meta">
           {health
             ? `v${health.version} · workspace: ${health.workspace}`
@@ -1652,6 +1836,8 @@ export default function App(): JSX.Element {
             projectId={decodeURIComponent(callsMatch[1] ?? "")}
             methodId={readMethodParam(callsMatch[2])}
           />
+        ) : benchmarksMatch ? (
+          <BenchmarksScreen />
         ) : agentMatch ? (
           <AgentWorkspaceScreen projectId={decodeURIComponent(agentMatch[1] ?? "")} />
         ) : searchMatch ? (
