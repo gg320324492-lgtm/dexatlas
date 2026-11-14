@@ -98,6 +98,9 @@ How to work:
 - Read before you answer. A tool's reading is a fact; your conclusion drawn
   from it is a lead. Never answer from memory and never state a fact you did
   not read.
+- Request one tool call per assistant turn, one at a time. The agent runs
+  the first call of a turn and refuses the others; a call that was refused
+  is not lost — ask for it again in the next turn.
 - Every conclusion you report must name what it rests on: the evidence ids the
   tools gave you, or the locators you read. A conclusion that names nothing
   cannot be checked, and it is reported as insufficient evidence rather than
@@ -365,6 +368,7 @@ class Orchestrator:
             state.turns.append(
                 AssistantTurn(content=response.content, tool_calls=response.tool_calls)
             )
+            self._refuse_extra_calls(state, response, runtime)
             self._store.save(state)
 
             if not response.tool_calls:
@@ -375,6 +379,56 @@ class Orchestrator:
                 state,
                 "tool_requested",
                 f"the model asked for {len(response.tool_calls)} tool call(s)",
+            )
+
+    def _refuse_extra_calls(
+        self,
+        state: TaskState,
+        response: ModelResponse,
+        runtime: _Runtime,
+    ) -> None:
+        """Answer every call after the round's first with a refusal.
+
+        A real model asks for several tools in one turn — the M4 end-to-end
+        run measured two to five — and the loop used to run all of them
+        before coming back to the model, which burned the tool-call budget
+        in a few rounds and left nothing for the answer. One call per round
+        keeps the read-then-answer rhythm: the first call runs, and the rest
+        are answered with an observation that says they were not run and
+        asks for them one at a time.
+
+        The refusal is an observation, not an exception: the model's turn
+        keeps every call it made, so the transcript answers each one, a
+        strict endpoint sees a tool message for each id, and a resume does
+        not re-run a call that was refused.
+        """
+        for call in response.tool_calls[1:]:
+            refusal = json.dumps(
+                {
+                    "ok": False,
+                    "tool": call.name,
+                    "deferred_tool": call.name,
+                    "error": (
+                        "the agent runs one tool call per assistant turn: this call was not "
+                        "made. Ask for it again in the next turn, one call at a time."
+                    ),
+                    "call_id": call.id,
+                },
+                sort_keys=True,
+            )
+            state.turns.append(
+                Observation(
+                    tool=call.name,
+                    call_id=call.id,
+                    content=refusal,
+                    ok=False,
+                    error="one tool call per round",
+                )
+            )
+            self._emit(
+                state,
+                "tool_deferred",
+                f"{call.name} was deferred: the agent runs one tool call per round",
             )
 
     def _finish(
