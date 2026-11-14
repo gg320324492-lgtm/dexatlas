@@ -128,12 +128,11 @@ def test_the_tree_kill_reports_a_launcher_it_cannot_find(
     """
     process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(2)"])
     try:
-        if os.name == "nt":
-            os.kill(process.pid, signal.SIGTERM)
-        else:
-            # The POSIX patch routes every os.kill through the fixture, which
-            # ends the launcher and then reports the group as empty -- the
-            # same window this test exercises on Windows.
+        # The launcher dies here on both platforms -- through the patched
+        # os.kill on POSIX, directly on Windows. A launcher already gone
+        # raises ProcessLookupError on POSIX; that is the state the test is
+        # about, not a failure.
+        with suppress(ProcessLookupError):
             base.os.kill(process.pid, signal.SIGTERM)
         time.sleep(0.3)
         process.wait()
