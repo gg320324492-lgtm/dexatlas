@@ -34,6 +34,8 @@ from dexatlas.core.models import (
     ManifestPermission,
     Project,
     Provenance,
+    ToolError,
+    ToolErrorCode,
 )
 from dexatlas.core.models import ProjectStatus as ProjectState
 from dexatlas.core.pipeline import Analyzer
@@ -633,3 +635,110 @@ def test_the_environment_step_budget_bounds_the_plan(
     final = store.load("announced")
     assert final is not None and final.plan is not None
     assert final.plan.max_steps == 40
+
+
+def test_a_question_about_a_failed_project_is_answered_and_discloses_the_gap(
+    client: TestClient,
+) -> None:
+    """A question about a project whose analysis failed is still taken.
+
+    The endpoint accepts a project that exists; it does not demand that the
+    analysis finished. That is the contract this test pins down: the agent's
+    first tool call reads the project's status, the incompleteness lands in
+    the findings as a verified observation, and the report's limitations
+    say the analysis did not finish — so a reader is never left to take a
+    count of a half-indexed APK as a count of the APK. A future change that
+    turned "the project exists" into "the project completed" would fail
+    here, and should not land quietly.
+
+    The workspace holds a manifest and a source file — the parts of the
+    analysis that survived the failure — so the task reads real rows, and
+    what is scripted is only the model's two answers.
+    """
+    from dexatlas.agent.providers.scripted import answer, conclusion, tool_call
+
+    analyzer: Analyzer = client.app.state.analyzer
+    failed_id = Project.new_id("d" * 64)
+    workspace = analyzer.settings.workspace / "projects" / failed_id
+    sources = workspace / "jadx" / "sources" / "com" / "example" / "demo"
+    sources.mkdir(parents=True, exist_ok=True)
+    (sources / "Crypto.java").write_text(
+        "package com.example.demo;\npublic final class Crypto {}\n", encoding="utf-8"
+    )
+    (workspace / "apktool").mkdir(parents=True, exist_ok=True)
+    (workspace / "apktool" / "AndroidManifest.xml").write_text(MANIFEST_XML, encoding="utf-8")
+
+    manifest = ManifestInfo(
+        package="com.example.demo",
+        version_code="42",
+        version_name="1.4.2",
+        min_sdk="24",
+        target_sdk="34",
+        permissions=[ManifestPermission(name="android.permission.INTERNET")],
+        components=[],
+    )
+    project = Project(
+        id=failed_id,
+        apk=ApkMetadata(sha256="d" * 64, size_bytes=1, path=Path("demo.apk"), dex_files=[DEX_FILE]),
+        status=ProjectState.FAILED,
+        tool_versions={"androguard": "4.1.4", "apktool": "2.9.3", "jadx": None},
+        errors=[
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.ANALYSIS_FAILED,
+                message="the analysis stopped before the decompiler finished",
+            )
+        ],
+        class_count=0,
+        method_count=0,
+        evidence_count=0,
+    )
+    analyzer.store.save_project(project, workspace, manifest)
+
+    client.app.state.agent_provider_factory = lambda: ScriptedProvider(
+        responses=[
+            tool_call("get_project_status", {"project_id": failed_id}, call_id="call-1"),
+            answer(
+                [conclusion("the project exists, but its analysis did not finish")],
+                limitations=[
+                    "the analysis did not finish: jadx failed, so the "
+                    "counts and sources are incomplete"
+                ],
+            ),
+        ]
+    )
+
+    accepted = client.post(
+        f"/api/projects/{failed_id}/agent/tasks",
+        json={"question": "Which permissions does this APK request?"},
+    )
+    assert accepted.status_code == 202, (
+        "a failed project exists, so its question is accepted, not refused"
+    )
+    task_id = accepted.json()["task_id"]
+
+    final = _wait_for_terminal(client, task_id)
+    assert final["status"] == "completed", (
+        "the task walks to an answer even though the analysis failed"
+    )
+
+    report = client.get(f"/api/agent/tasks/{task_id}/report").json()
+    assert report["task"]["status"] == "completed"
+    assert report["task"]["project_id"] == failed_id
+
+    # The status read is in the tool log, and the incompleteness is a
+    # finding the task recorded — not something the transport added.
+    assert any(call["tool"] == "get_project_status" for call in report["tool_calls"])
+    summaries = [finding["summary"] for finding in report["findings"]]
+    assert any("incomplete" in summary.lower() for summary in summaries), (
+        "the report records that the analysis is incomplete"
+    )
+
+    # The limitations are the model's own words, carried through the loop
+    # into the report: the analysis did not finish, and a count is not the
+    # APK's whole count.
+    assert report["limitations"], "the report carries what the task could not settle"
+    assert any(
+        "did not finish" in limitation or "incomplete" in limitation.lower()
+        for limitation in report["limitations"]
+    )

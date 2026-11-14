@@ -11,8 +11,10 @@ is not.
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1179,3 +1181,112 @@ def test_benchmark_metrics_recomputed_live_not_cached(
     assert calls["count"] == 2
     client.get("/api/benchmarks/m3")
     assert calls["count"] == 4
+
+
+class _ExitCalled(Exception):
+    """Raised in place of a clean exit, so a test can catch the exit."""
+
+
+def _main_with_prebuilt_front_end(
+    monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> tuple[str | None, int | None, int | None]:
+    """Run the workbench entry point with the front end already built.
+
+    The tests here are about the serve step, not about npm; the real
+    ``ensure_front_end_built`` would try to build the front end in a
+    workspace where dist/ does not exist, and that is a different test's
+    business. The bound host, the bound port and the exit code are
+    returned, so a test can check what the entry point asked uvicorn to
+    listen on and how it gave up.
+    """
+
+    def nothing_to_build() -> None:
+        return None
+
+    bound: dict[str, object] = {}
+
+    class RecordingUvicorn:
+        @staticmethod
+        def run(app: object, host: str = "127.0.0.1", port: int = 8000, **_kwargs: object) -> None:
+            bound["host"] = host
+            bound["port"] = port
+
+    from dexatlas.workbench import __main__ as entry
+
+    monkeypatch.setattr(entry, "ensure_front_end_built", nothing_to_build)
+    monkeypatch.setitem(sys.modules, "uvicorn", RecordingUvicorn)  # type: ignore[assignment]
+    exit_code: int | None = None
+    try:
+        with mock.patch("sys.exit", side_effect=_ExitCalled):
+            entry.main(argv)
+    except _ExitCalled:
+        exit_code = 1
+    host = bound.get("host")
+    port = bound.get("port")
+    return (
+        str(host) if host is not None else None,
+        int(port) if port is not None else None,
+        exit_code,
+    )
+
+
+def test_a_port_in_use_is_a_message_not_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The default port being taken is the newcomer's problem, so say so.
+
+    A second workbench on the same machine -- a second worktree, a second
+    checkout -- finds the default port held and, before this, died inside
+    uvicorn with a translated bind error and a traceback that named no
+    port and no remedy. The entry point now refuses before uvicorn is
+    asked to bind, and the one line it prints names the port, the flag
+    that fixes it, and the way to let the system choose one.
+    """
+    import socket as socket_module
+
+    held = socket_module.socket(socket_module.AF_INET, socket_module.SOCK_STREAM)
+    held.bind(("127.0.0.1", 0))
+    held.listen(1)
+    held_port = held.getsockname()[1]
+    try:
+        monkeypatch.setattr(
+            "dexatlas.config.settings.get_settings",
+            lambda: Settings(workspace=tmp_path / "workspace"),
+        )
+        host, port, exit_code = _main_with_prebuilt_front_end(
+            monkeypatch, ["--port", str(held_port)]
+        )
+    finally:
+        held.close()
+
+    assert host is None, "uvicorn must never be asked to bind a port that is held"
+    assert port is None
+    assert exit_code == 1, "a refused start is still a failed start"
+    output = capsys.readouterr().err
+    assert str(held_port) in output, "the message names the port that was taken"
+    assert "--port" in output, "the message names the flag that fixes it"
+    assert "--port 0" in output, "the message offers the pick-any-port option"
+
+
+def test_port_zero_lets_the_system_choose_the_port(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--port 0`` binds an ephemeral port, the way a test harness wants.
+
+    A tool that starts a workbench as a subprocess cannot know which port
+    is free; ``--port 0`` makes the operating system choose, and the entry
+    point hands that choice to uvicorn untouched. The banner does not
+    print a port nobody chose: uvicorn's own startup line names the one
+    that was actually bound.
+    """
+    monkeypatch.setattr(
+        "dexatlas.config.settings.get_settings",
+        lambda: Settings(workspace=tmp_path / "workspace"),
+    )
+    host, port, exit_code = _main_with_prebuilt_front_end(monkeypatch, ["--port", "0"])
+
+    assert host == "127.0.0.1"
+    assert port == 0
+    assert exit_code is None, "a port the system chose is a start, not a failure"
+    output = capsys.readouterr().out
+    assert "127.0.0.1:0" not in output, "the banner does not print a port nobody chose"

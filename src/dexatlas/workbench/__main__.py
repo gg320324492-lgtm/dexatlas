@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -83,6 +84,25 @@ def ensure_front_end_built() -> None:
         sys.exit("the front end build finished but produced no web/dist/index.html")
 
 
+def _port_is_free(host: str, port: int) -> bool:
+    """Whether a TCP port can be bound right now.
+
+    Asked before uvicorn is, so a port another workbench holds is refused
+    with a remedy instead of a translated bind error from inside uvicorn's
+    startup. The probe deliberately does not set the address reuse uvicorn
+    binds with: on Windows, reuse makes a probe succeed on a port another
+    live listener already holds, which would send the refusal one step too
+    late and let uvicorn's own bind error come back.
+    """
+    family = socket.AF_INET6 if ":" in host else socket.AF_INET
+    with socket.socket(family) as probe:
+        try:
+            probe.bind((host, port))
+        except OSError:
+            return False
+    return True
+
+
 def main(argv: list[str] | None = None) -> None:
     """Parse the arguments, build the front end once, serve with uvicorn."""
     parser = argparse.ArgumentParser(
@@ -98,7 +118,7 @@ def main(argv: list[str] | None = None) -> None:
         "--port",
         type=int,
         default=DEFAULT_PORT,
-        help="the port to bind (default: %(default)s)",
+        help="the port to bind (default: %(default)s; 0 lets the system choose)",
     )
     args = parser.parse_args(argv)
 
@@ -108,9 +128,29 @@ def main(argv: list[str] | None = None) -> None:
 
     from dexatlas.config.settings import get_settings
 
+    if args.port != 0 and not _port_is_free(args.host, args.port):
+        # The error a newcomer meets otherwise is uvicorn's own bind
+        # traceback, translated on a Windows console, naming no port and no
+        # remedy. This one line is the whole fix: name the port, name the
+        # flag, and offer the way out.
+        print(
+            f"error: port {args.port} on {args.host} is already in use; "
+            f"pass --port <other> (for example --port {args.port + 1}) "
+            "or --port 0 to let the system choose a free port",
+            file=sys.stderr,
+            flush=True,
+        )
+        sys.exit(1)
+
     analyzer = Analyzer(get_settings())
     app = create_app(analyzer)
-    print(f"serving the workbench on http://{args.host}:{args.port}", flush=True)
+    if args.port == 0:
+        # The port is the operating system's to choose, and uvicorn's own
+        # startup line names the one that was bound; a banner printed here
+        # would say :0, which is the argument, not the port.
+        print(f"serving the workbench on http://{args.host}:<system-chosen port>", flush=True)
+    else:
+        print(f"serving the workbench on http://{args.host}:{args.port}", flush=True)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
 
 
