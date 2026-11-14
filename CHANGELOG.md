@@ -19,6 +19,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `res/values*` 字符串资源的行为不变；`resources` 表新增 `attribute` 列（可空），
   旧工作区自动迁移。`@string/...` 引用仍不在索引——资源 ID 图是另一件事。
 
+- **资源引用（`@string/app_name` 等）进入符号索引，建立资源引用边表。**
+  解码树里全部 `res/**/*.xml` 的属性值与 `<item>` 文本，凡形如
+  `@type/name`（含 `@android:type/name` 平台前缀）都记成一条引用边，进新表
+  `resource_references`：引用方（文件 + 元素 + 属性 + 行号）指向被引资源
+  （type + name）。`@+id/...` 是定义不是引用，`?attr/...` 走主题解析，均不入边。
+  查询入口：CLI 新子命令 `dexatlas resrefs <project> [--type T] [--name N]`，
+  API 新端点 `GET /projects/{id}/resource-references?res_type=…&res_name=…`，
+  每条边带 `apktool:<file>#line=N;<Tag>` 形式的 locator，指回携带引用的元素。
+  `SymbolCounts` 新增 `resource_references` 计数；schema 升到 v6，旧工作区
+  自动迁移（新表为空，下次分析填入）。资源 ID 的数值映射
+  （`R.string.app_name` → int）仍不在索引——那要读 `resources.arsc`。
+
 ### Changed
 
 - **`dexatlas analyze` 在分析被截断时返回退出码 5（新退出码 `EXIT_TRUNCATED`）。**

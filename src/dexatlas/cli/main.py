@@ -632,6 +632,68 @@ def resources(
 
 
 @app.command()
+def resrefs(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    res_type: Annotated[
+        str | None,
+        typer.Option("--type", help="Show references to one resource type, e.g. string."),
+    ] = None,
+    name: Annotated[
+        str | None, typer.Option("--name", help="Show references to one resource, by its name.")
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum references to list. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 100,
+) -> None:
+    """List the references between resources: who points at a resource.
+
+    A layout that says ``android:text="@string/app_name"`` is one use of the
+    string it names. Each row is one use — the file, the element, the
+    attribute and the line it sits on — so "which files use this string?"
+    has an answer with a place attached to it.
+    """
+    analyzer = Analyzer()
+    _require_project(analyzer, project_id)
+    rows = analyzer.resource_references(project_id, res_type=res_type, res_name=name)
+    if not rows:
+        err_console.print(
+            "[yellow]No references matched.[/yellow] "
+            "The Apktool backend reads them from the decoded res/ tree; "
+            "it may not have been installed, or the resources carry no "
+            "@type/name references."
+        )
+        raise ExitCode(code=EXIT_EMPTY)
+
+    table = Table(header_style="bold")
+    table.add_column("Reference")
+    table.add_column("Attribute")
+    table.add_column("File")
+    table.add_column("Line")
+    table.add_column("Element")
+    table.add_column("Source")
+    for row in rows[:limit]:
+        source = row.provenance[0].ref() if row.provenance else "-"
+        table.add_row(
+            row.target,
+            row.attribute,
+            row.file,
+            str(row.line) if row.line else "-",
+            row.element,
+            f"[dim]{source}[/dim]",
+        )
+    console.print(table)
+
+    hidden = len(rows) - len(rows[:limit])
+    if hidden > 0:
+        console.print(_not_shown(hidden, "reference"))
+
+
+@app.command()
 def search(
     project_id: Annotated[str, typer.Argument(help="Project id.")],
     keyword: Annotated[str, typer.Argument(help="Term to search for.")],

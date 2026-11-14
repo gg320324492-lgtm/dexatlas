@@ -939,6 +939,69 @@ class ResourceString(Sourced):
         return self.name
 
 
+class ResourceReference(Sourced):
+    """A reference from one resource file to a resource declaration.
+
+    A layout that says ``android:text="@string/app_name"`` does not *hold*
+    text — it points at a declaration somewhere else in the resource table.
+    The declaration rows live in :class:`ResourceString`; the rows here are
+    the edges, and the question they answer is "which files use this
+    resource?", with a place attached to every use.
+
+    One row per attribute that carries a reference. The same element naming
+    two resources is two rows, because the two attributes are two uses.
+    """
+
+    reference: str
+    """The reference as the XML spelled it, e.g. ``@string/app_name`` or
+    ``@android:string/ok``."""
+
+    res_type: str
+    """The referenced resource's type, e.g. ``string`` for
+    ``@string/app_name``."""
+
+    res_name: str
+    """The referenced resource's name, e.g. ``app_name``."""
+
+    package: str | None = None
+    """The package the referenced resource belongs to.
+
+    ``@android:string/ok`` names the platform's ``string/ok``, not this
+    APK's, so the package is part of what the reference names. A plain
+    ``@string/app_name`` names this APK's own resource and leaves it empty.
+    """
+
+    attribute: str
+    """The attribute that carries the reference, e.g. ``text``.
+
+    The attribute is written without its namespace: both ``android:text``
+    and an app's own ``app:text`` read as ``text``, and the file plus the
+    line say which element the attribute sits on.
+    """
+
+    element: str
+    """The tag the attribute was written on, e.g. ``TextView``."""
+
+    line: int = 0
+    """The line the element starts on, counting from one.
+
+    ``0`` when the line could not be determined — a file that will not
+    survive the line-numbering pass still yields its references, and a row
+    without a line is a use that was found but not placed.
+    """
+
+    file: str = ""
+    """The file the reference was read from, relative to Apktool's output
+    tree — the same path the provenance locator names."""
+
+    @property
+    def target(self) -> str:
+        """The referenced resource, qualified by its package when it has one."""
+        if self.package:
+            return f"@{self.package}:{self.res_type}/{self.res_name}"
+        return f"@{self.res_type}/{self.res_name}"
+
+
 # ---------------------------------------------------------------------------
 # Source documents
 # ---------------------------------------------------------------------------

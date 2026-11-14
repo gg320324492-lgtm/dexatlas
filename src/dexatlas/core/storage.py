@@ -32,6 +32,7 @@ from dexatlas.core.models import (
     Project,
     ProjectStatus,
     ResourceKind,
+    ResourceReference,
     ResourceString,
     StringConstant,
     ToolError,
@@ -40,7 +41,7 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 #: The longest a name may be in the search index, in characters.
 #:
@@ -70,6 +71,7 @@ _PROJECT_TABLES = (
     "call_sites",
     "strings",
     "resources",
+    "resource_references",
     "search_index",
     "evidence",
 )
@@ -112,6 +114,15 @@ class SymbolCounts:
 
     resources: int = 0
 
+    resource_references: int = 0
+    """The resource-reference edges the index holds.
+
+    One row per attribute that carries a ``@type/name`` reference. The
+    declarations are the rows of ``resources``; these are the uses, and the
+    two counts answer two different questions — what the resource table
+    says, and which files point at it.
+    """
+
 
 #: The call-site table, written out by the migration as well as by the schema.
 #:
@@ -146,6 +157,26 @@ CREATE TABLE IF NOT EXISTS resources (
 );
 """
 
+#: One row per attribute that carries a ``@type/name`` reference. The key
+#: names the *use*: one element referring to two resources is two rows, and
+#: two elements of one file referring to the same resource are two rows
+#: because the line tells them apart.
+_RESOURCE_REFERENCES_TABLE = """
+CREATE TABLE IF NOT EXISTS resource_references (
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    reference  TEXT NOT NULL,
+    res_type   TEXT NOT NULL,
+    res_name   TEXT NOT NULL,
+    package    TEXT,
+    attribute  TEXT NOT NULL,
+    element    TEXT NOT NULL,
+    line       INTEGER NOT NULL DEFAULT 0,
+    file       TEXT NOT NULL,
+    provenance TEXT NOT NULL DEFAULT '[]',
+    PRIMARY KEY (project_id, file, element, attribute, line, res_type, res_name, package)
+);
+"""
+
 #: The indexes on the call-site table.
 #:
 #: They are written here as well as in the schema, because the migration
@@ -167,6 +198,14 @@ CREATE INDEX IF NOT EXISTS idx_sites_callee_canonical
 _RESOURCES_INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_resources_project ON resources(project_id);
 CREATE INDEX IF NOT EXISTS idx_resources_name ON resources(project_id, name);
+"""
+
+#: The index that answers "which files reference this resource?" — the lookup
+#: is by the resource named, so the index is on the (type, name) pair.
+_RESOURCE_REFERENCES_INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_resrefs_project ON resource_references(project_id);
+CREATE INDEX IF NOT EXISTS idx_resrefs_target
+    ON resource_references(project_id, res_type, res_name);
 """
 
 #: The whole schema. The resource table is spliced in rather than written out
@@ -286,6 +325,7 @@ CREATE TABLE IF NOT EXISTS strings (
 
 """
     + _RESOURCES_TABLE
+    + _RESOURCE_REFERENCES_TABLE
     + """
 CREATE TABLE IF NOT EXISTS evidence (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -312,6 +352,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
 """
     + _CALL_SITES_INDEXES
     + _RESOURCES_INDEXES
+    + _RESOURCE_REFERENCES_INDEXES
 )
 
 #: The tables the schema declares.
@@ -838,6 +879,7 @@ class Store:
         references: Iterable[MethodReference],
         strings: Iterable[StringConstant],
         resources: Iterable[ResourceString] = (),
+        resource_references: Iterable[ResourceReference] = (),
     ) -> SymbolCounts:
         """Replace a project's symbol tables. Callers re-analyse, so this is idempotent.
 
@@ -875,6 +917,7 @@ class Store:
         reference_list = list(references)
         string_list = list(strings)
         resource_list = list(resources)
+        resource_reference_list = list(resource_references)
 
         with self.transaction() as connection:
             for table in _PROJECT_TABLES:
@@ -972,6 +1015,24 @@ class Store:
                 ],
             )
             connection.executemany(
+                "INSERT OR REPLACE INTO resource_references VALUES (?,?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        project_id,
+                        r.reference,
+                        r.res_type,
+                        r.res_name,
+                        r.package,
+                        r.attribute,
+                        r.element,
+                        r.line,
+                        r.file,
+                        _dump_provenance(r),
+                    )
+                    for r in resource_reference_list
+                ],
+            )
+            connection.executemany(
                 "INSERT INTO search_index (kind, qualified_name, project_id, body) VALUES (?,?,?,?)",
                 _search_rows(
                     project_id, class_list, method_list, field_list, string_list, resource_list
@@ -985,6 +1046,7 @@ class Store:
                 call_sites=_count_rows(connection, "call_sites", project_id),
                 call_edges=_count_call_edges(connection, project_id),
                 resources=_count_rows(connection, "resources", project_id),
+                resource_references=_count_rows(connection, "resource_references", project_id),
             )
 
     def list_classes(self, project_id: str, *, prefix: str | None = None) -> list[ClassRef]:
@@ -1087,6 +1149,33 @@ class Store:
         with self.transaction() as connection:
             rows = connection.execute(query, params).fetchall()
         return [_row_to_resource(row) for row in rows]
+
+    def list_resource_references(
+        self,
+        project_id: str,
+        *,
+        res_type: str | None = None,
+        res_name: str | None = None,
+    ) -> list[ResourceReference]:
+        """The resource-reference edges indexed for a project.
+
+        ``res_type`` and ``res_name`` select the edges that point at one
+        resource: the answer to "who references ``string/app_name``?" is every
+        file, element and attribute that names it, each with the locator that
+        lands a reader on the use.
+        """
+        query = "SELECT * FROM resource_references WHERE project_id = ?"
+        params: list[Any] = [project_id]
+        if res_type:
+            query += " AND res_type = ?"
+            params.append(res_type)
+        if res_name:
+            query += " AND res_name = ?"
+            params.append(res_name)
+        query += " ORDER BY file, line, element, attribute, res_type, res_name"
+        with self.transaction() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [_row_to_resource_reference(row) for row in rows]
 
     def search(self, project_id: str, keyword: str, *, limit: int = 50) -> list[dict[str, Any]]:
         """Full-text search across indexed symbols.
@@ -1402,6 +1491,20 @@ def _row_to_resource(row: sqlite3.Row) -> ResourceString:
         quantity=row["quantity"] or None,
         qualifier=row["qualifier"],
         position=row["position"],
+        file=row["file"],
+        provenance=json.loads(row["provenance"]),
+    )
+
+
+def _row_to_resource_reference(row: sqlite3.Row) -> ResourceReference:
+    return ResourceReference(
+        reference=row["reference"],
+        res_type=row["res_type"],
+        res_name=row["res_name"],
+        package=row["package"],
+        attribute=row["attribute"],
+        element=row["element"],
+        line=row["line"],
         file=row["file"],
         provenance=json.loads(row["provenance"]),
     )

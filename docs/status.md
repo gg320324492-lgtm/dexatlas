@@ -19,7 +19,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3**（v0.2.0 发布准备中，见[发版说明](releases/v0.2.0.md)） |
-| 测试 | <!--fig:tests.total-->1350<!--/fig--> 个（<!--fig:tests.fast-->1206<!--/fig--> 快 + <!--fig:tests.slow-->144<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1370<!--/fig--> 个（<!--fig:tests.fast-->1226<!--/fig--> 快 + <!--fig:tests.slow-->144<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->91.6%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
@@ -117,8 +117,16 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 `android:label` 的字面量按 `layout_text` 入 `resources` 表和全文索引，
 locator 指回布局文件与元素起始行
 （详见[分析覆盖度与证据来源](analysis-provenance.md) §5.4）。
-仍然不在索引里的是 `@string/app_name` 这种**引用**——资源 ID 的图
-是另一个问题。
+
+`@string/app_name` 这种**资源引用**也进了索引：解码树里全部
+`res/**/*.xml` 的属性值与 `<item>` 文本凡形如 `@type/name`
+（含 `@android:string/ok` 这样的平台前缀）都记成一条引用边，
+进 `resource_references` 表——引用方（文件 + 元素 + 属性 + 行号）
+指向被引资源（type + name）。`dexatlas resrefs <project> --type string --name app_name`
+和 `GET /projects/{id}/resource-references` 都能反查「这个 string 被谁引用」，
+每条边带 `apktool:<file>#line=N;<Tag>` 的 locator。
+仍然不在索引里的是**资源 ID 的数值映射**（`R.string.app_name` 是哪个 int）——
+那要读 `resources.arsc` 的 ID 表，是下一件事。
 
 ### 4.3 压测没有覆盖的部分
 
@@ -330,7 +338,7 @@ demo 时长的结论（2026-11-14 更新）：60–90 秒端到端版已重录�
 | 文档与 issue 的发布状态 | 23 处过期陈述改完；issue #1 留了评论（正文没动）；`scripts/check-version-claims.py` 现在自动查这一类 |
 | 「这个方法调用了谁」被答成「谁调用了它」 | `find_callees` 与 `find_callers` 跑的是同一条查询；方向从来没被断言过，所以测试是绿的 |
 | 交叉引用的两个数在五处对不上 | 摘要与自己的 detail 打架；agent 用了报告不读的键；迁移重建表时把索引一起删了；JSON 报告的 project 块只有一个数；`schema_version` 没升 |
-| 资源完全没有覆盖 | 资源表进索引，`dexatlas resources` 和 `GET /projects/{id}/resources` 都能查 |
+| 资源完全没有覆盖 | 资源表进索引，`dexatlas resources` 和 `GET /projects/{id}/resources` 都能查；布局硬编码文本按 `layout_text` 入索引；`@string/...` 资源引用入 `resource_references` 边表，`dexatlas resrefs` 和 `GET /projects/{id}/resource-references` 能反查「谁引用了这个资源」 |
 | Smali 回退不附带 provenance | `class_source_document` / `method_source_document` 返回带出处的文档，CLI 与 API 都说得出是 Java 还是 Smali |
 | 大型 APK 的性能压测 | 基准跑完了；**顺带找出三个真缺陷并修掉** |
 | 文档里的引用会漂移没人管 | `scripts/check-doc-citations.py` 现在真的校验 94 处引用里的 93 处（原来只查 18 处） |

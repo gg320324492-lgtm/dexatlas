@@ -606,6 +606,34 @@ def list_resources(
     }
 
 
+@app.get("/projects/{project_id}/resource-references", tags=["analysis"])
+def list_resource_references(
+    project_id: str,
+    analyzer: AnalyzerDep,
+    res_type: Annotated[
+        str | None, Query(description="Filter by resource type, e.g. string.")
+    ] = None,
+    res_name: Annotated[
+        str | None, Query(description="Filter by resource name, e.g. app_name.")
+    ] = None,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+) -> dict[str, Any]:
+    """The references between resources: which files point at one resource.
+
+    Each row is one use — the file, the element and the attribute that carry
+    a ``@type/name`` reference — with the provenance that lands a reader on
+    it. ``res_type`` and ``res_name`` answer "who references this resource?".
+    """
+    if analyzer.store.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail=f"no project {project_id!r}")
+    references = analyzer.resource_references(project_id, res_type=res_type, res_name=res_name)
+    return {
+        "project_id": project_id,
+        "total": len(references),
+        "references": [r.model_dump(mode="json") for r in references[:limit]],
+    }
+
+
 @app.get(
     "/projects/{project_id}/classes/{class_name:path}/source",
     tags=["analysis"],

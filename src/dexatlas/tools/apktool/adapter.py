@@ -12,6 +12,7 @@ denial-of-service waiting to happen.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from xml.etree.ElementTree import Element, ParseError
 from xml.parsers import expat
@@ -25,6 +26,7 @@ from dexatlas.core.models import (
     ManifestInfo,
     ManifestPermission,
     ResourceKind,
+    ResourceReference,
     ResourceString,
     ToolError,
     ToolErrorCode,
@@ -69,6 +71,20 @@ _TEXT_ATTRIBUTES = ("text", "hint", "contentDescription", "title", "summary", "l
 #: requires that spelling — what makes an attribute an Android one is the
 #: namespace, not the prefix.
 _ANDROID_NAMESPACE = "{http://schemas.android.com/apk/res/android}"
+
+#: The ``@``-references a resource value can carry, and the prefix ``?`` of a
+#: theme attribute lookup, which is a different kind of reference and not one
+#: this index holds: ``?attr/colorPrimary`` resolves through the theme, not
+#: through the resource table.
+_REFERENCE_PREFIXES = ("@",)
+
+#: A resource reference spelled ``@type/name`` or ``@[package:]type/name``,
+#: captured as type, name and optional package. The name may itself carry a
+#: dot (style names do), and ``+`` marks a definition (``@+id/view``) rather
+#: than a reference, so it is not matched.
+_RESOURCE_REFERENCE = re.compile(
+    r"^@(?:(?P<package>[A-Za-z0-9_.]+):)?(?P<type>[A-Za-z0-9_.]+)/(?P<name>.+)$"
+)
 
 
 def source_locator(output_dir: Path, path: Path) -> str:
@@ -304,6 +320,135 @@ class ApktoolBackend(Backend):
                 )
             )
         return found, errors
+
+    def read_resource_references(
+        self, output_dir: Path, apk_sha256: str
+    ) -> tuple[list[ResourceReference], list[ToolError]]:
+        """Read the references between resources, out of Apktool's decoded ``res/``.
+
+        A value spelled ``@type/name`` — ``android:text="@string/app_name"`` —
+        points at a declaration the resource table holds somewhere else. Every
+        attribute of every element of every decoded XML file is looked at, so a
+        reference in a layout, a menu, a preference or a values file is one
+        edge: the file and element that point, and the resource they point at.
+
+        ``@+id/view`` is a *definition*, not a reference, and is not a row;
+        neither is ``?attr/...``, which resolves through the theme. The same
+        bargain as the declarations holds for a file that will not parse: it is
+        recorded as an error and the rest are still read.
+        """
+        res_dir = output_dir / "res"
+        if not res_dir.is_dir():
+            return [], []
+
+        found: list[ResourceReference] = []
+        errors: list[ToolError] = []
+        for xml_file in sorted(res_dir.rglob("*.xml")):
+            rows, error = self._read_reference_file(xml_file, output_dir, apk_sha256)
+            found.extend(rows)
+            if error is not None:
+                errors.append(error)
+
+        if len(errors) > MAX_RESOURCE_ERRORS:
+            hidden = len(errors) - MAX_RESOURCE_ERRORS
+            errors = errors[:MAX_RESOURCE_ERRORS]
+            errors.append(
+                ToolError(
+                    tool=self.name,
+                    code=ToolErrorCode.PARSE_ERROR,
+                    message=f"{hidden} further resource file(s) could not be parsed",
+                )
+            )
+        return found, errors
+
+    def _read_reference_file(
+        self,
+        path: Path,
+        output_dir: Path,
+        apk_sha256: str,
+    ) -> tuple[list[ResourceReference], ToolError | None]:
+        """Read one decoded XML file: the resource references written into it."""
+        relative = _relative_to(path, output_dir)
+        try:
+            root = safe_parse(path).getroot()
+        except ParseError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} is not well-formed XML: {exc}",
+                detail=relative,
+            )
+        except OSError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"could not read {relative}: {exc}",
+                detail=relative,
+            )
+        except ValueError as exc:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} was rejected as unsafe XML: {exc}",
+                detail=relative,
+            )
+
+        if root is None:
+            return [], ToolError(
+                tool=self.name,
+                code=ToolErrorCode.PARSE_ERROR,
+                message=f"{relative} has no root element",
+                detail=relative,
+            )
+
+        # The same second pass as the layout text: the safe parse above has
+        # already refused anything with a DTD or an entity in it, so this walk
+        # sees only the XML that survived, and a failure here costs the line
+        # numbers, not the references.
+        lines = _element_lines(path)
+
+        locator_base = source_locator(output_dir, path)
+        rows: list[ResourceReference] = []
+        for order, element in enumerate(root.iter(), start=1):
+            tag = _local_name(element.tag)
+            line = lines.get(order, 0)
+            # An element's ``name`` attribute says which value the element
+            # carries — ``<item name="android:textColor">`` — and the
+            # namespace prefix is dropped: the file, element and line already
+            # say where the use is.
+            value_attribute = element.get("name")
+            value_attribute = _local_name(value_attribute) if value_attribute else ""
+            candidates: list[tuple[str, str]] = [
+                (_local_name(attribute), value) for attribute, value in element.attrib.items()
+            ]
+            text = (element.text or "").strip()
+            if text:
+                candidates.append((value_attribute, text))
+            for attribute, value in candidates:
+                if not value.startswith(_REFERENCE_PREFIXES):
+                    continue
+                match = _RESOURCE_REFERENCE.match(value)
+                if match is None:
+                    # ``@+id/view`` and anything else the pattern does not
+                    # recognise is not a reference to a declaration.
+                    continue
+                locator = locator_base
+                if line:
+                    locator = f"{locator}#line={line};{tag}"
+                rows.append(
+                    ResourceReference(
+                        reference=value,
+                        package=match.group("package"),
+                        res_type=match.group("type"),
+                        res_name=match.group("name"),
+                        attribute=attribute,
+                        element=tag,
+                        line=line,
+                        file=relative,
+                        provenance=[self.provenance(apk_sha256, locator)],
+                    )
+                )
+        return rows, None
 
     def _read_resource_file(
         self,

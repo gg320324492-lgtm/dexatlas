@@ -283,11 +283,13 @@ SQLite with FTS5, in one workspace database — `workspace/dexatlas.db`
 (`Settings.database_path`).
 
 The tables are `projects` (one row per APK), `analysis_runs` (one row per attempt),
-`classes`, `methods`, `fields`, `call_sites`, `strings`, `resources`, `evidence`, and
+`classes`, `methods`, `fields`, `call_sites`, `strings`, `resources`,
+`resource_references`, `evidence`, and
 `search_index` — an FTS5 virtual table over the symbol names.
 
 **A run publishes, and publishing replaces.** The tables that hold a project's published
 snapshot — `classes`, `methods`, `fields`, `call_sites`, `strings`, `resources`,
+`resource_references`,
 `search_index` and `evidence` — are replaced as a whole when a run publishes. The
 evidence table is in that list for the same reason the symbol tables are: it is written
 afresh by every analysis, and its ids are assigned in sequence, so a record left behind

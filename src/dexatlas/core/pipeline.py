@@ -37,6 +37,7 @@ from dexatlas.core.models import (
     Project,
     ProjectStatus,
     Provenance,
+    ResourceReference,
     ResourceString,
     SourceDocument,
     SourceKind,
@@ -222,6 +223,7 @@ class Analyzer:
             references: list[MethodReference] = []
             strings: list[StringConstant] = []
             resources: list[ResourceString] = []
+            resource_references: list[ResourceReference] = []
             dex_classes: list[ClassRef] = []
 
             if include_apktool:
@@ -235,6 +237,11 @@ class Analyzer:
                     # exported component is a conclusion, and the report's evidence
                     # table is capped, so what is recorded last is what gets dropped.
                     builder.add_exported_components(manifest.components)
+                resource_references, reference_errors = self._read_resource_references(
+                    project, workspace
+                )
+                for reference_error in reference_errors:
+                    project.errors.append(reference_error)
 
             if include_androguard:
                 _check_cancelled(cancellation)
@@ -302,7 +309,14 @@ class Analyzer:
             # to it, and the copy publishes them under the same identity.
             staged_store.save_project(project, workspace, manifest=None)
             counts = staged_store.save_symbols(
-                project.id, classes, methods, fields, references, strings, resources
+                project.id,
+                classes,
+                methods,
+                fields,
+                references,
+                strings,
+                resources,
+                resource_references=resource_references,
             )
 
             evidence = builder.build()
@@ -531,6 +545,24 @@ class Analyzer:
             )
 
         return manifest, resources, errors
+
+    def _read_resource_references(
+        self, project: Project, workspace: Path
+    ) -> tuple[list[ResourceReference], list[ToolError]]:
+        """The resource-reference edges of the decoded tree Apktool wrote.
+
+        The tree is the one this run's decode produced, so a decode that failed
+        leaves nothing to scan and the answer is empty — the same rule the
+        resource declarations follow. A file that will not parse is an error,
+        and the rest of the tree is still read.
+        """
+        backend = self._apktool
+        if not backend.available():
+            return [], []
+        output_dir = workspace / "apktool"
+        if not (output_dir / "res").is_dir():
+            return [], []
+        return backend.read_resource_references(output_dir, project.apk.sha256)
 
     def _reconcile_sdk_levels(
         self, project: Project, manifest: ManifestInfo, builder: EvidenceBuilder
@@ -914,6 +946,22 @@ class Analyzer:
     def resources(self, project_id: str, *, name: str | None = None) -> list[ResourceString]:
         """The resource strings indexed for a project."""
         return self._store.list_resources(project_id, name=name)
+
+    def resource_references(
+        self,
+        project_id: str,
+        *,
+        res_type: str | None = None,
+        res_name: str | None = None,
+    ) -> list[ResourceReference]:
+        """The resource-reference edges indexed for a project.
+
+        ``res_type`` and ``res_name`` answer the question the edges exist for:
+        which files, elements and attributes point at one resource.
+        """
+        return self._store.list_resource_references(
+            project_id, res_type=res_type, res_name=res_name
+        )
 
 
 def _took_part(project: Project, tool: str) -> bool:
