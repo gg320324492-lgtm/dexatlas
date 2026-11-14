@@ -595,7 +595,6 @@ def test_the_environment_step_budget_bounds_the_plan(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A task run through ``run_agent_task`` carries the env step count into its plan."""
-    import dexatlas.agent as agent_pkg
     from dexatlas.agent.providers.scripted import answer, conclusion, tool_call
 
     settings = Settings(workspace=tmp_path / "workspace")

@@ -173,6 +173,10 @@ MiniMax-M3.1-Flash，默认 `Budget`（20000 tokens / 8 iterations / 120s）与
 `DEXATLAS_AGENT_MAX_TOKENS/MAX_ITERATIONS/MAX_SECONDS`，步数写死在
 `DEFAULT_MAX_STEPS=12`）；② 或在 system prompt/协议层抑制同轮多工具并行请求；
 ③ 或在 demo/验收场景使用更「先答后读」的模型配置。
+**（2026-11-14 追记：方向① 已实现 —— `DEXATLAS_AGENT_MAX_STEPS` 已由
+`max_steps_from_env()` 读取并传入 `Planner`，见
+[src/dexatlas/workbench/agent_tasks.py](../../src/dexatlas/workbench/agent_tasks.py)；
+方向②、③ 仍留待后续。）**
 
 ### P2 · 浏览器下载的报告文件名不带项目标识（小，可用性）
 
