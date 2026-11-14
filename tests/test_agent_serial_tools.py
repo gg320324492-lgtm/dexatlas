@@ -113,8 +113,7 @@ def _refusals(state: Any) -> list[Any]:
     return [
         turn
         for turn in state.turns
-        if not isinstance(turn, AssistantTurn)
-        and turn.error == "one tool call per round"
+        if not isinstance(turn, AssistantTurn) and turn.error == "one tool call per round"
     ]
 
 
@@ -148,7 +147,7 @@ def test_a_round_that_asks_for_several_tools_runs_one_and_refuses_the_rest(
     answered = {turn.call_id for turn in observations if turn.call_id}
     assert answered == {"batch-1", "batch-2"}
 
-    refusal_turn = [turn for turn in observations if turn.call_id == "batch-2"][0]
+    refusal_turn = next(turn for turn in observations if turn.call_id == "batch-2")
     refusal = json.loads(refusal_turn.content)  # type: ignore[union-attr]
     assert refusal["ok"] is False
     assert "one tool call per assistant turn" in refusal["error"]
@@ -197,9 +196,9 @@ def test_the_refusal_reaches_the_model_as_an_answer_to_its_own_call(
     assert roles.count("tool") == 2, roles
     tool_messages = [message for message in messages if message["role"] == "tool"]
     assert {message["tool_call_id"] for message in tool_messages} == {"batch-1", "batch-2"}
-    refusal_message = [
+    refusal_message = next(
         message for message in tool_messages if message["tool_call_id"] == "batch-2"
-    ][0]
+    )
     assert "one tool call per assistant turn" in refusal_message["content"]
 
 
@@ -309,7 +308,10 @@ def test_three_calls_in_a_round_run_one_and_refuse_two(demo: Demo, task_store: T
         [
             ("get_class_source", {"project_id": PROJECT_ID, "class_name": CRYPTO}),
             ("get_class_source", {"project_id": PROJECT_ID, "class_name": MAIN}),
-            ("get_class_source", {"project_id": PROJECT_ID, "class_name": "com.example.demo.Other"}),
+            (
+                "get_class_source",
+                {"project_id": PROJECT_ID, "class_name": "com.example.demo.Other"},
+            ),
         ],
         prefix="batch",
     )
@@ -367,9 +369,7 @@ def test_the_class_source_the_model_wanted_comes_back_later(
         "the second source read is the sensitive call the person has to approve"
     )
 
-    final = make_orchestrator(demo, provider, store=task_store).resume(
-        state.task_id, approved=True
-    )
+    final = make_orchestrator(demo, provider, store=task_store).resume(state.task_id, approved=True)
 
     assert final.status is TaskStatus.COMPLETED, final.error
     assert _model_tools(final) == ["get_class_source", "get_class_source"]

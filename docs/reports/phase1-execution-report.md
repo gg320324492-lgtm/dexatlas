@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1325<!--/fig-->（<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.0%<!--/fig-->**（<!--fig:coverage.covered-->6015<!--/fig-->/<!--fig:coverage.total-->6608<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1332<!--/fig-->（<!--fig:tests.fast-->1189<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.0%<!--/fig-->**（<!--fig:coverage.covered-->6022<!--/fig-->/<!--fig:coverage.total-->6614<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -98,8 +98,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `tools/androguard/adapter.py` | 86.8% | 38 / 288 |
 | `tools/base.py` | 87.2% | 24 / 188 |
 | `agent/tool_executor.py` | 87.9% | 34 / 282 |
-| `agent/orchestrator.py` | 88.4% | 46 / 398 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
+| `agent/orchestrator.py` | 88.6% | 46 / 404 |
 | `workbench/agent_tasks.py` | 88.7% | 20 / 177 |
 | `agent/reporter.py` | 89.2% | 11 / 102 |
 | `agent/providers/openai_compat.py` | 89.9% | 9 / 89 |
@@ -141,9 +141,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1182<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1189<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->143<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1325<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1332<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -223,6 +223,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_workbench_agent.py` | M4 屏 6：agent 工作区的任务接口——问题被受理为可轮询的任务，报告是 agent reporter 自己的文档，未配置模型时明确拒绝，key 不离开 provider |
 | `test_refresh_coverage_hygiene.py` | 报告测量前清掉残留的 .coverage：被中止的运行不能让同一棵树测出两个数 |
 | `test_backend_timeout_exit.py` | 后端超时分支被测试真实走到，而不是靠覆盖率测量碰巧经过 |
+| `test_agent_serial_tools.py` | agent 每轮只执行一个工具调用：多工具轮次被抑制、回绝走 tool 通道、resume 不重跑被回绝的调用、单工具行为不变（M4 e2e P1 修法②新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -843,10 +844,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1325<!--/fig--> 个：<!--fig:tests.fast-->1182<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1332<!--/fig--> 个：<!--fig:tests.fast-->1189<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.0%<!--/fig-->（<!--fig:coverage.covered-->6015<!--/fig-->/<!--fig:coverage.total-->6608<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1325<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.0%<!--/fig-->（<!--fig:coverage.covered-->6022<!--/fig-->/<!--fig:coverage.total-->6614<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1331<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -967,13 +968,13 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
       "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [398, 46],
+      "agent/orchestrator.py": [404, 46],
       "agent/planner.py": [46, 1],
       "agent/providers/__init__.py": [6, 0],
       "agent/providers/base.py": [80, 4],
       "agent/providers/local.py": [53, 10],
       "agent/providers/openai_compat.py": [89, 9],
-      "agent/providers/scripted.py": [42, 3],
+      "agent/providers/scripted.py": [42, 2],
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [102, 11],
       "agent/state.py": [197, 5],
@@ -1028,8 +1029,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 593,
-    "statements": 6608
+    "missing": 592,
+    "statements": 6614
   },
   "history": {
     "v0.1.0": {
@@ -1046,10 +1047,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:e533a35104ce2f8821fb2da945f72d53d42a991844cfe70aa4bd3e6ffd2f736f",
+  "source_fingerprint": "sha256:95c470606334a7ffc3b07b28d57512525b6c4541d324ef4e8dee457896f4a0fe",
   "suite": {
-    "failed": 0,
-    "passed": 1325,
+    "failed": 1,
+    "passed": 1331,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1057,8 +1058,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1182,
+    "fast": 1189,
     "slow": 143,
-    "total": 1325
+    "total": 1332
   }
 }-->
