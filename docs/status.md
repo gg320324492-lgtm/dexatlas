@@ -233,7 +233,7 @@ M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少�
 **M4 的 workbench 已建六屏**（随 v0.2.0 发布）：项目面板、APK 上传与分析进度（上传策略与
 REST API 共用同一份代码，后台分析，前端轮询项目状态）、检索与证据追溯（符号 →
 类/方法源码 → 证据记录 → locator 解析）、单个方法的调用关系视图（谁调用它、它调用
-谁，按调用点画出，点了节点就能跳到下一个方法）、agent 工作区（问题由生产
+谁，按调用点画出，点了节点就能跳到下一个方法）、Agent 工作区（问题由生产
 Orchestrator 在后台任务里回答，屏上轮询计划、工具时间线与三段式报告）、报告导出
 （CLI 与 REST API 同一份渲染器，无第二种格式）。六屏都坐在同一套只读 MCP
 工具上，浏览器拿到的 JSON 就是工具自己的形状，测试逐个端点比对
@@ -243,13 +243,23 @@ Orchestrator 在后台任务里回答，屏上轮询计划、工具时间线与�
 一次只答一个方法，不是全工作区调用图。
 设计与取舍在[workbench 架构文档](architecture/workbench.md)里。
 
-**Benchmark 视图也已落地**（屏 8 的另一半，未发布）：`#/benchmarks` 呈现 M3
+**Benchmark 视图也已落地**（屏 8 的另一半，随 v0.2.0 发布）：`#/benchmarks` 呈现 M3
 对比的两份测量——scripted 与 MiniMax-M3.1-Flash——各自的八项指标、失败成因表，
 以及「scripted 不是模型基线」「真模型运行不可复现」「不声称哪个配置更优」三条
 披露。`GET /api/benchmarks/m3` 用对比 harness 自己的 `_run_from_document` +
 `compare` 从仓库内 `docs/benchmarks/` 的 trace 实时重算、用 `format_value` 出
 报告同款文本——屏幕不加一个数字、不落盘、不缓存；trace 文件缺失时答空列表加
 披露，不报错。浏览器上的每格数字与两份报告逐字一致。
+
+**M4 端到端链路已实测**（2026-11-14，逐屏证据见
+[端到端实测报告](reports/m4-e2e-run.md)）：上传 `demo.apk` → 后台分析 →
+检索 `Crypto` → 打开源码与证据 E-0004 → 解析 locator → 调用关系一跳跳转 →
+报告导出，全程浏览器操作走通，导出文件与 `render_markdown` /
+`build_json_report` 的输出逐字节一致。Agent 环节接了真实模型
+（MiniMax-M3.1-Flash，key 只进环境变量）：屏、任务轮询与预算披露按设计工作，
+但当前模型习惯每轮并行请求多个工具，默认预算（12 步 / 20000 tokens）内
+5 个问题全部 `budget_exhausted`，没走到「写出带引用的结论」那一步——报告如实
+标注 did not finish。缺口、复现与候选修法记录在实测报告 §3，留给后续任务。
 
 ### 4.7 这一轮关掉的
 
