@@ -31,7 +31,12 @@ from benchmarks.comparison.adapters import (  # noqa: E402
     answer_from_result,
     is_empty,
 )
-from benchmarks.comparison.metrics import METRIC_NAMES, compare, format_value  # noqa: E402
+from benchmarks.comparison.metrics import (  # noqa: E402
+    _RATE_NAMES,
+    METRIC_NAMES,
+    compare,
+    format_value,
+)
 from benchmarks.comparison.model import Question, TaskTrace  # noqa: E402
 from benchmarks.comparison.systems import (  # noqa: E402
     AgentSystem,
@@ -184,7 +189,10 @@ def _provider_factory(
 
     def openai_factory() -> ModelProvider:
         return OpenAICompatibleProvider(
-            base_url=args.base_url, model=args.model, api_key=api_key or None
+            base_url=args.base_url,
+            model=args.model,
+            api_key=api_key or None,
+            timeout=args.request_timeout,
         )
 
     return openai_factory
@@ -198,13 +206,21 @@ def _systems(
     budget: int,
     provider_factory: Callable[[], ModelProvider] | None = None,
     total_tokens: int | None = None,
+    max_steps: int | None = None,
+    max_seconds: float = 600.0,
+    agent_budget: int | None = None,
+    max_iterations: int = 16,
+    max_sensitive_calls: int | None = None,
 ) -> tuple[System, ...]:
     """三个配置,同一预算,同一 provider 接口.
 
     真实 provider 时,三个配置由**同一个**构造拿各自的实例:同一模型,
-    同一预算,可比.
+    同一预算,可比. ``agent_budget`` 只给 D 配置的每请求上限:agent 的
+    回答要装下 JSON 与证据引用,A/B 的 prose 不需要,给 A/B 的 4096
+    不必跟着放大. None 表示与 A/B 相同.
     """
     project_ids = {name: analysis.result.project.id for name, analysis in analyses.items()}
+    agent_request_budget = agent_budget or budget
     systems: tuple[System, ...]
     if provider_factory is None:
         systems = (
@@ -215,8 +231,12 @@ def _systems(
                 analyses=analyses,
                 provider_factory=scripted_agent_provider,
                 store_root=workspace / "agent-states",
-                max_tokens=budget,
+                max_tokens=agent_request_budget,
                 total_tokens=total_tokens,
+                max_steps=max_steps,
+                max_seconds=max_seconds,
+                max_iterations=max_iterations,
+                max_sensitive_calls=max_sensitive_calls,
             ),
         )
     else:
@@ -233,8 +253,12 @@ def _systems(
                 analyses=analyses,
                 provider_factory=provider_factory,
                 store_root=workspace / "agent-states",
-                max_tokens=budget,
+                max_tokens=agent_request_budget,
                 total_tokens=total_tokens,
+                max_steps=max_steps,
+                max_seconds=max_seconds,
+                max_iterations=max_iterations,
+                max_sensitive_calls=max_sensitive_calls,
             ),
         )
     return systems
@@ -247,6 +271,11 @@ def run_comparison(
     limit: int = 0,
     provider_factory: Callable[[], ModelProvider] | None = None,
     total_tokens: int | None = None,
+    max_steps: int | None = None,
+    max_seconds: float = 600.0,
+    agent_budget: int | None = None,
+    max_iterations: int = 16,
+    max_sensitive_calls: int | None = None,
 ) -> ComparisonRun:
     """跑一次完整对比,返回可序列化的全部数据.
 
@@ -276,6 +305,11 @@ def run_comparison(
         budget=budget,
         provider_factory=provider_factory,
         total_tokens=total_tokens,
+        max_steps=max_steps,
+        max_seconds=max_seconds,
+        agent_budget=agent_budget,
+        max_iterations=max_iterations,
+        max_sensitive_calls=max_sensitive_calls,
     )
 
     traces: list[TaskTrace] = []
@@ -463,7 +497,12 @@ _REAL_PROVIDER_SECTION = (
 )
 
 
-def _markdown(run: ComparisonRun, *, evidence: str = "") -> str:
+def _markdown(
+    run: ComparisonRun,
+    *,
+    evidence: str = "",
+    comparison_to: Path | None = None,
+) -> str:
     """Render the report with no hand-written numbers.
 
     Every figure in the table comes from ``run.metrics``, which comes from the
@@ -526,6 +565,8 @@ def _markdown(run: ComparisonRun, *, evidence: str = "") -> str:
             f" {format_value(metric, values[metric])} |" for values in run.metrics.values()
         )
         lines.append(f"| `{metric}` |{cells}")
+    if comparison_to is not None:
+        lines += ["", *_comparison_section(run, comparison_to)]
     lines += ["", "## Disclosures", ""]
     for name, values in run.metrics.items():
         success = values["tool_call_success_rate"]
@@ -569,6 +610,74 @@ def _markdown(run: ComparisonRun, *, evidence: str = "") -> str:
         "",
     ]
     return "\n".join(lines)
+
+
+def _fmt_delta(metric: str, this: float | int | None, base: float | int | None) -> str:
+    """One delta cell: this value, the previous value, the difference.
+
+    Rates are shown as percentages with one decimal; counts as whole numbers.
+    ``n/a`` stays ``n/a``. A plus sign marks a rise. No judgement is made:
+    for a rate a rise may be good (correct answers) or bad (unsupported
+    assertions), and the table leaves that to the reader.
+    """
+    if this is None or base is None:
+        return "n/a"
+    rate = metric in _RATE_NAMES
+    if rate:
+        diff = (this - base) * 100.0
+        return f"{this * 100:.1f}% vs {base * 100:.1f}% ({'+' if diff >= 0 else ''}{diff:.1f} pp)"
+    diff = this - base
+    return f"{this} vs {base} ({'+' if diff >= 0 else ''}{diff})"
+
+
+def _comparison_section(run: ComparisonRun, previous: Path) -> list[str]:
+    """The per-configuration, per-metric comparison against a previous run.
+
+    The previous run is a different measurement — usually a different model
+    generation on the same task set — and it is never merged with this one:
+    both runs are stated separately, and this section only places their
+    numbers side by side. Every figure is recomputed from the two trace
+    files; nothing is copied from a report.
+    """
+    document = json.loads(previous.read_text(encoding="utf-8"))
+    base_run = _run_from_document(document)
+    lines = [
+        "## Comparison with the previous run",
+        "",
+        f"Previous run: `{previous.name}` ({base_run.task_count} tasks, budget "
+        f"{base_run.budget} `max_tokens` per request, model "
+        f"{', '.join(sorted(set(base_run.models.values())))}). This run: "
+        f"{run.task_count} tasks, budget {run.budget} `max_tokens` per request, "
+        f"model {', '.join(sorted(set(run.models.values())))}. The two runs are "
+        "separate measurements; the same tasks and the same scorer, but the "
+        "budgets and the model may differ, so a difference is a fact about "
+        "the pair of runs, not about the model alone.",
+        "",
+        "Delta = this run minus the previous run. For rates a rise in "
+        "`correct_answer_rate` and a fall in `unsupported_assertion_rate` "
+        "are both changes in the direction the metrics reward; the table "
+        "does not label any of them an improvement.",
+        "",
+    ]
+    for name in run.metrics:
+        base_metrics = base_run.metrics.get(name)
+        if base_metrics is None:
+            continue
+        lines.append(f"### {name}")
+        lines += [
+            "",
+            "| Metric | This run | Previous run | Delta |",
+            "|---|---:|---:|---:|",
+        ]
+        for metric in METRIC_NAMES:
+            lines.append(
+                f"| `{metric}` "
+                f"| {format_value(metric, run.metrics[name][metric])} "
+                f"| {format_value(metric, base_metrics[metric])} "
+                f"| {_fmt_delta(metric, run.metrics[name][metric], base_metrics[metric])} |"
+            )
+        lines.append("")
+    return lines
 
 
 def _failure_causes(run: ComparisonRun) -> list[str]:
@@ -640,6 +749,84 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=0,
+        help=(
+            "How many tool calls the agent's plan may make. 0 keeps the "
+            "planner's default (12). The step budget is a property of the "
+            "plan, not of the loop; the workbench reads the same number from "
+            "DEXATLAS_AGENT_MAX_STEPS. 0 also honours that environment "
+            "variable when it is set."
+        ),
+    )
+    parser.add_argument(
+        "--agent-budget",
+        type=int,
+        default=0,
+        help=(
+            "Per-request max_tokens for the agent configuration only. "
+            "0 keeps it equal to --budget. A/B stay at --budget either way: "
+            "the agent's JSON answers need more room than their prose, and "
+            "widening only the agent's envelope does not change what A and B see."
+        ),
+    )
+    parser.add_argument(
+        "--compare-to",
+        type=Path,
+        help=(
+            "A previous run's trace JSON. The report gains a section that "
+            "places this run's eight metrics beside that run's, recomputed "
+            "from its traces, with the delta. The two runs are never merged; "
+            "each is stated separately."
+        ),
+    )
+    parser.add_argument(
+        "--request-timeout",
+        type=float,
+        default=180.0,
+        help=(
+            "Seconds to wait for one model response before giving up. The "
+            "provider default is 60; a large per-request budget makes a slow "
+            "answer normal, and a timeout shorter than the model needs reads "
+            "as an endpoint failure, not as a model choice."
+        ),
+    )
+    parser.add_argument(
+        "--max-iterations",
+        type=int,
+        default=0,
+        help=(
+            "How many times the agent may go round its loop. 0 keeps the "
+            "harness default (16). A model that asks for tools one at a time "
+            "spends several steps a round; the round ceiling has to leave "
+            "room for the answer after the tools."
+        ),
+    )
+    parser.add_argument(
+        "--max-sensitive-calls",
+        type=int,
+        default=0,
+        help=(
+            "How many sensitive reads (get_method_source and its like) an "
+            "agent task may make before it would have to ask a person. 0 "
+            "keeps the planner's default (1). A benchmark run has nobody to "
+            "ask, so a second sensitive read paused the task until the run "
+            "ended; the report records this choice in its configuration "
+            "section."
+        ),
+    )
+    parser.add_argument(
+        "--max-seconds",
+        type=float,
+        default=0.0,
+        help=(
+            "Wall-clock ceiling per agent task, in seconds. 0 keeps the "
+            "harness default (600). A ceiling the model cannot reach measures "
+            "the clock, not the agent; raise it before reporting."
+        ),
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=0,
@@ -704,12 +891,28 @@ def _run_from_document(document: dict[str, Any]) -> ComparisonRun:
 COMMITTED_TRACES = REPOSITORY_ROOT / "docs" / "benchmarks" / "comparison-traces.json"
 
 
+def _int_env(name: str, default: int) -> int:
+    """Read an integer environment variable, or fall back to a default."""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        raise SystemExit(f"{name} must be a whole number, not {raw!r}") from None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     # ``--report`` alone regenerates the checked-in report from the checked-in
     # traces. It must not silently re-run the analysis: a report that changed
     # because of a fresh run would no longer describe the evidence beside it.
-    if args.report and not args.input and COMMITTED_TRACES.is_file():
+    # A run that names ``--output`` is a fresh measurement, not a
+    # regeneration: the committed traces would stand in for the run and the
+    # new run would never happen. Only an ``--output`` that is not the
+    # scripted default counts as that intent; ``--input`` always wins.
+    regenerate_report = args.report and not args.input
+    if regenerate_report and args.output == DEFAULT_OUTPUT and COMMITTED_TRACES.is_file():
         args.input = COMMITTED_TRACES
     if args.input:
         document = json.loads(args.input.read_text(encoding="utf-8"))
@@ -718,7 +921,10 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(run.metrics, indent=2, ensure_ascii=False))
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)
-            args.report.write_text(_markdown(run, evidence=args.input.name), encoding="utf-8")
+            args.report.write_text(
+                _markdown(run, evidence=args.input.name, comparison_to=args.compare_to),
+                encoding="utf-8",
+            )
         if not args.metrics and not args.report:
             _render(run, sys.stdout)
         return 0
@@ -726,12 +932,24 @@ def main(argv: list[str] | None = None) -> int:
     workspace = args.workspace or args.output / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     budget = args.budget or (2048 if args.provider == "scripted" else 4096)
+    # The step budget follows the workbench's rule: 0 (unset) means the
+    # planner's default, unless DEXATLAS_AGENT_MAX_STEPS says otherwise. A
+    # measurement that wants a specific ceiling passes --max-steps and it
+    # wins over the environment.
+
+    max_steps = args.max_steps or _int_env("DEXATLAS_AGENT_MAX_STEPS", 0) or None
+    max_seconds = args.max_seconds or 600.0
     run = run_comparison(
         workspace=workspace,
         budget=budget,
         limit=args.limit,
         provider_factory=_provider_factory(args),
         total_tokens=args.total_tokens or None,
+        max_steps=max_steps,
+        max_seconds=max_seconds,
+        agent_budget=args.agent_budget or None,
+        max_iterations=args.max_iterations or 16,
+        max_sensitive_calls=args.max_sensitive_calls or None,
     )
     args.output.mkdir(parents=True, exist_ok=True)
     document = run.to_dict()
@@ -744,7 +962,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
-        args.report.write_text(_markdown(run, evidence="comparison.json"), encoding="utf-8")
+        args.report.write_text(
+            _markdown(run, evidence="comparison.json", comparison_to=args.compare_to),
+            encoding="utf-8",
+        )
     if args.json:
         print(json.dumps(document, indent=2, ensure_ascii=False))
     else:

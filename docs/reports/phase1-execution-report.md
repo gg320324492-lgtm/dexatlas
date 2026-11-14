@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1338<!--/fig-->（<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.5%<!--/fig-->**（<!--fig:coverage.covered-->6069<!--/fig-->/<!--fig:coverage.total-->6631<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1350<!--/fig-->（<!--fig:tests.fast-->1206<!--/fig--> 快 + <!--fig:tests.slow-->144<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->36.8%<!--/fig-->**（<!--fig:coverage.covered-->2455<!--/fig-->/<!--fig:coverage.total-->6678<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -90,23 +90,57 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
 | `tools/androguard/worker.py` | 0.0% | 112 / 112 |
-| `workbench/__main__.py` | 58.0% | 29 / 69 |
-| `mcp/server.py` | 79.2% | 11 / 53 |
-| `agent/providers/local.py` | 81.1% | 10 / 53 |
-| `mcp/security.py` | 82.1% | 5 / 28 |
-| `cli/console.py` | 82.4% | 6 / 34 |
-| `tools/androguard/adapter.py` | 86.8% | 38 / 288 |
-| `tools/base.py` | 87.2% | 24 / 188 |
-| `agent/tool_executor.py` | 87.9% | 34 / 282 |
-| `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
-| `agent/orchestrator.py` | 88.6% | 46 / 404 |
-| `agent/reporter.py` | 89.2% | 11 / 102 |
-| `agent/providers/openai_compat.py` | 89.9% | 9 / 89 |
+| `workbench/__main__.py` | 0.0% | 69 / 69 |
+| `agent/orchestrator.py` | 17.3% | 334 / 404 |
+| `tools/androguard/adapter.py` | 17.4% | 237 / 287 |
+| `core/pipeline.py` | 18.5% | 411 / 504 |
+| `tools/apktool/adapter.py` | 20.2% | 210 / 263 |
+| `workbench/app.py` | 20.5% | 132 / 166 |
+| `reports/markdown.py` | 22.7% | 75 / 97 |
+| `cli/main.py` | 24.4% | 201 / 266 |
+| `tools/jadx/adapter.py` | 24.4% | 272 / 360 |
+| `core/methods.py` | 25.2% | 163 / 218 |
+| `core/storage.py` | 26.7% | 258 / 352 |
+| `agent/providers/openai_compat.py` | 27.0% | 65 / 89 |
+| `core/ingest.py` | 27.3% | 64 / 88 |
+| `api/uploads.py` | 27.6% | 131 / 181 |
+| `agent/evidence_verifier.py` | 29.5% | 86 / 122 |
+| `core/paths.py` | 30.6% | 25 / 36 |
+| `mcp/security.py` | 32.1% | 19 / 28 |
+| `agent/tool_executor.py` | 32.3% | 191 / 282 |
+| `core/evidence.py` | 33.6% | 71 / 107 |
+| `mcp/server.py` | 34.0% | 35 / 53 |
+| `core/locators.py` | 34.3% | 201 / 306 |
+| `mcp/tools/evidence.py` | 34.5% | 19 / 29 |
+| `mcp/tools/references.py` | 34.5% | 19 / 29 |
+| `mcp/tools/projects.py` | 35.6% | 29 / 45 |
+| `agent/providers/transport.py` | 36.7% | 19 / 30 |
+| `agent/providers/local.py` | 39.6% | 32 / 53 |
+| `mcp/tools/symbols.py` | 40.7% | 16 / 27 |
+| `agent/reporter.py` | 41.2% | 60 / 102 |
+| `tools/base.py` | 43.1% | 103 / 181 |
+| `mcp/errors.py` | 47.6% | 11 / 21 |
+| `reports/json_report.py` | 48.1% | 14 / 27 |
+| `workbench/benchmarks.py` | 50.0% | 34 / 68 |
+| `api/app.py` | 50.2% | 151 / 303 |
+| `agent/providers/scripted.py` | 52.4% | 20 / 42 |
+| `tools/androguard/isolation.py` | 52.6% | 46 / 97 |
+| `core/calls.py` | 53.1% | 15 / 32 |
+| `reports/coverage.py` | 54.5% | 5 / 11 |
+| `tools/registry.py` | 57.1% | 12 / 28 |
+| `agent/planner.py` | 63.0% | 17 / 46 |
+| `workbench/agent_tasks.py` | 63.3% | 66 / 180 |
+| `agent/state.py` | 67.0% | 65 / 197 |
+| `cli/console.py` | 67.6% | 11 / 34 |
+| `agent/providers/base.py` | 77.5% | 18 / 80 |
+| `config/settings.py` | 79.4% | 7 / 34 |
+| `core/models.py` | 80.1% | 64 / 321 |
+| `core/runs.py` | 88.6% | 8 / 70 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
-现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->94.1%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->12<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->205<!--/fig--> 未覆盖）**，已经离开这份清单。
+现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->20.2%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->210<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->263<!--/fig--> 未覆盖）**，已经离开这份清单。
 
 **`tools/androguard/worker.py` 写着 0%，那个数字说的不是「没人跑它」。**
 这个模块是**在另一个进程里跑的**：不受信的 DEX 在那里解析，
@@ -132,7 +166,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.5%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->36.8%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -140,9 +174,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1195<!--/fig--> | **不需要任何外部工具**，秒级完成 |
-| 集成套件（`-m slow`） | <!--fig:tests.slow-->143<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1338<!--/fig--> | |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1206<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 集成套件（`-m slow`） | <!--fig:tests.slow-->144<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
+| 合计 | <!--fig:tests.total-->1350<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -843,10 +877,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1338<!--/fig--> 个：<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1350<!--/fig--> 个：<!--fig:tests.fast-->1206<!--/fig--> 快 + <!--fig:tests.slow-->144<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.5%<!--/fig-->（<!--fig:coverage.covered-->6069<!--/fig-->/<!--fig:coverage.total-->6631<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1338<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->36.8%<!--/fig-->（<!--fig:coverage.covered-->2455<!--/fig-->/<!--fig:coverage.total-->6678<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1350<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -966,70 +1000,70 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "files": {
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
-      "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [404, 46],
-      "agent/planner.py": [46, 1],
+      "agent/evidence_verifier.py": [122, 86],
+      "agent/orchestrator.py": [404, 334],
+      "agent/planner.py": [46, 17],
       "agent/providers/__init__.py": [6, 0],
-      "agent/providers/base.py": [80, 4],
-      "agent/providers/local.py": [53, 10],
-      "agent/providers/openai_compat.py": [89, 9],
-      "agent/providers/scripted.py": [42, 2],
-      "agent/providers/transport.py": [30, 2],
-      "agent/reporter.py": [102, 11],
-      "agent/state.py": [197, 5],
-      "agent/tool_executor.py": [282, 34],
+      "agent/providers/base.py": [80, 18],
+      "agent/providers/local.py": [53, 32],
+      "agent/providers/openai_compat.py": [89, 65],
+      "agent/providers/scripted.py": [42, 20],
+      "agent/providers/transport.py": [30, 19],
+      "agent/reporter.py": [102, 60],
+      "agent/state.py": [197, 65],
+      "agent/tool_executor.py": [282, 191],
       "api/__init__.py": [3, 0],
-      "api/app.py": [307, 22],
-      "api/uploads.py": [181, 14],
+      "api/app.py": [303, 151],
+      "api/uploads.py": [181, 131],
       "cli/__init__.py": [3, 0],
-      "cli/console.py": [34, 6],
-      "cli/main.py": [258, 6],
+      "cli/console.py": [34, 11],
+      "cli/main.py": [266, 201],
       "config/__init__.py": [3, 0],
-      "config/settings.py": [39, 1],
+      "config/settings.py": [34, 7],
       "core/__init__.py": [3, 0],
-      "core/calls.py": [32, 0],
-      "core/evidence.py": [107, 1],
-      "core/ingest.py": [88, 3],
-      "core/locators.py": [306, 17],
-      "core/methods.py": [218, 10],
-      "core/models.py": [323, 6],
-      "core/paths.py": [36, 2],
-      "core/pipeline.py": [504, 31],
-      "core/runs.py": [70, 1],
-      "core/storage.py": [352, 7],
+      "core/calls.py": [32, 15],
+      "core/evidence.py": [107, 71],
+      "core/ingest.py": [88, 64],
+      "core/locators.py": [306, 201],
+      "core/methods.py": [218, 163],
+      "core/models.py": [321, 64],
+      "core/paths.py": [36, 25],
+      "core/pipeline.py": [504, 411],
+      "core/runs.py": [70, 8],
+      "core/storage.py": [352, 258],
       "mcp/__init__.py": [2, 0],
-      "mcp/errors.py": [21, 1],
+      "mcp/errors.py": [21, 11],
       "mcp/schemas.py": [153, 0],
-      "mcp/security.py": [28, 5],
-      "mcp/server.py": [53, 11],
+      "mcp/security.py": [28, 19],
+      "mcp/server.py": [53, 35],
       "mcp/tools/__init__.py": [1, 0],
-      "mcp/tools/evidence.py": [29, 1],
-      "mcp/tools/projects.py": [45, 4],
-      "mcp/tools/references.py": [29, 0],
-      "mcp/tools/symbols.py": [27, 0],
+      "mcp/tools/evidence.py": [29, 19],
+      "mcp/tools/projects.py": [45, 29],
+      "mcp/tools/references.py": [29, 19],
+      "mcp/tools/symbols.py": [27, 16],
       "reports/__init__.py": [4, 0],
-      "reports/coverage.py": [11, 0],
-      "reports/json_report.py": [27, 0],
-      "reports/markdown.py": [97, 0],
+      "reports/coverage.py": [11, 5],
+      "reports/json_report.py": [27, 14],
+      "reports/markdown.py": [97, 75],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [288, 38],
-      "tools/androguard/isolation.py": [97, 5],
+      "tools/androguard/adapter.py": [287, 237],
+      "tools/androguard/isolation.py": [97, 46],
       "tools/androguard/worker.py": [112, 112],
       "tools/apktool/__init__.py": [3, 0],
-      "tools/apktool/adapter.py": [205, 12],
-      "tools/base.py": [188, 24],
+      "tools/apktool/adapter.py": [263, 210],
+      "tools/base.py": [181, 103],
       "tools/jadx/__init__.py": [3, 0],
-      "tools/jadx/adapter.py": [360, 41],
-      "tools/registry.py": [28, 0],
+      "tools/jadx/adapter.py": [360, 272],
+      "tools/registry.py": [28, 12],
       "workbench/__init__.py": [0, 0],
-      "workbench/__main__.py": [69, 29],
-      "workbench/agent_tasks.py": [180, 16],
-      "workbench/app.py": [166, 4],
-      "workbench/benchmarks.py": [68, 2]
+      "workbench/__main__.py": [69, 69],
+      "workbench/agent_tasks.py": [180, 66],
+      "workbench/app.py": [166, 132],
+      "workbench/benchmarks.py": [68, 34]
     },
-    "missing": 562,
-    "statements": 6631
+    "missing": 4223,
+    "statements": 6678
   },
   "history": {
     "v0.1.0": {
@@ -1046,10 +1080,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:e8e2514a9e9810f04af0f9d6c1fccde888ebf581eb2676013d36eb5ebb93e455",
+  "source_fingerprint": "sha256:99f8a0e4246866070d0f97f6377ec0f75b9e44311b3a80615103be87fea31bbd",
   "suite": {
     "failed": 0,
-    "passed": 1338,
+    "passed": 1350,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1057,8 +1091,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1195,
-    "slow": 143,
-    "total": 1338
+    "fast": 1206,
+    "slow": 144,
+    "total": 1350
   }
 }-->

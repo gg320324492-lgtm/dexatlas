@@ -19,8 +19,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · **v0.1.3**（v0.2.0 发布准备中，见[发版说明](releases/v0.2.0.md)） |
-| 测试 | <!--fig:tests.total-->1338<!--/fig--> 个（<!--fig:tests.fast-->1195<!--/fig--> 快 + <!--fig:tests.slow-->143<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->91.5%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1350<!--/fig--> 个（<!--fig:tests.fast-->1206<!--/fig--> 快 + <!--fig:tests.slow-->144<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->36.8%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -102,34 +102,7 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 ### 4.1 真实加固 APK
 
-`obfuscated-app` 覆盖了短类名和短方法名，但它是**手写的**混淆，
-不是有控制流混淆的真实加固产物。真实的加固 APK 需要外部样本。
-
-### 4.2 布局里硬编码的文本仍然搜不到
-
-资源表现在读了：`res/values*/` 里的文本声明（`<string>`、
-`<string-array>` 的每一项、`<plurals>` 的每一项）进了索引，
-`dexatlas search` 搜得到 `DexAtlas Demo`，每一条都指回声明它的那个文件。
-
-但布局 XML 里 `android:text="..."` 这种**硬编码**的文本仍然进不了索引。
-这是这一轮明确留下的缺口，不是遗漏。`@string/app_name` 这种**引用**
-也不在索引里——资源 ID 的图是另一个问题。
-
-### 4.3 压测没有覆盖的部分
-
 [大型 APK 基准](benchmarks/large-apk.md) 记了它测了什么，也记了**没测什么**：
-真实的 APK（不是合成的）、JADX 与 Apktool 在规模下的表现、
-native 库、内存。这些要等下一个手里有真实样本的人。
-
-### 4.4 被截断的运行，退出码仍然是 0
-
-索引触到上限时，项目状态仍是 `completed`——部分成功不是失败——
-错误记在 `project.errors` 里，报告有「Backend errors」段，CLI 也会把它
-当警告打出来。**但 CLI 的退出码是 0**：只看退出码的调用方分不出
-「被截断的运行」和「完整的运行」。要看项目记录才知道。
-
-### 4.5 阶段验收挖出来的、这一轮修掉的
-
 评审（协议第 2 步，三份审核共 44 条发现）挖出来的产品缺陷，
 按严重程度排：
 
@@ -227,8 +200,21 @@ where-source 任务），三配置 harness、八项指标和脚本生成的报�
 | 对外代码结论可溯源或标未验证 | **部分满足**——DexAtlas 45 条非空断言中 43 条带 grounded + locator；A/B 的 86 条全部不溯源（0/86），由 `unsupported_assertion_rate` 100% 披露；agent 的 2 条不带 locator 的断言即 4.4% 的无支撑率 | 真模型 `comparison-real-traces.json` 的 assertions 字段 |
 | 对比不声称测量不支持的改进 | **满足**——两份报告均明文「never claims an improvement the measurements do not support」；scripted 报告另声明「not a model baseline」 | 两份报告的 Disclosures 段 |
 
-M3 剩下的工作：换更强的模型重跑，确认 agent 的差距有多少来自模型的工具
-使用习惯。
+**「换更强模型」这一问也跑完了**（2026-11-15）：仍是 MiniMax-M3.1-Flash、
+同端点同题集，但把三处预算约束放开（agent 工具调用步数 12→40、循环轮数
+8→24、每请求 token 4096→16384；A/B 每请求仍 4096），并修掉一处测量口径
+问题——敏感工具第二次调用会暂停等人工批准，而基准跑批无人可问，69 题
+因此空答；现在计划内的敏感读数由批准门放行（上限 8 次，见
+[架构文档](architecture/agent.md)与 `benchmarks/comparison/systems.py`）。
+结果在[强预算报告](benchmarks/comparison-stronger.md)，证据是
+`comparison-stronger-traces.json`，与上一轮**分开陈述、不并表**。
+agent 正确率 19.6% → 22.8%（+3.2 个百分点，21/92），A 30.4% → 28.3%，
+B 22.8% → 16.3%；agent 无支撑断言率 4.4% → 9.2%。结论：**agent 与 A 的
+差距主要是任务的步数预算与回答格式咬合的问题，不是「换个更强模型」能消的**
+——同一模型下，光把预算放开、把敏感门拿掉，agent 也只追回 3 个百分点，
+且 72 题仍撞在 24 轮的循环上限上（模型一轮只请求一个工具、又倾向反复取证）。
+A/B 在长上下文下反而更不稳定（B 退步 6.5 个百分点）。两轮的差值表在报告的
+「Comparison with the previous run」段；报告不把任何差值说成改进。
 
 **M4 的 workbench 已建六屏**（随 v0.2.0 发布）：项目面板、APK 上传与分析进度（上传策略与
 REST API 共用同一份代码，后台分析，前端轮询项目状态）、检索与证据追溯（符号 →

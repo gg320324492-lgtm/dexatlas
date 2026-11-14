@@ -31,6 +31,7 @@ from benchmarks.comparison.retrieval import (
     keyword_from,
 )
 from dexatlas.agent.orchestrator import Orchestrator
+from dexatlas.agent.planner import DEFAULT_MAX_SENSITIVE_CALLS, Planner
 from dexatlas.agent.providers.base import (
     ModelProvider,
     ModelRequest,
@@ -39,7 +40,7 @@ from dexatlas.agent.providers.base import (
     ToolSpec,
 )
 from dexatlas.agent.providers.scripted import ScriptedProvider, answer, conclusion
-from dexatlas.agent.state import Budget, TaskStore
+from dexatlas.agent.state import ApprovalRequest, Budget, TaskStore
 from dexatlas.agent.tool_executor import McpToolClient, ToolExecutor
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.models import EvidenceKind, EvidenceLevel
@@ -303,6 +304,20 @@ class StructuredSystem(_BaseSystem):
         )
 
 
+class _BenchmarkApprovalGate:
+    """Says yes to the sensitive reads the plan allows.
+
+    A benchmark task has nobody to ask. The plan still caps how many
+    sensitive reads happen (``max_sensitive_calls``) and which tools exist at
+    all, so the gate removes only the pause — the same reasoning the
+    workbench's own gate records. What was allowed is visible in the trace's
+    tool-call log; what the plan forbids never runs.
+    """
+
+    def approve(self, request: ApprovalRequest) -> bool:
+        return True
+
+
 class AgentSystem:
     """配置 D:DexAtlas agent,结构化工具 + 溯源 + 证据验证.
 
@@ -323,7 +338,10 @@ class AgentSystem:
         store_root: Path,
         max_tokens: int = 2048,
         total_tokens: int | None = None,
-        max_iterations: int = 8,
+        max_iterations: int = 16,
+        max_seconds: float = 600.0,
+        max_steps: int | None = None,
+        max_sensitive_calls: int | None = None,
     ) -> None:
         self._analyzer = analyzer
         self._analyses = analyses
@@ -338,8 +356,27 @@ class AgentSystem:
         # How many times the task may go round the loop. Four was the first
         # guess and it was too few: with a real model, 42 of 92 tasks ran out
         # of iterations before they answered, which measures the budget and
-        # not the agent.
+        # not the agent. Sixteen pairs with the 40-step plan budget: a model
+        # that asks for tools one at a time spends several steps a round, so
+        # the round count has to leave room for the answer too.
         self.max_iterations = max_iterations
+        # The wall-clock ceiling per task. The default was 120 seconds,
+        # tuned for a faster model; a slower one spends it mid-verification
+        # and the measurement records the clock rather than the agent.
+        self.max_seconds = max_seconds
+        # The step budget is a property of the *plan* (how many tool calls a
+        # task may make), not of the loop budget, so it reaches the planner,
+        # not ``Budget``. The default is the planner's own default; a
+        # measurement that wants to lift the ceiling passes it explicitly
+        # (the workbench reads ``DEXATLAS_AGENT_MAX_STEPS`` for the same
+        # field). ``None`` keeps whatever default the planner has.
+        self.max_steps = max_steps
+        # How many sensitive reads (get_method_source and its like) a task may
+        # make before somebody must say yes. The planner's default is 1; a
+        # benchmark run has nobody to ask, so a second sensitive read paused
+        # the task until the run ended, and the measurement recorded the
+        # gate, not the agent. ``None`` keeps the planner's default.
+        self.max_sensitive_calls = max_sensitive_calls
 
     @property
     def provider_name(self) -> str:
@@ -370,15 +407,41 @@ class AgentSystem:
                 workspace=analysis.result.workspace,
             )
 
+        planner = (
+            Planner(
+                limits=Budget(
+                    max_tokens=self.total_tokens,
+                    max_iterations=self.max_iterations,
+                    max_seconds=self.max_seconds,
+                ),
+                max_steps=self.max_steps,
+                max_sensitive_calls=(
+                    self.max_sensitive_calls
+                    if self.max_sensitive_calls is not None
+                    else DEFAULT_MAX_SENSITIVE_CALLS
+                ),
+            )
+            if self.max_steps is not None
+            else None
+        )
+        # The question that started the task is the authorisation to read the
+        # analysis it names: a benchmark has nobody to ask, so the gate the
+        # workbench uses — say yes to what the plan allows, within the plan's
+        # own sensitive-call cap — is the same gate here. Raising the cap is
+        # the measurement's choice, recorded in the report; the plan still
+        # bounds which tools may run at all.
+        approvals = _BenchmarkApprovalGate() if planner is not None else None
         orchestrator = Orchestrator(
             provider=provider,
             client=client,
             builder_for=builder_for,
             store=store,
+            planner=planner,
+            approvals=approvals,
             limits=Budget(
                 max_tokens=self.total_tokens,
                 max_iterations=self.max_iterations,
-                max_seconds=120.0,
+                max_seconds=self.max_seconds,
             ),
             executor=ToolExecutor(client, timeout=10.0),
             model_attempts=1,
