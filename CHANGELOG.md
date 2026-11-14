@@ -7,6 +7,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing changed yet.
+
+## [0.2.0] — 2026-11-14
+
+The agent layer, open to a caller. Phase 2's first four milestones, in one
+release: the analysis core made safe for programmatic access (M0), a read-only
+MCP server over the workspace (M1), a single evidence-first agent (M2), and a
+92-task benchmark harness with a scripted and a real-model comparison (M3).
+The web workbench carries six of its eight screens; the benchmark view and
+the screen-level refinement behind them are still being built, and this
+release says so rather than counting them in.
+
 ### Added
 
 - **The workbench agent workspace (M4 screen 6).** A user can now ask the
@@ -58,7 +70,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   A client to try it with is in `examples/mcp_client.py`, and the tools are
   described in `docs/architecture/mcp-server.md`.
 
-- **The web workbench, and five of its eight screens.** `dexatlas-workbench`
+- **The web workbench, and six of its eight screens.** `dexatlas-workbench`
   serves a read-only browser over a workspace: the projects it holds, each
   with the backends that took part and the counts the analysis produced; the
   upload screen, where an APK chosen in the browser is stored with the REST
@@ -72,8 +84,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   record's provenance locators resolve to places inside that analysis; the
   cross-reference view — for one method at a time — of who calls it and what
   it calls, with the DEX file and the instruction offset each call was read
-  out of, and clickable callers and callees to walk the chain with; and the
-  report export: the Markdown and JSON the existing renderers write over the
+  out of, and clickable callers and callees to walk the chain with; the agent
+  workspace, where a question about an analysed APK is answered by the
+  production orchestrator over a configured model endpoint; and the report
+  export: the Markdown and JSON the existing renderers write over the
   published snapshot — the same report the CLI and the REST API produce,
   with no second format and no changed field.
 
@@ -93,11 +107,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   uv run dexatlas-workbench      # serves http://127.0.0.1:8618
   ```
 
-  Two screens of the M4 set are not built — the agent workspace, and the
-  benchmark view whose report-export half is the export above — and the
-  cross-reference screen answers one method at a time rather than rendering
-  a whole-workspace call graph. The screens and the decisions they were
-  built under: `docs/architecture/workbench.md`.
+  Two screens of the M4 set are not built — the benchmark view whose
+  report-export half is the export above, and the deeper work the existing
+  screens still need — and the cross-reference screen answers one method at a
+  time rather than rendering a whole-workspace call graph. The screens and
+  the decisions they were built under: `docs/architecture/workbench.md`.
 
 - **The workflow is in the repository, not in a scratch directory.** The scripts
   that re-derive the documents' citations, that accept a branch, that prove a
@@ -839,7 +853,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.2.0
 [0.1.3]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.3
 [0.1.2]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2
 [0.1.1]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.1
