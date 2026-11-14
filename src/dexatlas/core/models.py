@@ -921,7 +921,7 @@ class ResourceString(Sourced):
     ``None`` for the unqualified ``res/values/`` directory. A qualifier is
     part of a resource's identity: the same name in two languages is two
     resources, and only one of them is the default. The same word separates
-    one layout variant from another, ``land`` for ``res/layout-land/``.
+    one layout variant from another.
     """
 
     file: str = ""
