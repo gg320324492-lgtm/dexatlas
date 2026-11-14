@@ -241,6 +241,9 @@ def test_cli_provider_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
             base_url=extra.get("base_url", ""),
             model=extra.get("model", ""),
             api_key_env=extra.get("api_key_env", ""),
+            # _provider_factory reads this for the openai-compat provider; the
+            # default is the CLI's own (run.py --request-timeout, 180s).
+            request_timeout=extra.get("request_timeout", 180.0),
         )
 
     monkeypatch.setenv(API_KEY_ENV, API_KEY)
