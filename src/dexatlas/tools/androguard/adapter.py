@@ -90,9 +90,6 @@ INVOKE_KINDS: dict[str, InvocationKind] = {
     "invoke-interface/range": InvocationKind.INTERFACE,
 }
 
-#: Opcodes that reference a method. The target is the final operand.
-INVOKE_OPCODES = frozenset(INVOKE_KINDS)
-
 #: Opcodes that load a string constant. ``const-string/jumbo`` is the same
 #: instruction with a 32-bit pool index, for a pool larger than 65535 entries.
 CONST_STRING_OPCODES = frozenset({"const-string", "const-string/jumbo"})
@@ -987,7 +984,6 @@ def _truncation_error(truncations: list[ToolError], other: ToolError | None) -> 
 __all__ = [
     "CONST_STRING_OPCODES",
     "INVOKE_KINDS",
-    "INVOKE_OPCODES",
     "AndroguardBackend",
     "androguard_available",
 ]

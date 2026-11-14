@@ -31,8 +31,6 @@ class Settings(BaseSettings):
     # value leaves it to the default discovery, which looks for the tool on PATH.
     jadx_path: str | None = None
     apktool_jar: str | None = None
-    rizin_path: str | None = None
-    ghidra_path: str | None = None
 
     # Subprocess execution. Backends parse untrusted input; give up rather than hang.
     tool_timeout_seconds: int = Field(default=900, ge=1)
@@ -72,12 +70,8 @@ class Settings(BaseSettings):
     def projects_dir(self) -> Path:
         return self.workspace / "projects"
 
-    @property
-    def cache_dir(self) -> Path:
-        return self.workspace / "cache"
-
     def ensure_workspace(self) -> None:
-        for path in (self.workspace, self.projects_dir, self.cache_dir):
+        for path in (self.workspace, self.projects_dir):
             path.mkdir(parents=True, exist_ok=True)
 
 

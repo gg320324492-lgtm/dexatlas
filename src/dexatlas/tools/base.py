@@ -30,16 +30,6 @@ from dexatlas.core.models import Provenance, ToolError, ToolErrorCode
 
 logger = logging.getLogger(__name__)
 
-#: The cap on what one backend may write back, in bytes.
-#:
-#: Nothing reads this constant. The cap a run actually applies is
-#: :attr:`Settings.tool_max_output_bytes`, and what happens past it is
-#: described on :meth:`Backend.run`: the output is cut at the cap, and the run
-#: says that it was cut. A reader who finds this number must not mistake it
-#: for the cap in force -- the two can differ, because the settings can be
-#: changed and this cannot.
-_DEFAULT_MAX_OUTPUT = 256 * 1024 * 1024
-
 #: The signal that ends a process without giving it a chance to react.
 #:
 #: ``SIGKILL`` does not exist on Windows, where the tree is killed by
@@ -529,22 +519,3 @@ def which_or_none(candidates: Sequence[str | None], *, names: Sequence[str] = ()
         if found:
             return Path(found)
     return None
-
-
-def java_available() -> bool:
-    """Whether a JRE is present. Apktool and JADX both need one."""
-    return shutil.which("java") is not None
-
-
-def parse_error(tool: str, exc: Exception) -> ToolError:
-    return ToolError(
-        tool=tool,
-        code=ToolErrorCode.PARSE_ERROR,
-        message=f"could not parse {tool} output: {exc}",
-        detail=type(exc).__name__,
-    )
-
-
-def coerce(value: Any) -> Any:
-    """Best-effort conversion of a tool's loosely typed JSON field."""
-    return value if isinstance(value, (str, int, float, bool, type(None))) else str(value)

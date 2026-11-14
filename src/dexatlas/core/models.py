@@ -178,11 +178,6 @@ class Sourced(BaseModel):
 
     provenance: list[Provenance] = Field(default_factory=list)
 
-    @property
-    def tools(self) -> list[str]:
-        """Distinct backends that contributed, in insertion order."""
-        return list(dict.fromkeys(p.tool for p in self.provenance))
-
 
 # ---------------------------------------------------------------------------
 # Canonical identifiers
@@ -279,10 +274,6 @@ class ClassRef(Sourced):
     @property
     def package(self) -> str:
         return self.name.rpartition(".")[0]
-
-    @property
-    def simple_name(self) -> str:
-        return self.name.rpartition(".")[2]
 
 
 class MethodRef(Sourced):

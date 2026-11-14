@@ -36,6 +36,13 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy
         run: uv run mypy
+      # Vulture has no rule in ruff's set: ruff flags an unused import (F401)
+      # but not a defined-and-never-called function or constant. A nonzero
+      # exit (findings exist) fails the job; the [tool.vulture] section in
+      # pyproject.toml carries the paths, the confidence floor and the
+      # suppressions, each with the reason it is not dead code.
+      - name: Dead code (vulture)
+        run: uv run vulture --config pyproject.toml src/ tests/ scripts/ benchmarks/ --min-confidence 80
       # actionlint checks the workflow files themselves. Without it, a mistake in
       # this file makes GitHub refuse to schedule a single job — which shows up as
       # a run that fails with no output and no jobs, and takes a while to tell

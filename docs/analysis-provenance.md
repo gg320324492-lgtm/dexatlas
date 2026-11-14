@@ -22,14 +22,14 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 |---|---|---|---|
 | APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:199-225` |
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:130-229` |
-| manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:417-447` |
+| manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:530-566` |
 | manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `ManifestInfo` | `tools/androguard/adapter.py:284-331`、`core/pipeline.py:535-585` |
-| 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:528-546` |
+| 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:526-542` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:602-763` 的 `class_source_document` / `method_source_document` |
-| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:623-639` |
+| 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:621-637` |
 | 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:403-456` |
-| 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:546-563` |
-| 交叉引用（调用点） | **Androguard**（唯一，遍历字节码得到） | `CallSite`（MethodReference 的子类） | `tools/androguard/adapter.py:639-651` |
+| 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:544-561` |
+| 交叉引用（调用点） | **Androguard**（唯一，遍历字节码得到） | `CallSite`（MethodReference 的子类） | `tools/androguard/adapter.py:637-649` |
 | 字符串常量 | **Androguard**（唯一，取自 DEX 字符串池） | `StringConstant` | `tools/androguard/adapter.py:750-775` |
 | 字符串常量**出现在哪** | **Androguard**（遍历字节码时记录 `const-string` 的引用点） | `StringConstant.class_name` / `method_name` | `tools/androguard/adapter.py:750-775` |
 | 资源里的**文本**（`res/values*/` 下的 `<string>`、`<string-array>`、`<plurals>`） | **Apktool** | `ResourceString` | `tools/apktool/adapter.py:233-355` |
@@ -111,8 +111,8 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 
 | 字段 | 类型 | 含义 | 谁填的 |
 |---|---|---|---|
-| `tool` | `str` | 后端名（`jadx` / `apktool` / `androguard`） | `tools/base.py:314` |
-| `tool_version` | `str \| None` | 后端版本字符串 | `tools/base.py:315` → `Backend.version()`，每个后端只问一次 |
+| `tool` | `str` | 后端名（`jadx` / `apktool` / `androguard`） | `tools/base.py:304` |
+| `tool_version` | `str \| None` | 后端版本字符串 | `tools/base.py:305` → `Backend.version()`，每个后端只问一次 |
 | `apk_sha256` | `str` | 被分析 APK 的完整 SHA-256 | 调用方传入 |
 | `locator` | `str` | 指回源头的指针，形状是 `<后端名>:<相对路径>`（见 3.2） | 各 adapter 自己拼 |
 
@@ -120,7 +120,7 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 注意是**列表**：一个产物可以有多个来源（见第 2 节）。
 
 还有一个项目级的版本表 `Project.tool_versions: dict[str, str | None]`
-（`models.py:773`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
+（`models.py:764`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
 （`core/storage.py:187`）。它和 `provenance.tool_version` 是**两份独立的数据**——
 管道把同一份版本表交给证据构造器（`core/pipeline.py:198-205` 的 `tool_versions`），
 所以两份数据现在说的是同一件事。
@@ -141,7 +141,7 @@ call site 或 method handle，不是方法，没有 callee 可填。
 
 ### 3.2 locator 的实际格式
 
-locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/base.py:311-318`）
+locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/base.py:301-308`）
 只负责填 `tool` / `tool_version` / `apk_sha256`，`locator` 由各 adapter 自己拼，
 但拼出来的形状是同一个：
 
@@ -202,7 +202,7 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
 
 - **行号。** 原因见上。
 - **字符串池里没有被任何指令加载的条目。** `StringConstant` 里，`class_name` /
-  `method_name` 现在**会填**（`models.py:423-424`）：遍历字节码时顺带记下每条
+  `method_name` 现在**会填**（`models.py:415-416`）：遍历字节码时顺带记下每条
   `const-string` 指令引用了哪个池项，于是「这个 URL 出现在哪个方法里」可以回答。
   但 DEX 字符串池里还有类型描述符（`Landroid/app/Activity;`）、成员名（`onCreate`）
   这类**没有指令直接加载**的条目——demo-app 的 63 条池项里只有 8 条是真正的字面量，
@@ -215,7 +215,7 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
   （`core/pipeline.py:663-686`）为了不破坏既有契约，仍然返回裸字符串，
   **返回值本身说不出这是 Apktool 的输出**。带出处的形式是
   `class_source_document` / `method_source_document`（`core/pipeline.py:627-763`），
-  它们返回 `SourceDocument`（`models.py:945-962`）：文本、表示形式（Java 还是 Smali）、
+  它们返回 `SourceDocument`（`models.py:936-965`）：文本、表示形式（Java 还是 Smali）、
   以及 provenance 一起来。**只调旧接口的调用方仍然只能靠「工作区里有没有 jadx 目录」推断。**
 - **同一产物的多个来源之间没有主次标记。** `provenance` 是一个扁平的列表，
   顺序即合并顺序（Androguard 在前，JADX 在后），但这个顺序**不表达可信度**。
@@ -277,7 +277,7 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-demo.json
 ```
 
 `apk_80a8fe0e81204c9f` 不是写死的：**项目 id 是内容寻址的**，
-`Project.new_id()` 取 SHA-256 的前 16 位（`models.py:816-818`）。
+`Project.new_id()` 取 SHA-256 的前 16 位（`models.py:807-809`）。
 所以任何人都能自己算出这个 id：
 
 ```console
@@ -408,7 +408,7 @@ $ python -c "import sqlite3; c=sqlite3.connect(r'C:/Users/admin/AppData/Local/Te
 
 **管道里产出三种 `kind`：** `declaration`（类、manifest、导出组件）、
 `cross_reference`（这个 APK 自己的方法被谁调用）和 `observation`（后端失败，
-以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:515`），
+以及 JADX 的反编译覆盖度）。`EvidenceKind` 定义了 5 种（`models.py:506`），
 `behaviour` 和 `code_located` **一次都不会出现**——它们是给 Phase 2 的模型输出准备的。
 
 **`cross_reference` 的粒度是「被调用的方法」，不是「调用」**：一个被五十处调用的方法
@@ -680,7 +680,7 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   **`JsonHandler.handle` 和 `XmlHandler.handle` 看起来「没有调用者」**，
   而实际上运行时它们很可能就是被调用的那一个。
   **静态交叉引用在多态处会漏掉实现类。** 想要实现类的调用者，得自己沿
-  `ClassRef.interfaces`（`models.py:256`）往下展开——DexAtlas 不做这件事。
+  `ClassRef.interfaces`（`models.py:251`）往下展开——DexAtlas 不做这件事。
   > 补充：DEX 编码的是**声明类型**（这里是接口），不是子类。实现类只有在运行时多态分派时
   > 才知道，所以任何静态工具都拿不到「运行时被调用的实现」。
 
@@ -738,7 +738,7 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   前 64 字符相同的两个字符串会得到**相同的 locator**。
 
 - **它是唯一一个跑在进程内的后端。** JADX 和 Apktool 是子进程（`tools/base.py:168` 的 `run`），
-  Androguard 是 Python 库，直接 import 进我们的进程（`tools/androguard/adapter.py:358-359` 的 `APK` / `DEX`）。
+  Androguard 是 Python 库，直接 import 进我们的进程（`tools/androguard/adapter.py:355-356` 的 `APK` / `DEX`）。
   所以 DEX 解析崩溃会打在**我们**的进程里——代码用 try/except 把它兜成 `ToolError`
   （`tools/androguard/adapter.py:356-374`），但解析器本身的内存安全风险是继承来的。
 
@@ -863,7 +863,7 @@ com.example.demo.SyncService class
 - **部分 manifest 的版本号和 SDK 版本不在解码后的 manifest 里。** Apktool 2.11.1
   解码五个自建样本时，`demo-app` 的两个版本属性被挪进 `apktool.yml`，另外四个样本的
   解码 manifest 仍保留原值；SDK 级别则一律不在解码 manifest 里
-  （`tools/apktool/adapter.py:417-420`、`tools/apktool/adapter.py:417-448` 的 `_merge_build_metadata`）。
+  （`tools/apktool/adapter.py:530-533`、`tools/apktool/adapter.py:530-561` 的 `_merge_build_metadata`）。
   `versionInfo` 的 `versionCode` / `versionName` 与五个 APK 的二进制 manifest 一致，
   由 `tests/test_version_fields.py` 对源码、入库 yml、真实解码产物和适配器输出逐一核对；
   因此只补版本字段的缺口（manifest 自身的值优先）。`sdkInfo` 则不是 APK 字节的答案，
@@ -871,9 +871,9 @@ com.example.demo.SyncService class
   证据链其实跨了两个文件**，而 provenance 只写了 `apktool:AndroidManifest.xml` 一个。
 
 - **manifest 里的 `exported` 属性只有显式写了才为 `true`。**
-  `ManifestComponent.exported` 是 `bool | None`（`models.py:466`），
-  `_parse_bool` 把没写的当 `None`（`tools/apktool/adapter.py:411-415`）。
-  `exported_components` 只挑 `exported is True`（`models.py:494-495`）。
+  `ManifestComponent.exported` 是 `bool | None`（`models.py:457`），
+  `_parse_bool` 把没写的当 `None`（`tools/apktool/adapter.py:524-527`）。
+  `exported_components` 只挑 `exported is True`（`models.py:485-486`）。
   **一个没有显式 `android:exported` 的组件，在 API 31+ 上默认不导出，
   但在这份报告里它不会出现在「已导出组件」列表里——这是对的；
   但反过来，如果 APK 显式写了 `exported="true"` 而实际有权限保护，
@@ -961,7 +961,7 @@ com.example.demo.SyncService class
 
 **根因：** Androguard 4.1.4 的 `get_descriptor()` 返回
 `'(Ljava/lang/String; Ljava/lang/String;)Ljava/lang/String;'`（带空格），
-而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:849-878`）在解析调用目标时
+而 `_parse_dalvik_reference`（`tools/androguard/adapter.py:846-875`）在解析调用目标时
 **去掉了空格**。于是 `methods` 表里存的是带空格的 id，`xrefs` 表里存的是不带空格的 id，
 **两张表按字符串精确相等是连不上的**：
 
@@ -987,7 +987,7 @@ apk_d342e11b7931077d xrefs=15  exactly-joinable-to-methods=3
 本来就 join 不上，那是正常的。）
 
 **现在的行为：** 方法 id 在模型层、存储层、查询层三处都只有**一个**拼写——
-规范的 JVM 描述符，参数类型紧挨着（`models.py:192-218` 的 `canonical_descriptor`）。`dexatlas methods` 印出来的
+规范的 JVM 描述符，参数类型紧挨着（`models.py:187-213` 的 `canonical_descriptor`）。`dexatlas methods` 印出来的
 就是能用的 id，`dexatlas xrefs` 也认两种写法（查询时两边都规范化）：
 
 ```console

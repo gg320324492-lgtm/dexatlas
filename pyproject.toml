@@ -71,6 +71,56 @@ dev = [
     "mypy>=1.13",
     "types-defusedxml>=0.7",
     "types-pyyaml>=6.0",
+    # Dead-code detection. Ruff has no rule for a defined-but-never-called
+    # function (F401 covers imports only), so the gate against them is
+    # vulture's exit code; see the [tool.vulture] section below.
+    "vulture>=2.14",
+]
+
+[tool.vulture]
+# Both trees are scanned together: a symbol used only by tests (Analyzer.class_source,
+# Store.get_class) is alive, and scanning src/ alone would report it. With both,
+# the pytest machinery names are what need ignoring.
+paths = ["src", "tests", "scripts", "benchmarks"]
+min_confidence = 80
+# Decorators that register code with a framework, so a definition vulture sees
+# as unreferenced is in fact reachable: FastAPI routes, Typer commands,
+# pydantic validators, pytest fixtures and marks, and plain properties.
+ignore_decorators = [
+    "@app.get",
+    "@app.post",
+    "@app.delete",
+    "@app.put",
+    "@app.patch",
+    "@app.callback",
+    "@app.command",
+    "@field_validator",
+    "@model_validator",
+    "@pytest.fixture",
+    "@pytest.mark.*",
+    "@typer.*",
+]
+# Names that are read by a mechanism rather than by our code: pydantic's
+# config, sqlite3's row_factory, pytest's module-level markers, and test
+# fixtures' well-known names. The last five are test doubles' parameters:
+# a stub keeps an argument to match the signature it replaces
+# (sig, sha), and a test keeps a fixture argument so pytest injects it
+# (the three fixture names) — none of them is a dead definition.
+ignore_names = [
+    "model_config",
+    "row_factory",
+    "pytestmark",
+    "apktool_available",
+    "jadx_unavailable",
+    "fake_dex",
+    "compress_type",
+    "_blob",
+    "report_path",
+    "sig",
+    "sha",
+    "launcher_dies_before_the_kill",
+    "the_kill_cannot_find_the_tree",
+    "the_kill_itself_fails",
 ]
 
 [project.scripts]

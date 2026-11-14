@@ -226,12 +226,6 @@ class AnalyzeJobResponse(BaseModel):
     detail: str = Field(description="Where to poll for the finished analysis.")
 
 
-class SubmitResponse(BaseModel):
-    project_id: str
-    sha256: str
-    already_analysed: bool
-
-
 class RunResponse(BaseModel):
     """One analysis run of a project."""
 

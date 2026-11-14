@@ -48,6 +48,7 @@ uv sync --extra dev --extra analysis      # once, in your own worktree
 uv run --no-sync pytest -q                # the suite
 uv run --no-sync ruff check . && uv run --no-sync ruff format --check .
 uv run --no-sync mypy                    # strict
+uv run --no-sync vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80  # dead code: must exit 0
 uv run --no-sync python scripts/check-doc-citations.py
 uv run --no-sync python scripts/check-version-claims.py --base auto
 ```
