@@ -136,7 +136,7 @@ def test_the_tree_kill_reports_a_launcher_it_cannot_find(
             base.os.kill(process.pid, signal.SIGTERM)
         time.sleep(0.3)
         process.wait()
-        assert base._taskkill_tree(process) == base._ALREADY_EXITED
+        assert base._terminate_tree(process) == base._ALREADY_EXITED
     finally:
         if process.poll() is None:
             process.kill()
