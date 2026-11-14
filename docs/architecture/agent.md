@@ -45,6 +45,16 @@ state, and one report.
 Steps 3 and 4 are the only ones that involve a model, and the model is not in
 charge of any of the rest.
 
+**One tool call per round.** A real model asks for several tools in one
+assistant turn — the M4 end-to-end run measured two to five — and running all
+of them before coming back to the model spent the tool-call budget in a few
+rounds and left nothing for the answer. The loop runs the round's first call
+and answers the rest with an observation that says the call was deferred and
+asks for it again one at a time; the instructions say the same rule. The
+model's turn keeps every call it made, so each refusal travels in the tool
+channel of the protocol, and a refused call is an answered call: a resumed
+task picks up at the model rather than re-running what was refused.
+
 ## The package
 
 ```text
