@@ -254,6 +254,14 @@ release says so rather than counting them in.
   overstated what the tree had. The documentation fixes below are its
   findings, fixed.
 
+  The M4 source review and acceptance (`docs/reports/m4-review.md`) first
+  recorded a **conditional pass** with two closing conditions; both were
+  verified the same day (the real-model re-run in `docs/reports/m4-e2e-run.md`
+  §5, commit `b6e5fb1`, and the bilingual README agent sections, commit
+  `6eee294`), and the verdict was upgraded to **pass**. A question can still
+  exhaust its budget under the default settings, and the documents say so:
+  that is model-behaviour tuning, not an engineering gap.
+
 ### Changed
 
 - **The health answers name the workspace, not its path.** The workbench's
