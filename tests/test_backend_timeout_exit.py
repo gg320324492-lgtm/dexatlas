@@ -66,6 +66,19 @@ def launcher_dies_before_the_kill(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     real_run = subprocess.run
 
+    if os.name != "nt":
+        # On POSIX the tree kill is os.kill over the process group, not a
+        # subprocess call. Making the group empty before the kill arrives is
+        # the same window: the kill then reports the launcher as already
+        # gone instead of claiming it was terminated.
+        def _kill_group_when_empty(pid: int, sig: int) -> None:
+            with suppress(OSError):
+                os.kill(pid, signal.SIGTERM)
+            raise ProcessLookupError
+
+        monkeypatch.setattr(base.os, "kill", _kill_group_when_empty)
+        return
+
     def _kill_comes_too_late(argv: list[str], **kwargs: Any) -> Any:
         if argv and argv[0] == "taskkill":
             # The launcher is the process the kill names. Ending it here —
@@ -140,6 +153,15 @@ def the_kill_cannot_find_the_tree(monkeypatch: pytest.MonkeyPatch) -> None:
     def _refused(*args: Any, **kwargs: Any) -> _Refused:
         return _Refused()
 
+    if os.name != "nt":
+        # On POSIX the tree kill is os.kill over the process group. A
+        # PermissionError is what the same refusal looks like there.
+        def _permission_denied(pid: int, sig: int) -> None:
+            raise PermissionError
+
+        monkeypatch.setattr(base.os, "kill", _permission_denied)
+        return
+
     monkeypatch.setattr(base.subprocess, "run", _refused)
 
 
@@ -175,6 +197,12 @@ def the_kill_itself_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def _broken(*args: Any, **kwargs: Any) -> Any:
         raise OSError("the kill could not run")
+
+    if os.name != "nt":
+        # On POSIX the kill is os.kill; an OSError from it is the same
+        # broken-machine refusal.
+        monkeypatch.setattr(base.os, "kill", _broken)
+        return
 
     monkeypatch.setattr(base.subprocess, "run", _broken)
 
