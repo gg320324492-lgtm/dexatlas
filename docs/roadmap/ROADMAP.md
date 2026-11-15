@@ -8,8 +8,10 @@ promise of features — the README describes what actually ships, this file desc
 what comes next.
 
 - **Current phase:** Phase 2 delivered; M4 source review and acceptance passed
-  on 2026-11-14. Phase 3 is planned around portfolio value and scoped delivery;
-  see [current status](../status.md) and the [Phase 3 plan](phase3-plan.md).
+  on 2026-11-14. Phase 3 is under way: M5 and M7 are complete, M6 and M8 are
+  partly done, M9 materials are drafted but unpublished, and M10 has not
+  started. Per-milestone evidence is in [§3.4](#34-progress-2026-11-15); see
+  [current status](../status.md) and the [Phase 3 plan](phase3-plan.md).
 - **Plan version:** 2026-11-15 (Phase 3 scope revision; prior phase history retained)
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
@@ -323,7 +325,9 @@ Automation, LLM Integration and Backend Development roles.
 **Replanned on 2026-11-15 for a personal GitHub / Upwork portfolio.**
 The executable scope and acceptance criteria are in the
 [Phase 3 plan](phase3-plan.md). It supersedes the earlier platform-expansion
-vision in this section. Phase 3 is planned, not implemented or accepted.
+vision in this section. Phase 3 is under way and **has not been accepted**;
+`v1.0.0` is not released. The status below records only evidence merged into
+the repository.
 
 ### 3.1 Goal and scope
 
@@ -369,6 +373,21 @@ and a complete workflow performed by a reader who did not implement it.
 Version `v1.0.0` remains a target; its stability promises cover the explicitly
 documented contracts. Portfolio readiness does not promise orders, revenue,
 security certification or commercial SaaS readiness.
+
+### 3.4 Progress (2026-11-15)
+
+Only work merged into the repository is listed; anything without merged
+evidence is marked as not started or unverified. **Independent acceptance has
+not begun; the Phase 3 exit criteria are not met and `v1.0.0` is not released.**
+
+| Milestone | Status | Evidence and what remains |
+|---|---|---|
+| M5 | **Done** | [phase3-baseline.md](../reports/phase3-baseline.md): claims inventory, all three benchmarks recomputed from committed traces, demo labelling for scripted versus real-model runs |
+| M6 | **Partly done** | 20-question service regression set frozen at `100b191` ([service-regression-set.md](../benchmarks/service-regression-set.md)); level 0 deterministic scoring **20/20**; level 1 scripted drill complete ([m6-level1-scripted.md](../benchmarks/m6-level1-scripted.md)). The scripted provider is a stand-in, so its published scores test the question/trace/scoring machinery, not model capability. **Level 2 real-model batch not run, awaiting separate authorization**, so the 90% acceptance target is not met |
+| M7 | **Done** | Three customer-structured case studies ([case-studies/](../case-studies/README.md)); offline HTML and the minimal evidence package, with post-move citation checks and adversarial tests, in [report-rendering.md](../architecture/report-rendering.md) |
+| M8 | **Partly done** | Clean-install, Docker and failure-recovery rehearsal done; macOS unverified ([m8-install-rehearsal.md](../reports/m8-install-rehearsal.md)). Public contract table done ([public-contracts.md](../architecture/public-contracts.md)). M8-2 (query commands lack `--workspace`) and M8-3 (`install.md` extras mismatch) fixes are in progress and not merged here. M8-4 (all three backends timing out still yields `completed` and exit code 0) is **decided and recorded as a known limitation** without changing the exit-code contract; reproduction and rationale in the rehearsal report §6 |
+| M9 | **Showcase done; materials unpublished** | Bilingual README entry, documentation map, third-party attribution and this roadmap status are merged. English Upwork materials remain **drafts, not published** ([outreach/](../outreach/project-brief.md)) |
+| M10 | **Not started** | Independent reproduction, readiness re-scoring and the release candidate remain. The preparation package is under review in another session and is not merged here |
 
 ---
 
