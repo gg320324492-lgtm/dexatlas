@@ -221,8 +221,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         "--configuration",
         action="append",
         choices=[configuration.value for configuration in Configuration],
-        help="Only run the tasks asked in this configuration. Repeatable; the default is "
-        "all of them.",
+        help="Only run the tasks that declare this configuration (the tasks asked in "
+        "it), and build only their workspaces. Repeatable; the default is all of "
+        "them. A filter that matches no task ends the run with 'no tasks selected' "
+        "rather than running the full set.",
     )
     parser.add_argument(
         "--category",
@@ -267,8 +269,21 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def _selected_tasks(args: argparse.Namespace) -> list[Task]:
-    """The tasks the run is asked to cover."""
+    """The tasks the run is asked to cover.
+
+    A ``--configuration`` filter narrows the set to the tasks that declare
+    that configuration, not merely to a set of workspaces: every task is
+    asked in the configuration it declares, and the analysis pass below
+    builds a workspace per selected configuration. Without this filter a
+    ``--configuration no-jadx`` run would select all 92 tasks and then fail
+    to find the analysis of a ``full``-declared task (the KeyError this
+    replaces). A configuration filter that selects nothing names it: an
+    empty result is an explicit outcome, never a silent full set.
+    """
     tasks = list(ALL_TASKS)
+    if args.configuration:
+        wanted = {Configuration(value) for value in args.configuration}
+        tasks = [task for task in tasks if task.configuration in wanted]
     if args.category:
         wanted = set(args.category)
         tasks = [task for task in tasks if task.category.value in wanted]

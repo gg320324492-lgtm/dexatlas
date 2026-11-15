@@ -314,3 +314,12 @@ PY
 no-jadx 配置下判过；回归测试见
 `tests/test_partial_backend_failure_scoring.py`（判分层）与
 `tests/test_comparison_configuration_routing.py`（执行层路由）。
+
+### B.6 同类缺口的后续修复（2026-11-16）
+
+M6 层级 3 复验（[m6-level3-recheck.md](m6-level3-recheck.md) §6）发现的
+`benchmarks/run.py --configuration no-*` 缺口（任务集不按配置过滤、
+`_run_tasks` KeyError）已修复：`--configuration` 现在按题面声明过滤任务集、
+只建被选配置的工作区，与 `--task` / `--category` 取交集，空组合以
+「no tasks selected」退出码 2 明确结束。回归测试在
+`tests/test_comparison_configuration_routing.py`。

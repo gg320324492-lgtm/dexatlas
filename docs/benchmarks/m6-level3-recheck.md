@@ -54,10 +54,13 @@ JSON 原件在 `E:/Dexatlas/.scratch/m6-level3-recheck/`（不入库），本文
 | 工作区 | `E:/Dexatlas/.scratch/m6-level3-recheck/`（.scratch 内，不入库） |
 | 产物 | `level0-full.json`（92 题）、`level0b`（partial 单跑）、`l1/service-regression-20-traces.json`（60 trace）、`l1/m6-level1-report.md` |
 
-层级 0 逐题命令（20 题前缀见 `benchmarks/m6_service_set.py`；`run.py`
+层级 0 逐题命令（20 题前缀见 `benchmarks/m6_service_set.py`；~~`run.py`
 的 `--configuration no-*` 过滤当前会把其它配置的题也选进判分集、但只
 Analyze 被选配置的样本，从而在 `_run_tasks` 处 KeyError——见 §6，因此
-no-jadx / no-apktool 配置的题用 `--task <id>` 单跑）：
+no-jadx / no-apktool 配置的题用 `--task <id>` 单跑~~ **已修复
+（2026-11-16）：`--configuration no-*` 现在按题面声明过滤任务集并只建对应
+工作区，no-jadx / no-apktool 的题可直接按配置跑；回归测试见
+`tests/test_comparison_configuration_routing.py`。当时记录：**）：
 
 ```bash
 export DEXATLAS_JADX_PATH="E:/Dexatlas/.scratch/backends/jadx/bin/jadx.bat"
@@ -182,6 +185,19 @@ provider 不走 orchestrator 的结论分类，其「复述观察」形态与 M3
 逐题一致，这一层的 16 题全败是测量形态的已知属性，不是修复失效。
 
 ## 6. 本次发现的一个 harness 缺口（不影响结论，建议另行处理）
+
+**状态更新（2026-11-16）：本缺口已修复。** `_selected_tasks` 现在按
+`--configuration` 过滤任务集——只保留题面声明适用该配置的题，只建被选
+配置的工作区；与 `--category` / `--task` 叠加时取交集，组合不出任何题时
+以「no tasks selected」退出码 2 明确结束。回归测试
+`tests/test_comparison_configuration_routing.py`（8 项）覆盖「no-* 配置只
+路由适用题」「不适用组合明确报错」「正常全量路径不变」，在旧实现上先红
+（复现：`--configuration no-jadx --task manifest.package.demo` 于修复前在
+`_run_tasks` 处抛 `KeyError: (<Configuration.FULL: 'full'>,
+<Sample.DEMO: 'demo-app'>)`），修复后全绿。CHANGELOG [Unreleased] Fixed
+已登记。
+
+以下为原始记录（修复前的现象，保留供追溯）：
 
 `benchmarks/run.py` 的 `--configuration no-jadx`（或 `no-apktool`）只把
 被选配置加入 Analyze 集，但 `_selected_tasks` 仍返回**全部 92 题**；
