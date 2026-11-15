@@ -124,7 +124,7 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 
 还有一个项目级的版本表 `Project.tool_versions: dict[str, str | None]`
 （`models.py:764`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
-（`core/storage.py:226`）。它和 `provenance.tool_version` 是**两份独立的数据**——
+（`core/storage.py:234`）。它和 `provenance.tool_version` 是**两份独立的数据**——
 管道把同一份版本表交给证据构造器（`core/pipeline.py:198-205` 的 `tool_versions`），
 所以两份数据现在说的是同一件事。
 

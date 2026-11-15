@@ -53,9 +53,7 @@ def test_the_telemetry_style_constant_survives_a_word_search(demo) -> None:
     that quotes the characters it was shown cannot drop the tail.
     """
     result = search_symbols(demo.analyzer, PROJECT_ID, "api.example.com", limit=50, offset=0)
-    names = [
-        str(getattr(symbol.name, "text", symbol.name)) for symbol in result.symbols
-    ]
+    names = [str(getattr(symbol.name, "text", symbol.name)) for symbol in result.symbols]
     assert "https://api.example.com/collect" in names
     # The whole literal is what the tool hands back: the model that quotes
     # it verbatim cannot have dropped a query parameter, because none of

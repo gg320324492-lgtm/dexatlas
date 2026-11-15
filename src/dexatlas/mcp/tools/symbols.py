@@ -57,11 +57,7 @@ def search_symbols(
     # pool itself, so the answer "the index holds no such constant" is
     # backed by the constants the index *does* hold.
     if not page and query.strip():
-        page = list(
-            analyzer.store.search_string_substring(
-                project_id, query, limit=offset + limit
-            )
-        )
+        page = list(analyzer.store.search_string_substring(project_id, query, limit=offset + limit))
     if not page and query.strip():
         page = list(analyzer.store.list_string_constants(project_id, limit=offset + limit))
 

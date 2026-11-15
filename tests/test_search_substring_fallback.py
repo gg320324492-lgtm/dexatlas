@@ -74,7 +74,9 @@ def test_a_search_for_words_the_constant_lacks_still_finds_it(demo) -> None:
 
     result = search_symbols(demo.analyzer, PROJECT_ID, "api key", limit=50, offset=0)
     names = _names(result)
-    assert api_key in names, "a word search that the constant cannot match must still find it by substring"
+    assert api_key in names, (
+        "a word search that the constant cannot match must still find it by substring"
+    )
     assert any(symbol.kind == "string" for symbol in result.symbols)
 
 

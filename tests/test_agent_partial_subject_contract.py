@@ -44,7 +44,7 @@ def _orchestrator(demo, provider: ScriptedProvider, tmp_path: Path):
 
 
 def test_a_conclusion_about_the_recorded_gap_is_a_finding(demo, tmp_path: Path) -> None:
-    """"The analysis records jadx as missing" stands as a finding on the partial question.
+    """ "The analysis records jadx as missing" stands as a finding on the partial question.
 
     The conclusion cites only the completeness read — the one record that
     describes the analysis rather than the APK. On a question about the
@@ -70,21 +70,15 @@ def test_a_conclusion_about_the_recorded_gap_is_a_finding(demo, tmp_path: Path) 
             cite_the_completeness_read,
         ]
     )
-    state = _orchestrator(demo, provider, tmp_path).run(
-        PARTIAL_QUESTION, project_id=PROJECT_ID
-    )
+    state = _orchestrator(demo, provider, tmp_path).run(PARTIAL_QUESTION, project_id=PROJECT_ID)
 
     assert state.status is TaskStatus.COMPLETED
-    behaviours = [
-        record for record in state.findings if record.kind.value == "behaviour"
-    ]
+    behaviours = [record for record in state.findings if record.kind.value == "behaviour"]
     assert behaviours, "the recorded gap is the answer, and it must be a finding"
     assert any("jadx" in record.summary for record in behaviours)
 
 
-def test_a_process_note_is_still_a_limitation_on_an_apk_question(
-    settings, tmp_path: Path
-) -> None:
+def test_a_process_note_is_still_a_limitation_on_an_apk_question(settings, tmp_path: Path) -> None:
     """The subject check does not open the door on ordinary APK questions.
 
     "Which permissions does this APK request?" is about the APK; a
@@ -116,7 +110,5 @@ def test_a_process_note_is_still_a_limitation_on_an_apk_question(
     )
 
     assert state.status is TaskStatus.COMPLETED
-    behaviours = [
-        record for record in state.findings if record.kind.value == "behaviour"
-    ]
+    behaviours = [record for record in state.findings if record.kind.value == "behaviour"]
     assert not behaviours, "a process-only conclusion on an APK question stays a limitation"

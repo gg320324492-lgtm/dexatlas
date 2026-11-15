@@ -1628,9 +1628,7 @@ def _is_process_note(
         # the decompiler was missing?") is. There the completeness read is
         # the answer's subject, not its excuse; demoting it would erase the
         # one honest answer the task has.
-        if _asks_about_the_analysis(state.question):
-            return False
-        return True
+        return not _asks_about_the_analysis(state.question)
     # The conclusion's wording is a negation and nothing supported it: the
     # sentence is the answer "there is none", and the place for it is the
     # limitations, not the findings. A negation that *was* supported stays a

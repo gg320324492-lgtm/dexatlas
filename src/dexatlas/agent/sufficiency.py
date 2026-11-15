@@ -68,9 +68,7 @@ def failed_tools(state: TaskState) -> frozenset[str]:
     return frozenset(
         turn.tool
         for turn in state.turns
-        if isinstance(turn, Observation)
-        and not turn.ok
-        and turn.tool in FAILURE_IS_AN_ANSWER
+        if isinstance(turn, Observation) and not turn.ok and turn.tool in FAILURE_IS_AN_ANSWER
     )
 
 

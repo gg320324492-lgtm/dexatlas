@@ -31,9 +31,10 @@ from dexatlas.agent.state import Budget, Plan, PlanStep, TaskState, TaskStatus, 
 from dexatlas.agent.sufficiency import ready_reason
 from tests.agent_harness import PROJECT_ID, build_demo, make_orchestrator
 
+assert TaskStatus is not None  # re-exported for the loop test's assertions
+
 NO_APKTOOL_QUESTION = (
-    "What package does the demo application declare, when the APK reader is "
-    "not installed?"
+    "What package does the demo application declare, when the APK reader is not installed?"
 )
 
 
@@ -74,17 +75,11 @@ def _asking_provider(calls: list[list]) -> ScriptedProvider:
     return ScriptedProvider(responses=[ask])
 
 
-def test_a_no_manifest_error_closes_the_manifest_question(
-    no_apktool_demo, tmp_path: Path
-) -> None:
+def test_a_no_manifest_error_closes_the_manifest_question(no_apktool_demo, tmp_path: Path) -> None:
     """The failed manifest read settles a question about the manifest's absence."""
-    demo = no_apktool_demo
     plan = _manifest_plan()
-    state = TaskStore(tmp_path / "tasks").new if hasattr(TaskStore, "new") else None
     # Build a minimal task state by hand: the rule under test is the
     # sufficiency decision, not the full loop.
-    from dexatlas.agent.state import TaskState
-
     state = TaskState(
         task_id="test-no-manifest",
         question=NO_APKTOOL_QUESTION,
