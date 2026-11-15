@@ -26,6 +26,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   新口径自下次测量生效。详见
   `docs/benchmarks/service-regression-set.md` §3 判定规则与附录 B。
 
+### Fixed
+
+- **`benchmarks/run.py --configuration no-*` 按题面配置过滤任务集**
+  （m6-level3-recheck.md §6 的 harness 缺口）。旧实现只把所选配置加入
+  Analyze 集，任务集仍返回全部 92 题，`_run_tasks` 随即在
+  `analyses[(task.configuration, task.sample)]` 处 KeyError；现改为
+  `--configuration no-jadx` / `no-apktool` 只路由**声明**适用该配置的题、
+  只建对应工作区，与 `--category` / `--task` 取交集；组合不出任何题时以
+  「no tasks selected」退出码 2 明确结束，不再静默全选。不带
+  `--configuration` 的正常路径不变。回归测试
+  `tests/test_comparison_configuration_routing.py`（8 项）在旧实现上先红
+  （KeyError / 全选），修复后全绿。
+
 ### Added
 
 - **修复提案：退出码 6 分辨「跑完了但无可用的代码索引」。** 为公共契约

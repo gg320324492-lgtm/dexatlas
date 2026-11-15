@@ -1,120 +1,111 @@
-"""comparison harness 按题面配置 Analyze 的端到端回归测试(Phase 3 M6-③).
+"""``benchmarks/run.py`` 按配置路由任务集的回归测试(Phase 3 M6 层级 3 复验发现).
 
-失败分析(docs/benchmarks/m6-level2-failure-analysis.md §5.6)的根因之一:
-harness 只用 ``Configuration.FULL`` Analyze, ``Question.configuration``
-没有任何消费者. 这里的用例锁住路由行为——后端禁用配置的题目, 读到的是
-那个配置自己的分析, 而不是 full 工作区的.
+``--configuration no-*`` 的直觉用法是「只跑该配置的题、只建该配置的工作区」,
+但旧实现只把所选配置加入 Analyze 集, 任务集仍返回全部 92 题, ``_run_tasks``
+随即在 ``analyses[(task.configuration, task.sample)]`` 处 KeyError
+(m6-level3-recheck.md §6). 这里锁住三件事:
+
+* no-* 配置只路由**声明**适用该配置的题;
+* 组合出空集时是明确的「no tasks selected」退出码 2, 不是静默全选;
+* 不带 ``--configuration`` 的正常路径仍是全量 92 题, 判分与题号不受影响.
 """
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 
 import pytest
-from benchmarks.comparison.model import Question
-from benchmarks.comparison.retrieval import SourceTextTools, StructuredTools
-from benchmarks.comparison.run import _analyse_samples
-from benchmarks.model import Configuration, Sample
+from benchmarks.model import Category, Configuration
+from benchmarks.run import _selected_tasks
+from benchmarks.tasks import ALL_TASKS
 
 
-def test_analyse_samples_groups_by_declared_configuration(tmp_path: Path) -> None:
-    """no-apktool 配置得到自己的工作区, apktool 的缺席被记录."""
-    _analyzer, by_config, _ids = _analyse_samples(
-        tmp_path, samples={Sample.DEMO}, configurations={Configuration.NO_APKTOOL}
+def _args(**overrides: object) -> argparse.Namespace:
+    """A parsed-args stand-in with the runner's defaults."""
+    values: dict[str, object] = {
+        "configuration": None,
+        "category": None,
+        "task": None,
+    }
+    values.update(overrides)
+    return argparse.Namespace(**values)
+
+
+def test_configuration_filter_routes_only_declared_tasks() -> None:
+    """--configuration no-jadx 只选题面声明 no-jadx 的题, 不再全选 92 题."""
+    selected = _selected_tasks(_args(configuration=["no-jadx"]))
+    assert selected, "no-jadx 配置在题集中有声明它的题"
+    assert all(task.configuration is Configuration.NO_JADX for task in selected)
+    assert len(selected) < len(ALL_TASKS)
+    # 全集里确实存在声明 no-jadx 的题, 过滤不是碰巧为空.
+    declared = [task for task in ALL_TASKS if task.configuration is Configuration.NO_JADX]
+    assert {task.id for task in selected} == {task.id for task in declared}
+
+
+def test_configuration_filter_keeps_full_set_order() -> None:
+    """过滤不重排: 子集仍按全集顺序出现(报告可比性的前提)."""
+    selected = _selected_tasks(_args(configuration=["no-apktool"]))
+    expected = [task.id for task in ALL_TASKS if task.configuration is Configuration.NO_APKTOOL]
+    assert [task.id for task in selected] == expected
+
+
+def test_no_jadx_and_no_apktool_each_select_their_own_tasks() -> None:
+    """两个 no-* 配置各自路由到自己的题, 互不串集."""
+    jadx = {task.id for task in _selected_tasks(_args(configuration=["no-jadx"]))}
+    apktool = {task.id for task in _selected_tasks(_args(configuration=["no-apktool"]))}
+    assert jadx and apktool
+    assert jadx.isdisjoint(apktool)
+
+
+def test_task_prefix_combined_with_configuration_intersects() -> None:
+    """--task 与 --configuration 同时给出时取交集(与 --category 同一语义)."""
+    selected = _selected_tasks(
+        _args(configuration=["no-jadx"], task=["partial.no-jadx-the-failure-is-recorded"])
     )
-    assert set(by_config) == {Configuration.FULL, Configuration.NO_APKTOOL}
-    no_apktool = by_config[Configuration.NO_APKTOOL]["demo-app"]
-    full = by_config[Configuration.FULL]["demo-app"]
-    # project id 由 APK 内容决定, 两配置相同; 工作区才是配置的边界.
-    assert no_apktool.result.project.id == full.result.project.id
-    assert no_apktool.result.workspace != full.result.workspace
-    # no-apktool 的工作区里, apktool 版本是 None(缺席), 且失败已记录;
-    # 该配置只禁 apktool, 其余后端按本机安装情况如实出现.
-    versions = dict(no_apktool.result.project.tool_versions)
-    assert versions["apktool"] is None
-    errors = [(error.tool, error.code.value) for error in no_apktool.result.project.errors]
-    assert ("apktool", "not_installed") in errors
-    # full 工作区里 apktool 不缺席——前提是本机装了它 (CI 与本机的
-    # ``DEXATLAS_APKTOOL_JAR``). 没装时 full 与 no-apktool 的差别只剩
-    # 工作区路径, no-* 的记录行为已由上面的断言独立成立, 这里跳过.
-    if dict(full.result.project.tool_versions)["apktool"] is not None:
-        assert no_apktool.result.project.tool_versions["apktool"] is None
+    assert [task.id for task in selected] == ["partial.no-jadx-the-failure-is-recorded"]
+    assert selected[0].configuration is Configuration.NO_JADX
 
 
-def test_structured_tools_route_the_question_to_its_configuration(
-    tmp_path: Path,
+def test_configuration_filter_with_no_matching_task_is_empty() -> None:
+    """配置与 --task 组合不出任何题时返回空集; main 把它报成明确错误."""
+    selected = _selected_tasks(_args(configuration=["no-jadx"], task=["manifest.package.demo"]))
+    assert selected == []
+
+
+def test_category_filter_still_works_alongside_configuration() -> None:
+    """--category 与 --configuration 叠加仍取交集, 不受新过滤影响."""
+    selected = _selected_tasks(_args(configuration=["no-jadx"], category=[Category.PARTIAL.value]))
+    assert selected
+    assert all(
+        task.configuration is Configuration.NO_JADX and task.category is Category.PARTIAL
+        for task in selected
+    )
+
+
+def test_without_configuration_filter_the_full_set_is_selected() -> None:
+    """正常路径(不带 --configuration)仍覆盖全集, 判分集不变."""
+    selected = _selected_tasks(_args())
+    assert len(selected) == len(ALL_TASKS)
+    assert [task.id for task in selected] == [task.id for task in ALL_TASKS]
+
+
+def test_main_reports_no_tasks_selected_for_an_impossible_combination(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """B 对 no-apktool 题调 get_manifest, 拿到 no_manifest 错误而不是包名.
+    """端到端: 不适用的组合得到退出码 2 与明确提示, 而不是 KeyError."""
+    from benchmarks.run import main
 
-    full 配置的前提是本机装了 Apktool (CI 与本机的
-    ``DEXATLAS_APKTOOL_JAR``); 没装时 full 的 manifest 也读不出,
-    那是环境前提不成立, 跳过而不是让断言误报.
-    """
-    _analyzer, by_config, project_ids = _analyse_samples(
-        tmp_path, samples={Sample.DEMO}, configurations={Configuration.NO_APKTOOL}
+    code = main(
+        [
+            "--configuration",
+            "no-jadx",
+            "--task",
+            "manifest.package.demo",
+            "--workspace",
+            str(tmp_path / "ws"),
+        ]
     )
-    full_versions = dict(by_config[Configuration.FULL]["demo-app"].result.project.tool_versions)
-    if full_versions["apktool"] is None:
-        pytest.skip("apktool not installed on this machine")
-    tools = StructuredTools(
-        analyzer=_analyzer,
-        project_ids=project_ids,
-        analyses_by_config=by_config,
-    )
-    question = Question(
-        reference="q067",
-        question="What package does the demo application declare, when the APK reader "
-        "is not installed?",
-        sample="demo-app",
-        configuration="no-apktool",
-    )
-    payload = tools.call("get_manifest", question, "package")
-    assert payload.get("error_code") == "no_manifest"
-    assert "apktool" in payload.get("missing_backends", [])
-
-    # 同一工具面对 full 配置的题, 照常返回包名.
-    full_question = Question(
-        reference="q001",
-        question="What package does the demo application declare?",
-        sample="demo-app",
-        configuration="full",
-    )
-    ok = tools.call("get_manifest", full_question, "package")
-    assert ok.get("package") == "com.example.demo"
-
-
-def test_source_text_tools_hide_the_absent_backend_files(tmp_path: Path) -> None:
-    """A 对 no-apktool 题检索不到 manifest/smali, 对 full 题照常检索."""
-    tools = SourceTextTools({sample.value: sample.source_directory for sample in Sample})
-    demo = Sample.DEMO.source_directory
-
-    full_question = Question(
-        reference="q001",
-        question="What package does the demo application declare?",
-        sample="demo-app",
-        configuration="full",
-    )
-    hits = tools.call("search_source_text", full_question, "com.example.demo")
-    assert hits["hits"], "the full configuration still sees the sources"
-
-    absent_question = Question(
-        reference="q067",
-        question="What package does the demo application declare, when the APK reader "
-        "is not installed?",
-        sample="demo-app",
-        configuration="no-apktool",
-    )
-    hidden = tools.call("search_source_text", absent_question, "com.example.demo")
-    assert hidden["hits"] == [], "apktool's files are gone with the backend"
-
-    # jadx 缺失只藏 Java, smali 仍在.
-    no_jadx_question = Question(
-        reference="q066",
-        question="Does the analysis record that the decompiler was missing?",
-        sample="demo-app",
-        configuration="no-jadx",
-    )
-    partial = tools.call("search_source_text", no_jadx_question, "const-string")
-    assert partial["hits"], "smali survives a missing decompiler"
-    assert not any(hit["file"].endswith(".java") for hit in partial["hits"]), "no Java without jadx"
-    assert demo.is_dir()
+    captured = capsys.readouterr()
+    assert code == 2
+    assert "no tasks selected" in captured.err
