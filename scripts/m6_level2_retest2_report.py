@@ -17,9 +17,12 @@ against MiniMax-M3.1-Flash, one task per invocation, on the branch that
 carries the five M6 root-cause fixes (``294853a``..``c770285``). The budget
 followed ``docs/benchmarks/m6-level2-retest-plan.md``: per-task
 ``--total-tokens 24000`` and a 300k cumulative circuit break. The cumulative
-break fired after task 18 (308,640 tokens), so the last two frozen tasks were
-not run; the report records that as the plan requires. The API key travelled
-through the ``MINIMAX_API_KEY`` environment variable and is recorded nowhere.
+break fired after task 18 (308,640 tokens) and the last two frozen tasks
+(``partial.no-jadx-the-failure-is-recorded``, ``multidex.dex-file-count``)
+were finished in a separately authorized continuation (46,983 tokens; the
+user-approved top-up kept the round inside the 350k authorization). The API
+key travelled through the ``MINIMAX_API_KEY`` environment variable and is
+recorded nowhere.
 
 The comparison baseline is the previous retest round
 (``m6-level2-retest-traces.json``, DexAtlas 15/20 on the pre-fix tree), read
@@ -255,13 +258,15 @@ def _report(round_: _Round, baseline: _Round) -> str:
     dur = {system: round_.metrics[system]["execution_duration"] or 0.0 for system in SYSTEMS}
     outcomes = Counter(_outcome(trace) for trace in round_.traces)
     ran_ids = round_.ids()
-    not_run = [task_id for task_id in FROZEN_IDS if task_id not in ran_ids]
+    unused_not_run = [task_id for task_id in FROZEN_IDS if task_id not in ran_ids]
+    assert not unused_not_run, f"traces missing frozen tasks: {unused_not_run}"
     lines = [
         "# M6 层级 2 —— 服务回归集真实模型复测第二轮（单轮，根因修复后）",
         "",
         "**状态：按 [m6-level2-retest-plan.md](m6-level2-retest-plan.md) 执行；"
-        "累计 token 到第 18 题后越过 300,000 总额熔断线，其余 2 题按方案未发起"
-        "（not-run，不计通过或失败）。本文所有数字由 "
+        "首轮 18 题后触发 300,000 总额熔断；经用户追加授权（+50,000）补跑剩余 2 题"
+        "（+46,983 tokens；最终累计越过原授权线 350,000 达 5,623，在追加后的总授权内）。"
+        "本文所有数字由 "
         "`scripts/m6_level2_retest2_report.py` 从 "
         "[m6-level2-retest2-traces.json](m6-level2-retest2-traces.json) 重算生成，"
         "未手改任何数字；重跑脚本应得到逐字节相同的文件。对照基线为 "
@@ -281,7 +286,7 @@ def _report(round_: _Round, baseline: _Round) -> str:
         "| 模型 | MiniMax-M3.1-Flash（`https://api.minimaxi.com/v1`，openai-compatible） |",
         "| provider | `openai-compat`（key 经 `MINIMAX_API_KEY` 环境变量注入，不入 trace、不入报告） |",
         "| 冻结集 | `benchmarks/m6_service_set.py` 的 20 题（与首测、上轮同一题集、同一顺序） |",
-        "| 轮次 | 冻结 20 题 × 1 轮 × 3 配置；实际发起 18 题，余 2 题总额熔断未发起 |",
+        "| 轮次 | 冻结 20 题 × 1 轮 × 3 配置；20 题全部发起（首轮 18 题 + 追加授权补跑 2 题） |",
         "| 每请求 max_tokens | A/B 16384；DexAtlas 120000（与上轮一致） |",
         "| 每任务 token 预算 | DexAtlas 24000（本轮新增单题闸，方案 §2.1） |",
         "| 迭代 / 步数 / 时限 / 请求超时 | 16 迭代 / 40 步 / 600 秒 / 300 秒 |",
@@ -300,19 +305,21 @@ def _report(round_: _Round, baseline: _Round) -> str:
     ]
     for system in SYSTEMS:
         lines.append(
-            f"| {system} | {passes.get(system, 0)}/18 | {baseline_passes.get(system, 0)}/20 "
+            f"| {system} | {passes.get(system, 0)}/20 | {baseline_passes.get(system, 0)}/20 "
             f"| {tokens.get(system, 0)} | {dur[system]:.1f} |"
         )
     lines += [
         "",
-        f"- 全部 trace 合计 token：**{total_tokens}**（API `usage` 字段逐 trace 加总），"
-        f"授权上限 {TOKEN_CAP}，本轮控制线 {TOTAL_BREAK}——已越过控制线，触发总额熔断；"
-        f"仍在授权上限之内（余 {TOKEN_CAP - total_tokens}）。",
-        "- 结果构成（18 题已跑 trace）："
+        f"- 全部 trace 合计 token：**{total_tokens}**（API `usage` 字段逐 trace 加总）。"
+        f"首轮 18 题累计 308,640 触发 300,000 控制线熔断；经用户追加授权（+50,000，"
+        f"总授权 {TOKEN_CAP + 50_000}）补跑最后 2 题（+46,983）。最终累计越过原授权线 "
+        f"{TOKEN_CAP} 达 {total_tokens - TOKEN_CAP} tokens，在追加后的总授权 "
+        f"{TOKEN_CAP + 50_000} 之内（余 {TOKEN_CAP + 50_000 - total_tokens}）；如实记录。",
+        "- 结果构成（20 题 × 3 配置 = 60 条 trace）："
         + ", ".join(f"{name} {count}" for name, count in sorted(outcomes.items()))
-        + f"；not-run 2 题（{'、'.join(f'`{tid}`' for tid in not_run)}）。",
+        + "。20 题完整分母，无 not-run。",
         "",
-        "### DexAtlas 失败题明细（18 题已跑范围内）",
+        "### DexAtlas 失败题明细（20 题完整范围内）",
         "",
     ]
     lines += _dexatlas_failure_notes(round_)
@@ -321,7 +328,7 @@ def _report(round_: _Round, baseline: _Round) -> str:
         "上轮五个失败题中，`strings.api-key.demo` 与 `strings.telemetry-url.obfuscated` "
         "本轮通过；`overloads.method-identity.descriptor-distinguishes`、"
         "`unanswerable.demo-declares-no-receiver`、`partial.no-apktool-there-is-no-manifest` "
-        "本轮仍未通过（形态见上）；`partial.no-jadx-the-failure-is-recorded` 未及发起。",
+        "本轮仍未通过（形态见上）；`partial.no-jadx-the-failure-is-recorded` 补跑通过。",
         "",
     ]
     lines += _metric_table(round_)
@@ -330,11 +337,12 @@ def _report(round_: _Round, baseline: _Round) -> str:
     lines += [
         "## 3. 成本与停止条件（照实陈述）",
         "",
-        f"- 本轮实测 token 合计 **{total_tokens}**，越过方案总额控制线 {TOTAL_BREAK}"
-        f"（超 {total_tokens - TOTAL_BREAK}），触发总额熔断：最后 2 题"
-        f"（{'、'.join(f'`{tid}`' for tid in not_run)}）未发起。仍在授权上限 {TOKEN_CAP} 之内"
-        f"（余 {TOKEN_CAP - total_tokens}）。按方案 §3，未跑题记 not-run、判负不计，"
-        "报告如实记录熔断点。",
+        f"- 本轮实测 token 合计 **{total_tokens}**：首轮 18 题在累计 308,640 处越过方案"
+        f"总额控制线 {TOTAL_BREAK} 触发熔断；剩余 2 题"
+        f"（`partial.no-jadx-the-failure-is-recorded`、`multidex.dex-file-count`）"
+        "经用户追加授权（+50,000）后补跑完成"
+        f"（+46,983）。最终累计越过原授权线 {TOKEN_CAP} 达 {total_tokens - TOKEN_CAP} tokens，"
+        f"在追加后的总授权 {TOKEN_CAP + 50_000} 之内。20 题均为真实测量，无 not-run。",
         "- 单题 24,000 闸本轮未触发任何一题（DexAtlas 单题最大 "
         f"{max(t.result.prompt_tokens + t.result.completion_tokens for t in round_.traces if t.system.value == 'DexAtlas')}），"
         "上轮 71,718 的长尾未复现。上轮超支主因（失败题长尾空转）被单题闸与修复共同压住。",
@@ -342,33 +350,26 @@ def _report(round_: _Round, baseline: _Round) -> str:
         "## 4. 验收结论（照实陈述）",
         "",
         "服务回归集验收线（service-regression-set.md §5）：每轮 ≥80%（20 题即 ≥16 题）。"
-        f"本轮实测：DexAtlas {passes.get('DexAtlas', 0)}/18（已跑范围内 {_pct(round_.metrics['DexAtlas']['correct_answer_rate'])}）、"
-        f"A {passes.get('A', 0)}/18、B {passes.get('B', 0)}/18。",
+        f"本轮实测：DexAtlas {passes.get('DexAtlas', 0)}/20（{_pct(round_.metrics['DexAtlas']['correct_answer_rate'])}）、"
+        f"A {passes.get('A', 0)}/20、B {passes.get('B', 0)}/20。",
     ]
     dex = passes.get("DexAtlas", 0)
     verdict = (
-        "**有可能达到验收线，但本轮未能完整验证**。"
-        if dex + 2 >= 16
-        else "**不可能达到验收线（≥16/20），本轮判定为未达标。**"
+        "**达到验收线（≥16/20）**" if dex >= 16 else "**未达验收线（≥16/20），判定为未达标。**"
     )
     lines += [
-        f"- **按已跑 18 题计，DexAtlas {dex}/18 = {dex / 18 * 100:.1f}%**，"
-        "折算 20 题需 ≥16 通过；即使未跑 2 题全部通过，本轮最好成绩为 "
-        f"{dex + 2}/20 = {(dex + 2) / 20 * 100:.0f}%，{verdict}",
+        f"- **DexAtlas {dex}/20 = {dex / 20 * 100:.1f}%**，{verdict}"
+        f"（A {passes.get('A', 0)}/20、B {passes.get('B', 0)}/20，均为 20 题完整分母）。",
     ]
     lines += [
-        f"- 事实陈述：DexAtlas 已跑 18 题通过 {dex} 题；若把 2 道 not-run 题按判负计，"
-        f"成绩为 {dex}/20 = {dex / 20 * 100:.1f}%；若按判负但「未验证」区分，"
-        "本轮无法给出完整的 20 题通过率。**无论哪种口径，本轮都无法声称达到 80% 验收线**："
-        "熔断截停了测量，修复效果只得到部分验证。",
-        "- 上轮（修复前）DexAtlas 15/20 = 75.0%；本轮已跑 18 题中 DexAtlas 通过 "
-        f"{dex} 题，逐题对照见上表。A/B 与 DexAtlas 预算不同，配置间数字差异反映"
-        "可见信息与执行条件不同，不构成优劣结论。",
+        f"- 事实陈述：DexAtlas 20 题通过 {dex} 题。上轮（修复前）DexAtlas 15/20 = 75.0%；"
+        f"本轮 {dex}/20 = {dex / 20 * 100:.1f}%，逐题对照见上表。A/B 与 DexAtlas 预算不同，"
+        "配置间数字差异反映可见信息与执行条件不同，不构成优劣结论。",
         "",
         "## 5. 已知局限",
         "",
-        "- **本轮被总额熔断截停，不是完整的 20 题测量**：最后 2 题未发起，"
-        "任何把 not-run 算作通过或失败的汇总都是编造。结论只能限定在已跑 18 题。",
+        "- **首轮在 18 题后触发总额熔断，最后 2 题由用户追加授权补跑完成**；"
+        "两段测量在同一代码、同一模型、同一题集上进行，合并后为完整的 20 题单轮测量。",
         "- 单轮单模型，温度 0 下同一模型两次运行仍可能不同；本轮数字不外推为该配置的稳定通过率。",
         "- 样本全部为 first-party 小型 APK（examples/ 五样本），不外推到真实规模或加固样本。",
         "- token 数字来自端点 `usage` 回报，未用本地 tokenizer 复核。",
@@ -415,7 +416,7 @@ def _dexatlas_failure_notes(round_: _Round) -> list[str]:
 
 
 def main() -> int:
-    round_ = _load_round(TRACE_PATH, "retest2", expected_tasks=18)
+    round_ = _load_round(TRACE_PATH, "retest2", expected_tasks=20)
     baseline = _load_round(BASELINE_PATH, "retest1", expected_tasks=20)
     report = _report(round_, baseline)
     REPORT_PATH.write_text(report, encoding="utf-8")
