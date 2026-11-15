@@ -1255,6 +1255,35 @@ class Store:
                     break
         return hits
 
+    def list_string_constants(self, project_id: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        """The string constants the pool holds, as search-shaped rows.
+
+        This is the last of the three readings a string-constant question can
+        fall back to: the token search, then the substring sweep, then the
+        pool itself. An agent that has failed to name the constant it is
+        looking at is shown the constants that exist, which is what lets it
+        answer "the pool holds these N constants" instead of an unsupported
+        absence.
+        """
+        with self.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT value
+                FROM strings
+                WHERE project_id = ?
+                LIMIT ?
+                """,
+                (project_id, max(limit, 1)),
+            ).fetchall()
+        return [
+            {
+                "kind": "string",
+                "name": str(row["value"])[:MAX_SEARCH_NAME_CHARS],
+                "excerpt": str(row["value"]),
+            }
+            for row in rows[:limit]
+        ]
+
     # -- evidence ----------------------------------------------------------
 
     def save_evidence(self, project_id: str, evidence: Iterable[Evidence]) -> int:
