@@ -91,3 +91,6 @@ Thumbs.db
 # The workbench front end: npm state and the built bundle. The sources under
 # src/dexatlas/workbench/web/src are the real thing; these are regenerable.
 src/dexatlas/workbench/web/node_modules/
+
+# M8 演练的本地 E2E 产物（APK 反编译输出与证据包不进仓库）
+.m8-e2e/
