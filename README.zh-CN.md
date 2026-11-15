@@ -8,15 +8,25 @@
 
 </div>
 
-DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整合进一套模块化、可复现的
+DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权限清单、完整的
+类/方法/字段符号索引、反编译的 Java 源码、调用点与调用关系交叉引用，以及一条证据链——
+每个事实都记录着是哪个工具、在哪个版本、从哪个字节位置读出来的。一套模块化、可复现的
 工作流，面向开发者、安全研究员，以及对自己拥有或已获授权的应用进行分析的工程师。
 
+**一条结论必须能指回它来自的那些字节。** 结论分级为 `verified` / `lead` /
+`insufficient`，每个事实都带 provenance；后端失败被当作一个值来报告，而不是抛异常——
+哪怕 APK 让反编译器彻底失效，你仍会拿到 manifest、符号索引，以及一份写明哪些步骤
+没能运行的分析报告。
+
 > [!IMPORTANT]
-> **当前状态：早期开发（Phase 2 已交付，Phase 3 已规划）。** CLI、分析内核与报告
+> **当前状态：早期开发（v0.2.0 已发布；Phase 3 进行中）。** CLI、分析内核与报告
 > 流水线在 `v0.1.0` 发布，此后每个版本都在交付。MCP server、证据优先的 Agent 与
 > Web 工作台的 M4 八屏——项目面板、上传与分析进度、检索与证据溯源、单方法调用
 > 关系、Agent 工作区、报告导出、M3 基准视图——已全部建成并随 `v0.2.0` 发布。
-> M4 已于 2026-11-14 通过源码评审。后续规划见[路线图](#路线图)与
+> M4 已于 2026-11-14 通过源码评审。Phase 3 正按[作品集计划](docs/roadmap/phase3-plan.md)
+> 推进：M5（声明基线）与 M7（客户可审阅交付包）已完成；M6（有限 Agent 任务）与
+> M8（干净安装、契约与导出安全）进行中；M9（本页展示入口）与 M10（独立验收、
+> 发布候选）尚未开始。详见[路线图](#路线图)与
 > [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)。
 > 本文档不会声称任何尚未实际可运行的功能。
 
@@ -199,6 +209,13 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 `scripts/build-demo-apk.sh` 重新构建——不是来历不明的二进制文件。体积更大的测试样本
 则通过 `scripts/fetch-fixtures.sh` 获取。
 
+**安装捷径**（完整命令、故障排查与后端安装：[docs/install.md](docs/install.md)）：
+
+- **uv**（推荐——见下方快速开始）：在克隆目录里执行 `uv sync --extra analysis`
+- **Docker**（预装 JADX 与 Apktool）：`docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends`
+- **pipx**：`uv tool install --from . --with ".[analysis]" dexatlas` —— 从克隆目录安装
+  三个可执行入口；JADX、Apktool 与 JDK 等引擎不随包分发，需另行安装
+
 ## Web 工作台
 
 DexAtlas 可以在浏览器里展示分析工作区。工作台直接 in-process 调用 MCP server
@@ -261,17 +278,47 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 
 ## 文档
 
-- **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
-- **[架构说明](docs/architecture/README.md)** —— 项目如何组织，以及为什么这样设计
+### 案例——一次真实运行长什么样
+
+- **[从上传到证据链](docs/case-studies/demo-app-walkthrough.md)** —— 在内置演示 APK 上
+  走完整条工具链：analyze、manifest、检索、源码、交叉引用，以及背后的证据记录
+- **[读一个混淆过的应用](docs/case-studies/obfuscated-app.md)** —— 名称混淆后还剩什么、
+  字符串索引还能找到什么，以及能力边界在哪里
+- **[从 Python 集成](docs/case-studies/api-integration.md)** —— REST API 与 MCP server
+  的线缆契约，逐端点看调用方拿到什么
+
+### 架构——如何组织，为什么
+
+- **[架构说明](docs/architecture/README.md)** —— 流水线、存储模型与设计取舍
 - **[Web 工作台](docs/architecture/workbench.md)** —— 只读浏览器界面：已有的屏幕、启动方式与选型
 - **[MCP server](docs/architecture/mcp-server.md)** —— 十个只读工具，以及调用方在提问前要知道的三件事
 - **[证据优先的 Agent](docs/architecture/agent.md)** —— 一个循环、一份预算、一份状态机，以及线索与 finding 的边界
+- **[报告渲染与证据包](docs/architecture/report-rendering.md)** —— 同一份分析的三种渲染，以及可交给客户的证据导出
+
+### 基准——测了什么，没测什么
+
+- **[脚本化对比](docs/benchmarks/comparison.md)** —— 92 题上验证对比机制本身，不是模型基线
+- **[真实模型对比](docs/benchmarks/comparison-real.md)** —— 一个具名模型、完整披露、不挑数字
+- **[更强预算对比](docs/benchmarks/comparison-stronger.md)** —— 同一模型的预算与执行条件变化，
+  不是模型变化
+- **[大型 APK 基准](docs/benchmarks/large-apk.md)** —— 20 万个方法的 APK 上分析会变成什么样，
+  它拒绝声称什么，以及它没有测量什么
+- **[服务回归集](docs/benchmarks/service-regression-set.md)** —— agent 服务承诺所对标的
+  20 道冻结题，以及统一判定规则
+
+### 项目记录
+
+- **[交接说明](docs/HANDOVER.md)** —— 项目现状、如何在另一台机器跑起来、接下来做什么
+- **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
 - **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 - **[Phase 2 计划](docs/roadmap/phase2-plan.md)** —— 源码评审之后、对着真实代码写的
-- **[大型 APK 基准](docs/benchmarks/large-apk.md)** —— 20 万个方法的 APK 上分析会变成什么样，
-  它拒绝声称什么，以及它没有测量什么
+- **[Phase 3 计划](docs/roadmap/phase3-plan.md)** —— 作品集计划：可复现的 GitHub 展示、
+  有范围的客户交付、独立验收
+- **[Phase 3 基线](docs/reports/phase3-baseline.md)** —— 声明清单、重算后的 benchmark 数字，
+  以及其背后的未决问题
+- **[演示视频](docs/assets/demo.mp4)** —— GIF 所出自的完整 85 秒会话（MP4）
 
 源码评审已经做完：三份审核共 44 条发现，每一条都在发现它的那棵树上复验过。
 
@@ -281,12 +328,32 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分
 - **[Phase 2 任务清单](docs/reports/phase2-issue-list.md)** —— 推迟的发现，每条带两个方案和推荐
 
+## 作者贡献与第三方引擎
+
+DexAtlas 是一个**个人自主的开源项目**——背后没有客户或雇主。作者完成了架构设计，
+编写了分析内核、三个后端集成、存储与证据模型、CLI 与 REST API、只读 MCP server、
+证据优先的 agent 循环、Web 工作台、测试套件与全部文档。部分实现由 AI 编码助手辅助
+完成；每一个设计决策、每一次集成和每一行发布的代码都经过作者评审与验收，作者对
+交付的一切负责。
+
+反编译与字节码分析的重活由三个第三方引擎完成，它们以**独立进程**方式被调用，
+在本仓库中不被内嵌、不被捆绑、也不被再分发：
+
+| 引擎 | 在 DexAtlas 中的角色 | 许可证 |
+|---|---|---|
+| [JADX](https://github.com/skylot/jadx) | 把 DEX 反编译为可读的 Java 伪代码 | Apache-2.0 |
+| [Apktool](https://github.com/iBotPeaches/Apktool) | 解码 manifest 与资源；提供 Smali 回退 | Apache-2.0 |
+| [Androguard](https://github.com/androguard/androguard) | 权威的 DEX 符号图与交叉引用图 | Apache-2.0 |
+
+它们的输出保持原生形态；DexAtlas 补上的是其外的统一索引、证据模型与传输层。
+许可证审计说明见[路线图](docs/roadmap/ROADMAP.md#license)。
+
 ## 参与贡献
 
 欢迎提交 Issue、Bug 报告与 Pull Request——详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 规划 Phase 1 的 8 个任务已归档在
 [`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/) 下，每个文件都记着
-背后的设计决策；当前的工作是 Phase 2 计划。
+背后的设计决策；当前的工作是 Phase 3 计划。
 
 请勿提交包含 APK、反编译源码，或任何来自你无权分析的应用程序的代码。参见
 [SECURITY.md](SECURITY.md)。
@@ -302,3 +369,20 @@ DexAtlas 用于教育、经授权的软件分析、移动应用安全评估与�
 
 [Apache-2.0](LICENSE)。第三方分析引擎以独立进程方式调用，不随本项目分发；审计说明见
 [路线图](docs/roadmap/ROADMAP.md#license)中的许可证章节。
+
+## 路线图状态
+
+Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让项目在 GitHub 上
+可复现地被看懂，把客户能订购的交付范围写清楚，并让每一条声明都放在陌生人可以重新
+推导的证据后面。当前进度：
+
+| 里程碑 | 范围 | 状态 |
+|---|---|---|
+| M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
+| M6 | 冻结回归集上的有限 agent 任务 | **进行中** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20 |
+| M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
+| M8 | 干净安装、故障恢复、契约与导出安全验收 | **进行中** |
+| M9 | GitHub 展示入口（本页）与 Upwork 素材 | **进行中** |
+| M10 | 独立验收、重新评分、发布候选 | **未开始** |
+
+只有本计划的退出标准全部通过，才会考虑 `v1.0.0`——阶段推进靠证据，不靠日历。

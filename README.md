@@ -16,19 +16,32 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 
 </div>
 
-DexAtlas brings Android decompilation, program analysis, AI agents and developer-friendly
-automation together in one modular, reproducible workflow — built for developers, security
-researchers and engineers analysing applications they own or are authorized to assess.
+DexAtlas turns an APK into a complete, verifiable picture: the manifest and permissions,
+a full class/method/field symbol index, decompiled Java source, call-site and call-graph
+cross-references, and an evidence trail that records — for every fact — which tool read
+it, at which version, from which byte position. One modular, reproducible workflow for
+developers, security researchers and engineers analysing applications they own or are
+authorized to assess.
+
+**A conclusion must trace back to the bytes it came from.** Conclusions are graded
+`verified` / `lead` / `insufficient`, every fact carries its provenance, and a backend
+that fails is reported as a value, not a crash: an APK that defeats the decompiler
+still yields a manifest, an index and a report that says which steps did not run.
 
 > [!IMPORTANT]
-> **Status: early development (Phase 2 delivered, Phase 3 planned).** The CLI, analysis
-> core and report pipeline shipped in `v0.1.0` and have been released in every version
-> since. The MCP server, the evidence-first agent and the web workbench's M4 screens —
-> the project dashboard, upload and analysis progress, search and evidence, the
-> cross-reference view, the agent workspace, report export, and the M3 benchmark view —
-> are built and shipped in `v0.2.0`. M4 passed its source review on 2026-11-14. See the
-> [Roadmap](#roadmap) and [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)
-> for what is next. Nothing on this page claims a feature that does not yet run.
+> **Status: early development (v0.2.0 released; Phase 3 in progress).** The CLI,
+> analysis core and report pipeline shipped in `v0.1.0` and have been released in
+> every version since. The MCP server, the evidence-first agent and the web
+> workbench's M4 screens — the project dashboard, upload and analysis progress,
+> search and evidence, the cross-reference view, the agent workspace, report
+> export, and the M3 benchmark view — are built and shipped in `v0.2.0`. M4 passed
+> its source review on 2026-11-14. Phase 3 is under way against the
+> [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
+> (client-ready deliverables) are done; M6 (bounded agent tasks) and M8 (clean
+> installs, contracts, export safety) are in progress; M9 (this showcase) and M10
+> (independent acceptance, release candidate) are not started. See the
+> [Roadmap](#roadmap) and [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md).
+> Nothing on this page claims a feature that does not yet run.
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas analysing a bundled demo APK: backend discovery, the analysis summary, exported components from the manifest, and the evidence levels in the report" width="900">
@@ -295,26 +308,73 @@ It is built from the smali sources in [`examples/demo-app/`](examples/demo-app/)
 and rebuildable with `scripts/build-demo-apk.sh` — no mystery binary. Larger test
 fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
+**Install shortcuts** (full commands, troubleshooting and backend setup:
+[docs/install.md](docs/install.md)):
+
+- **uv** (recommended — see the Quick start below): `uv sync --extra analysis` in a clone
+- **Docker** (JADX and Apktool preinstalled): `docker build -t dexatlas . && docker run --rm dexatlas dexatlas backends`
+- **pipx**: `uv tool install --from . --with ".[analysis]" dexatlas` — installs the three
+  executables from a clone; the engines (JADX, Apktool, a JDK) are not bundled and must
+  be installed separately
+
 ## Documentation
+
+### Case studies — what a real run looks like
+
+- **[From upload to evidence chain](docs/case-studies/demo-app-walkthrough.md)** — the
+  full tool chain on the bundled demo APK: analyze, manifest, search, source,
+  cross-references, and the evidence records behind them
+- **[Reading an obfuscated app](docs/case-studies/obfuscated-app.md)** — what survives
+  name obfuscation, what the string index still finds, and where the capability
+  boundary sits
+- **[Integrating from Python](docs/case-studies/api-integration.md)** — the REST API and
+  the MCP server as a caller sees them, endpoint by endpoint, with the wire contract
+
+### Architecture — how it fits together and why
+
+- **[Architecture overview](docs/architecture/README.md)** — the pipeline, the storage
+  model and the design decisions
+- **[The web workbench](docs/architecture/workbench.md)** — the read-only browser UI:
+  the screens that exist, how to start it, and the choices behind them
+- **[The MCP server](docs/architecture/mcp-server.md)** — the ten read-only tools, and
+  the three things a caller has to know before it asks them anything
+- **[The agent](docs/architecture/agent.md)** — the evidence-first agent: the loop, the
+  budgets, the state machine, and where the boundary between a lead and a finding is
+- **[Report rendering and the evidence package](docs/architecture/report-rendering.md)** —
+  three renderings of one analysis, and the client-ready evidence export
+
+### Benchmarks — what was measured, and what was not
+
+- **[Scripted comparison](docs/benchmarks/comparison.md)** — the harness proved out on
+  92 tasks; not a model baseline
+- **[Real-model comparison](docs/benchmarks/comparison-real.md)** — one named model,
+  full disclosures, no cherry-picked numbers
+- **[Stronger-budget comparison](docs/benchmarks/comparison-stronger.md)** — a budget
+  and execution-conditions change on the same model, not a model change
+- **[Large-APK benchmark](docs/benchmarks/large-apk.md)** — what the analysis does to a
+  200,000-method APK, what it refuses to claim, and what it never measured
+- **[Service regression set](docs/benchmarks/service-regression-set.md)** — the 20
+  frozen questions the agent service promise is measured against, and the judging
+  rules
+
+### Project records
 
 - **[Handover](docs/HANDOVER.md)** — where the project stands, how to get it running on a
   new machine, and what to do next
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
-- **[Architecture](docs/architecture/README.md)** — how it fits together and why
-- **[The web workbench](docs/architecture/workbench.md)** — the read-only browser UI:
-  the screens that exist, how to start it, and the choices behind them
-- **[The MCP server](docs/architecture/mcp-server.md)** — the ten read-only tools,
-  and the three things a caller has to know before it asks them anything
 - **[Current status](docs/status.md)** — where the project stands and what is left
   (Chinese; 当前状态)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
   which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
-- **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review, against the code that exists
-- **[Large-APK benchmark](docs/benchmarks/large-apk.md)** — what the analysis does to a
-  200,000-method APK, what it refuses to claim, and what it never measured
-- **[The agent](docs/architecture/agent.md)** — the evidence-first agent: the loop, the
-  budgets, the state machine, and where the boundary between a lead and a finding is
+- **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review,
+  against the code that exists
+- **[Phase 3 plan](docs/roadmap/phase3-plan.md)** — the portfolio plan: reproducible
+  GitHub showcase, scoped client deliverables, independent acceptance
+- **[Phase 3 baseline](docs/reports/phase3-baseline.md)** — the claims inventory, the
+  recomputed benchmark figures, and the open issues behind them
+- **[Demo video](docs/assets/demo.mp4)** — the full 85-second session the GIFs were cut
+  from (MP4)
 
 The source review is done: 44 findings across three reviews, every one of them
 re-verified against the tree it was found on.
@@ -325,12 +385,36 @@ re-verified against the tree it was found on.
 - **[Maturity assessment](docs/reports/phase1-maturity-assessment.md)** — six weighted dimensions, scored from what could be run (Chinese; 成熟度评估)
 - **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings, each with two options and a recommendation (Chinese; Phase 2 任务清单)
 
+## Authorship and third-party engines
+
+DexAtlas is a **personal, self-directed open-source project** — there is no client or
+employer behind it. The author designed the architecture, wrote the analysis core, the
+three backend integrations, the storage and evidence model, the CLI and REST API, the
+read-only MCP server, the evidence-first agent loop, the web workbench, the test suite
+and the documentation. AI coding assistants were used for parts of the implementation;
+every design decision, integration and line of shipped code was reviewed and accepted
+by the author, who is responsible for everything that ships.
+
+The heavy lifting of decompilation and bytecode analysis is done by three third-party
+engines, invoked **as separate processes** and never vendored, embedded or
+redistributed here:
+
+| Engine | What it does in DexAtlas | License |
+|---|---|---|
+| [JADX](https://github.com/skylot/jadx) | decompiles DEX to readable Java pseudocode | Apache-2.0 |
+| [Apktool](https://github.com/iBotPeaches/Apktool) | decodes the manifest and resources; Smali fallback | Apache-2.0 |
+| [Androguard](https://github.com/androguard/androguard) | the authoritative DEX symbol and cross-reference graph | Apache-2.0 |
+
+Their outputs are kept in their native form; what DexAtlas adds is the unified index,
+the evidence model and the transports around them. The license audit notes are in the
+[roadmap](docs/roadmap/ROADMAP.md#license).
+
 ## Contributing
 
 Issues, bug reports and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 The eight tasks that planned Phase 1 are archived under
 [`.github/issues/v0.1.0/planned/`](.github/issues/v0.1.0/planned/), each carrying the
-design decisions behind it; the live work is the Phase 2 plan.
+design decisions behind it; the live work is the Phase 3 plan.
 
 Please do not open a pull request that includes an APK, decompiled source, or any code from
 an application you are not authorized to analyse. See [SECURITY.md](SECURITY.md).
@@ -349,3 +433,21 @@ are explicitly **out of scope** — they are not features, not selling points, n
 [Apache-2.0](LICENSE). Third-party analysis engines are invoked as external processes and
 are not redistributed as part of this project; see the license section of the
 [roadmap](docs/roadmap/ROADMAP.md#license) for the audit notes.
+
+## Roadmap status
+
+Phase 3 ([plan](docs/roadmap/phase3-plan.md)) is a portfolio push: make the project
+reproducibly demonstrable on GitHub, scope the deliverables a client can order, and put
+every claim behind evidence a stranger can re-derive. Where it stands:
+
+| Milestone | Scope | Status |
+|---|---|---|
+| M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
+| M6 | bounded agent tasks on a frozen regression set | **in progress** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20 |
+| M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
+| M8 | clean installs, failure recovery, contract and export-safety acceptance | **in progress** |
+| M9 | GitHub showcase (this page) and Upwork materials | **in progress** |
+| M10 | independent acceptance, re-scoring, release candidate | **not started** |
+
+`v1.0.0` is considered only after this plan's exit criteria pass — phases advance on
+evidence, not on a calendar.
