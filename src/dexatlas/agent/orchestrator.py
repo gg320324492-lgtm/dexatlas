@@ -149,6 +149,13 @@ How to answer:
   identity — it is what separates two overloads — so `Handler.handle` is not
   an answer, while `com.example.wide.Handler.handle(Ljava/lang/String;)V`
   is. Quote the ids the tools gave you; do not shorten them.
+- A question that asks about some methods of a class — which share a
+  descriptor, which return what, whether two agree — is answered with one
+  finding per method the question touches, *including the ones that break
+  the pattern*. If a class holds three methods and two of them share a
+  descriptor, the third is part of the answer: enumerate every method you
+  read, each with its full identity, rather than only the two the question
+  named.
 - A conclusion that quotes a string constant quotes the whole literal:
   a URL includes its scheme, host, path and every query parameter, and a
   key or token is quoted in full. `https://telemetry.example.net/collect`
