@@ -1,0 +1,371 @@
+# M10 读者验收包 —— 外部独立验收一站式入口
+
+> **状态：验收包已就绪，等待读者执行。独立验收尚未开始；M10 未完成。**
+>
+> 本文件把 [M10 独立验收准备包](m10-acceptance-pack.md)整理成可直接交给一位
+> **未参与实现**的读者的完整执行包：从这里出发，不需要再向作者要任何步骤。
+> 验收记录填写[验收记录模板](m10-review-record-template.md)。
+>
+> 编写日期：2026-11-16 · 配套验收包基准：`bfa2f56`（main）
+> · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
+> （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
+> （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）
+
+## 0. 这份包是什么、不是什么
+
+**是什么**
+
+- 一条从 clone 到完成逐项打分的完整路径，每步给出可复制命令与预期输出要点。
+- 一份独立性守则：你的判定只依据你自己执行命令得到的输出。
+- 一份高风险声明清单：这些地方最值得怀疑，请优先核查。
+- 一份评分与提交说明：怎么打分、怎么记录、交回什么。
+
+**不是什么**
+
+- 不是验收结论，也不是评分。所有数字都是作者自述或脚本生成，**在你亲自复现之前一律视为未验证**。
+- 不替代[验收准备包](m10-acceptance-pack.md)的 40 项判定标准；本包只负责把路走通，判定以准备包为准。
+- 不是安全审计：DexAtlas 是静态分析工具，不做动态分析、不定性恶意软件、不判断可利用性。
+
+## 1. 读者须知（独立性要求）
+
+1. **不采信作者自述。** README、案例、报告里的每一个数字，都要么由你重跑命令复现，
+   要么记「未验证」。作者的解释可以听，但只能作为线索，不能作为证据。
+2. **逐项按检查表判定。** 40 个验收项见[准备包 §2](m10-acceptance-pack.md)，
+   三态判定（通过 / 不通过 / 未验证），没有「大概可以」。判定标准写在每个验收项里，
+   按标准判，不按印象判。
+3. **文档与实际不符，如实记录。** 预期输出和实际输出不一致时，以实际输出为准，
+   把差异写成[卡点](#52-卡点记录格式)。文档缺步骤本身就是缺陷，不要替项目圆场。
+4. **不要让作者代劳。** 作者可以澄清「这个词是什么意思」，不可以替你补命令、
+   改环境或远程操作。凡是靠作者口头补充才走通的步骤，相关验收项判不通过。
+5. **阻断项一票否决。** 19 个标 ★ 的验收项（清单见[准备包 §2.8](m10-acceptance-pack.md)）
+   任何一个不通过，M10 即不通过，高分不能抵消。
+6. **固定 commit。** 向验收发起人索取要验收的 commit hash，全程只验这一个 commit，
+   所有记录写明 hash。不要用移动的 `main` 分支做验收。
+7. ** secrets 与第三方样本不入记录。** 记录中的个人路径、密钥、日志用 `<redacted>` 脱敏；
+   不要把第三方 APK 或 `so` 文件传给任何人。
+
+## 2. 开始之前：你需要什么
+
+| 项目 | 要求 | 说明 |
+|---|---|---|
+| 操作系统 | Windows 11 或 Linux | 两者有实测记录；**macOS 未验证**，使用 macOS 请如实记录 |
+| Python | 3.12 或 3.13 | CI 在两个版本上运行 |
+| [uv](https://docs.astral.sh/uv/) | 最新版 | 包与环境管理 |
+| JDK | 21+ | 仅 JADX / Apktool 后端需要；没有 Java 也能用 Androguard 完成基础分析 |
+| Docker | 可选 | 不想装 Python/JDK 时走 [Docker 路线](#32-路线-bdocker隔离环境自带后端) |
+| `gh` CLI | 仅 fixtures 需要 | `scripts/fetch-fixtures.sh` 经 GitHub API 拉取 androguard 测试数据 |
+| 网络 | 首次需要 | clone、依赖、后端下载；装好后分析本身可离线 |
+| 磁盘 | 预留数 GB | 记录实际占用；不要写系统盘根目录 |
+| 时间 | 首次约 10–20 分钟到第一份报告；完整验收建议预留半天 | 暖缓存后到第一份报告约 30 秒（[M8 演练](m8-install-rehearsal.md)实测） |
+
+## 3. 分步执行路径
+
+每一步都记录：命令原文、退出码、关键输出、耗时。这是后面 A/B/D 组验收项的证据。
+
+### 3.1 第 1 步：取得固定副本（验收项 A1）
+
+```bash
+git clone https://github.com/gg320324492-lgtm/dexatlas.git
+cd dexatlas
+git checkout <验收发起人指定的 commit>
+git status
+```
+
+预期：`git status` 干净；记录 commit hash、clone 来源 URL、日期。
+
+### 3.2 第 2 步：环境准备（验收项 A2、A3）
+
+**路线 A（推荐，可完成 CLI、案例、测试和契约检查）：**
+
+```bash
+uv sync --extra dev --extra analysis --extra mcp --extra demo
+uv run dexatlas backends
+```
+
+预期：`uv sync` 退出码 0；`backends` 打印一张表，每个后端是 `available` 或
+`not installed`。四个 extras 的分工见 [install.md](../install.md)。
+
+> **已知文档不一致（M8-3）：** [install.md](../install.md) 安装节写的
+> `uv venv` + `uv pip install -e ".[analysis]"` 是最小安装，不含 `mcp` 与
+> `demo` extras。验收推荐上面的四 extras 路线；无论用哪条，记录实际命令。
+> 若两处说明冲突影响你的操作，记录为卡点。
+
+后端不在 `PATH` 时按 [install.md](../install.md) 设置：
+
+```bash
+export DEXATLAS_JADX_PATH=/path/to/jadx/bin/jadx
+export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
+```
+
+Windows 下 `DEXATLAS_JADX_PATH` 指向 `bin\jadx.bat`。**没有后端不要停**：
+继续往下走，这正好是验收项 A6 / G2 要核实的降级行为。
+
+**路线 B（Docker，隔离环境，自带后端）：**
+
+```bash
+docker build -t dexatlas .
+docker run --rm dexatlas dexatlas backends
+```
+
+预期：构建约 2 分钟（[M8 演练](m8-install-rehearsal.md)实测 2 分 16 秒）；
+镜像内 JADX / Apktool 可用。容器内多个命令共享 workspace 时，用
+`DEXATLAS_WORKSPACE=/workspace/ws` 统一（已知限制 M8-2：查询类命令缺
+`--workspace` 选项；遇到即记录，不要改用作者未公开的步骤）。
+
+### 3.3 第 3 步：首次分析 demo.apk（验收项 A4）
+
+```bash
+uv run dexatlas analyze examples/demo-app/demo.apk
+```
+
+预期（读者记录实际值；计数不同先核对后端是否齐全，再判定）：
+
+```text
+apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 resource string
+```
+
+样本 sha256：`80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`。
+
+**后端缺失降级（验收项 A6）**：在 Androguard 可用、至少一个外部后端不可用的
+情况下重复分析，预期仍以退出码 0 完成并产出报告，错误记录写明哪个后端
+`not_installed`；不得崩溃或静默省略。
+
+### 3.4 第 4 步：检索、证据与 locator 解析（验收项 A3–A5、B3–B4、C1–C3）
+
+以下命令全部来自 [demo-app 案例](../case-studies/demo-app-walkthrough.md)：
+
+```bash
+uv run dexatlas manifest apk_80a8fe0e81204c9f
+uv run dexatlas search apk_80a8fe0e81204c9f "Crypto"
+uv run dexatlas search apk_80a8fe0e81204c9f "sk_live"
+uv run dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity
+uv run dexatlas xrefs apk_80a8fe0e81204c9f \
+  "com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;"
+```
+
+预期要点：
+
+| 步骤 | 预期 |
+|---|---|
+| manifest | 包名 `com.example.demo`；version 1.0 (1)；sdk min 24 / target 34；1 个权限；3 个组件；MainActivity 与 SyncService 均为 exported 且无权限保护 |
+| search `Crypto` | 命中 `com.example.demo.Crypto` 相关类与方法 |
+| search `sk_live` | 一条字符串命中 `sk_live_2f8a91c4e7b3`，并显示来自哪个索引 |
+| source | 第一行标明 `source kind: java`（或 smali 回退）与 locator，例如 `jadx:sources/com/example/demo/MainActivity.java` |
+| xrefs | `1 call site(s), 1 call edge(s)`，调用点为 `classes.dex@34` |
+
+**证据核查（C 组核心）**：打开 JSON 报告或证据包，任选 3 条 evidence 记录，
+逐条核对工具、版本、locator、level 四个字段；理解三级语义——`verified` 是
+确定性工具产出且 citation 可解析，`lead` 是线索不是结论，`insufficient` 是
+证据不足；模型生成的文本永远不能是 `verified`。locator 解析规则见
+[准备包 §2.3 C2](m10-acceptance-pack.md)。
+
+### 3.5 第 5 步：三格式报告导出（验收项 A5、D1–D2）
+
+```bash
+uv run dexatlas analyze examples/demo-app/demo.apk \
+  -o report.md --json report.json --html report.html
+```
+
+预期：三份非空文件，描述同一 project id。抽查 3 个数字（如 classes、methods、
+call edges），确认 Markdown / JSON / HTML 三处一致。
+
+**离线阅读（验收项 D1）**：把 `report.html` 复制到另一个目录，断网后双击打开；
+页面应完整可读，无 `<script>`、无外部 CSS/JS/字体请求。
+
+### 3.6 第 6 步：证据包导出与校验（验收项 C5–C6、D3–D5、G5）
+
+```bash
+uv run dexatlas export apk_80a8fe0e81204c9f -o evidence.zip
+uv run --no-sync python -c \
+  "from pathlib import Path; from dexatlas.reports.evidence_package import verify_package, verify_citations; p=Path('evidence.zip'); m=verify_package(p); print(verify_citations(p, m))"
+```
+
+预期：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定）；
+`citations_resolved` 为 `True`，`citations_unresolved` 为空。
+
+**迁移复验（C6）**：把 `evidence.zip` 复制到另一个目录（或另一台机器）再跑一次
+校验，仍应通过；包内路径不得指向生成它的机器。
+
+**数据边界（D3、G5）**：解压 `python -m zipfile -e evidence.zip evidence`，
+打开 `evidence/manifest.json`，对照 `not_included` 声明检查包内实际文件——
+证据包**不含** APK、全量源码、未被证据引用的字符串。包内只有裸树/DEX locator
+时没有 `sources/` 目录，这是按构造解析，不是缺失（详见[准备包 §3.5](m10-acceptance-pack.md)）。
+
+### 3.7 第 7 步：至少一个完整案例核对（验收项 B1–B6）
+
+以读者身份通读 [demo-app 案例](../case-studies/demo-app-walkthrough.md)，
+核对三件事：
+
+1. 案例里的每条命令你能否照跑且结果一致（B1）；
+2. 案例的结论、限制、下一步是否都能从你自己的输出复述出来（B6）；
+3. 哪些是工具读到的事实、哪些是作者推断、哪些明确没覆盖（C3、B6）。
+
+有余力再抽查 [obfuscated-app 案例](../case-studies/obfuscated-app.md)
+（名称混淆下还能读到什么）与 [api-integration 案例](../case-studies/api-integration.md)
+（REST/MCP 集成）。
+
+### 3.8 第 8 步：契约与回归集抽查（验收项 E、F 组，可选但建议）
+
+- **CLI 退出码（F1）**：0 成功、1 空答案、2 请求错误、3 分析失败、4 重载歧义、
+  5 截断；至少实测 0/1/2 各一次。语义见[公共契约表](../architecture/public-contracts.md)。
+- **契约实测（F5–F6）**：
+
+  ```bash
+  uv run --no-sync pytest tests/test_public_contracts.py -q
+  uv run --no-sync python scripts/verify-public-contracts.py
+  ```
+
+- **服务回归集（E1–E5）**：读[服务回归集](../benchmarks/service-regression-set.md)
+  与[层级 1 scripted 演练](../benchmarks/m6-level1-scripted.md)，确认你能区分
+  层级 0（确定性判分 20/20）、层级 1（scripted 替身演练）、层级 2（真实模型，
+  结果见[高风险声明清单](#4-需要重点核查的高风险声明)）各自证明什么、不证明什么。
+- **故障恢复（G1–G4）**：坏输入（非 ZIP 当 APK）应退出码 2 且不留半成品；
+  清空后端环境变量后分析仍完成并写明 `not_installed`；同一 APK 分析两次
+  project id 相同。
+
+### 3.9 第 9 步：按检查表逐项打分
+
+打开[验收记录模板](m10-review-record-template.md)复制一份，按
+[准备包 §2](m10-acceptance-pack.md) 的 40 项逐项填写三态与证据记录，
+按[准备包 §5](m10-acceptance-pack.md) 的空白评分表给两平台打分。
+填写说明见[本包 §5](#5-评分表填写说明与提交格式)。
+
+## 4. 需要重点核查的高风险声明
+
+以下是作者自述中**最值得怀疑、对结论影响最大**的声明。逐条给出核查方法；
+核查结果直接写进对应验收项与卡点记录。
+
+### 4.1 Agent 层级 2 未达验收线（对应 E2、E3，★）
+
+作者自述：层级 2 真实模型批次（MiniMax-M3.1-Flash，冻结 20 题 × 3 轮）中
+DexAtlas 配置合计 24/60（40.0%，逐轮 45% / 40% / 35%），**未达验收线
+（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103
+tokens，超出当次授权的 800,000 上限，92 题全量轮因此未执行。
+出处：[m6-level2-real.md](../benchmarks/m6-level2-real.md)。
+
+**核查方法**：确认该文档的数字是否由 committed trace 重算得出（文档声称可用
+`scripts/m6_level2_report.py` 逐字节复现）；确认文档没有把 40% 说成达标，
+没有只报成功子集；确认服务承诺范围是否因此收窄且对外表述一致。
+
+### 4.2 演示视频是 scripted provider，不是真实模型（对应 E3，★）
+
+作者自述：README 中的演示 GIF/视频由仓库内置的 scripted demo provider 驱动
+——无 API key、无真实模型。出处：[README.md](../../README.md) 演示一节。
+
+**核查方法**：确认 README 与相关文档在展示演示处保留了 scripted 标注；
+确认没有任何材料把 scripted 演示表述为模型能力。
+
+### 4.3 benchmark 配置不等价，配置间对比不是模型质量结论（对应 E2、E3，★）
+
+作者自述：层级 2 中三配置预算不同（DexAtlas 120000 tokens/任务，A/B 检索式
+16384/请求），配置间差异同时反映执行条件与可见信息，**不构成对模型质量的
+比较**；层级 1 scripted 成绩（冻结 20 题 A 4/20、B 4/20、DexAtlas 1/20）
+度量的是 harness 机械，不是任何模型的解题能力。出处：
+[m6-level2-real.md](../benchmarks/m6-level2-real.md)、
+[m6-level1-scripted.md](../benchmarks/m6-level1-scripted.md)。
+
+**核查方法**：抽查报告是否保留了免责声明；确认没有把 scripted 数字当作
+通过率引用；确认预算差异已被披露而不是隐去。
+
+### 4.4 已知限制与未合入修复（对应 G2、G3、A2，★）
+
+- **M8-4**：三个后端全部超时（或全部失败）时，分析状态仍为 `completed`、
+  退出码仍为 0。项目已**决策为已知限制**，不改退出码契约；复现与理由见
+  [M8 演练 §6](m8-install-rehearsal.md)。请核对你会不会把「全部后端失败」
+  误读为「分析成功」。
+- **M8-2**：Docker 容器内查询类命令缺 `--workspace` 选项，需用
+  `DEXATLAS_WORKSPACE` 统一。
+- **M8-3**：[install.md](../install.md) 的安装 extras 组合与验收推荐路线不一致
+  （见[本包 §3.2](#32-第-2-步环境准备验收项-a2a3)）。
+- **macOS 未验证**：环境表只对 Windows 11 与 Linux 有实测记录。
+
+**核查方法**：这些限制是否在对应文档中原样可见（而不是只藏在验收包里）；
+降级行为（A6/G2）是否真的「记录为值」——错误写进报告而不是抛异常。
+
+### 4.5 其他诚实性边界
+
+- 案例与回归集全部使用 first-party 样本（`examples/`）；可疑形状的常量是
+  无害占位符。工具不做恶意软件定性、不判断可利用性——案例里若出现越界结论，
+  直接判不通过。
+- `lead 0` 表示「分析没有在这一级落结论」，**不表示样本安全**。
+- 测试与覆盖率数字来自 M8 窗口的重测量；你验收的 commit 若不同，以你本机
+  `uv run --no-sync pytest -q` 的实际结果为准。
+
+## 5. 评分表填写说明与提交格式
+
+### 5.1 打分规则
+
+- 六个维度、两套权重（GitHub / Upwork）与 0–4 分定义沿用
+  [基线评估](portfolio-readiness-2026-11-15.md)；空白表在
+  [准备包 §5.2–5.3](m10-acceptance-pack.md)。
+- 等级含义：0＝未见证据；1＝初步证据；2＝局部可用、仍有实质缺口；
+  3＝在声明环境内有完整演示或复现记录；4＝在限定范围内经过评审并有边界验证。
+  4 不表示软件无缺陷。
+- 每项贡献 = 分值 ÷ 4 × 平台权重；六项求和即平台总分，保留一位小数。
+- **两个平台分别 ≥90% 才算达到 M10 评分目标**；平均分不能替代。
+- **分数不能抵消阻断缺陷**：证据链断裂、数据隔离失败、真实模型披露不实、
+  首次安装有阻断缺陷——任一存在即判 M10 不通过（见[准备包 §5.4](m10-acceptance-pack.md)）。
+- 打分只依据你自己的验收记录；引用作者报告的数字时注明「作者自述，未独立复现」
+  或附上你的复现命令。
+
+### 5.2 卡点记录格式
+
+每个卡点一条，格式与[准备包 §3.7](m10-acceptance-pack.md) 一致：
+
+```text
+卡点编号：
+发生步骤（§3.x / 验收项 ID）：
+环境（OS / Python / uv / JDK / Docker / commit）：
+执行的命令：
+退出码：
+实际输出（完整原文，脱敏后）：
+预期（引用文档哪一节、哪一句）：
+是否可以重试：
+是否阻断后续步骤：
+附件路径（不入仓库）：
+作者修复 commit：
+复验结果（通过 / 不通过 / 未验证）：
+```
+
+### 5.3 提交格式
+
+向验收发起人交回**一份**[验收记录模板](m10-review-record-template.md)的填写件，
+包含：
+
+1. **记录元数据**（模板 §1）：角色、commit hash、OS、Python/uv/JDK/Docker 版本、
+   后端可用性、是否使用了作者补充步骤。
+2. **首次读者会话记录**（模板 §2）：A/B/D 组逐项的命令、退出码、关键输出、耗时、
+   卡点编号，以及总结栏（两段总耗时、需要作者补充的步骤、最影响理解/信任的一处、
+   建议优先修复的三项）。
+3. **卡点记录**（模板 §3）：每卡点一条，按 §5.2 格式。
+4. **客户视角审阅备忘**（模板 §4）：三问结论、抽查的 3 条引用、红旗清单。
+5. **源码评审记录**（模板 §5，仅当你是源码评审者）：逐里程碑结论与最终门禁。
+6. **重评记录**（模板 §6）：GitHub / Upwork 两张评分表填满，附每项扣分原因。
+
+原始日志、截图和证据包留在你自己的机器上，**不要**上传；仓库与提交记录只接收
+脱敏后的文字。若验收发起人要求归档，按其指定渠道提交，不要自行 push 到仓库。
+
+### 5.4 时间参考
+
+- 到第一份报告：首次 10–20 分钟（含下载），暖缓存约 30 秒。
+- Docker 镜像构建：约 2 分钟。
+- 完整案例（analyze 到 xrefs）：约 1–2 分钟。
+- 40 项逐项判定 + 两平台打分：视抽查深度，建议预留半天。
+
+## 6. 常见问题
+
+**Q：某一步的预期输出和我的实际输出不一致，先改环境还是先记录？**
+先记录。差异本身就是验收发现；只有确认是自己的环境问题（如后端没装、
+PATH 没配）才修复后重试，并把两次输出都留下。
+
+**Q：某个后端装不上怎么办？**
+不要停。这正是 A6 / G2 的验收场景：确认分析仍完成、报告写明该后端
+`not_installed`、没有崩溃或静默省略，然后把装不上的原因写成卡点。
+
+**Q：我可以用作者提供的脚本一键跑通全部步骤吗？**
+不可以。本包的每条命令都要你亲手执行；作者未在文档中公开的任何步骤，用了
+就使相关验收项不能判通过。
+
+**Q：遇到文档没写的报错？**
+按 §5.2 记录卡点：完整命令、退出码、原始输出、你期望的依据（文档哪一节）。
+然后问验收发起人，不要自行猜测项目的意图。
