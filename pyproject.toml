@@ -121,6 +121,7 @@ ignore_names = [
     "launcher_dies_before_the_kill",
     "the_kill_cannot_find_the_tree",
     "the_kill_itself_fails",
+    "seeded_workspace",
 ]
 
 [project.scripts]

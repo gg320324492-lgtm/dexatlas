@@ -56,6 +56,7 @@ from dataclasses import dataclass
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DOCS = [
     REPO / "docs" / "analysis-provenance.md",
+    REPO / "docs" / "architecture" / "public-contracts.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
     REPO / "docs" / "benchmarks" / "large-apk.md",
 ]

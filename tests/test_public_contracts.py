@@ -1,0 +1,583 @@
+"""The public contracts, as tests.
+
+``docs/architecture/public-contracts.md`` states what DexAtlas promises the
+outside world: the REST routes and their shapes, the MCP tools, the CLI exit
+codes, the report schema and the meanings of the counts. This module turns
+those statements into assertions, so a contract cannot drift quietly — a
+change to any of them fails here first, and the person making the change has
+to say so in the CHANGELOG.
+
+The contracts are exercised against the real interfaces: the routes are read
+off the FastAPI application, the MCP tools are listed over the protocol, and
+the CLI exit codes are triggered through the same runner the rest of the
+suite uses. No third-party backend is required: the workspace is seeded
+directly, the way ``tests/test_cli.py`` seeds its project.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import unittest.mock
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+from mcp.client import Client
+from typer.testing import CliRunner
+
+from dexatlas.api.app import app
+from dexatlas.cli.main import (
+    EXIT_AMBIGUOUS,
+    EXIT_BAD_REQUEST,
+    EXIT_EMPTY,
+    EXIT_FAILED,
+    EXIT_TRUNCATED,
+)
+from dexatlas.cli.main import app as cli_app
+from dexatlas.config.settings import get_settings
+from dexatlas.core.models import (
+    ApkMetadata,
+    ClassKind,
+    ClassRef,
+    EvidenceLevel,
+    MethodRef,
+    MethodReference,
+    Project,
+    ProjectStatus,
+    Provenance,
+    ToolError,
+    ToolErrorCode,
+)
+from dexatlas.core.pipeline import AnalysisFailed, AnalysisResult, Analyzer
+from dexatlas.core.storage import Store, SymbolCounts
+from dexatlas.mcp.schemas import DATA_NOTICE, DEFAULT_LIMIT, MAX_LIMIT, UntrustedText
+from dexatlas.mcp.server import build_server
+from dexatlas.reports.evidence_package import _REPORT_PATHS, NOT_INCLUDED, PACKAGE_SCHEMA_VERSION
+
+runner = CliRunner()
+
+#: The project id of the seeded workspace: derived from the seed hash, the way
+#: every project id is.
+SEED_SHA256 = "0123456789abcdef" * 4
+SEED_PID = f"apk_{SEED_SHA256[:16]}"
+
+#: A second project, whose method name is shared by two overloads. The exit
+#: code for asking for it by name alone is the ambiguous one.
+OVERLOAD_SHA256 = "b" * 64
+OVERLOAD_PID = f"apk_{OVERLOAD_SHA256[:16]}"
+
+#: Every route the REST API serves, as (method, path). A route that appears
+#: here is published; a route that disappears is a breaking change.
+EXPECTED_REST_ROUTES = {
+    ("GET", "/health"),
+    ("GET", "/backends"),
+    ("POST", "/analyze"),
+    ("GET", "/projects"),
+    ("GET", "/projects/{project_id}"),
+    ("DELETE", "/projects/{project_id}"),
+    ("GET", "/projects/{project_id}/runs"),
+    ("GET", "/projects/{project_id}/runs/{run_id}"),
+    ("POST", "/projects/{project_id}/cancel"),
+    ("GET", "/projects/{project_id}/manifest"),
+    ("GET", "/projects/{project_id}/classes"),
+    ("GET", "/projects/{project_id}/methods"),
+    ("GET", "/projects/{project_id}/resources"),
+    ("GET", "/projects/{project_id}/resource-references"),
+    ("GET", "/projects/{project_id}/classes/{class_name:path}/source"),
+    ("GET", "/projects/{project_id}/methods/{class_name:path}/{method_name}"),
+    ("GET", "/projects/{project_id}/xrefs/{method_id:path}"),
+    ("GET", "/projects/{project_id}/search"),
+    ("GET", "/projects/{project_id}/evidence"),
+    ("GET", "/projects/{project_id}/report"),
+    ("GET", "/uploads"),
+    ("DELETE", "/uploads/{sha256}"),
+    ("POST", "/uploads/cleanup"),
+}
+
+#: The headers a source response carries beside its body.
+EXPECTED_SOURCE_HEADERS = {
+    "X-DexAtlas-Source-Kind",
+    "X-DexAtlas-Source-Tool",
+    "X-DexAtlas-Source-Locator",
+    "X-DexAtlas-Source-Tool-Version",
+}
+
+#: The ten read-only tools, and nothing else.
+EXPECTED_MCP_TOOLS = {
+    "list_projects",
+    "get_project_status",
+    "get_manifest",
+    "search_symbols",
+    "get_class_source",
+    "get_method_source",
+    "find_callers",
+    "find_callees",
+    "get_evidence",
+    "resolve_locator",
+}
+
+#: The CLI's exit codes, as the epilog states them.
+EXPECTED_EXIT_CODES = {
+    0: "the command did what was asked",
+    EXIT_EMPTY: "the answer is empty",
+    EXIT_BAD_REQUEST: "the request was wrong",
+    EXIT_FAILED: "the analysis itself failed",
+    EXIT_AMBIGUOUS: "the answer is ambiguous",
+    EXIT_TRUNCATED: "a limit cut a step short",
+}
+
+#: The fields of a project response, in the order the schema declares them.
+EXPECTED_PROJECT_FIELDS = {
+    "id",
+    "status",
+    "apk_sha256",
+    "apk_path",
+    "apk_size_bytes",
+    "class_count",
+    "method_count",
+    "reference_count",
+    "call_site_count",
+    "call_edge_count",
+    "evidence_count",
+    "resource_count",
+    "tool_versions",
+    "errors",
+}
+
+#: The top-level fields of the JSON report.
+EXPECTED_REPORT_FIELDS = {
+    "schema_version",
+    "generated_at",
+    "project",
+    "run",
+    "latest_attempt_status",
+    "tools",
+    "errors",
+    "manifest",
+    "evidence",
+    "summary",
+}
+
+#: The fields of the evidence package's manifest.
+EXPECTED_PACKAGE_MANIFEST_FIELDS = {
+    "schema_version",
+    "project_id",
+    "apk_sha256",
+    "run_id",
+    "package_generated_at",
+    "tool_versions",
+    "files",
+    "not_included",
+}
+
+#: What a backend failure can be recorded as.
+EXPECTED_TOOL_ERROR_CODES = {
+    "not_installed",
+    "timeout",
+    "exit_nonzero",
+    "parse_error",
+    "unsupported",
+    "output_truncated",
+    "analysis_failed",
+}
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """An isolated workspace, the way the CLI tests make one."""
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    monkeypatch.setenv("DEXATLAS_WORKSPACE", str(ws))
+    get_settings.cache_clear()
+    try:
+        yield ws
+    finally:
+        get_settings.cache_clear()
+
+
+def _provenance(sha256: str, locator: str) -> list[Provenance]:
+    return [Provenance(tool="androguard", apk_sha256=sha256, locator=locator)]
+
+
+def _seed_workspace(ws: Path) -> None:
+    """A completed project and an overloaded one, written straight to the store.
+
+    Seeding keeps the contract tests independent of the analysis backends: a
+    machine with none of them installed still has to be able to check that
+    the interfaces keep their shapes.
+    """
+    store = Store.open(get_settings().database_path)
+    project = Project(
+        id=Project.new_id(SEED_SHA256),
+        apk=ApkMetadata(sha256=SEED_SHA256, size_bytes=4096, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=1,
+        method_count=2,
+        reference_count=1,
+        call_edge_count=1,
+    )
+    store.save_project(project, ws / "projects" / project.id, manifest=None)
+    store.save_symbols(
+        project.id,
+        [
+            ClassRef(
+                name="com.example.demo.MainActivity",
+                kind=ClassKind.CLASS,
+                provenance=_provenance(SEED_SHA256, "androguard:classes.dex#MainActivity"),
+            )
+        ],
+        [
+            MethodRef(
+                class_name="com.example.demo.MainActivity",
+                name="onCreate",
+                descriptor="(Landroid/os/Bundle;)V",
+                provenance=_provenance(SEED_SHA256, "androguard:classes.dex#MainActivity"),
+            ),
+            MethodRef(
+                class_name="com.example.demo.MainActivity",
+                name="toString",
+                descriptor="()Ljava/lang/String;",
+                provenance=_provenance(SEED_SHA256, "androguard:classes.dex#MainActivity"),
+            ),
+        ],
+        [],
+        [
+            # One caller, calling once: one call site, one call edge. The two
+            # counts are part of the xref contract, and a seeded row is what
+            # the endpoint reads them from.
+            MethodReference(
+                caller="com.example.demo.Other.onCreate(Landroid/os/Bundle;)V",
+                callee="com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V",
+            )
+        ],
+        [],
+    )
+
+    overloaded = Project(
+        id=Project.new_id(OVERLOAD_SHA256),
+        apk=ApkMetadata(sha256=OVERLOAD_SHA256, size_bytes=1, path=Path("overloaded.apk")),
+        status=ProjectStatus.COMPLETED,
+    )
+    store.save_project(overloaded, ws / "projects" / overloaded.id, manifest=None)
+    store.save_symbols(
+        overloaded.id,
+        [
+            ClassRef(
+                name="com.example.Crypto",
+                kind=ClassKind.CLASS,
+                provenance=_provenance(OVERLOAD_SHA256, "androguard:classes.dex#Crypto"),
+            )
+        ],
+        [
+            MethodRef(
+                class_name="com.example.Crypto",
+                name="sign",
+                descriptor=descriptor,
+                provenance=_provenance(OVERLOAD_SHA256, "androguard:classes.dex#Crypto"),
+            )
+            for descriptor in ("(I)V", "(Ljava/lang/String;)V")
+        ],
+        [],
+        [],
+        [],
+    )
+
+
+@pytest.fixture
+def seeded_workspace(workspace: Path) -> Path:
+    _seed_workspace(workspace)
+    return workspace
+
+
+@pytest.fixture
+def client(seeded_workspace: Path) -> Iterator[TestClient]:
+    """A REST client over the seeded workspace."""
+    app.dependency_overrides[get_settings] = get_settings
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def seeded_analyzer(seeded_workspace: Path) -> Analyzer:
+    return Analyzer()
+
+
+# ---------------------------------------------------------------------------
+# The REST contract
+# ---------------------------------------------------------------------------
+
+
+#: Routes FastAPI adds by itself. They are the framework's, not the contract's.
+FRAMEWORK_ROUTES = {
+    ("GET", "/docs"),
+    ("HEAD", "/docs"),
+    ("GET", "/redoc"),
+    ("HEAD", "/redoc"),
+    ("GET", "/openapi.json"),
+    ("HEAD", "/openapi.json"),
+    ("GET", "/docs/oauth2-redirect"),
+    ("HEAD", "/docs/oauth2-redirect"),
+}
+
+
+def test_the_rest_route_table_is_the_contract() -> None:
+    """Every published route is on the app, and the app serves nothing else."""
+    served = {
+        (method, route.path) for route in app.routes for method in getattr(route, "methods", set())
+    }
+    assert served - FRAMEWORK_ROUTES == EXPECTED_REST_ROUTES, (
+        "the published REST surface changed — update "
+        "docs/architecture/public-contracts.md and the CHANGELOG"
+    )
+
+
+def test_the_source_endpoints_declare_their_provenance_headers() -> None:
+    """The schema says which headers a source response carries.
+
+    OpenAPI spells a starlette ``:path`` converter without the ``:path``.
+    """
+    schema = app.openapi()
+    for path in (
+        "/projects/{project_id}/classes/{class_name}/source",
+        "/projects/{project_id}/methods/{class_name}/{method_name}",
+    ):
+        headers = schema["paths"][path]["get"]["responses"]["200"].get("headers", {})
+        assert set(headers) >= EXPECTED_SOURCE_HEADERS, f"{path} lost a provenance header"
+
+
+def test_an_upload_is_answered_with_a_job(client: TestClient, minimal_apk: Path) -> None:
+    """``POST /analyze`` accepts and answers with a job, not with an analysis."""
+    response = client.post("/analyze", files={"file": ("tiny.apk", minimal_apk.read_bytes())})
+
+    assert response.status_code == 202
+    body = response.json()
+    assert set(body) == {"project_id", "status", "detail"}
+    assert body["project_id"].startswith("apk_")
+
+
+def test_the_project_response_carries_both_call_counts(client: TestClient) -> None:
+    """``call_site_count`` and ``reference_count`` are the same number, published twice."""
+    body = client.get(f"/projects/{SEED_PID}").json()
+
+    assert set(body) == EXPECTED_PROJECT_FIELDS
+    assert body["call_site_count"] == body["reference_count"]
+
+
+def test_the_xref_response_states_the_unit_of_its_total(client: TestClient) -> None:
+    """``total`` is a count of call sites, and the response says so."""
+    method_id = "com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V"
+    body = client.get(f"/projects/{SEED_PID}/xrefs/{method_id}").json()
+
+    assert body["total_unit"] == "call_sites"
+    assert body["total"] == body["call_sites"]
+    assert body["call_edges"] <= body["call_sites"]
+
+
+def test_the_json_report_is_schema_version_3(client: TestClient) -> None:
+    """The report's top level is the documented one, and says which version it is."""
+    body = client.get(f"/projects/{SEED_PID}/report", params={"format": "json"}).json()
+
+    assert body["schema_version"] == 3
+    assert set(body) == EXPECTED_REPORT_FIELDS
+
+
+def test_an_unknown_project_is_a_404_with_a_detail(client: TestClient) -> None:
+    body = client.get("/projects/apk_deadbeefdeadbeef")
+
+    assert body.status_code == 404
+    assert "detail" in body.json()
+
+
+def test_a_report_rejects_an_unknown_format(client: TestClient) -> None:
+    assert client.get(f"/projects/{SEED_PID}/report", params={"format": "xml"}).status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# The MCP contract
+# ---------------------------------------------------------------------------
+
+
+def test_the_mcp_tool_table_is_the_contract(seeded_analyzer: Analyzer) -> None:
+    """The tool list is the whole contract, and every tool is read-only."""
+
+    async def ask() -> tuple[set[str], bool]:
+        async with Client(build_server(seeded_analyzer)) as client:
+            listed = await client.list_tools()
+            names = {tool.name for tool in listed.tools}
+            read_only = all(
+                tool.annotations is not None
+                and tool.annotations.read_only_hint
+                and not tool.annotations.destructive_hint
+                for tool in listed.tools
+            )
+            return names, read_only
+
+    names, read_only = asyncio.run(ask())
+
+    assert names == EXPECTED_MCP_TOOLS
+    assert read_only
+
+
+def test_the_mcp_page_bounds_are_the_contract() -> None:
+    """A page is at most ``MAX_LIMIT`` rows, and defaults to ``DEFAULT_LIMIT``."""
+    assert MAX_LIMIT == 200
+    assert DEFAULT_LIMIT == 50
+    assert 1 <= DEFAULT_LIMIT <= MAX_LIMIT
+
+
+def test_apk_text_travels_with_the_data_notice() -> None:
+    """Every piece of an APK that reaches a caller says what it is."""
+    text = UntrustedText(text="some string from the apk")
+    assert text.notice == DATA_NOTICE
+    assert "untrusted" in DATA_NOTICE.lower()
+
+
+# ---------------------------------------------------------------------------
+# The CLI contract
+# ---------------------------------------------------------------------------
+
+
+def test_the_cli_exit_code_table_is_the_contract() -> None:
+    """The constants, their meanings in the epilog, and the epilog itself agree."""
+    from dexatlas.cli.main import EXIT_AMBIGUOUS as AMBIGUOUS
+    from dexatlas.cli.main import EXIT_BAD_REQUEST as BAD
+    from dexatlas.cli.main import EXIT_EMPTY as EMPTY
+    from dexatlas.cli.main import EXIT_FAILED as FAILED
+    from dexatlas.cli.main import EXIT_TRUNCATED as TRUNCATED
+
+    assert (EMPTY, BAD, FAILED, AMBIGUOUS, TRUNCATED) == (1, 2, 3, 4, 5)
+    epilog = cli_app.info.epilog or ""
+    for code, phrase in EXPECTED_EXIT_CODES.items():
+        assert str(code) in epilog, f"exit code {code} is not declared in the epilog"
+        assert phrase.split()[0] in epilog, f"exit code {code} loses its meaning"
+
+
+def test_cli_success_is_zero(seeded_workspace: Path) -> None:
+    assert runner.invoke(cli_app, ["version"]).exit_code == 0
+    assert runner.invoke(cli_app, ["projects"]).exit_code == 0
+
+
+def test_cli_an_empty_answer_is_one(seeded_workspace: Path) -> None:
+    """A project that is there, asked for something it does not hold."""
+    result = runner.invoke(cli_app, ["search", SEED_PID, "nothing-matches-this"])
+
+    assert result.exit_code == EXIT_EMPTY
+
+
+def test_cli_a_wrong_request_is_two(seeded_workspace: Path) -> None:
+    """An id that names nothing is a wrong request, not an empty answer."""
+    result = runner.invoke(cli_app, ["classes", "apk_nope"])
+
+    assert result.exit_code == EXIT_BAD_REQUEST
+    assert "No such project" in result.stderr
+
+
+def test_cli_an_ambiguous_method_is_four(seeded_workspace: Path) -> None:
+    """A name shared by two overloads is answered with the candidates and code 4."""
+    result = runner.invoke(
+        cli_app, ["source", OVERLOAD_PID, "com.example.Crypto", "--method", "sign"]
+    )
+
+    assert result.exit_code == EXIT_AMBIGUOUS
+    assert "(I)V" in result.output and "(Ljava/lang/String;)V" in result.output
+
+
+def test_cli_a_failed_analysis_is_three(seeded_workspace: Path, tmp_path: Path) -> None:
+    """The pipeline failing is its own exit code, distinct from empty and wrong."""
+    failure = AnalysisFailed(
+        ToolError(
+            tool="dexatlas",
+            code=ToolErrorCode.ANALYSIS_FAILED,
+            message="the workspace could not be written",
+        )
+    )
+    # ``analyze`` validates that the file exists before anything else, so the
+    # stub is handed a real path to a file it never reads.
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+
+    class _Failing:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> object:
+            raise failure
+
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _Failing):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == EXIT_FAILED
+
+
+def test_cli_a_truncated_analysis_is_five(seeded_workspace: Path, tmp_path: Path) -> None:
+    """A finished run with a capped step is its own exit code, and says so."""
+    truncated = Project(
+        id=Project.new_id("c" * 64),
+        apk=ApkMetadata(sha256="c" * 64, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        errors=[
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.OUTPUT_TRUNCATED,
+                message="output cut at the cap",
+            )
+        ],
+    )
+
+    class _Truncating:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> AnalysisResult:
+            return AnalysisResult(project=truncated, manifest=None)
+
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _Truncating):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == EXIT_TRUNCATED
+    assert str(EXIT_TRUNCATED) in result.output
+
+
+# ---------------------------------------------------------------------------
+# The shared shapes
+# ---------------------------------------------------------------------------
+
+
+def test_the_tool_error_codes_are_the_contract() -> None:
+    """A recorded failure carries one of these codes, and nothing else."""
+    assert {code.value for code in ToolErrorCode} == EXPECTED_TOOL_ERROR_CODES
+
+
+def test_the_evidence_levels_are_the_three() -> None:
+    assert {level.value for level in EvidenceLevel} == {"verified", "lead", "insufficient"}
+
+
+def test_the_symbol_counts_name_what_they_count() -> None:
+    """The count fields are the contract: sites and edges are different numbers."""
+    assert set(SymbolCounts.__dataclass_fields__) == {
+        "classes",
+        "methods",
+        "fields",
+        "call_sites",
+        "call_edges",
+        "resources",
+        "resource_references",
+    }
+
+
+def test_the_evidence_package_manifest_is_versioned() -> None:
+    """The manifest says which shape it is, and names what it leaves out."""
+    assert PACKAGE_SCHEMA_VERSION == 1
+    assert set(_REPORT_PATHS) == {"json", "markdown", "html"}
+    assert set(NOT_INCLUDED) == {"apk", "full_sources", "unrelated_strings"}
