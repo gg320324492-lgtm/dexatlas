@@ -278,11 +278,14 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     ``.gitignore`` excludes them, but an ignore rule is only a claim — this checks what
     git actually tracks.
 
-    The exception is DexAtlas's own test applications. They are first-party, built from
-    the smali sources committed beside them, and rebuildable with
-    ``scripts/build-test-apks.sh``. The allowed set is derived from what is on disk
-    rather than written out by hand, so a sample added without its sources — or a
-    third-party APK slipped into ``examples/`` — fails here.
+    The exceptions are DexAtlas's own test applications — first-party, built from the
+    smali sources committed beside them, rebuildable with ``scripts/build-test-apks.sh``
+    — and the case-study delivery packages under ``docs/case-studies/attachments/``,
+    which are generated from those same first-party samples by the documented
+    ``analyze --html`` / ``export`` commands and whose manifest hashes every file
+    they carry. The allowed set is derived from what is on disk rather than written
+    out by hand, so a sample added without its sources — or a third-party APK slipped
+    into either directory — fails here.
     """
     import subprocess
 
@@ -296,10 +299,11 @@ def test_no_third_party_apk_or_binary_is_committed() -> None:
     if result.returncode != 0:
         pytest.skip("not a git checkout")
 
-    examples = REPO_ROOT / "examples"
+    first_party_dirs = [REPO_ROOT / "examples", REPO_ROOT / "docs" / "case-studies" / "attachments"]
     allowed = {
         str(path.relative_to(REPO_ROOT)).replace("\\", "/")
-        for path in examples.rglob("*")
+        for directory in first_party_dirs
+        for path in directory.rglob("*")
         if path.is_file() and path.suffix.lower() in _ANALYSIS_ARTIFACT_SUFFIXES
     }
     assert allowed, "no first-party sample was found under examples/"

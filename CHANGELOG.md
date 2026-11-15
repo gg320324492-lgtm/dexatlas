@@ -45,6 +45,29 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **REST API 导出的报告丢失 APK 档案事实。** 项目行过去只存哈希与大小，
+  API 从行重建报告时 `ApkMetadata` 的 `dex_files` / `native_libraries` /
+  `has_signed_certificate` 全部落默认值——同一项目 CLI 报告写
+  `DEX files: 1`，API 报告写 `DEX files: 0`，违背案例 3「两种导出字节一致」
+  的声称。`SCHEMA_VERSION` 6→7，projects 表新增 `apk_metadata` JSON 列
+  （迁移按列缺失判定，旧行读作「未记录」而非零），写入方随 upsert 保存、
+  读取方优先从该列恢复。回归测试
+  `tests/test_api.py::test_the_api_report_carries_the_same_apk_metadata_as_the_cli`
+  在旧实现上先红（`[] == ['classes.dex', 'classes2.dex']`），修复后转绿。
+- **重复分析后 CLI 报告的 `created_at` 与存储行不一致。** `Project.create`
+  以当次分析时钟盖戳，而 upsert 不改写该列——重复分析后 CLI 报告（渲染自
+  内存模型）携带第二次的时间，API 报告（自存储行重建）携带第一次的时间，
+  两个传输对同一项目报出两个创建时间。发布前从存储回读项目（仅发布路径；
+  未发布路径保留内存模型，避免把失败分析误报为运行中），两个传输
+  陈述同一存储事实。回归测试
+  `tests/test_analysis_runs.py::test_a_re_analysis_reports_the_stored_created_at`
+  在旧实现上先红，修复后转绿。
+- **`androguard:AndroidManifest.xml` 出处无法被 `resolve_locator` 解析。**
+  SDK 级别证据（E-0001）自 74d4c55 起引用该 locator，但解析器把
+  `AndroidManifest.xml` 当 DEX 文件名对照 APK 的 dex 清单校验，永远拒绝——
+  MCP 的 `resolve_locator` 对自己产出的一条 verified 证据返回「不是该 APK
+  的 dex 文件」。修复：dex 白名单仅约束 `.dex` 后缀的 place；androguard
+  从 APK 内读取的其它位置（二进制 manifest）按其本名解析。
 - **`benchmarks/run.py --configuration no-*` 按题面配置过滤任务集**
   （m6-level3-recheck.md §6 的 harness 缺口）。旧实现只把所选配置加入
   Analyze 集，任务集仍返回全部 92 题，`_run_tasks` 随即在

@@ -25,7 +25,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:675-711` |
 | manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `ManifestInfo` | `tools/androguard/adapter.py:284-331`、`core/pipeline.py:535-585` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:526-542` |
-| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:602-763` 的 `class_source_document` / `method_source_document` |
+| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:720-881` 的 `class_source_document` / `method_source_document` |
 | 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:621-637` |
 | 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:403-456` |
 | 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:544-561` |
@@ -43,7 +43,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
   回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:1285-1302` 的 `_apply_decompilation`）。
   它是**状态**，不是结构——方法的签名、描述符、访问标志仍然全部来自 Androguard。
 - **Apktool 不产出任何符号。** 它产出 manifest、Smali 文件和资源表里的文本；
-  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:602-763` 的 `class_source` / `method_source`），
+  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:695-719` 的 `class_source` / `method_source`），
   资源字符串则进 `resources` 表，也进全文索引（见 5.4）。
 - **资源覆盖了一部分，不是全部。** Apktool 会把 `res/` 解码到工作区，`src/` 里现在**有**代码读它：
   `read_resources()` 读 `res/values*/` 下的文本声明（`tools/apktool/adapter.py:233-355`），
@@ -220,7 +220,7 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
 - **旧接口返回的 Smali 仍然不带出处。** `class_source` / `method_source`
   （`core/pipeline.py:695-718`）为了不破坏既有契约，仍然返回裸字符串，
   **返回值本身说不出这是 Apktool 的输出**。带出处的形式是
-  `class_source_document` / `method_source_document`（`core/pipeline.py:627-763`），
+  `class_source_document` / `method_source_document`（`core/pipeline.py:765-901`），
   它们返回 `SourceDocument`（`models.py:1025-1054`）：文本、表示形式（Java 还是 Smali）、
   以及 provenance 一起来。**只调旧接口的调用方仍然只能靠「工作区里有没有 jadx 目录」推断。**
 - **同一产物的多个来源之间没有主次标记。** `provenance` 是一个扁平的列表，
@@ -543,7 +543,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 这一行整个不出现——不是 0，是「没有这一说」。
 同理，方法表里的 `decompiled` 全部是 `false`：没有反编译器，就没有反编译出来的 Java。
 
-这时候 `class_source` 会落到 Smali（`core/pipeline.py:685-693`）：
+这时候 `class_source` 会落到 Smali（`core/pipeline.py:695-703`）：
 
 ```smali
 .class public final Lcom/example/demo/Crypto;
@@ -864,7 +864,7 @@ com.example.demo.SyncService class
 - **旧的 `class_source` / `method_source` 仍然不带 provenance。** 走回退路径时，
   这两个接口给调用方的只是一个字符串，不知道它来自 Apktool。
   带出处的形式是 `class_source_document` / `method_source_document`
-  （`core/pipeline.py:627-763`），CLI 和 REST API 用的都是这两个（见 3.3）。
+  （`core/pipeline.py:765-901`），CLI 和 REST API 用的都是这两个（见 3.3）。
 
 - **部分 manifest 的版本号和 SDK 版本不在解码后的 manifest 里。** Apktool 2.11.1
   解码五个自建样本时，`demo-app` 的两个版本属性被挪进 `apktool.yml`，另外四个样本的
@@ -1080,7 +1080,7 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 报告里看不到「谁调用了什么」这一层，只能在索引里查。
 
 **现在的行为：** 管道会为**这个 APK 自己的、被调用过的方法**各记一条证据
-（`core/pipeline.py:654` 调用 `core/evidence.py:414-443` 的
+（`core/pipeline.py:670` 调用 `core/evidence.py:414-443` 的
 `add_cross_references`）。粒度是**被调用的方法**，不是「调用」：
 一个被五十处调用的方法是**一条**结论。调用库代码（`java.lang.StringBuilder.append`）
 **不产生记录**——那是关于 JDK 的事实，不是关于这个应用的结论；

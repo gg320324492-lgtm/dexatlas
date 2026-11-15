@@ -313,7 +313,18 @@ class LocatorResolver:
     # -- the dex files ------------------------------------------------------
 
     def _resolve_dex(self, parsed: ParsedLocator) -> Resolution:
-        if self._dex_files and parsed.place not in self._dex_files:
+        # The dex-file names are checked against the APK's own list, so a
+        # locator cannot pass a foreign file off as part of this analysis.
+        # Androguard reads more than DEX out of the APK — the binary
+        # manifest is where the SDK levels come from — and such a place is
+        # still inside this analysis: it is a reading the backend made, not
+        # a dex file, and it is resolved as the file it is rather than
+        # refused for not being one.
+        if (
+            parsed.place.endswith(".dex")
+            and self._dex_files
+            and parsed.place not in self._dex_files
+        ):
             return Resolution(
                 False,
                 ResolutionReason.UNKNOWN_DEX,

@@ -358,6 +358,22 @@ class Analyzer:
             _check_cancelled(cancellation)
             if project.status is ProjectStatus.COMPLETED:
                 self._store.publish_run(project, run, staged, manifest)
+                # The result carries what the workspace now stores, not what
+                # this run's model held: ``Project.create`` stamped
+                # ``created_at`` with *this* analysis's clock, and a
+                # re-analysis that reported that stamp disagreed with the
+                # stored row -- and with the report the first run had
+                # written. The row is the authority.
+                #
+                # A run that found nothing is not published, and the model it
+                # built is the only record of what it saw, so the result
+                # keeps that model: reading back the row a `begin_run` wrote
+                # would report a failed analysis as one still running, with
+                # none of the errors it recorded.
+                stored = self._store.get_project(project.id)
+                if stored is not None:
+                    project = stored
+                    project.duration_seconds = elapsed
             # A run that found nothing has nothing to publish, and publishing
             # it would replace a snapshot that was complete with one that is
             # empty.

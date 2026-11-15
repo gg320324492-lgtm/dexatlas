@@ -359,6 +359,44 @@ def test_a_re_analysis_replaces_the_snapshot_as_a_whole(
     assert analyzer.store.get_published_run_id(project_id) == second.run.id
 
 
+def test_a_re_analysis_reports_the_stored_created_at(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A re-analysis's result carries the project's stored creation time.
+
+    ``Project.create`` stamps ``created_at`` with the moment *that* analysis
+    started. The stored row keeps the first stamp — the upsert does not
+    rewrite the column — but the pipeline used to return the new model, so a
+    fresh CLI report rendered from it disagreed with the API report rebuilt
+    from the row: two creation times for one project, and the CLI's named a
+    moment that was neither the project's first analysis nor its second.
+
+    The published project is read back from the store before the result is
+    built, so both transports state the same stored fact.
+    """
+    analyzer = Analyzer(settings)
+    _patch_dex_reader(monkeypatch, "com.fake.One")
+    _analyse(analyzer, minimal_apk)
+
+    # The id is the sha256 prefix of the fixture APK; read it from the store
+    # rather than spelling it, so the assertion follows the fixture.
+    (project_id,) = [p.id for p in analyzer.store.list_projects()]
+    first = analyzer.store.get_project(project_id)
+    assert first is not None
+    first_created_at = first.created_at
+
+    second = _analyse(analyzer, minimal_apk)
+
+    stored = analyzer.store.get_project(project_id)
+    assert stored is not None
+    assert stored.created_at == first_created_at, (
+        "re-analysis must not move the project's stored creation time"
+    )
+    assert second.project.created_at == first_created_at, (
+        "the result's project must carry the stored creation time, not this run's clock"
+    )
+
+
 # ---------------------------------------------------------------------------
 # One writer per run
 # ---------------------------------------------------------------------------

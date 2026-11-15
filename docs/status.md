@@ -20,8 +20,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · **v0.2.0**（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） |
-| 测试 | <!--fig:tests.total-->1497<!--/fig--> 个（<!--fig:tests.fast-->1351<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->91.8%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1505<!--/fig--> 个（<!--fig:tests.fast-->1358<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->91.9%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -111,7 +111,7 @@ Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表
 |---|---|---|
 | M5 基线校准 | **已完成** | [phase3-baseline.md](reports/phase3-baseline.md)：声明清单、三份 benchmark 由已提交 trace 重算、演示素材的 scripted/真实模型标注 |
 | M6 服务回归集 | **已完成（单轮验收线达标）** | 20 题已冻结在 `100b191`（[service-regression-set.md](benchmarks/service-regression-set.md)）；层级 0 确定性判分 **20/20**（零模型）；层级 1 scripted 演练完成（[m6-level1-scripted.md](benchmarks/m6-level1-scripted.md)）——scripted 是替身模型，成绩原样公开，只证明发题/trace/判分管线端到端可用，不是模型能力基线；层级 2 真实模型批次已完成（[m6-level2-real.md](benchmarks/m6-level2-real.md)，全部数字由脚本从 [m6-level2-traces.json](benchmarks/m6-level2-traces.json) 重算）：MiniMax-M3.1-Flash 对冻结 20 题独立跑 3 轮，DexAtlas 24/60（40.0%，逐轮 45%/40%/35%）、A 源码文本 24/60（40.0%）、B 结构化检索 18/60（30.0%）——**未达验收线（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103 tokens，超出本次授权的 800,000 上限 53,103，92 题全量轮因此未执行。诚实边界：agent 当前默认配置在该冻结集上未达验收线，服务承诺范围待失败模式分析后重定。失败模式分析已完成（[m6-level2-failure-analysis.md](benchmarks/m6-level2-failure-analysis.md)），修复后第一轮复测 DexAtlas 15/20（[m6-level2-retest.md](benchmarks/m6-level2-retest.md)）；五项根因修复后的第二轮复测（20 题完整分母，首轮 18 题 + 追加授权补跑 2 题，token 355,623）**DexAtlas 16/20 = 80.0%，达到验收线**（[m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)，A 7/20、B 7/20；层级 1 复验确认修复未破坏 scripted 路径，见 [m6-level1-recheck-after-fixes.md](benchmarks/m6-level1-recheck-after-fixes.md)） |
-| M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例的可下载报告/证据包附件尚未落盘（可用这两条命令生成），M10 验收前核对 |
+| M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例可下载报告/证据包附件已落盘（[attachments/](case-studies/attachments/)，2026-11-16 由文档内命令生成、`verify_package` 校验通过）；案例与代码逐项核对完成（2026-11-16）：三案例声称的命令、样例哈希、计数与证据记录均实跑核对一致，MCP 工具数等过期表述已纠正，API 报告丢失 APK 档案事实与重复分析 `created_at` 漂移两处真实缺陷已带红→绿回归修复 |
 | M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**已修复并合入**（d90baff，全命令 `--workspace/-w`、install.md 修正）；M8-4（三后端全失败但 manifest 可解析仍退出 0）已按[提案](proposals/exit-code-partial-read.md)修复：新增退出码 6（EXIT_NO_INDEX），0–5 语义不变（1f6ef05） |
 | M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；Upwork 英文素材为**草稿，未发布**（[outreach/](outreach/project-brief.md)） |
 | M10 独立验收 | **准备包就绪，验收未开始** | 40 项验收检查表（[m10-acceptance-pack.md](reports/m10-acceptance-pack.md)）、读者一站式入口（[m10-reader-package.md](reports/m10-reader-package.md)）与作者侧自动化自查（[m10-selfcheck.md](reports/m10-selfcheck.md)，40/40 通过；退出码 6 落地后 F1 期望滞后已修复并带回归测试）已合入；独立复现、准备度重评与 release candidate 未开始，需真实独立读者执行。准备度自评见[复评增补](reports/portfolio-readiness-2026-11-15-recheck.md) |
