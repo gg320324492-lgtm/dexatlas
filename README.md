@@ -38,7 +38,9 @@ still yields a manifest, an index and a report that says which steps did not run
 > its source review on 2026-11-14. Phase 3 is under way against the
 > [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
 > (client-ready deliverables) are done; M6 (bounded agent tasks) has its level-0
-> and level-1 drills complete with the real-model batch pending, and M8 (clean
+> and level-1 drills complete and its level-2 real-model batch run — which did
+> **not** meet the acceptance line (DexAtlas 40.0% over three rounds against
+> ≥80%; see the [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
 > the GitHub side with the Upwork materials still unpublished; M10 (independent
@@ -109,7 +111,7 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.2` | Acceptance Checklist      | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words                      |
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.2.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
-| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, real-model batch pending), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
+| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% vs the 80% acceptance line), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 
@@ -376,6 +378,16 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[M6 level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md)** — the
   end-to-end question/trace/scoring pass over the frozen set with the scripted
   stand-in provider; not a model-capability baseline
+- **[M6 level-2 real-model batch](docs/benchmarks/m6-level2-real.md)** — one named
+  model over the frozen 20 questions, 3 rounds, three configurations: DexAtlas
+  agent 24/60 (40.0%), A source-text 24/60, B structured retrieval 18/60 —
+  **below the ≥80%-per-round acceptance line; verdict "not passed"**. The 853,103
+  tokens spent exceeded the authorized 800,000 cap, so the full 92-question sweep
+  did not run. The configurations differ in budget and visible information, so
+  these numbers compare execution conditions, not model quality. What it means:
+  the agent's current default configuration does not meet the acceptance line on
+  this set, and the service-promise scope is to be re-decided after failure-mode
+  analysis
 
 ### Project records
 
@@ -463,7 +475,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the real-model batch awaits separate authorization |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line) — the service-promise scope is to be re-decided after failure-mode analysis |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit-code question is decided and recorded as a known limitation |
 | M9 | GitHub showcase (this page) and Upwork materials | **showcase done; materials unpublished** — this page and the [project brief](docs/outreach/project-brief.md) draft are in place; the Upwork materials are not published |

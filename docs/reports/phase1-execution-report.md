@@ -1057,7 +1057,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:5c363b4e225c853e55b280415e6964a023a6d2dbeb7c18068331c516b0430c0f",
+  "source_fingerprint": "sha256:d228182080e596616e23873086358f64c18445be34a56ecc6a32fd55d07ffcf1",
   "suite": {
     "failed": 0,
     "passed": 1447,
