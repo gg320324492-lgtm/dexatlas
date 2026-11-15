@@ -30,12 +30,29 @@ checked before each piece of work, not after. A task that runs out of budget
 says that it ran out of budget — it does not say it found nothing, and it
 does not say it finished.
 
+**The reading being complete stops it sooner.** A model that has read the
+fact its question needs can still go on reading — the M4 run spent a token
+budget on six successful calls and no answer. So the loop watches for the
+question's key reading (:mod:`dexatlas.agent.sufficiency`): once it is in,
+the next request says so and asks for the answer, a small grace of further
+reads is allowed, and then the tools are removed from the request and the
+model is asked again. A model that still will not answer stops the task as
+failed, with a reason. Closing the reading does not write the answer — the
+model still does, and its conclusion is still a lead.
+
+**A repeated call is not a new reading.** The workspace is read-only, so a
+call with the same tool and arguments cannot return anything new. It is
+answered from the earlier reading (the evidence id included), recorded as a
+repeat, and not made against the workspace. That is what keeps a model that
+is going in circles from spending the budget on the same answer twice.
+
 An interruption is not a failure: the state is written down and the task can
 be picked up where it stopped.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections.abc import Callable, Mapping
@@ -67,6 +84,7 @@ from dexatlas.agent.state import (
     TaskStatus,
     TaskStore,
 )
+from dexatlas.agent.sufficiency import ready_reason
 from dexatlas.agent.tool_executor import (
     SENSITIVE_TOOLS,
     ToolClient,
@@ -123,6 +141,38 @@ An empty conclusion list is an answer: it says the analysis does not settle
 the question.
 """
 
+#: How many more reads the model may make after the question's key fact is in.
+#:
+#: The reading being complete is not the same as the answer being written: a
+#: model may reasonably follow a call site or resolve a citation. Two is
+#: enough for that, and small enough that a model going in circles is stopped
+#: before it spends the budget.
+WRAP_UP_GRACE_CALLS = 2
+
+#: How many times the model is asked for its answer after the tools close.
+#:
+#: The tools are removed from the request, so an answer is the only thing it
+#: can produce. A model that still refuses after two asks stops the task as
+#: failed; it does not become a completed task with no answer.
+FINAL_ANSWER_ROUNDS = 2
+
+#: What the request says once the question's key reading is in.
+READY_DIRECTIVE = (
+    "The reading for this question is complete: {reason}. "
+    "Answer with the JSON document described above, using the evidence ids you "
+    "were given. Do not ask for more tool calls. If what you read does not "
+    'settle the question, say so in "limitations" — an answer that names what '
+    "is missing is the right answer."
+)
+
+#: What the request says when the tools have been closed.
+CLOSED_DIRECTIVE = (
+    "The tools are now closed: {reason}. No further tool call will be made. "
+    "Answer with the JSON document described above, from what you have already "
+    'read; if the reading does not settle the question, say so in "limitations". '
+    "A refusal to answer stops the task without one."
+)
+
 
 @runtime_checkable
 class ApprovalGate(Protocol):
@@ -147,6 +197,15 @@ class _Runtime:
     same ids twice, and a reader following ``E-0004`` would not know which
     record it was.
     """
+
+    wrap_up_calls: int = 0
+    """How many tool calls the model has made since the reading was complete."""
+
+    final: bool = False
+    """Whether the tools are closed and only an answer is accepted."""
+
+    final_tool_rounds: int = 0
+    """How many times the model asked for tools after they were closed."""
 
 
 class Orchestrator:
@@ -343,9 +402,18 @@ class Orchestrator:
                 self._emit(state, "budget", reason)
                 return
 
+            if self._tools_are_closed(state, runtime):
+                self._close_the_tools(state, runtime)
+
             pending = _unanswered_calls(state)
             if pending:
                 for call in pending:
+                    if runtime.final:
+                        self._refuse_closed_call(state, call)
+                        continue
+                    if self._reuse_answer(state, runtime, plan, call):
+                        continue
+                    was_wrapped = state.wrap_up_reason is not None
                     outcome = self._execute(
                         state,
                         plan,
@@ -358,16 +426,46 @@ class Orchestrator:
                     if outcome is None:
                         # The task is waiting for a confirmation.
                         return
-                    self._record_observation(state, call.name, call.id, outcome, runtime)
+                    self._record_observation(
+                        state,
+                        call.name,
+                        call.id,
+                        outcome,
+                        runtime,
+                        fingerprint=_call_fingerprint(call, state, plan),
+                    )
+                    if outcome.ok:
+                        self._mark_ready(state, plan)
+                    if was_wrapped:
+                        runtime.wrap_up_calls += 1
                 continue
 
-            request = self._build_request(state, plan)
+            request = self._build_request(state, plan, runtime)
             assert_instructions_are_clean(request)
             response = self._ask(request)
             state.charge(iterations=1, tokens=response.total_tokens)
             state.turns.append(
                 AssistantTurn(content=response.content, tool_calls=response.tool_calls)
             )
+
+            if runtime.final:
+                self._store.save(state)
+                if response.tool_calls:
+                    runtime.final_tool_rounds += 1
+                    self._refuse_every_call(state, response)
+                    self._store.save(state)
+                    if runtime.final_tool_rounds >= FINAL_ANSWER_ROUNDS:
+                        state.error = (
+                            "the model did not answer after the evidence for the question "
+                            "was complete: it kept asking for tool calls with the tools closed"
+                        )
+                        state.transition(TaskStatus.FAILED)
+                        self._emit(state, "failed", state.error)
+                        return
+                    continue
+                self._finish(state, plan, response, runtime)
+                return
+
             self._refuse_extra_calls(state, response, runtime)
             self._store.save(state)
 
@@ -380,6 +478,96 @@ class Orchestrator:
                 "tool_requested",
                 f"the model asked for {len(response.tool_calls)} tool call(s)",
             )
+
+    def _tools_are_closed(self, state: TaskState, runtime: _Runtime) -> bool:
+        """Whether the reading is complete and the grace has been spent."""
+        return state.wrap_up_reason is not None and runtime.wrap_up_calls >= WRAP_UP_GRACE_CALLS
+
+    def _close_the_tools(self, state: TaskState, runtime: _Runtime) -> None:
+        """Close the tools, once, and say so."""
+        if runtime.final:
+            return
+        runtime.final = True
+        self._emit(
+            state,
+            "tools_closed",
+            "the evidence for the question is complete; the tools are closed and the "
+            "model is asked for its answer",
+        )
+
+    def _mark_ready(self, state: TaskState, plan: Plan) -> None:
+        """Note that the question's key reading is in, and say what it was."""
+        if state.wrap_up_reason is not None:
+            return
+        reason = ready_reason(plan, state)
+        if reason is None:
+            return
+        state.wrap_up_reason = reason
+        self._emit(state, "evidence_ready", reason)
+
+    def _reuse_answer(
+        self,
+        state: TaskState,
+        runtime: _Runtime,
+        plan: Plan,
+        call: ToolCall,
+    ) -> bool:
+        """Answer a repeated call from the reading the task already holds.
+
+        The analysis is read-only, so an identical call cannot get a
+        different answer. The repeat is recorded as an answered call, with
+        the earlier call named, so the model sees that nothing new happened
+        and the report can count it.
+        """
+        fingerprint = _call_fingerprint(call, state, plan)
+        original = _original_answer(state, fingerprint)
+        if original is None:
+            return False
+        state.turns.append(
+            Observation(
+                tool=call.name,
+                call_id=call.id,
+                content=_duplicate_content(call.name, original),
+                ok=True,
+                fingerprint=fingerprint,
+                duplicate_of=original.call_id,
+            )
+        )
+        if state.wrap_up_reason is not None:
+            runtime.wrap_up_calls += 1
+        self._emit(
+            state,
+            "duplicate_call",
+            f"{call.name} was asked again with the same arguments; the earlier reading "
+            "was reused instead of calling the tool again",
+        )
+        return True
+
+    def _refuse_closed_call(self, state: TaskState, call: ToolCall) -> None:
+        """Answer a call made after the tools were closed.
+
+        The refusal is an observation, not an exception: every call in the
+        transcript stays answered, and the model is told what to do instead.
+        """
+        state.turns.append(
+            Observation(
+                tool=call.name,
+                call_id=call.id,
+                content=_closed_content(call.name, state.wrap_up_reason or ""),
+                ok=False,
+                error="the tools are closed: the reading for the question is complete",
+            )
+        )
+        self._emit(
+            state,
+            "tool_refused",
+            f"{call.name} was refused: the tools are closed and the model must answer",
+        )
+
+    def _refuse_every_call(self, state: TaskState, response: ModelResponse) -> None:
+        """Answer every call of a turn made after the tools were closed."""
+        for call in response.tool_calls:
+            self._refuse_closed_call(state, call)
 
     def _refuse_extra_calls(
         self,
@@ -550,6 +738,8 @@ class Orchestrator:
         call_id: str,
         outcome: ToolOutcome,
         runtime: _Runtime,
+        *,
+        fingerprint: str = "",
     ) -> None:
         """Turn what a tool read into evidence, and put it in the transcript.
 
@@ -571,6 +761,7 @@ class Orchestrator:
                 content=content,
                 ok=outcome.ok,
                 error=outcome.record.error,
+                fingerprint=fingerprint,
             )
         )
         self._store.save(state)
@@ -632,19 +823,29 @@ class Orchestrator:
 
     # -- the model -----------------------------------------------------------
 
-    def _build_request(self, state: TaskState, plan: Plan) -> ModelRequest:
+    def _build_request(self, state: TaskState, plan: Plan, runtime: _Runtime) -> ModelRequest:
         """The request the model is asked.
 
         The instructions and the question are the only things the model is
         *told*. Everything the tools read is in the turns, as observations,
         and the check that follows refuses a request whose instructions carry
         any of it.
+
+        Once the question's key reading is in, the instructions say so and
+        ask for the answer. Once the grace is spent, the tools are removed
+        from the request altogether: an answer is then the only thing the
+        model can produce.
         """
         objective = self._planner.objective(state.question)
+        instructions = f"{INSTRUCTIONS}\nThe task: {objective}"
+        closed = runtime.final
+        if state.wrap_up_reason is not None:
+            directive = CLOSED_DIRECTIVE if closed else READY_DIRECTIVE
+            instructions = f"{instructions}\n\n{directive.format(reason=state.wrap_up_reason)}"
         return ModelRequest(
-            instructions=f"{INSTRUCTIONS}\nThe task: {objective}",
+            instructions=instructions,
             question=state.question,
-            tools=self._tool_specs(plan),
+            tools=() if closed else self._tool_specs(plan),
             turns=tuple(state.turns),
             max_tokens=plan.limits.max_tokens,
         )
@@ -1075,6 +1276,94 @@ def _record_from_analysis(payload: Any, builder: EvidenceBuilder) -> Evidence | 
 def _has_observation(state: TaskState, tool: str) -> bool:
     """Whether the task has already heard from a tool."""
     return any(isinstance(turn, Observation) and turn.tool == tool for turn in state.turns)
+
+
+def _call_fingerprint(call: ToolCall, state: TaskState, plan: Plan) -> str:
+    """What a call asks for: the tool and its arguments, as one digest.
+
+    The project the call is about is filled in before the digest, because a
+    call that names the task's project and one that leaves it to the task are
+    the same call. The digest is short and stored with the observation; it is
+    not a secret and it is not shown to the model.
+    """
+    arguments = dict(call.arguments)
+    project_id = state.project_id or plan.project_id
+    if project_id and "project_id" not in arguments:
+        arguments["project_id"] = project_id
+    payload = json.dumps({"tool": call.name, "arguments": arguments}, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _original_answer(state: TaskState, fingerprint: str) -> Observation | None:
+    """The earlier successful reading of this exact call, if there is one.
+
+    A failed call is not an answer, and a reused answer is not a reading of
+    its own: only an original, successful observation is a candidate.
+    """
+    for turn in reversed(state.turns):
+        if (
+            isinstance(turn, Observation)
+            and turn.fingerprint == fingerprint
+            and turn.ok
+            and not turn.duplicate_of
+        ):
+            return turn
+    return None
+
+
+def _duplicate_content(tool: str, original: Observation) -> str:
+    """What the model is told when a repeated call is answered from the transcript.
+
+    The earlier answer is not repeated in full: it is already in the
+    transcript, and repeating a source file would spend the token budget on
+    a second copy of what the model has. The note says what happened and
+    names the evidence id, which is what the model needs in order to answer.
+    """
+    document: dict[str, Any] = {
+        "ok": True,
+        "tool": tool,
+        "duplicate": True,
+        "duplicate_of_call_id": original.call_id,
+        "note": (
+            "this exact call was already made in this task, and the analysis has not "
+            "changed since. Its answer is in the transcript above; asking it again "
+            "returns the same answer. Use the evidence you already have, or ask a "
+            "different question."
+        ),
+    }
+    evidence_id = _evidence_id_in(original.content)
+    if evidence_id:
+        document["evidence_id"] = evidence_id
+    return json.dumps(document, sort_keys=True)
+
+
+def _closed_content(tool: str, reason: str) -> str:
+    """What the model is told when it asks for a tool after the tools close."""
+    return json.dumps(
+        {
+            "ok": False,
+            "tool": tool,
+            "error": (
+                "the evidence for this question is complete and no further tool call "
+                "will be made. Answer with the JSON document from what you have "
+                'already read, or say in "limitations" what the reading does not settle.'
+            ),
+            "reading_complete": reason,
+        },
+        sort_keys=True,
+    )
+
+
+def _evidence_id_in(content: str) -> str:
+    """The evidence id an observation carries, if it carries one."""
+    try:
+        document = json.loads(content)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(document, dict):
+        return ""
+    identifier = document.get("evidence_id")
+    return identifier if isinstance(identifier, str) else ""
 
 
 def _unanswered_calls(state: TaskState) -> list[ToolCall]:

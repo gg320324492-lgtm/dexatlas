@@ -117,14 +117,33 @@ class BudgetExceeded(Exception):
 class Budget:
     """What one task may spend."""
 
-    max_tokens: int = 20_000
-    """How many tokens the model may use, in total."""
+    max_tokens: int = 120_000
+    """How many tokens the model may use, in total.
 
-    max_iterations: int = 8
-    """How many times the task may go round the loop."""
+    The default is the configuration the M4 re-verification completed tasks
+    under. Under the old 20,000 the longest recorded task spent 66,361
+    tokens over 14 iterations and had still not answered; the two tasks that
+    did answer used 10,455 and 15,211. The ceiling is therefore about twice
+    the largest recorded run, not a target.
+    """
+
+    max_iterations: int = 16
+    """How many times the task may go round the loop.
+
+    The completed M4 tasks used four and five iterations; the longest
+    recorded run reached 14 and was still reading. Sixteen leaves room for
+    the convergence path (a grace read and a final ask) without paying for
+    an open-ended loop. A task that goes this far has not converged, and
+    more iterations of the same behaviour would not make it.
+    """
 
     max_seconds: float = 120.0
-    """How long the task may run, in seconds."""
+    """How long the task may run, in seconds.
+
+    No recorded run exhausted the time budget, so it is unchanged. It stays
+    the bound that a slow endpoint hits first, and an operator can raise it
+    through ``DEXATLAS_AGENT_MAX_SECONDS``.
+    """
 
 
 @dataclass(slots=True)
@@ -177,11 +196,27 @@ class Plan:
     allowed_tools: tuple[str, ...] = ()
     """The tools the task may call. Nothing else is callable."""
 
-    max_steps: int = 8
-    """How many tool calls the task may make."""
+    max_steps: int = 40
+    """How many tool calls the task may make.
+
+    The planner writes this number; the default is the fallback for a plan
+    read back without one. It covers the model's calls, the plan's own
+    status reads and the verifier's evidence lookups, which is why it is
+    larger than the iteration budget: only the model's calls spend
+    iterations.
+    """
 
     max_sensitive_calls: int = 1
     """How many sensitive calls may be made before a person is asked."""
+
+    intents: tuple[str, ...] = ()
+    """What kinds of question the plan was made for.
+
+    The stopping strategy reads this: a manifest question is complete when
+    the manifest has been read, a callers question when the callers have.
+    An older saved plan has no intents, and is treated as a general
+    question.
+    """
 
     limits: Budget = field(default_factory=Budget)
 
@@ -268,6 +303,16 @@ class TaskState:
     again.
     """
 
+    wrap_up_reason: str | None = None
+    """Why the task stopped reading, once the question's key fact was in.
+
+    The reason is written down rather than held in the loop: a task that is
+    picked up again carries the convergence it reached, and the report can
+    say what closed the reading without replaying the transcript. The
+    boundary is unchanged — closing the reading does not write the answer;
+    the model still writes it, and its conclusion is still a lead.
+    """
+
     error: str | None = None
     created_at: str = ""
     updated_at: str = ""
@@ -350,6 +395,7 @@ class TaskState:
             },
             "usage": self.usage.as_dict(),
             "sensitive_calls": self.sensitive_calls,
+            "wrap_up_reason": self.wrap_up_reason,
             "approved_calls": list(self.approved_calls),
             "pending_approval": (
                 {
@@ -401,6 +447,7 @@ class TaskState:
                 seconds=float(usage.get("seconds", 0.0)),
             ),
             sensitive_calls=int(document.get("sensitive_calls", 0)),
+            wrap_up_reason=document.get("wrap_up_reason"),
             pending_approval=(
                 ApprovalRequest(
                     step=int(pending["step"]),
@@ -445,6 +492,7 @@ def _plan_as_dict(plan: Plan | None) -> dict[str, Any] | None:
         "allowed_tools": list(plan.allowed_tools),
         "max_steps": plan.max_steps,
         "max_sensitive_calls": plan.max_sensitive_calls,
+        "intents": list(plan.intents),
         "limits": {
             "max_tokens": plan.limits.max_tokens,
             "max_iterations": plan.limits.max_iterations,
@@ -471,7 +519,10 @@ def _plan_from_dict(document: dict[str, Any] | None) -> Plan | None:
             for step in document.get("steps") or []
         ),
         allowed_tools=tuple(str(tool) for tool in document.get("allowed_tools") or []),
-        max_steps=int(document.get("max_steps", 8)),
+        intents=tuple(str(intent) for intent in document.get("intents") or []),
+        # The planner writes this number into every plan it makes; the
+        # fallback is only for a document that does not carry it.
+        max_steps=int(document.get("max_steps", 40)),
         max_sensitive_calls=int(document.get("max_sensitive_calls", 1)),
         limits=Budget(
             max_tokens=int(limits.get("max_tokens", Budget().max_tokens)),
@@ -491,6 +542,8 @@ def _turn_as_dict(turn: AssistantTurn | Observation) -> dict[str, Any]:
             "content": turn.content,
             "ok": turn.ok,
             "error": turn.error,
+            "fingerprint": turn.fingerprint,
+            "duplicate_of": turn.duplicate_of,
         }
     return {
         "kind": "assistant",
@@ -511,6 +564,8 @@ def _turn_from_dict(document: dict[str, Any]) -> AssistantTurn | Observation:
             content=str(document.get("content", "")),
             ok=bool(document.get("ok", True)),
             error=document.get("error"),
+            fingerprint=str(document.get("fingerprint", "")),
+            duplicate_of=str(document.get("duplicate_of", "")),
         )
     return AssistantTurn(
         content=str(document.get("content", "")),

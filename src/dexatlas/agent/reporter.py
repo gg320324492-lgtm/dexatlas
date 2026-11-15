@@ -86,6 +86,24 @@ class AgentReport:
         """The findings that could not be settled either way."""
         return tuple(item for item in self.findings if item.level is EvidenceLevel.INSUFFICIENT)
 
+    @property
+    def repeated_calls(self) -> int:
+        """How many identical calls were answered from the earlier reading."""
+        return sum(1 for event in self.events if event.kind == "duplicate_call")
+
+    @property
+    def evidence_ready(self) -> str | None:
+        """Why reading stopped, once the question's key fact was in."""
+        for event in reversed(self.events):
+            if event.kind == "evidence_ready":
+                return event.message
+        return None
+
+    @property
+    def tools_closed(self) -> bool:
+        """Whether the tools were closed to ask for the answer."""
+        return any(event.kind == "tools_closed" for event in self.events)
+
 
 def build_agent_json(report: AgentReport) -> dict[str, Any]:
     """The agent's report, as a JSON document.
@@ -119,12 +137,47 @@ def build_agent_json(report: AgentReport) -> dict[str, Any]:
         },
         "limitations": list(report.limitations),
         "events": [event.as_dict() for event in report.events],
+        # How the task stopped reading. It is additive to the document's
+        # schema: a reader that does not know the key ignores it, and the
+        # events it summarises are still there in full.
+        "convergence": {
+            "evidence_ready": report.evidence_ready,
+            "repeated_calls": report.repeated_calls,
+            "tools_closed": report.tools_closed,
+        },
         "error": report.error,
         # The analysis the task was about, in the analysis report's own shape.
         # It is nested rather than merged, so the analysis document keeps the
         # contract it has always had.
         "analysis": build_json_report(report.analysis) if report.analysis is not None else None,
     }
+
+
+def _convergence_section(report: AgentReport) -> list[str]:
+    """How the task stopped reading, when it said anything about it.
+
+    A reader who sees only the evidence table cannot tell whether a short
+    task stopped because it was done or because it was cut off. These lines
+    say which. A report written before this section existed has no such
+    events, and the section is simply absent — not empty.
+    """
+    if report.evidence_ready is None and not report.repeated_calls and not report.tools_closed:
+        return []
+    lines = ["", "## How the task converged", ""]
+    if report.evidence_ready is not None:
+        lines.append(
+            f"- The reading for the question was complete: {_inline(report.evidence_ready)}."
+        )
+    if report.repeated_calls:
+        lines.append(
+            f"- Repeated tool calls answered from the earlier reading: {report.repeated_calls}"
+        )
+    if report.tools_closed:
+        lines.append(
+            "- The tools were closed after the evidence was complete; the answer was "
+            "taken from what had been read."
+        )
+    return lines
 
 
 def render_agent_markdown(report: AgentReport) -> str:
@@ -152,9 +205,13 @@ def render_agent_markdown(report: AgentReport) -> str:
         f"| Leads | {len(report.leads)} |",
         f"| Insufficient evidence | {len(report.insufficient)} |",
         f"| Tool calls | {len(report.tool_calls)} |",
+        f"| Repeated tool calls | {report.repeated_calls} |",
         f"| Tokens used | {report.usage.tokens} of {report.limits.max_tokens} |",
         f"| Iterations used | {report.usage.iterations} of {report.limits.max_iterations} |",
         f"| Seconds used | {report.usage.seconds:.1f} of {report.limits.max_seconds:.0f} |",
+    ]
+    lines += _convergence_section(report)
+    lines += [
         "",
         "## Evidence levels",
         "",

@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1411<!--/fig-->（<!--fig:tests.fast-->1266<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.5%<!--/fig-->**（<!--fig:coverage.covered-->6494<!--/fig-->/<!--fig:coverage.total-->7096<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1430<!--/fig-->（<!--fig:tests.fast-->1285<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.7%<!--/fig-->**（<!--fig:coverage.covered-->6659<!--/fig-->/<!--fig:coverage.total-->7259<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -99,9 +99,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `agent/tool_executor.py` | 87.9% | 34 / 282 |
 | `tools/base.py` | 88.4% | 21 / 181 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
-| `agent/orchestrator.py` | 88.6% | 46 / 404 |
 | `reports/evidence_package.py` | 88.9% | 17 / 153 |
-| `agent/reporter.py` | 89.2% | 11 / 102 |
 | `agent/providers/openai_compat.py` | 89.9% | 9 / 89 |
 <!--/fig-->
 
@@ -133,7 +131,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.6%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.7%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -141,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1266<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1285<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->145<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1411<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1430<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -228,6 +226,10 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_html_report.py` | 离线 HTML 报告：与 Markdown/JSON 同源的事实、样本文本转义、页面自包含、证据表上限（M7 新增） |
 | `test_evidence_package.py` | 最小证据包：清单校验、路径遍历拒绝、篡改检测、样本绑定、迁移后引用解析（M7 新增） |
 | `test_public_contracts.py` | 公共契约快照：REST 路由表、MCP 工具表、CLI 退出码表、报告/证据包 schema 固化为断言，契约变更先红测试（M8 新增） |
+| `test_comparison_task_selection.py` | comparison harness 的按题前缀过滤：子集只决定问哪些题，reference 题号与判分规则不变（M6 层级 1 演练新增） |
+| `test_agent_duplicate_calls.py` | agent 的重复调用检测：同一工具+参数的成功调用被复用并计数，失败调用可重试（M6 新增） |
+| `test_agent_stop.py` | agent 的收束停止策略：关键事实到位即收束、宽限后关闭工具、拒绝无答案的 completed（M6 新增） |
+| `test_agent_budget_defaults.py` | agent 默认预算是公开承诺：默认值、环境变量覆盖语义（M6 预算调整新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -848,10 +850,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1411<!--/fig--> 个：<!--fig:tests.fast-->1266<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1430<!--/fig--> 个：<!--fig:tests.fast-->1285<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.5%<!--/fig-->（<!--fig:coverage.covered-->6494<!--/fig-->/<!--fig:coverage.total-->7096<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1410<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.7%<!--/fig-->（<!--fig:coverage.covered-->6659<!--/fig-->/<!--fig:coverage.total-->7259<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1430<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -972,16 +974,17 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
       "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [404, 46],
+      "agent/orchestrator.py": [507, 47],
       "agent/planner.py": [46, 1],
       "agent/providers/__init__.py": [6, 0],
-      "agent/providers/base.py": [80, 4],
+      "agent/providers/base.py": [84, 4],
       "agent/providers/local.py": [53, 10],
       "agent/providers/openai_compat.py": [89, 9],
       "agent/providers/scripted.py": [42, 2],
       "agent/providers/transport.py": [30, 2],
-      "agent/reporter.py": [102, 11],
-      "agent/state.py": [197, 5],
+      "agent/reporter.py": [127, 12],
+      "agent/state.py": [201, 5],
+      "agent/sufficiency.py": [23, 1],
       "agent/tool_executor.py": [282, 34],
       "api/__init__.py": [3, 0],
       "api/app.py": [309, 22],
@@ -1032,12 +1035,12 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "tools/registry.py": [28, 0],
       "workbench/__init__.py": [0, 0],
       "workbench/__main__.py": [69, 29],
-      "workbench/agent_tasks.py": [180, 16],
+      "workbench/agent_tasks.py": [180, 14],
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 599,
-    "statements": 7100
+    "missing": 600,
+    "statements": 7259
   },
   "history": {
     "v0.1.0": {
@@ -1054,10 +1057,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:d926fced42a388a5d330712f4b6069ccaf6b99d222bd633da980bf7542b656a7",
+  "source_fingerprint": "sha256:bb28ede7b4c512ad9c5236b6549945319f11870c2738db94b5417dafdc5a76d6",
   "suite": {
-    "failed": 1,
-    "passed": 1410,
+    "failed": 0,
+    "passed": 1430,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1065,8 +1068,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1266,
+    "fast": 1285,
     "slow": 145,
-    "total": 1411
+    "total": 1430
   }
 }-->

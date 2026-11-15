@@ -60,6 +60,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Agent 默认预算上调（Phase 3 M6，公共契约变更）。** `Budget` 默认值改为
+  `max_tokens=120000`、`max_iterations=16`、`max_seconds=120`，`Planner` 的
+  `DEFAULT_MAX_STEPS` 改为 40。依据是 M4 复验（`docs/reports/m4-e2e-run.md` §5）
+  的真实记录：旧默认（20000/8/120s，12 步）下 5/5 任务 `budget_exhausted`，
+  而完成任务实际用到的配置是 tokens=120000、步数 40，完成的两次运行分别用了
+  4 与 5 次迭代、18 与 12 次工具调用；最长的未完成运行达到 14 次迭代仍在读。
+  新上限约为最大实测用量的两倍，不是目标值。**兼容性影响：** 四个环境变量
+  （`DEXATLAS_AGENT_MAX_TOKENS/MAX_ITERATIONS/MAX_SECONDS/MAX_STEPS`）仍是
+  整体替换式覆盖、语义不变；但依赖旧默认上限的调用方（如按旧值断言
+  `budget_exhausted`、或按旧值做费用估算）需注意——同一任务在新默认下可能
+  完成、也可能消耗更多预算。依据与边界写进
+  `docs/architecture/agent.md` 的「Default budget and stop policy」一节。
+
+- **Agent 新增重复调用检测与收束停止策略（Phase 3 M6）。** 工作区只读，因此
+  同一工具+同一参数的重复调用不可能返回新答案：现在循环会命中先前成功读取的
+  摘要，直接以复用观察回答（携带同一 evidence id，并注明 `duplicate: true` 与
+  被复用的 call id），不再真正调用工具；事件记录 `duplicate_call`，报告
+  `convergence.repeated_calls` 计数。失败/超时/被拒的调用不算重复，允许重试。
+  同时新增停止策略：`planner` 把问题意图写入 plan，`sufficiency.py` 在每次
+  成功读取后判定该意图的关键事实是否已取到（manifest 题看 manifest、callers
+  题看 find_callers/find_callees 等；搜索「没搜到」也是有效事实）；命中后下一
+  请求的指令会说明证据已齐并要求作答，再给 2 次宽限读取
+  （`WRAP_UP_GRACE_CALLS`），随后从请求中移除全部工具并再要求作答两次
+  （`FINAL_ANSWER_ROUNDS`）——仍不答则以 `failed` 结束并给出可读原因，绝不
+  变成无答案的 `completed`。边界不变：收束只是停止读取，答案仍由模型给出、
+  结论仍是 lead。Agent JSON 报告新增 `convergence` 字段
+  （`evidence_ready`/`repeated_calls`/`tools_closed`），Markdown 报告新增
+  「How the task converged」小节（旧报告无此节即不出现，纯增量）。
+
 - **`dexatlas analyze` 在分析被截断时返回退出码 5（新退出码 `EXIT_TRUNCATED`）。**
   分析跑完、报告照常写出，但只要有一步被上限截短（`output_truncated` 记在
   项目上），退出码就是 5——调用方只看退出码就能区分「干净完成（0）」「部分

@@ -349,14 +349,18 @@ def test_the_class_source_the_model_wanted_comes_back_later(
     def answer_with_source(request: ModelRequest) -> ModelResponse:
         ids = observation_evidence_ids(request)
         return answer(
-            [conclusion("the Crypto class is decompiled Java", evidence_ids=ids[-1:])],
+            [
+                conclusion(
+                    "the class the first round deferred is decompiled Java", evidence_ids=ids[-1:]
+                )
+            ],
         )
 
     provider = _ParallelThenScriptedProvider(
         first,
         [
             tool_calls(
-                [("get_class_source", {"project_id": PROJECT_ID, "class_name": CRYPTO})],
+                [("get_class_source", {"project_id": PROJECT_ID, "class_name": MAIN})],
                 prefix="again",
             ),
             answer_with_source,
@@ -373,4 +377,7 @@ def test_the_class_source_the_model_wanted_comes_back_later(
 
     assert final.status is TaskStatus.COMPLETED, final.error
     assert _model_tools(final) == ["get_class_source", "get_class_source"]
-    assert any("Crypto" in item.summary for item in final.findings), "the source was read"
+    assert any(
+        record.tool == "get_class_source" and record.arguments.get("class_name") == MAIN
+        for record in final.tool_calls
+    ), "the call the first round deferred was made after the resume"

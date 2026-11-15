@@ -168,7 +168,13 @@ OBJECTIVES: dict[Intent, str] = {
 }
 
 #: How many tool calls a task may make.
-DEFAULT_MAX_STEPS = 12
+#:
+#: The step budget covers every call the task makes: the plan's own status
+#: reads, the model's reads and the verifier's evidence lookups. The M4
+#: re-verification's completed tasks made 18 and 12 recorded calls while
+#: spending only four and five iterations, so a budget of 12 was exhausted
+#: before the model was; 40 is the value those tasks ran under.
+DEFAULT_MAX_STEPS = 40
 
 #: How many sensitive calls a task may make before a person is asked.
 DEFAULT_MAX_SENSITIVE_CALLS = 1
@@ -240,6 +246,7 @@ class Planner:
             allowed_tools=self.allowed_tools(intents),
             max_steps=self.max_steps,
             max_sensitive_calls=self.max_sensitive_calls,
+            intents=tuple(intent.value for intent in intents),
             limits=self.limits,
         )
 

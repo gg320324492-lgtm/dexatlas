@@ -73,6 +73,23 @@ class Observation:
     error: str | None = None
     """Why the call did not produce an answer, when it did not."""
 
+    fingerprint: str = ""
+    """What call this answered: a digest of the tool and its arguments.
+
+    Two calls with the same fingerprint ask the same question of the same
+    read-only analysis, so the second cannot get a different answer. It is
+    empty for observations that no model call asked for — the plan's own
+    status and project reads.
+    """
+
+    duplicate_of: str = ""
+    """The call id of the earlier answer this one reuses, when it reuses one.
+
+    A repeated call is answered from the reading the task already holds
+    instead of being made again. The field is what lets the report count
+    the repeats without parsing the transcript.
+    """
+
     def as_message(self) -> str:
         """The observation as the model sees it, data notice included."""
         return f"[data from tool `{self.tool}` — {DATA_NOTICE}]\n{self.content}"

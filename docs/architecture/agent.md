@@ -139,6 +139,69 @@ does not say it found nothing: that is a different claim, and a much worse
 one. The report's status line says *did not finish* for every status but
 `completed`.
 
+### Default budget and stop policy
+
+The defaults are a public promise: a task started without any environment
+variable runs under exactly these numbers.
+
+| Budget | Default | Why |
+|---|---:|---|
+| `max_tokens` | 120,000 | The configuration the M4 re-verification completed tasks under. Under the old 20,000 the longest recorded run spent 66,361 tokens over 14 iterations and had still not answered; the two runs that did answer used 10,455 and 15,211. The ceiling is therefore about twice the largest recorded run, not a target. |
+| `max_iterations` | 16 | The completed M4 tasks used four and five iterations; the longest recorded run reached 14 and was still reading. Sixteen leaves room for the convergence path without paying for an open-ended loop. |
+| `max_seconds` | 120 | No recorded run exhausted the time budget. It stays the bound a slow endpoint hits first. |
+| `max_steps` (plan) | 40 | The step budget covers every call the task makes — the plan's status reads, the model's reads, the verifier's evidence lookups. The completed M4 tasks made 18 and 12 recorded calls while spending only four and five iterations, so 12 was exhausted before the model was. |
+
+**Compatibility.** These are the agent's own defaults; every one of them is
+still replaced — not added to — by its environment variable
+(`DEXATLAS_AGENT_MAX_TOKENS`, `DEXATLAS_AGENT_MAX_ITERATIONS`,
+`DEXATLAS_AGENT_MAX_SECONDS`, `DEXATLAS_AGENT_MAX_STEPS`). Changing a default
+is a change to the public contract: a task that used to stop at
+`budget_exhausted` under the old defaults may now complete, and a caller that
+depended on the old ceiling must set the variables explicitly. The change is
+recorded in the CHANGELOG for the next release.
+
+### How the reading stops
+
+Running out of budget is the *last* way a task stops reading, not the first.
+Three mechanisms come before it, and each is visible in the report.
+
+**The question's key reading closes it.** A manifest question is answered
+when the manifest has been read; a callers question, when the callers have.
+`planner.py` writes the question's intents into the plan, and
+`sufficiency.py` checks, after each successful read, whether every intent has
+its key reading (`KEY_TOOLS`). Only a successful read counts: a failed call,
+a timeout or a refused call is not evidence that the question was answered —
+and a *successful* search that found nothing also counts, because "the symbol
+is not in the index" is the fact an absent-symbol question needs. When the
+key reading is in, the next request says so in its instructions and asks for
+the answer.
+
+**A grace, then the tools close.** After the key reading, the model may still
+make two further reads (`WRAP_UP_GRACE_CALLS`) — following a call site or
+resolving a citation is reasonable. Past that, the tools are removed from the
+request entirely and the model is asked again. It is asked twice
+(`FINAL_ANSWER_ROUNDS`); a model that still asks for tools instead of
+answering stops the task as `failed`, with the reason in the report — it
+never becomes a completed task with no answer. The boundary is unchanged:
+closing the reading does not write the answer, the model still writes it, and
+its conclusion is still a lead.
+
+**A repeat is answered, not re-run.** The workspace is read-only, so a call
+with the same tool and the same arguments cannot return anything new. The
+loop keeps a digest of every successful call (the tool, the arguments with
+the task's project filled in); a call whose digest matches an earlier
+successful one is answered from that reading — the observation carries the
+same evidence id, and says so — and is not made against the workspace. The
+event log records `duplicate_call`, and the report counts the repeats. A
+*failed* call is not a repeat: its answer may change (a breaker cooling off,
+a transient timeout), so asking again is allowed.
+
+The report carries this under `convergence` in the JSON document and a
+*How the task converged* section in the Markdown: why the reading stopped,
+how many calls were repeats, and whether the tools were closed. A report
+written before the section existed has none — the section is absent, not
+empty.
+
 ## The boundary between a lead and a finding
 
 This is the part that matters, so it is worth being exact about.
