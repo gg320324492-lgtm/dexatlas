@@ -11,7 +11,7 @@ run it, and the decisions the first two screens were built under.
 
 ## What it is
 
-A browser over the same ten read-only tools the [MCP server](mcp-server.md)
+A browser over the same eleven read-only tools the [MCP server](mcp-server.md)
 exposes. The functions under `src/dexatlas/mcp/tools/` are plain Python that
 takes an `Analyzer` — they are the layer the MCP server wraps in stdio, and
 the workbench calls them in-process instead. That is the whole design: the

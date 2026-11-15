@@ -286,4 +286,4 @@ every call site says which container it was read from — the raw material an
 analyst needs to reason about what a class-loader would actually resolve.
 
 The summary for this run: 4 classes, 11 methods, 13 call sites, 10 call edges,
-evidence records E-0001…E-0008, jadx 7 of 11 methods decompiled, 4.8 s.
+evidence records E-0001…E-0009, jadx 7 of 11 methods decompiled, 4.8 s.

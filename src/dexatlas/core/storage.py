@@ -41,7 +41,7 @@ from dexatlas.core.models import (
 )
 from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 #: The longest a name may be in the search index, in characters.
 #:
@@ -234,7 +234,8 @@ CREATE TABLE IF NOT EXISTS projects (
     duration_seconds REAL,
     manifest         TEXT,
     workspace        TEXT,
-    published_run_id TEXT
+    published_run_id TEXT,
+    apk_metadata     TEXT
 );
 
 -- One row per analysis attempt. The run id says nothing about the APK: two
@@ -369,8 +370,8 @@ INSERT INTO projects (
     id, apk_sha256, apk_path, apk_size_bytes, created_at, status,
     tool_versions, errors, class_count, method_count,
     reference_count, call_edge_count, evidence_count, resource_count,
-    duration_seconds, manifest, workspace
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    duration_seconds, manifest, workspace, apk_metadata
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     apk_path      = excluded.apk_path,
     status        = excluded.status,
@@ -388,7 +389,12 @@ ON CONFLICT(id) DO UPDATE SET
     -- write that does not name one leaves the pointer where it is. A run
     -- that has not published yet must not move it: the reader of the
     -- workspace would follow it into a directory that was never published.
-    workspace     = COALESCE(excluded.workspace, projects.workspace)
+    workspace     = COALESCE(excluded.workspace, projects.workspace),
+    -- The APK's own metadata is a fact about the bytes, so a write that
+    -- carries it replaces the old one; a write that does not (a project
+    -- created before the column existed) leaves the old value standing
+    -- rather than wiping it to NULL.
+    apk_metadata  = COALESCE(excluded.apk_metadata, projects.apk_metadata)
 """
 
 _RUN_UPSERT = """
@@ -486,6 +492,14 @@ def _migrate(connection: sqlite3.Connection) -> None:
         connection.execute(
             "ALTER TABLE projects ADD COLUMN call_edge_count INTEGER NOT NULL DEFAULT 0"
         )
+    if "apk_metadata" not in columns:
+        # The APK's own metadata -- the DEX files, the native libraries, the
+        # signature -- as a JSON blob beside the hash and the size. The row
+        # used to hold only enough to identify the bytes; a report rebuilt
+        # from it said "DEX files: 0" for an APK the pipeline's own report
+        # says holds one. A row written before the column existed reads as
+        # nothing: the archive facts it never recorded are unknown, not zero.
+        connection.execute("ALTER TABLE projects ADD COLUMN apk_metadata TEXT")
     site_columns = {row["name"] for row in connection.execute("PRAGMA table_info(call_sites)")}
     legacy = connection.execute(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'xrefs'"
@@ -1283,6 +1297,15 @@ def _save_project(
             project.duration_seconds,
             manifest.model_dump_json() if manifest else None,
             str(workspace) if workspace else None,
+            # The archive facts the reports render -- the DEX files, the
+            # native libraries, the signature. The project row used to store
+            # only the hash and the size, which is enough to identify the
+            # bytes but not to state what a report says about them; a report
+            # rebuilt from this row alone said "DEX files: 0" for an APK the
+            # pipeline's own report says holds one.
+            project.apk.model_dump_json()
+            if project.apk.zip_entries or project.apk.dex_files
+            else None,
         ),
     )
 
@@ -1400,13 +1423,19 @@ def _canonical_search_name(kind: str, name: str) -> str:
 
 
 def _row_to_project(row: sqlite3.Row) -> Project:
-    return Project(
-        id=row["id"],
-        apk=ApkMetadata(
+    apk_keys = row.keys() if isinstance(row, sqlite3.Row) else []
+    apk = (
+        ApkMetadata.model_validate_json(row["apk_metadata"])
+        if "apk_metadata" in apk_keys and row["apk_metadata"]
+        else ApkMetadata(
             sha256=row["apk_sha256"],
             size_bytes=row["apk_size_bytes"],
             path=Path(row["apk_path"]),
-        ),
+        )
+    )
+    return Project(
+        id=row["id"],
+        apk=apk,
         created_at=datetime.fromisoformat(row["created_at"]),
         status=ProjectStatus(row["status"]),
         tool_versions=json.loads(row["tool_versions"]),

@@ -227,7 +227,7 @@ In an MCP host, add it as a stdio server:
 ### The web workbench
 
 DexAtlas can show a workspace in a browser. The workbench sits on the same
-ten tools the MCP server exposes, called in-process — the JSON the browser
+eleven tools the MCP server exposes, called in-process — the JSON the browser
 receives is the shape the MCP server would have returned. It is the Phase 2
 plan's M4 screen set; all eight screens are built and shipped in `v0.2.0`:
 

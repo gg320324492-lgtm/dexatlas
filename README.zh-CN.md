@@ -179,7 +179,7 @@ uv sync --extra analysis --extra mcp
 uv run dexatlas-mcp                 # 通过 stdio 说 MCP
 ```
 
-十个工具，以及调用方在提问之前必须知道的三件事：
+十一个工具，以及调用方在提问之前必须知道的三件事：
 **[MCP server 架构](docs/architecture/mcp-server.md)**。
 
 可以直接试用的客户端：
@@ -227,7 +227,7 @@ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 ## Web 工作台
 
 DexAtlas 可以在浏览器里展示分析工作区。工作台直接 in-process 调用 MCP server
-暴露的那十个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状完全相同；
+暴露的那十一个只读工具函数，浏览器拿到的 JSON 与 MCP server 返回的形状完全相同；
 唯一接受输入的是上传屏，它把 APK 交给与 REST API、CLI 相同的分析管线。这是
 [Phase 2 计划](docs/roadmap/phase2-plan.md) 的 M4 屏幕清单，八屏已全部建成并随
 `v0.2.0` 发布：
@@ -303,7 +303,7 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 
 - **[架构说明](docs/architecture/README.md)** —— 流水线、存储模型与设计取舍
 - **[Web 工作台](docs/architecture/workbench.md)** —— 只读浏览器界面：已有的屏幕、启动方式与选型
-- **[MCP server](docs/architecture/mcp-server.md)** —— 十个只读工具，以及调用方在提问前要知道的三件事
+- **[MCP server](docs/architecture/mcp-server.md)** —— 十一个只读工具，以及调用方在提问前要知道的三件事
 - **[证据优先的 Agent](docs/architecture/agent.md)** —— 一个循环、一份预算、一份状态机，以及线索与 finding 的边界
 - **[报告渲染与证据包](docs/architecture/report-rendering.md)** —— 同一份分析的三种渲染，以及可交给客户的证据导出
 - **[公共契约表](docs/architecture/public-contracts.md)** —— CLI、REST、MCP 与报告

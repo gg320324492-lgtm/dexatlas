@@ -21,7 +21,7 @@ placeholders committed beside the APK.
 |---|---|---|---|
 | 1 | [From upload to evidence chain](demo-app-walkthrough.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk) | The full tool chain: analyze, manifest, search, source, cross-references, and the eleven evidence records behind them — the complete customer walkthrough |
 | 2 | [Reading an obfuscated app](obfuscated-app.md) | [`examples/obfuscated-app/obfuscated.apk`](../../examples/obfuscated-app/obfuscated.apk), plus a multi-DEX appendix on [`examples/multidex-app/multidex.apk`](../../examples/multidex-app/multidex.apk) | What survives name obfuscation, what the string index still finds, how the index records a class defined in two DEX files at once — and where the capability boundary sits |
-| 3 | [Integrating from Python](api-integration.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk), via the REST API and the MCP server | The wire contract: upload → analyze → poll → query → report over HTTP, the same analysis over ten read-only MCP tools, and a minimal Python client |
+| 3 | [Integrating from Python](api-integration.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk), via the REST API and the MCP server | The wire contract: upload → analyze → poll → query → report over HTTP, the same analysis over eleven read-only MCP tools, and a minimal Python client |
 
 Both APK samples are **first-party**: built from smali sources committed
 beside them, rebuildable with `scripts/build-test-apks.sh`, and free of

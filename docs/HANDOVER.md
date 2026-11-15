@@ -26,7 +26,7 @@ the workbench. M4 passed its source review and acceptance on 2026-11-14
 | | Milestone | State |
 |---|---|---|
 | **M0** | Core contracts and reliability (P2-001 … P2-005) | **done** — overload-safe resolution, `AnalysisRun`, call sites and edges, evidence invariants, runtime isolation |
-| **M1** | The read-only MCP server | **done** — `src/dexatlas/mcp/`, ten tools, `uv run dexatlas-mcp` over stdio, **no model provider needed** |
+| **M1** | The read-only MCP server | **done** — `src/dexatlas/mcp/`, eleven tools, `uv run dexatlas-mcp` over stdio, **no model provider needed** |
 | **M2** | The single evidence-first agent | **done** — `src/dexatlas/agent/`: one loop, one plan, one budget, one state, one report |
 | **M3** | Evaluation and benchmarking | **done** — 92 tasks with independently checked answers, scripted + real-model comparison runs, plus a same-model wider-budget rerun (`docs/benchmarks/`; the "stronger" run changed budgets and approval conditions, not the model) |
 | **M4** | Web workbench and portfolio | **done** — six screens live, benchmark view, end-to-end demo; review passed 2026-11-14 (`docs/reports/m4-review.md`) |

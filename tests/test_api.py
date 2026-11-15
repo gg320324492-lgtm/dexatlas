@@ -161,6 +161,42 @@ def test_analyze_a_synthetic_apk_end_to_end(client: TestClient, tmp_path: Path) 
     assert "# DexAtlas analysis report" in markdown.text
 
 
+@pytest.mark.slow
+def test_the_api_report_carries_the_same_apk_metadata_as_the_cli(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """The report over HTTP states the same APK facts the CLI's report states.
+
+    The case study promises that ``format=json`` returns "the same report the
+    CLI's ``--json`` flag writes", and the "DEX files" count the Markdown
+    summary renders comes from ``project.apk.dex_files``. A report rebuilt
+    from the project row alone loses that field — the row stores the hash
+    and the size, not the archive's contents — and the API's Markdown then
+    says "DEX files: 0" for an APK the CLI's own report says holds one.
+    """
+    apk = build_apk(tmp_path / "demo.apk", dex_count=2)
+    response = client.post(
+        "/analyze",
+        files={"file": ("demo.apk", apk.read_bytes(), "application/vnd.android.package-archive")},
+    )
+    assert response.status_code == 202
+    project_id = response.json()["project_id"]
+
+    from dexatlas.core.ingest import inspect_apk
+
+    expected = inspect_apk(apk)
+
+    report = client.get(f"/projects/{project_id}/report", params={"format": "json"})
+    assert report.status_code == 200
+    body = report.json()
+    assert body["project"]["apk"]["dex_files"] == expected.dex_files
+    assert body["project"]["apk"]["native_libraries"] == expected.native_libraries
+    assert body["project"]["apk"]["has_signed_certificate"] == expected.has_signed_certificate
+
+    markdown = client.get(f"/projects/{project_id}/report", params={"format": "markdown"})
+    assert f"| DEX files | {len(expected.dex_files)} |" in markdown.text
+
+
 def test_the_project_response_says_which_unit_each_count_counts(
     client: TestClient, tmp_path: Path
 ) -> None:

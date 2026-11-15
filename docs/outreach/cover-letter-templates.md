@@ -121,7 +121,7 @@ The agent works within your question set and your budget, and treats model
 output as a lead that a human confirms — not as a finding.
 
 **Relevant example (my own open-source work):** DexAtlas — a read-only MCP
-server (ten tools over stdio) exposing a completed Android APK analysis to AI
+server (eleven tools over stdio) exposing a completed Android APK analysis to AI
 assistants, plus a single-loop agent that answers questions with per-fact
 citations, separates verified evidence from leads, and treats instructions
 found inside analyzed data as data, not orders. The tool layer has no write

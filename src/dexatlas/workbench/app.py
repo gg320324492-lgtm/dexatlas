@@ -82,7 +82,7 @@ def create_app(analyzer: Analyzer) -> FastAPI:
         version=__version__,
         description=(
             "A read-only web UI over the analysis a workspace already holds. "
-            "The JSON answers the same ten read-only tools answer over stdio."
+            "The JSON answers the same eleven read-only tools answer over stdio."
         ),
     )
     app.state.analyzer = analyzer

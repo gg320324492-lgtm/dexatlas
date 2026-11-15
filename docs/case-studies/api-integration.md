@@ -29,7 +29,7 @@ DexAtlas answers with two transports over the same analyzer:
   report) are answered inline; analysis is a background job you poll.
 - **MCP server** — `dexatlas-mcp`, a read-only Model Context Protocol tool
   server over stdio, meant to be started by a host (an IDE, an agent runtime)
-  as a subprocess. It exposes ten read-only tools and never writes, never
+  as a subprocess. It exposes eleven read-only tools and never writes, never
   runs a shell, and needs no model provider.
 
 Both read the same workspace the CLI writes, so the numbers in this study are
@@ -43,8 +43,8 @@ the same numbers the other studies quote.
   completion;
 - the read endpoints an integrator actually calls: manifest, search, class
   source, cross-references, evidence, and report export (JSON and Markdown);
-- the MCP server: how a host starts it, what its ten tools are, and what two
-  of them return on the same sample;
+- the MCP server: how a host starts it, what its eleven tools are, and what
+  two of them return on the same sample;
 - a minimal Python client (`examples/api_client.py`) that wraps the whole
   upload → analyze → query → report flow in four functions;
 - the response shapes, status codes and error contract an integrator codes
@@ -198,7 +198,7 @@ The Markdown answer opens:
 **APK:** `demo.apk`
 **SHA-256:** `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`
 **Status:** completed
-**Run:** `run_0c22b6c710674137` (completed, complete)
+**Run:** `run_6506002de5d8486a` (completed, complete)
 **Tool versions:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 ```
 
@@ -230,7 +230,7 @@ examples/api_client.py examples/demo-app/demo.apk`, against a running API):
 analyze: completed  apk_80a8fe0e81204c9f
 project: completed  5 classes, 8 methods, 21 call edges, 11 evidence records
 search:   string  sk_live_2f8a91c4e7b3
-report:  schema 3, run run_0c22b6c710674137 (complete)
+report:  schema 3, run run_6506002de5d8486a (complete)
 ```
 
 The module is ~150 lines with no dependency beyond `httpx` (already in the
@@ -246,17 +246,17 @@ uv sync --extra analysis --extra mcp
 uv run dexatlas-mcp        # MCP over stdio; DEXATLAS_WORKSPACE selects the workspace
 ```
 
-The ten tools: `list_projects`, `get_project_status`, `get_manifest`,
+The eleven tools: `list_projects`, `get_project_status`, `get_manifest`,
 `search_symbols`, `get_class_source`, `get_method_source`, `find_callers`,
-`find_callees`, `get_evidence`, `resolve_locator`. Every one is annotated
-read-only.
+`find_callees`, `find_resource_declarations`, `get_evidence`,
+`resolve_locator`. Every one is annotated read-only.
 
 [`examples/mcp_client.py`](../../examples/mcp_client.py) is a working client
 that starts the server over stdio and lists what it offers — its actual
 output:
 
 ```
-the server offers 10 tools:
+the server offers 11 tools:
   list_projects        List the APKs analysed in this workspace, newest first, …
   get_project_status   Read one project's status and how complete its analysis is: …
   get_manifest         Read the AndroidManifest.xml of an analysed APK: …
