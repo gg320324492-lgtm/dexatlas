@@ -155,6 +155,22 @@ def project_id(workspace: Path) -> str:
         summary=f"exported activity com.example.demo.MainActivity; {HOSTILE_SUMMARY}",
         provenance=provenance,
     )
+    # The coverage observation a real analysis always writes: its provenance
+    # names the decompiler's whole output tree (``jadx:sources``), not one
+    # file — the same record the pipeline's ``_record_decompilation`` adds.
+    builder.add(
+        kind=EvidenceKind.OBSERVATION,
+        level=EvidenceLevel.VERIFIED,
+        summary="jadx produced real Java for 1 of 1 methods in 1 of 1 classes",
+        provenance=[
+            Provenance(
+                tool="jadx",
+                tool_version="1.5.2",
+                apk_sha256=SHA,
+                locator="jadx:sources",
+            )
+        ],
+    )
     staged.save_evidence(PROJECT_ID, builder.build())
 
     run.status = RunStatus.COMPLETED
@@ -281,6 +297,45 @@ def test_key_citations_resolve_after_the_package_moves(project_id: str, tmp_path
     report = verify_citations(elsewhere, manifest)
     assert report["citations_resolved"] is True
     assert report["citations_unresolved"] == []
+
+
+def test_a_bare_tree_citation_does_not_count_as_unresolved(project_id: str, tmp_path: Path) -> None:
+    """The coverage observation cites the whole JADX tree, not a file.
+
+    ``jadx:sources`` names where the decompiler's output lives; the package
+    states that the full tree is deliberately absent. It is a citation that
+    resolves by construction, like a DEX locator — not a missing file. The
+    real pipeline always writes this record, so a package from a real
+    analysis must still verify as fully resolved.
+    """
+    target = tmp_path / "pkg" / "evidence.zip"
+    assert _export(project_id, target) == 0
+
+    manifest = verify_package(target)
+    report = verify_citations(target, manifest)
+    assert report["citations_unresolved"] == []
+    assert report["citations_resolved"] is True
+
+
+def test_a_bare_tree_citation_is_unresolved_without_the_exception(
+    project_id: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red guard: without the bare-tree rule, ``jadx:sources`` reads as unresolved.
+
+    The exception is not cosmetic — this test re-runs the check with the rule
+    removed and shows the citation land in ``citations_unresolved``, which is
+    exactly the false failure the real rehearsal hit.
+    """
+    from dexatlas.reports import evidence_package as module
+
+    target = tmp_path / "pkg" / "evidence.zip"
+    assert _export(project_id, target) == 0
+
+    manifest = verify_package(target)
+    monkeypatch.setattr(module, "_BARE_TREE_LOCATORS", frozenset())
+    report = module.verify_citations(target, manifest)
+    assert "jadx:sources" in report["citations_unresolved"]
+    assert report["citations_resolved"] is False
 
 
 def test_a_tampered_file_is_refused(project_id: str, tmp_path: Path) -> None:

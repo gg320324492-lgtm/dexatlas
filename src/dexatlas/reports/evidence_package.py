@@ -47,6 +47,12 @@ _REPORT_PATHS = {
 #: decompiler's tree name: the package's tree is the package's own.
 _SOURCES_PREFIX = "sources/"
 
+#: Locators that name one of the decompiler's whole output trees rather than
+#: a file inside it. The coverage observation cites ``jadx:sources`` — there
+#: is no single file behind it, and the package states that the full tree is
+#: deliberately absent rather than carrying it (``NOT_INCLUDED.full_sources``).
+_BARE_TREE_LOCATORS = frozenset({"jadx:sources", "jadx:resources"})
+
 #: What is deliberately absent, stated rather than implied.
 NOT_INCLUDED = {
     "apk": "the analysed APK is not packaged; identify it by its SHA-256",
@@ -216,6 +222,15 @@ def verify_citations(package_path: Path, manifest: dict[str, Any]) -> dict[str, 
                 resolved += 1
                 continue
             place = place.partition("#")[0]
+            if f"{tool}:{place}" in _BARE_TREE_LOCATORS:
+                # A bare tree locator names the decompiler's whole output
+                # tree, not one file in it: the coverage observation points
+                # there, and the package's manifest already says the full
+                # tree is deliberately absent. It resolves the same way the
+                # DEX and tool-error locators do — by construction, not by a
+                # packaged file.
+                resolved += 1
+                continue
             # The locator's place already names its position inside the
             # JADX tree (``sources/...``), which is exactly where the
             # package keeps it: the package's ``sources/`` tree mirrors the
