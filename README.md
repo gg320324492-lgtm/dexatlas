@@ -9,8 +9,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1435%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-91.6%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1447%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-91.8%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
@@ -37,10 +37,14 @@ still yields a manifest, an index and a report that says which steps did not run
 > export, and the M3 benchmark view — are built and shipped in `v0.2.0`. M4 passed
 > its source review on 2026-11-14. Phase 3 is under way against the
 > [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
-> (client-ready deliverables) are done; M6 (bounded agent tasks) and M8 (clean
-> installs, contracts, export safety) are in progress; M9 (this showcase) and M10
-> (independent acceptance, release candidate) are not started. See the
-> [Roadmap](#roadmap) and [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md).
+> (client-ready deliverables) are done; M6 (bounded agent tasks) has its level-0
+> and level-1 drills complete with the real-model batch pending, and M8 (clean
+> installs, contracts, export safety) has its rehearsals, fixes and public
+> contract table done with acceptance still open; M9 (this showcase) is done on
+> the GitHub side with the Upwork materials still unpublished; M10 (independent
+> acceptance, release candidate) has its preparation pack ready but has not run.
+> See the [Roadmap](#roadmap) and
+> [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md).
 > Nothing on this page claims a feature that does not yet run.
 
 <p align="center">
@@ -84,7 +88,7 @@ DexAtlas is built around fixing that:
 - **Automation-friendly** — the same analysis core is reachable from a CLI and a REST API,
   so analyses are reproducible in CI rather than retyped by hand.
 - **Agent-ready architecture** — normalized tool interfaces and structured JSON are the
-  contract an AI agent will consume in Phase 2, designed for it from the start.
+  contract the shipped AI agent consumes, designed for it from the start.
 - **Extensible by design** — analysis backends are adapters behind one interface; new engines
   plug in without rewriting the core.
 
@@ -105,7 +109,7 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.2` | Acceptance Checklist      | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words                      |
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.2.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
-| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows, portable evidence reports, clean-install verification, client-facing examples and independent acceptance |
+| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, real-model batch pending), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 
@@ -161,11 +165,15 @@ cd dexatlas
 uv sync --extra analysis
 
 uv run dexatlas backends              # what is installed, at what version
-uv run dexatlas analyze app.apk -o report.md --json report.json
+uv run dexatlas analyze app.apk -o report.md --json report.json --html report.html
 uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;"
+uv run dexatlas export <project-id> -o evidence-package.zip
 ```
+
+Every command takes the same `--workspace`/`-w` option: `analyze` creates the
+workspace, the read-only commands require it to exist.
 
 The REST API is the same analysis core over HTTP:
 
@@ -285,12 +293,19 @@ refused with `503 agent_not_configured` rather than answered by a stand-in
 model.
 
 One honest limit, carried from the M4 end-to-end run: the real model tried
-there (MiniMax-M3.1-Flash) exhausted its default budget in 5 of 5 tasks before
-reaching a cited conclusion. Every link of the chain worked as designed, and
-each report said *did not finish* rather than inventing an answer; the
-serial-tool fix and the `DEXATLAS_AGENT_MAX_STEPS` budget knob landed
-afterwards. The gap and its evidence:
-**[docs/reports/m4-e2e-run.md](docs/reports/m4-e2e-run.md)**.
+there (MiniMax-M3.1-Flash) exhausted the then-default budget in 5 of 5 tasks
+before reaching a cited conclusion. Every link of the chain worked as designed,
+and each report said *did not finish* rather than inventing an answer. The
+serial-tool fix landed, the `DEXATLAS_AGENT_MAX_STEPS` budget knob was added,
+and the defaults were raised to the measured need — 120,000 tokens, 16 loop
+iterations, 40 planned tool calls, 120 seconds — so tasks that finish reading
+before the ceiling now finish. Each default is still replaceable wholesale
+through the environment (`DEXATLAS_AGENT_MAX_TOKENS`, `..._ITERATIONS`,
+`..._SECONDS`, `..._STEPS`), and changing a default remains a public-contract
+change. The gap and its evidence:
+**[docs/reports/m4-e2e-run.md](docs/reports/m4-e2e-run.md)**; the defaults and
+the stop policy:
+**[docs/architecture/agent.md](docs/architecture/agent.md)**.
 
 Docker, with JADX and Apktool preinstalled:
 
@@ -342,6 +357,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   budgets, the state machine, and where the boundary between a lead and a finding is
 - **[Report rendering and the evidence package](docs/architecture/report-rendering.md)** —
   three renderings of one analysis, and the client-ready evidence export
+- **[Public contracts](docs/architecture/public-contracts.md)** — the CLI, REST, MCP
+  and report-schema surfaces, tested and versioned, with their known limits
 
 ### Benchmarks — what was measured, and what was not
 
@@ -356,6 +373,9 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Service regression set](docs/benchmarks/service-regression-set.md)** — the 20
   frozen questions the agent service promise is measured against, and the judging
   rules
+- **[M6 level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md)** — the
+  end-to-end question/trace/scoring pass over the frozen set with the scripted
+  stand-in provider; not a model-capability baseline
 
 ### Project records
 
@@ -443,11 +463,11 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **in progress** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20 |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the real-model batch awaits separate authorization |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
-| M8 | clean installs, failure recovery, contract and export-safety acceptance | **in progress** |
-| M9 | GitHub showcase (this page) and Upwork materials | **in progress** |
-| M10 | independent acceptance, re-scoring, release candidate | **not started** |
+| M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit-code question is decided and recorded as a known limitation |
+| M9 | GitHub showcase (this page) and Upwork materials | **showcase done; materials unpublished** — this page and the [project brief](docs/outreach/project-brief.md) draft are in place; the Upwork materials are not published |
+| M10 | independent acceptance, re-scoring, release candidate | **preparation ready; acceptance not run** — the [preparation pack](docs/reports/m10-acceptance-pack.md) exists; independent reproduction and re-scoring have not started |
 
 `v1.0.0` is considered only after this plan's exit criteria pass — phases advance on
 evidence, not on a calendar.
