@@ -415,11 +415,15 @@ def check_contract_sources(report: Report) -> None:
 
 
 def check_exit_code_contract(report: Report) -> None:
-    """F1：契约表与 CLI 源码的退出码集合一致（0–5，六个语义）。
+    """F1：契约表、CLI 源码与契约测试的退出码集合一致。
 
-    0 is the success code typer answers by default; the module defines no
-    ``EXIT_`` constant for it (the contract test spells it out instead), so
-    the defined set is compared with the expectation *plus* that implicit 0.
+    The expectation is not restated here: it is read from the contract
+    test's ``EXPECTED_EXIT_CODES`` table, so the three places that name the
+    codes — the contract table, the CLI constants, and the test that freezes
+    them — are compared with *each other*. An expectation copied here would
+    have to be updated by hand on every contract change, and a stale copy
+    would fail a correct tree (as it did when exit code 6 landed and this
+    set still read 0–5).
     """
     contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
     table = contracts.split("### 1.2 退出码", 1)[-1].split("###", 1)[0]
@@ -427,14 +431,24 @@ def check_exit_code_contract(report: Report) -> None:
 
     cli = (REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
     defined = {int(m) for m in re.findall(r"^EXIT_[A-Z_]+ = (\d+)$", cli, re.MULTILINE)}
-    expected = {0, 1, 2, 3, 4, 5}
+
+    test = CONTRACT_TEST.read_text(encoding="utf-8")
+    block = test.split("EXPECTED_EXIT_CODES = {", 1)[-1].split("}", 1)[0]
+    tested = {int(m) for m in re.findall(r"^\s+(\d+):", block, re.MULTILINE)}
+    for name in re.findall(r"^\s+([A-Z][A-Z_]+):", block, re.MULTILINE):
+        match = re.search(rf"^{name} = (\d+)$", cli, re.MULTILINE)
+        if match:
+            tested.add(int(match.group(1)))
+    # The implicit success code: typer answers 0 by default, the CLI module
+    # defines no constant for it, and the test spells it out as a literal.
+    expected = tested | {0}
 
     report.add(
         outcome_of(
             "F1.exit-codes",
-            "退出码 0–5：契约表、CLI 常量（含隐式成功 0）、期望集合一致",
+            "退出码契约：契约表、CLI 常量（含隐式成功 0）、契约测试期望一致",
             stated == expected and defined | {0} == expected,
-            f"契约表={sorted(stated)}，CLI 常量={sorted(defined)} + 隐式 0",
+            f"契约表={sorted(stated)}，CLI 常量={sorted(defined)} + 隐式 0，契约测试={sorted(tested)}",
             blocking=True,
         )
     )

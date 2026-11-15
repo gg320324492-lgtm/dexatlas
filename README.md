@@ -38,9 +38,11 @@ still yields a manifest, an index and a report that says which steps did not run
 > its source review on 2026-11-14. Phase 3 is under way against the
 > [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
 > (client-ready deliverables) are done; M6 (bounded agent tasks) has its level-0
-> and level-1 drills complete and its level-2 real-model batch run — which did
+> and level-1 drills complete, its level-2 real-model batch run — which did
 > **not** meet the acceptance line (DexAtlas 40.0% over three rounds against
-> ≥80%; see the [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and M8 (clean
+> ≥80%; see the [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and a
+> post-fix retest that reached the line on a single round (DexAtlas 16/20 = 80.0%;
+> see the [retest record](docs/benchmarks/m6-level2-retest2.md)); M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
 > the GitHub side with the Upwork materials still unpublished; M10 (independent
@@ -388,6 +390,11 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   the agent's current default configuration does not meet the acceptance line on
   this set, and the service-promise scope is to be re-decided after failure-mode
   analysis
+- **[M6 level-2 retest after fixes](docs/benchmarks/m6-level2-retest2.md)** — the
+  five root-cause fixes re-run against the frozen 20 questions with a real model,
+  full denominator: DexAtlas 16/20 (80.0%) meets the ≥80% per-round line once;
+  A 7/20, B 7/20; traces 355,623 tokens. One round at the line is not the
+  three-round ≥90% acceptance bar, so the service-promise scope is still open
 
 ### Project records
 
@@ -475,7 +482,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line) — the service-promise scope is to be re-decided after failure-mode analysis |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line); after failure-mode analysis and five root-cause fixes, a single-round [retest](docs/benchmarks/m6-level2-retest2.md) reached the line (DexAtlas 16/20 = 80.0%, full 20-question denominator, traces 355,623 tokens) — the per-round line is met once, not the three-round ≥90% bar, so the milestone stays open |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit-code question is decided and recorded as a known limitation |
 | M9 | GitHub showcase (this page) and Upwork materials | **showcase done; materials unpublished** — this page and the [project brief](docs/outreach/project-brief.md) draft are in place; the Upwork materials are not published |

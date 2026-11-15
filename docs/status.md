@@ -1,6 +1,6 @@
 # DexAtlas 当前状态
 
-**最后更新：** 2026-11-15 · **对应版本：** v0.2.0（已发布；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** Phase 3 进行中（逐里程碑状态见 §4.0；M10 独立验收尚未开始，`v1.0.0` 未发布）
+**最后更新：** 2026-11-16 · **对应版本：** v0.2.0（已发布；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** Phase 3 进行中（逐里程碑状态见 §4.0；M10 独立验收尚未开始，`v1.0.0` 未发布）
 
 这份文档回答两个问题：**现在在哪**，**还剩什么**。
 
@@ -10,7 +10,7 @@
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
-- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收尚未开始
+- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)与[复评](reports/portfolio-readiness-2026-11-15-recheck.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收尚未开始
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---
@@ -101,20 +101,20 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 这一版关掉了原来五项里的四项。先说还开着的，再说这一轮新发现的。
 
-### 4.0 Phase 3 进度（截至 2026-11-15）
+### 4.0 Phase 3 进度（截至 2026-11-16）
 
 Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表只列**已合入
 本分支**的产物，并写明每项还差什么；没有证据的一律标未开始或未验证。**M10
-独立验收尚未开始，Phase 3 的退出标准未达成，`v1.0.0` 未发布。**
+独立验收尚未开始，Phase 3 的退出标准未全部达成（M6 层级 2 第二轮单轮已达标 80.0%，B3 准备度与 B2 独立验收仍在推进），`v1.0.0` 未发布。**
 
 | 里程碑 | 状态 | 证据 / 还差什么 |
 |---|---|---|
 | M5 基线校准 | **已完成** | [phase3-baseline.md](reports/phase3-baseline.md)：声明清单、三份 benchmark 由已提交 trace 重算、演示素材的 scripted/真实模型标注 |
-| M6 服务回归集 | **部分完成** | 20 题已冻结在 `100b191`（[service-regression-set.md](benchmarks/service-regression-set.md)）；层级 0 确定性判分 **20/20**（零模型）；层级 1 scripted 演练完成（[m6-level1-scripted.md](benchmarks/m6-level1-scripted.md)）——scripted 是替身模型，成绩原样公开，只证明发题/trace/判分管线端到端可用，不是模型能力基线；层级 2 真实模型批次已完成（[m6-level2-real.md](benchmarks/m6-level2-real.md)，全部数字由脚本从 [m6-level2-traces.json](benchmarks/m6-level2-traces.json) 重算）：MiniMax-M3.1-Flash 对冻结 20 题独立跑 3 轮，DexAtlas 24/60（40.0%，逐轮 45%/40%/35%）、A 源码文本 24/60（40.0%）、B 结构化检索 18/60（30.0%）——**未达验收线（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103 tokens，超出本次授权的 800,000 上限 53,103，92 题全量轮因此未执行。诚实边界：agent 当前默认配置在该冻结集上未达验收线，服务承诺范围待失败模式分析后重定。失败模式分析已完成（[m6-level2-failure-analysis.md](benchmarks/m6-level2-failure-analysis.md)），修复后单轮复测 DexAtlas 15/20（[m6-level2-retest.md](benchmarks/m6-level2-retest.md)）；下一轮复测的预算与判分方案见 [m6-level2-retest-plan.md](benchmarks/m6-level2-retest-plan.md) |
+| M6 服务回归集 | **已完成（单轮验收线达标）** | 20 题已冻结在 `100b191`（[service-regression-set.md](benchmarks/service-regression-set.md)）；层级 0 确定性判分 **20/20**（零模型）；层级 1 scripted 演练完成（[m6-level1-scripted.md](benchmarks/m6-level1-scripted.md)）——scripted 是替身模型，成绩原样公开，只证明发题/trace/判分管线端到端可用，不是模型能力基线；层级 2 真实模型批次已完成（[m6-level2-real.md](benchmarks/m6-level2-real.md)，全部数字由脚本从 [m6-level2-traces.json](benchmarks/m6-level2-traces.json) 重算）：MiniMax-M3.1-Flash 对冻结 20 题独立跑 3 轮，DexAtlas 24/60（40.0%，逐轮 45%/40%/35%）、A 源码文本 24/60（40.0%）、B 结构化检索 18/60（30.0%）——**未达验收线（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103 tokens，超出本次授权的 800,000 上限 53,103，92 题全量轮因此未执行。诚实边界：agent 当前默认配置在该冻结集上未达验收线，服务承诺范围待失败模式分析后重定。失败模式分析已完成（[m6-level2-failure-analysis.md](benchmarks/m6-level2-failure-analysis.md)），修复后第一轮复测 DexAtlas 15/20（[m6-level2-retest.md](benchmarks/m6-level2-retest.md)）；五项根因修复后的第二轮复测（20 题完整分母，首轮 18 题 + 追加授权补跑 2 题，token 355,623）**DexAtlas 16/20 = 80.0%，达到验收线**（[m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)，A 7/20、B 7/20；层级 1 复验确认修复未破坏 scripted 路径，见 [m6-level1-recheck-after-fixes.md](benchmarks/m6-level1-recheck-after-fixes.md)） |
 | M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例的可下载报告/证据包附件尚未落盘（可用这两条命令生成），M10 验收前核对 |
-| M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**修复进行中，未合入本分支**；M8-4（三后端全超时仍 `completed`、退出码 0）**已决策为已知限制**，不改退出码契约，复现与理由见演练报告 §6 |
+| M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**已修复并合入**（d90baff，全命令 `--workspace/-w`、install.md 修正）；M8-4（三后端全失败但 manifest 可解析仍退出 0）已按[提案](proposals/exit-code-partial-read.md)修复：新增退出码 6（EXIT_NO_INDEX），0–5 语义不变（1f6ef05） |
 | M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；Upwork 英文素材为**草稿，未发布**（[outreach/](outreach/project-brief.md)） |
-| M10 独立验收 | **未开始** | 独立复现、准备度重评与 release candidate 均未开始；准备包在另一会话审阅，**未合入本分支** |
+| M10 独立验收 | **准备包就绪，验收未开始** | 40 项验收检查表（[m10-acceptance-pack.md](reports/m10-acceptance-pack.md)）、读者一站式入口（[m10-reader-package.md](reports/m10-reader-package.md)）与作者侧自动化自查（[m10-selfcheck.md](reports/m10-selfcheck.md)，40/40 通过；退出码 6 落地后 F1 期望滞后已修复并带回归测试）已合入；独立复现、准备度重评与 release candidate 未开始，需真实独立读者执行。准备度自评见[复评增补](reports/portfolio-readiness-2026-11-15-recheck.md) |
 
 4.1 起是此前记录、仍未关闭的缺口。
 
