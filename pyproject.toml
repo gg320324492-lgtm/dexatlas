@@ -179,6 +179,8 @@ ignore = ["E501"]
 # CJK fullwidth punctuation inside its string literals trips RUF001, which
 # exists for identifiers where a lookalike could hide a bug.
 "scripts/m6_level2_report.py" = ["RUF001"]
+# The level-2 retest report script writes the same kind of Chinese report.
+"scripts/m6_level2_retest_report.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"
