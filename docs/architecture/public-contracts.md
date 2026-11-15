@@ -11,7 +11,7 @@
 
 ## 1. CLI
 
-CLI 是 Typer 应用（`src/dexatlas/cli/main.py:67`）。全部命令委托
+CLI 是 Typer 应用（`src/dexatlas/cli/main.py:68`）。全部命令委托
 `Analyzer`（`src/dexatlas/core/pipeline.py`），CLI 自身不做分析。全局选项：
 `--log-level`、`--verbose/-v`（`src/dexatlas/cli/main.py:191-203`）。
 
@@ -36,7 +36,7 @@ CLI 是 Typer 应用（`src/dexatlas/cli/main.py:67`）。全部命令委托
 `source` 的文本格式把"这是 Java 还是 Smali、来自哪个文件"打到 stderr
 （`src/dexatlas/cli/main.py:539-547`），stdout 只承载源码本身；`--format json`
 把同一信息放进文档。方法名命中多个重载时列出候选并要求 `--descriptor`
-（`src/dexatlas/cli/main.py:517-530`）。
+（`src/dexatlas/cli/main.py:564-577`）。
 
 ### 1.2 退出码
 
@@ -46,15 +46,19 @@ CLI 是 Typer 应用（`src/dexatlas/cli/main.py:67`）。全部命令委托
 | 码 | 常量 | 语义 | 触发点（示例） |
 |---|---|---|---|
 | 0 | — | 成功完成 | `analyze` 无截断（`src/dexatlas/cli/main.py:311-312`） |
-| 1 | `EXIT_EMPTY` | 请求正确但答案为空：无匹配类/方法/调用者/资源/源码 | `classes` 无匹配（`src/dexatlas/cli/main.py:397-399`）、`analyze` 零符号（`src/dexatlas/cli/main.py:294-299`） |
-| 2 | `EXIT_BAD_REQUEST` | 请求本身错误：项目不存在、输入不是 APK、描述符不合法、无已发布 run | `_require_project`（`src/dexatlas/cli/main.py:163-180`）、`ApkValidationError`（`src/dexatlas/cli/main.py:268-270`）、`export` 无发布 run（`src/dexatlas/cli/main.py:777-782`） |
-| 3 | `EXIT_FAILED` | 分析本身失败（步骤抛错、工作区不可写） | `AnalysisFailed`（`src/dexatlas/cli/main.py:271-279`）、`export` 构建失败（`src/dexatlas/cli/main.py:784-788`） |
-| 4 | `EXIT_AMBIGUOUS` | 请求正确但答案有歧义：方法名命中多个重载 | `AmbiguousMethodError`（`src/dexatlas/cli/main.py:517-530`） |
-| 5 | `EXIT_TRUNCATED` | 分析跑完，但有步骤被上限截断，报告带缺口 | `_truncated` 判定（`src/dexatlas/cli/main.py:147-160`）、赋值（`src/dexatlas/cli/main.py:147-157`） |
+| 1 | `EXIT_EMPTY` | 请求正确但答案为空：无匹配类/方法/调用者/资源/源码 | `classes` 无匹配（`src/dexatlas/cli/main.py:404-406`）、`analyze` 零符号（`src/dexatlas/cli/main.py:294-299`） |
+| 2 | `EXIT_BAD_REQUEST` | 请求本身错误：项目不存在、输入不是 APK、描述符不合法、无已发布 run | `_require_project`（`src/dexatlas/cli/main.py:208-225`）、`ApkValidationError`（`src/dexatlas/cli/main.py:308-310`）、`export` 无发布 run（`src/dexatlas/cli/main.py:805-810`） |
+| 3 | `EXIT_FAILED` | 分析本身失败（步骤抛错、工作区不可写） | `AnalysisFailed`（`src/dexatlas/cli/main.py:311-319`）、`export` 构建失败（`src/dexatlas/cli/main.py:805-809`） |
+| 4 | `EXIT_AMBIGUOUS` | 请求正确但答案有歧义：方法名命中多个重载 | `AmbiguousMethodError`（`src/dexatlas/cli/main.py:564-577`） |
+| 5 | `EXIT_TRUNCATED` | 分析跑完，但有步骤被上限截断，报告带缺口 | `_truncated` 判定（`src/dexatlas/cli/main.py:161-174`）、赋值（`src/dexatlas/cli/main.py:161-171`） |
 
 判据：截断 = 项目 errors 里存在 `output_truncated`（`ToolErrorCode.OUTPUT_TRUNCATED`，
 `src/dexatlas/core/models.py:42`）。三个"空"彼此不同：请求错（2）、答案空（1）、
 运行失败（3），调用方只读退出码也能区分（`src/dexatlas/cli/main.py:7-30`）。
+
+已知缺口：三个后端全部失败、但 manifest 仍可解析时，索引为空而退出码仍为 0，
+与"只看退出码能分辨残缺运行"的承诺有距离；触发条件、调用方自行检测的方式与
+接受理由见 §8.1。
 
 ## 2. REST API
 
@@ -397,3 +401,41 @@ not_included: {apk, full_sources, unrelated_strings}
 | `analyze` 桩抛 `AnalysisFailed` | 3 | ✅ |
 | `analyze` 项目带 `output_truncated` 错误 | 5 | ✅ |
 | 截断场景的 stderr 提到 exit code 5 | ✅ | ✅ |
+
+## 8. 已知限制
+
+本节记录当前版本**已知但未修复**的契约缺口。它不是对承诺的描述，而是对"承诺与
+实现之间还差什么"的说明。修复任何一条都属于公共契约变更，按 §6 的规则显式版本化，
+不得悄悄改。
+
+### 8.1 三后端全部失败时 run 仍可能记 `completed`、CLI 退出码为 0
+
+- **现象**：`DEXATLAS_TOOL_TIMEOUT_SECONDS` 过小等情况下，JADX、Apktool、
+  Androguard 三个后端全部超时，报告带三条 `timeout` 错误、`classes`/`methods` 计数
+  为 0——但只要 Apktool 在超时前写出了可解析的 `AndroidManifest.xml`，
+  `project.status` 仍是 `completed`：只有 `classes` 为空**且** `manifest` 也为空时
+  才记 `ProjectStatus.FAILED`（`src/dexatlas/core/pipeline.py:334-336`），`analyze`
+  因此走成功分支，退出码 0（`src/dexatlas/cli/main.py:334-350`）。
+- **与承诺的缺口**：§1.2 与 `docs/install.md` 的退出码表承诺"只看退出码能分辨残缺
+  运行"——截断（`output_truncated`）确实以 5 表达（`src/dexatlas/cli/main.py:161-176`），
+  但"索引为空、所有代码后端都失败"的运行与完整成功的运行同为 0。只看退出码的调用方
+  会把"什么都没读到"误读为"读完了"。部分后端失败不触发此缺口：索引仍在，错误记录与
+  `completeness=partial` 也都在。
+- **何时会发生**：代码/资源后端全部失败（超时或崩溃），同时 manifest 仍可解析——
+  例如 Apktool 在被超时终止前已经写出 manifest。若 manifest 也没有，项目记为
+  `failed`，`analyze` 以退出码 1 结束，不在此列。
+- **调用方如何自行检测**（这些路径都已存在，是当前唯一可靠的检测方式）：
+  - CLI 的 JSON 报告：`errors[]` 非空，或 `summary.index_complete == false`、
+    `summary.index_gaps[]` 非空、`summary.backends_with_errors` 非空（§5.1；判定函数
+    `index_completeness`，`src/dexatlas/reports/summary.py:23-35`）。
+  - REST：`GET /projects/{pid}` 的 `errors[]`（`src/dexatlas/api/app.py:188-220`）；
+    `GET /projects/{pid}/runs` 的 `completeness == "partial"`
+    （`src/dexatlas/api/app.py:229-252`）。
+  - 运行记录本身：存在任何错误时 `run.completeness` 为 `partial`，即"这次运行没有
+    读完它要读的东西"（`src/dexatlas/core/pipeline.py:349-353`）。
+  - 截断与"全失败"是两回事：前者由 `output_truncated` 错误判定并给出退出码 5
+    （`src/dexatlas/cli/main.py:161-176`）；后者只能按上面的错误/完整性字段检测。
+- **接受理由**：修复需要给"无可用索引但 manifest 可读"的运行一个新的退出码语义
+  （或复用既有的 3/5），属于破坏性或新增的公共契约变更（§6），必须显式版本化并在
+  CHANGELOG 声明。本次（Phase 3 M8）按用户决策只记录、不改契约；后续版本评估是否
+  引入"无可用索引"的独立退出码。

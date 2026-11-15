@@ -9,6 +9,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **全部读写工作区的命令统一接受 `--workspace`/`-w`（Phase 3 M8）。**
+  `analyze` 之外，`backends`、`projects`、`classes`、`methods`、`source`、
+  `resources`、`resrefs`、`search`、`export`、`manifest`、`xrefs` 现在也接受
+  `--workspace`/`-w`，语义与 `analyze` 相同（设置 `DEXATLAS_WORKSPACE` 后清除
+  设置缓存，使选项在已缓存设置的进程里同样生效）。Docker / 多工作区场景下
+  「分析写入哪个工作区，查询就读哪个」不必再在两套记法之间切换。`analyze`
+  可以创建工作区；其余命令只读，`--workspace` 指向不存在的目录时报
+  `No such workspace` 并以退出码 2 结束，且不创建该目录。
+
 - **公共契约表（Phase 3 M8）。** 新增 `docs/architecture/public-contracts.md`：
   逐项固化对外承诺——CLI 全部 13 个子命令与退出码语义（0 成功 / 1 空答案 /
   2 请求错误 / 3 分析失败 / 4 重载歧义 / 5 截断）、REST 全部 23 个端点的请求/
@@ -94,6 +103,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   项目上），退出码就是 5——调用方只看退出码就能区分「干净完成（0）」「部分
   完成/被截断（5）」「失败（3）」。0/1/2/3/4 的含义不变；此前截断的运行
   退出码是 0，依赖旧退出码的调用方需注意这一公共契约变更。
+
+### Fixed
+
+- **`docs/install.md` 的安装命令与实际 extras 组合对齐（Phase 3 M8）。**
+  安装节改为 lockfile 驱动的 `uv sync --extra dev --extra analysis --extra mcp
+  --extra demo`，并逐项说明四个 extra 的用途，以及「仅 `analysis`」最小安装
+  路线缺什么；开发节同步为四 extras（CI 装 dev/analysis/mcp，`demo` 只在
+  重生成演示与报告图时用到），并说明 `tests/test_public_contracts.py` 需要
+  `mcp` extra。补充 `scripts/fetch-fixtures.sh` 需要已认证的 `gh` CLI，
+  并在 Docker 一节写明工作区可用 `--workspace`/`-w` 或 `DEXATLAS_WORKSPACE`
+  指定（见上方 Added 条目）。
 
 ## [0.2.0] — 2026-11-14
 

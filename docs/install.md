@@ -16,16 +16,36 @@ Analysis backends are optional and independent — see [Backends](#backends).
 
 ## Install
 
+The full route — all four extras, installed from the lockfile:
+
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
 
+uv sync --extra dev --extra analysis --extra mcp --extra demo
+```
+
+| Extra     | Installs                                   | Needed by                                              |
+| --------- | ------------------------------------------ | ------------------------------------------------------ |
+| `analysis`| Androguard                                 | In-process DEX parsing, the authoritative symbol graph |
+| `mcp`     | the Model Context Protocol SDK             | `dexatlas-mcp`, the read-only MCP server               |
+| `demo`    | Pillow                                     | `scripts/render-demo.py` (frames; ffmpeg encodes them)  |
+| `dev`     | pytest, pytest-cov, ruff, mypy, vulture, httpx | The test suite and this repository's gates          |
+
+`uv sync` installs the versions pinned in `uv.lock`, so the environment is the one CI
+tested. CI itself installs `dev`, `analysis` and `mcp`; `demo` is only needed to
+regenerate the demo and the report's figures.
+
+For the CLI and the REST API alone, the smaller route is enough:
+
+```bash
 uv venv --python 3.12
 uv pip install -e ".[analysis]"
 ```
 
 The `analysis` extra installs Androguard, which parses DEX in-process. Without it you
-still get APK validation, hashing and archive inspection.
+still get APK validation, hashing and archive inspection. This route installs neither
+the MCP server nor the demo renderer; use `.[analysis,mcp,demo]` when you need them.
 
 ### Docker
 
@@ -43,6 +63,12 @@ run, so a broken backend is caught at build time rather than during your first a
 docker run --rm -p 127.0.0.1:8000:8000 -v dexatlas-workspace:/workspace dexatlas
 # API docs at http://localhost:8000/docs
 ```
+
+Every command names its workspace the same way: `--workspace`/`-w` on `analyze` **and**
+on each query (`projects`, `export`, `search`, …), or `DEXATLAS_WORKSPACE` for the whole
+container. An analysis written with `--workspace` is queried back with the same option;
+a query pointed at a directory that does not exist says so and exits `2` rather than
+creating an empty workspace, so a typo is visible instead of silent.
 
 The port is published on `127.0.0.1` on purpose. **The REST API has no
 authentication**: it lists every project, serves their decompiled sources and
@@ -126,6 +152,10 @@ Get a fixture to analyse. No APK is committed to this repository, so fetch one:
 ```bash
 bash scripts/fetch-fixtures.sh
 ```
+
+The script reads androguard's test data through the GitHub API, so the
+[`gh` CLI](https://cli.github.com/) has to be installed and authenticated
+(`gh auth login`). It is only needed for the fixtures, not for DexAtlas itself.
 
 These come from androguard's own test data under Apache-2.0, and their source and licence
 are recorded in `fixtures/apk/SOURCES.md`. **Never commit an APK you are not authorized to
@@ -304,7 +334,7 @@ central directory, before a single byte of it is decompressed.
 ## Development
 
 ```bash
-uv pip install -e ".[dev,analysis]"
+uv sync --extra dev --extra analysis --extra mcp --extra demo
 uv run ruff check .
 uv run ruff format .
 uv run mypy
@@ -312,6 +342,10 @@ uv run pytest                      # everything
 uv run pytest -m "not slow"        # fast suite, no backends needed
 uv run pytest --cov=dexatlas --cov-report=term-missing
 ```
+
+`dev` alone is not enough for the whole suite: `tests/test_public_contracts.py`
+imports the MCP SDK. Regenerating the report's figures also needs `demo`
+(Pillow) and `ffmpeg` on `PATH`.
 
 CI runs the same commands on Python 3.12 and 3.13.
 
