@@ -1036,6 +1036,122 @@ def test_analyze_workspace_option_redirects_the_run(
     assert not (workspace / "dexatlas.db").exists()
 
 
+# -- the workspace option every command shares -------------------------------
+
+#: Every command that touches the workspace, and so has to be able to name it.
+_WORKSPACE_COMMANDS = (
+    "analyze",
+    "backends",
+    "projects",
+    "classes",
+    "methods",
+    "source",
+    "resources",
+    "resrefs",
+    "search",
+    "export",
+    "manifest",
+    "xrefs",
+)
+
+
+@pytest.mark.parametrize("command", _WORKSPACE_COMMANDS)
+def test_every_command_that_reads_the_workspace_accepts_it(command: str) -> None:
+    """A workspace can be named on every command, the way ``analyze`` names it.
+
+    The Docker path is why: an analysis writes into ``--workspace`` and the
+    queries that follow have to read that same directory. Holding the option
+    on ``analyze`` alone made the two halves of one workflow speak different
+    languages — the analysis named its workspace, and every query after it
+    answered from ``DEXATLAS_WORKSPACE`` or from the default, without saying
+    which.
+    """
+    result = _run(command, "--help")
+
+    assert result.exit_code == 0
+    # The help table prints the long option and its short form side by side:
+    # "--workspace  -w". A bare substring check for "-w" would also match the
+    # "--workspace" it is part of, and pass on a command that has only one.
+    assert re.search(r"--workspace\s+-w\b", result.stdout), result.stdout
+
+
+def test_a_query_reads_the_workspace_it_is_given(
+    workspace: Path, tmp_path: Path, seeded_project: str
+) -> None:
+    """``--workspace`` must reach the settings object, cache included.
+
+    Settings are cached for the life of the process, so writing the
+    environment variable alone changes nothing after the first command has
+    read it: the query would answer from the first workspace, and the answer
+    would look right. These two invocations share a process on purpose.
+    """
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+
+    first = _run("projects")
+    assert first.exit_code == 0
+    assert seeded_project in first.stdout
+
+    result = _run("projects", "--workspace", str(elsewhere))
+
+    assert result.exit_code == 0
+    assert "No projects yet" in result.stdout
+    assert seeded_project not in result.stdout
+
+
+def test_the_workspace_option_has_a_short_form(
+    workspace: Path, tmp_path: Path, seeded_project: str
+) -> None:
+    """``-w`` is the same option as ``--workspace``, not a second spelling."""
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+
+    result = _run("projects", "-w", str(elsewhere))
+
+    assert result.exit_code == 0
+    assert "No projects yet" in result.stdout
+    assert seeded_project not in result.stdout
+
+
+@pytest.mark.parametrize("name", ["missing", "file"])
+def test_a_workspace_that_names_nothing_is_a_wrong_request(
+    workspace: Path, tmp_path: Path, name: str
+) -> None:
+    """A query does not create the workspace it was pointed at.
+
+    Creating one would answer "No projects yet" about a path that holds no
+    analysis — a wrong answer wearing the right one's clothes — and would
+    write to disk from a command that promised to read.
+    """
+    target = tmp_path / name
+    if name == "file":
+        target.write_text("not a workspace", encoding="utf-8")
+
+    result = _run("projects", "--workspace", str(target))
+
+    assert result.exit_code == 2
+    assert "No such workspace" in result.stderr
+
+    if name == "missing":
+        assert not target.exists()
+
+
+@pytest.mark.slow
+def test_analyze_and_a_query_share_the_workspace_option(
+    workspace: Path, tmp_path: Path, minimal_apk: Path
+) -> None:
+    """The Docker workflow, by name on both sides: analyse, then query the same root."""
+    elsewhere = tmp_path / "elsewhere"
+
+    analysed = _run("analyze", str(minimal_apk), "--workspace", str(elsewhere))
+    assert analysed.exit_code in (0, 1), analysed.output
+
+    result = _run("projects", "--workspace", str(elsewhere))
+
+    assert result.exit_code == 0
+    assert "minimal.apk" in result.stdout
+
+
 def test_analyze_rejects_a_zip_that_is_not_an_apk(
     workspace: Path, zip_without_android_markers: Path
 ) -> None:

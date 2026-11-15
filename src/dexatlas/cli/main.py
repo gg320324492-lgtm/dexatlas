@@ -7,8 +7,8 @@ drift apart.
 Three kinds of "nothing" are kept apart, because they mean different things to
 whoever reads the output:
 
-* the request was wrong — the project id names nothing, or the input is not an APK.
-  That is exit code :data:`EXIT_BAD_REQUEST`.
+* the request was wrong — the project id or the workspace names nothing, or the
+  input is not an APK. That is exit code :data:`EXIT_BAD_REQUEST`.
 * the request was fine and the answer is empty — the project has no classes, no
   callers, no source for that class. That is exit code :data:`EXIT_EMPTY`.
 * the analysis itself failed — a step raised, or the workspace could not be
@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
@@ -69,7 +70,8 @@ app = typer.Typer(
     help="Evidence-first Android reverse engineering and analysis platform.",
     epilog=(
         "Exit codes: 0 the command did what was asked; 1 the answer is empty; "
-        "2 the request was wrong (no such project, or an input that is not an APK); "
+        "2 the request was wrong (no such project or workspace, or an input that "
+        "is not an APK); "
         "3 the analysis itself failed; 4 the request was right and the answer is "
         "ambiguous (the method name matches several overloads); 5 the analysis "
         "finished but a limit cut a step short, so the report has gaps in it."
@@ -134,6 +136,18 @@ class SourceFormat(StrEnum):
     """One JSON document carrying the source and its provenance."""
 
 
+#: The workspace override every command shares, ``analyze`` included.
+#:
+#: One spelling for one idea: a workflow that analysed into ``--workspace``
+#: used to have to query it back through ``DEXATLAS_WORKSPACE``, and a reader
+#: of the second command could not see which directory answered. The short
+#: form exists because ``-o`` and ``-w`` are typed together in Docker runs.
+WorkspaceOption = Annotated[
+    Path | None,
+    typer.Option("--workspace", "-w", help="Override the analysis workspace root."),
+]
+
+
 def _more(count: int, singular: str, plural: str | None = None) -> str:
     """``1 more source`` / ``2 more sources`` — a count and the noun that fits it."""
     return f"{count} more {singular if count == 1 else (plural or singular + 's')}"
@@ -158,6 +172,37 @@ def _truncated(result: AnalysisResult) -> bool:
     a caller should not read as the whole APK.
     """
     return any(error.code is ToolErrorCode.OUTPUT_TRUNCATED for error in result.project.errors)
+
+
+def _use_workspace(workspace: Path | None, *, must_exist: bool) -> None:
+    """Point every setting this process reads at the requested workspace.
+
+    Settings are cached for the life of the process, so writing the
+    environment variable alone would be read by the next process and ignored
+    by this one — the command would answer from the workspace it was not
+    asked about, and the answer would look right. Clearing the cache is what
+    makes the option real.
+
+    ``analyze`` may create the workspace, because writing an analysis into a
+    new directory is what it was asked to do. Every other command reads, and
+    a read does not create the directory it was pointed at: that would answer
+    "no projects yet" about a path that holds no analysis, and would write to
+    disk from a command that promised to read. A path that names no directory
+    is a wrong request, and it says so.
+    """
+    if workspace is None:
+        return
+    if must_exist and not workspace.is_dir():
+        err_console.print(
+            f"[red]No such workspace:[/red] {workspace}\n"
+            "A workspace is a directory an analysis has written to; nothing "
+            "exists there to read, and a query does not create it.\n"
+            "Analyse an APK into it first: "
+            "`dexatlas analyze <apk> --workspace <path>`."
+        )
+        raise ExitCode(code=EXIT_BAD_REQUEST)
+    os.environ["DEXATLAS_WORKSPACE"] = str(workspace)
+    get_settings.cache_clear()
 
 
 def _require_project(analyzer: Analyzer, project_id: str) -> Project:
@@ -210,8 +255,9 @@ def version() -> None:
 
 
 @app.command()
-def backends() -> None:
+def backends(workspace: WorkspaceOption = None) -> None:
     """Show which analysis backends are installed and at what version."""
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     table = Table(title="Analysis backends", header_style="bold")
     table.add_column("Backend")
@@ -252,16 +298,10 @@ def analyze(
             help="Write the offline HTML report here — one file, no scripts, no fetched resources.",
         ),
     ] = None,
-    workspace: Annotated[
-        Path | None, typer.Option("--workspace", help="Override the analysis workspace root.")
-    ] = None,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """Analyse an APK and produce a report."""
-    if workspace is not None:
-        import os
-
-        os.environ["DEXATLAS_WORKSPACE"] = str(workspace)
-        get_settings.cache_clear()
+    _use_workspace(workspace, must_exist=False)
 
     try:
         result = Analyzer().analyze(apk)
@@ -333,8 +373,9 @@ def analyze(
 
 
 @app.command()
-def projects() -> None:
+def projects(workspace: WorkspaceOption = None) -> None:
     """List every analysed project."""
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     rows = analyzer.store.list_projects()
     if not rows:
@@ -384,6 +425,7 @@ def classes(
     all_sources: Annotated[
         bool, typer.Option("--all", help="Show every source of every class.")
     ] = False,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """List the classes indexed for a project.
 
@@ -391,6 +433,7 @@ def classes(
     dex file that defines it. The listing shows the first two and says how many
     it left out; ``--all`` shows them all, and the REST API returns them all.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     indexed = analyzer.store.list_classes(project_id, prefix=prefix)
@@ -430,6 +473,7 @@ def methods(
             help="Maximum methods to list. 1 or more; the CLI applies no upper bound.",
         ),
     ] = 100,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """List the methods indexed for a project.
 
@@ -437,6 +481,7 @@ def methods(
     JADX produced Java for the method, so ``no`` means there is no decompiled
     source to read.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     indexed = analyzer.store.list_methods(project_id, class_name)
@@ -487,6 +532,7 @@ def source(
             help="Print the source text, or a JSON document carrying its provenance.",
         ),
     ] = SourceFormat.TEXT,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """Print a class (or one method) as decompiled Java, falling back to Smali.
 
@@ -499,6 +545,7 @@ def source(
     of them: the candidates are named, and the exit code says the request was
     ambiguous. ``--descriptor`` says which overload is meant.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     if descriptor is not None and not is_descriptor(descriptor):
@@ -605,6 +652,7 @@ def resources(
             help="Maximum resources to list. 1 or more; the CLI applies no upper bound.",
         ),
     ] = 100,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """List the resource strings indexed for a project.
 
@@ -612,6 +660,7 @@ def resources(
     ``res/values/strings.xml`` and its siblings. Each row names the file it was
     declared in, so a value found here can be traced back to its declaration.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     rows = analyzer.resources(project_id, name=name)
@@ -663,6 +712,7 @@ def resrefs(
             help="Maximum references to list. 1 or more; the CLI applies no upper bound.",
         ),
     ] = 100,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """List the references between resources: who points at a resource.
 
@@ -671,6 +721,7 @@ def resrefs(
     attribute and the line it sits on — so "which files use this string?"
     has an answer with a place attached to it.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     rows = analyzer.resource_references(project_id, res_type=res_type, res_name=name)
@@ -719,8 +770,10 @@ def search(
             help="Maximum results. 1 or more; the CLI applies no upper bound.",
         ),
     ] = 50,
+    workspace: WorkspaceOption = None,
 ) -> None:
     """Full-text search across a project's indexed symbols."""
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     # One row more than was asked for: the extra row is how the command knows
@@ -759,6 +812,7 @@ def export(
             help="Where to write the evidence package (a .zip).",
         ),
     ],
+    workspace: WorkspaceOption = None,
 ) -> None:
     """Export the minimal evidence package for a finished analysis.
 
@@ -772,6 +826,7 @@ def export(
     citation, because everything in it is located by a path relative to the
     package, never by a path on this machine.
     """
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     if analyzer.store.get_published_run(project_id) is None:
@@ -795,8 +850,12 @@ def export(
 
 
 @app.command()
-def manifest(project_id: Annotated[str, typer.Argument(help="Project id.")]) -> None:
+def manifest(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    workspace: WorkspaceOption = None,
+) -> None:
     """Show the parsed AndroidManifest.xml for a project."""
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     info = analyzer.store.get_manifest(project_id)
@@ -829,8 +888,10 @@ def xrefs(
         str,
         typer.Argument(help="Method id, e.g. com.example.Foo.bar(Ljava/lang/String;)V"),
     ],
+    workspace: WorkspaceOption = None,
 ) -> None:
     """List the callers of a method."""
+    _use_workspace(workspace, must_exist=True)
     analyzer = Analyzer()
     _require_project(analyzer, project_id)
     # Canonicalise before the lookup, so the id echoed back on failure is the one
