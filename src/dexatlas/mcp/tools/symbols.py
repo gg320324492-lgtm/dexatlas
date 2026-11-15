@@ -29,6 +29,14 @@ def search_symbols(
     The search runs over the whole index — classes, methods, fields and
     strings — and the excerpt is the index's own text around the match, so
     it says why a symbol matched.
+
+    The token search answers "what does the index say about these words". A
+    string constant whose value never spells the query as words — "api key"
+    asked, `sk_live_4eC39...` held — is invisible to it, so the constant
+    pool is also swept for the query as a *substring*, and those hits are
+    appended after the word matches. The sweep is deterministic, free, and
+    answers the question a string-constant question actually asks: does
+    this text occur in the APK.
     """
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
@@ -39,6 +47,22 @@ def search_symbols(
     # happens to show.
     found = analyzer.store.search(project_id, query, limit=offset + limit)
     page = found[offset : offset + limit]
+
+    # The sweep only adds what the word search missed, and only string
+    # constants, so the shape of a code-symbol answer is unchanged. The name
+    # check keeps a constant the word search already returned from appearing
+    # twice.
+    if query.strip():
+        seen = {str(entry.get("name", "")) for entry in page}
+        for entry in analyzer.store.search_string_substring(
+            project_id, query, limit=offset + limit
+        ):
+            name = str(entry.get("name", ""))
+            if name in seen:
+                continue
+            seen.add(name)
+            page.append(entry)
+        page = page[: offset + limit]
 
     return SymbolList(
         symbols=[
