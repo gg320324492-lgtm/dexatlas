@@ -320,7 +320,14 @@ def build_demo(
         [],
         references,
         strings,
-        [ResourceString(name="app_name", value="Demo")],
+        [
+            ResourceString(
+                name="app_name",
+                value="Demo",
+                file="res/values/strings.xml",
+                provenance=_provenance("apktool:res/values/strings.xml", tool="apktool"),
+            ),
+        ],
     )
     project.class_count = counts.classes
     project.method_count = counts.methods

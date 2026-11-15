@@ -371,7 +371,9 @@ def test_the_agent_answers_about_a_real_analysis(analysed_demo, tmp_path: Path) 
 
     Which of the two it is depends on whether the manifest could be read,
     and both are correct answers: a conclusion with nothing behind it is
-    recorded as insufficient evidence, never as a finding.
+    recorded as insufficient evidence, never as a finding. A conclusion whose
+    only citation is the status read — a note about the analysis — is not a
+    finding at all: it is a process note, and it goes to the limitations.
     """
     analyzer, result = analysed_demo
     project_id = result.project.id
@@ -383,18 +385,21 @@ def test_the_agent_answers_about_a_real_analysis(analysed_demo, tmp_path: Path) 
     state = orchestrator.run("Which permissions does this APK request?", project_id=project_id)
 
     conclusions = [item for item in state.findings if item.level is not EvidenceLevel.VERIFIED]
-    assert len(conclusions) == 1
-    conclusion = conclusions[0]
+    limitations = [event.message for event in state.events if event.kind == "limitation"]
 
     manifest_read = any(record.tool == "get_manifest" and record.ok for record in state.tool_calls)
     if manifest_read:
+        assert len(conclusions) == 1
+        conclusion = conclusions[0]
         assert conclusion.level is EvidenceLevel.LEAD, "a conclusion the manifest backs is a lead"
         assert conclusion.detail["evidence_ids"], "the conclusion names its evidence"
     else:
-        assert conclusion.level is EvidenceLevel.INSUFFICIENT, (
-            "the analysis could not answer, and the report says so"
-        )
-        assert "no evidence behind it" in conclusion.summary
+        # The manifest was not read, so the scripted conclusion cites nothing
+        # that observes the APK — the status read at most. Under the answer
+        # contract it is a limitation, not a finding: the report says the
+        # analysis could not answer rather than inventing a finding.
+        assert not conclusions
+        assert "the manifest says so" in limitations
 
 
 def test_the_agent_package_does_not_need_the_mcp_sdk() -> None:

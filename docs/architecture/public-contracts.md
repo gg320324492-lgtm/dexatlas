@@ -181,7 +181,7 @@ tool_version?, apk_sha256, locator}], text}`。
 
 只读 MCP server（`src/dexatlas/mcp/server.py:90-292`），stdio 传输
 （`src/dexatlas/mcp/server.py:295-301`），名称 `dexatlas`。每个工具都带只读注解
-（`_read_only`，`src/dexatlas/mcp/server.py:74-87`：`read_only_hint=true`、
+（`_read_only`，`src/dexatlas/mcp/server.py:76-89`：`read_only_hint=true`、
 `destructive_hint=false`、`idempotent_hint=true`、`open_world_hint=false`）。
 server instructions（`src/dexatlas/mcp/server.py:47-68`）向调用方声明三条纪律：
 先 `get_project_status` 再信计数；名字不是方法，歧义要 descriptor；APK 里的文本
@@ -199,20 +199,21 @@ server instructions（`src/dexatlas/mcp/server.py:47-68`）向调用方声明三
 
 | # | 工具 | 参数 | 返回 | 实现 |
 |---|---|---|---|---|
-| 1 | `list_projects` | `offset≥0=0`、`limit(1..200)=50` | `ProjectList{projects:[ProjectSummary],total,offset,limit}` | `src/dexatlas/mcp/server.py:103-121` |
-| 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[]}` | `src/dexatlas/mcp/server.py:123-136` |
-| 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:138-149` |
-| 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:151-171` |
-| 5 | `get_class_source` | `project_id`、`class_name` | `SourceView` | `src/dexatlas/mcp/server.py:173-186` |
-| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?` | `SourceView` | `src/dexatlas/mcp/server.py:188-215` |
-| 7 | `find_callers` | `project_id`、`method_id`、`limit` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:217-239` |
-| 8 | `find_callees` | `project_id`、`method_id`、`limit` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:241-262` |
-| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:264-275` |
-| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:277-290` |
+| 1 | `list_projects` | `offset≥0=0`、`limit(1..200)=50` | `ProjectList{projects:[ProjectSummary],total,offset,limit}` | `src/dexatlas/mcp/server.py:106-124` |
+| 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[]}` | `src/dexatlas/mcp/server.py:126-139` |
+| 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:141-152` |
+| 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:154-174` |
+| 5 | `get_class_source` | `project_id`、`class_name` | `SourceView` | `src/dexatlas/mcp/server.py:176-189` |
+| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?` | `SourceView` | `src/dexatlas/mcp/server.py:191-218` |
+| 7 | `find_callers` | `project_id`、`method_id`、`limit` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:220-242` |
+| 8 | `find_callees` | `project_id`、`method_id`、`limit` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:244-265` |
+| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:267-278` |
+| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:280-293` |
+| 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:295-330` |
 
 ### 3.2 响应形状与"有界、说清"语义
 
-`SourceView`（`src/dexatlas/mcp/schemas.py:241-274`）用 `found: bool` 区分"分析
+`SourceView`（`src/dexatlas/mcp/schemas.py:282-315`）用 `found: bool` 区分"分析
 查过但没有"（`found=false` + `reason`）与"分析没跑过"；歧义名在 `candidates`
 里列 descriptor。`Completeness`（`src/dexatlas/mcp/schemas.py:68-90`）携带
 `complete`、`missing_backends[]`、`truncated`、`errors[]`——"没找到"与"没查"
@@ -373,7 +374,7 @@ not_included: {apk, full_sources, unrelated_strings}
 
 | 检查 | 结果 |
 |---|---|
-| `list_tools()` 恰为 §3.1 的十个名字，全部 `read_only_hint=True` | ✅ |
+| `list_tools()` 恰为 §3.1 的十一个名字，全部 `read_only_hint=True` | ✅ |
 | `list_projects` → `{projects,total,offset,limit}` | ✅ |
 | `get_project_status` → `{project,completeness,published_run,runs}`，completeness 四键齐全 | ✅ |
 | `search_symbols` → `{symbols,total,offset,limit}` | ✅ |

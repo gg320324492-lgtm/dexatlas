@@ -198,6 +198,7 @@ def test_the_server_registers_the_tools_it_says_it_does(analyzer: Analyzer) -> N
         "get_method_source",
         "find_callers",
         "find_callees",
+        "find_resource_declarations",
         "get_evidence",
         "resolve_locator",
     }

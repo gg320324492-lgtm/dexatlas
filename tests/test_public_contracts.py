@@ -103,7 +103,7 @@ EXPECTED_SOURCE_HEADERS = {
     "X-DexAtlas-Source-Tool-Version",
 }
 
-#: The ten read-only tools, and nothing else.
+#: The read-only tools, and nothing else.
 EXPECTED_MCP_TOOLS = {
     "list_projects",
     "get_project_status",
@@ -113,6 +113,7 @@ EXPECTED_MCP_TOOLS = {
     "get_method_source",
     "find_callers",
     "find_callees",
+    "find_resource_declarations",
     "get_evidence",
     "resolve_locator",
 }

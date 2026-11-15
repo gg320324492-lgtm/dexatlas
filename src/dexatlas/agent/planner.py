@@ -42,6 +42,7 @@ class Intent(StrEnum):
     SOURCE = "source"
     CALLS = "calls"
     EVIDENCE = "evidence"
+    RESOURCES = "resources"
     GENERAL = "general"
 
 
@@ -81,6 +82,17 @@ INTENT_WORDS: dict[Intent, tuple[str, ...]] = {
         "proof",
         "locator",
         "recorded",
+    ),
+    Intent.RESOURCES: (
+        "resource",
+        "resources",
+        "res",
+        "strings.xml",
+        "declared",
+        "declaration",
+        "declares",
+        "app_name",
+        "label",
     ),
     Intent.CALLS: (
         "call",
@@ -136,6 +148,7 @@ INTENT_TOOLS: dict[Intent, tuple[str, ...]] = {
         "get_method_source",
     ),
     Intent.EVIDENCE: ("get_evidence", "resolve_locator", "get_manifest", "search_symbols"),
+    Intent.RESOURCES: ("find_resource_declarations", "search_symbols"),
     Intent.GENERAL: (
         "get_manifest",
         "search_symbols",
@@ -143,6 +156,7 @@ INTENT_TOOLS: dict[Intent, tuple[str, ...]] = {
         "get_method_source",
         "find_callers",
         "find_callees",
+        "find_resource_declarations",
     ),
 }
 
@@ -160,6 +174,10 @@ OBJECTIVES: dict[Intent, str] = {
     Intent.CALLS: ("Trace the calls the question is about: who calls what, and what calls what."),
     Intent.EVIDENCE: (
         "Find the evidence the question is about, and say whether it resolves inside this analysis."
+    ),
+    Intent.RESOURCES: (
+        "Find where the resource the question names is declared: the file, the "
+        "qualifier and the value, from the resource table."
     ),
     Intent.GENERAL: (
         "Find out what the question is about, using the tools, and say what the "

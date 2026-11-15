@@ -9,6 +9,32 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Agent 回答契约与工具调优（Phase 3 M6-③）。** 依据 M6 层级 2 失败分析
+  （`docs/benchmarks/m6-level2-failure-analysis.md`）的失败模式，改 agent 的
+  回答契约并补一个查询工具，不动题集与判分：
+  - **否定/缺席题的回答形态（FM-1，9 题次）**：问题问「是否存在 X」而证据
+    表明不存在时，`orchestrator` 的答案合成不再把否定陈述写成 finding——
+    否定措辞且无真实证据支撑的 conclusion 改记入 limitations
+    （`_is_process_note`），报告仍完整携带这句话，但 findings 为零，与
+    判分 `expect_empty` 的语义一致。
+  - **过程注记移出结论（FM-2，7 题次）**：只引用过程类记录（
+    `supports_claims=false`，如「分析已完成」）的 conclusion 不再成为
+    finding，改记入 limitations。真实证据支撑的结论不受影响。
+  - **计数题逐项成条与完整描述符（FM-2/FM-7）**：`INSTRUCTIONS` 明确要求
+    「一个计数对象一条 finding、汇总文字移出 conclusions」以及「方法身份
+    必须带完整 JVM 描述符 `Class.name(descriptor)`」。
+  - **新增 MCP 只读工具 `find_resource_declarations`（FM-6，工具缺口）**：
+    按资源名或值反查声明文件（`res/values*/strings.xml` 等），返回声明行
+    的文件、qualifier、kind 与 provenance；`McpToolClient`、`Planner`
+    （新增 `resources` 意图）、证据记录（`_record_resource_declarations`）
+    全链路接入。**公共契约变更：MCP 工具从十个增至十一个**，
+    `docs/architecture/public-contracts.md`、`tests/test_public_contracts.py`、
+    `scripts/verify-public-contracts.py` 已同步。
+  - 契约行为由 `tests/test_agent_answer_contract.py` 的 19 个测试固化
+    （旧实现上全部先红）。
+
+### Added
+
 - **全部读写工作区的命令统一接受 `--workspace`/`-w`（Phase 3 M8）。**
   `analyze` 之外，`backends`、`projects`、`classes`、`methods`、`source`、
   `resources`、`resrefs`、`search`、`export`、`manifest`、`xrefs` 现在也接受

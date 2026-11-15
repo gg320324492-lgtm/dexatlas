@@ -333,6 +333,7 @@ EXPECTED_TOOLS = {
     "get_method_source",
     "find_callers",
     "find_callees",
+    "find_resource_declarations",
     "get_evidence",
     "resolve_locator",
 }
@@ -375,7 +376,7 @@ def mcp_checks() -> None:
             }
 
     answer = asyncio.run(ask())
-    check("tool list is exactly the ten read-only tools", answer["names"] == EXPECTED_TOOLS)
+    check("tool list is exactly the read-only tools", answer["names"] == EXPECTED_TOOLS)
     check("every tool is annotated read-only", answer["read_only"] is True)
     check(
         "list_projects page shape",

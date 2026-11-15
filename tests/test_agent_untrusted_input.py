@@ -307,6 +307,7 @@ def test_the_agent_has_no_way_to_run_a_shell(poisoned: Demo, tmp_path: Path) -> 
         "get_method_source",
         "find_callers",
         "find_callees",
+        "find_resource_declarations",
         "get_evidence",
         "resolve_locator",
     }

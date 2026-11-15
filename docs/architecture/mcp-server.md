@@ -37,6 +37,7 @@ The workspace comes from the same settings as the rest of DexAtlas, so
 | `get_method_source` | **One exact method** — by descriptor, not by name |
 | `find_callers` | The calls into a method, as call sites, with both counts |
 | `find_callees` | The calls out of a method |
+| `find_resource_declarations` | Where a resource string is declared — by name or by value, with the declaring file |
 | `get_evidence` | One evidence record, with the locators it was read from |
 | `resolve_locator` | A provenance locator, resolved into the source it names |
 

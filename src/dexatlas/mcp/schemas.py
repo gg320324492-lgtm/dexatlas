@@ -238,6 +238,47 @@ class SymbolList(BaseModel):
     limit: int
 
 
+class ResourceDeclarationView(BaseModel):
+    """One declaration of one resource string, and the file that declares it.
+
+    A resource's *value* lives in the symbol index; its *place* — the values
+    file a reader would open to see it declared — lives here. The two are
+    different facts about the same row, and a question that asks "where is
+    this declared?" is answered by the place and not by the value.
+    """
+
+    name: str
+    """The resource name, e.g. ``app_name``."""
+
+    value: UntrustedText
+    """The declared text, which came out of the APK."""
+
+    kind: str
+    """Which element declared it: ``string``, ``string_array``, ``plural`` or
+    ``layout_text``."""
+
+    file: str
+    """The file that declares it, e.g. ``res/values/strings.xml``."""
+
+    qualifier: str | None = None
+    """The values-directory qualifier, e.g. ``zh`` for ``res/values-zh/``."""
+
+    position: int = 0
+    """Where the text sits inside its declaration, counting from zero."""
+
+    provenance: list[str] = Field(default_factory=list)
+    """The locators that say where the declaration was read from."""
+
+
+class ResourceDeclarationList(BaseModel):
+    """A page of resource declarations."""
+
+    declarations: list[ResourceDeclarationView]
+    total: int
+    offset: int
+    limit: int
+
+
 class SourceView(BaseModel):
     """One method's or class's source, and where it came from."""
 

@@ -1102,12 +1102,25 @@ def badge_figures(facts: Facts, report_figures: dict[str, str]) -> dict[str, lis
     the tree as it is now, and right when it names the release the project
     last shipped. The badge that shipped with v0.1.2 named neither: it said
     275, and the project had 444.
+
+    A tests badge says "N **passing**", so the measured *pass* count answers
+    it too: the report records both the collected total (``tests.total``)
+    and the run's passes (``suite.passed``), and a complete measurement can
+    differ by the runs that sat out — a backend that is not installed makes
+    its tests skip, and the skipped ones do not pass. Both figures come from
+    the same measurement of the same tree, so both are accepted here.
     """
     newest = facts.newest_tag
     released = measured_figures(f"v{newest}") if newest else {}
+    current_tests = [
+        report_figures.get("tests.total"),
+        report_figures.get("suite.passed"),
+        released.get("tests.total"),
+        released.get("suite.passed"),
+    ]
     return {
-        "tests": [report_figures.get("tests.total"), released.get("tests.total")],
-        "test": [report_figures.get("tests.total"), released.get("tests.total")],
+        "tests": current_tests,
+        "test": current_tests,
         "coverage": [report_figures.get("coverage.pct"), released.get("coverage.pct")],
     }
 

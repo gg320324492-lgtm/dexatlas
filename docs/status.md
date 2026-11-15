@@ -20,8 +20,8 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · **v0.2.0**（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） |
-| 测试 | <!--fig:tests.total-->1447<!--/fig--> 个（<!--fig:tests.fast-->1301<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） |
-| 一方代码覆盖率 | <!--fig:coverage.pct-->91.8%<!--/fig--> |
+| 测试 | <!--fig:tests.total-->1466<!--/fig--> 个（<!--fig:tests.fast-->1320<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->91.9%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
@@ -225,7 +225,7 @@ P2-003 关掉了上表里 `xrefs` 那条缺陷：索引里现在存的是**调�
 （带着它是从哪个 DEX 文件、哪条指令读出来的），**调用边**由调用点派生。
 两个数在报告里分开写，并且各自说清是哪个。
 
-**M1 也落地了**：只读的 MCP 服务器。十个工具，读而不写、不跑 shell、
+**M1 也落地了**：只读的 MCP 服务器。十一个工具，读而不写、不跑 shell、
 不需要模型 provider；每一份从 APK 里读出来的文字都带着「这是数据」的标记。
 设计与边界在[架构文档](architecture/mcp-server.md)里。
 

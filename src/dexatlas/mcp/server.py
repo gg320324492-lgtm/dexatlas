@@ -36,12 +36,14 @@ from dexatlas.mcp.schemas import (
     ManifestView,
     ProjectList,
     ProjectStatus,
+    ResourceDeclarationList,
     SourceView,
     SymbolList,
 )
 from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
 from dexatlas.mcp.tools import references as reference_tools
+from dexatlas.mcp.tools import resources as resource_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 
 INSTRUCTIONS = """\
@@ -288,6 +290,43 @@ def build_server(analyzer: Analyzer) -> MCPServer:
     )
     def resolve_locator(project_id: str, locator: str) -> LocatorResolution:
         return evidence_tools.resolve_locator(analyzer, project_id, locator)
+
+    @server.tool(
+        name="find_resource_declarations",
+        title="Find where a resource is declared",
+        description=(
+            "Find the declarations of one resource string, by its name ('app_name') "
+            "or by its value ('Demo'): each declaration with the file that declares "
+            "it — res/values/strings.xml and its siblings — the qualifier, and the "
+            "provenance of the read. Pass name, value, or both. This reads the "
+            "resource table, not the code."
+        ),
+        annotations=_read_only("Find where a resource is declared"),
+    )
+    def find_resource_declarations(
+        project_id: str,
+        name: Annotated[
+            str | None,
+            Field(description="The resource name, e.g. 'app_name'."),
+        ] = None,
+        value: Annotated[
+            str | None,
+            Field(description="The declared text to look up, e.g. 'Demo'."),
+        ] = None,
+        offset: Annotated[int, Field(ge=0, description="How many results to skip.")] = 0,
+        limit: Annotated[
+            int,
+            Field(ge=1, le=MAX_LIMIT, description="How many results to return at most."),
+        ] = DEFAULT_LIMIT,
+    ) -> ResourceDeclarationList:
+        return resource_tools.find_resource_declarations(
+            analyzer,
+            project_id,
+            name=name,
+            value=value,
+            limit=limit,
+            offset=offset,
+        )
 
     return server
 

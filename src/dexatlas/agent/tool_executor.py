@@ -44,6 +44,7 @@ from dexatlas.mcp.errors import RequestError
 from dexatlas.mcp.tools import evidence as evidence_tools
 from dexatlas.mcp.tools import projects as project_tools
 from dexatlas.mcp.tools import references as reference_tools
+from dexatlas.mcp.tools import resources as resource_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 
 #: How a call ended badly.
@@ -190,6 +191,12 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
         "Find the calls out of a method: what it calls, with the call-site and "
         "call-edge counts kept apart."
     ),
+    "find_resource_declarations": (
+        "Find where a resource string is declared: by its name ('app_name') or by "
+        "its value ('Demo'), each declaration with the file that declares it — "
+        "res/values/strings.xml and its siblings — and the provenance of the read. "
+        "Pass name, value, or both."
+    ),
     "get_evidence": (
         "Read one evidence record by its id, with the locators it was read from. "
         "The locators are the places a reader can go to check the record."
@@ -233,6 +240,9 @@ class McpToolClient:
             "get_method_source": partial(symbol_tools.method_source, analyzer),
             "find_callers": partial(reference_tools.find_callers, analyzer),
             "find_callees": partial(reference_tools.find_callees, analyzer),
+            "find_resource_declarations": partial(
+                resource_tools.find_resource_declarations, analyzer
+            ),
             "get_evidence": partial(evidence_tools.get_evidence, analyzer),
             "resolve_locator": partial(evidence_tools.resolve_locator, analyzer),
         }
