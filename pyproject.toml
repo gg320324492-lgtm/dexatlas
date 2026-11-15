@@ -175,6 +175,10 @@ ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101"]
+# The M6 level-2 report script writes a Chinese-language report file; the
+# CJK fullwidth punctuation inside its string literals trips RUF001, which
+# exists for identifiers where a lookalike could hide a bug.
+"scripts/m6_level2_report.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"
