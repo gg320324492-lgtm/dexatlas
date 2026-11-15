@@ -25,9 +25,11 @@ DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权
 > 关系、Agent 工作区、报告导出、M3 基准视图——已全部建成并随 `v0.2.0` 发布。
 > M4 已于 2026-11-14 通过源码评审。Phase 3 正按[作品集计划](docs/roadmap/phase3-plan.md)
 > 推进：M5（声明基线）与 M7（客户可审阅交付包）已完成；M6（有限 Agent 任务）的
-> 层级 0 与层级 1 演练已完成、真实模型批次待授权；M8（干净安装、契约与导出安全）
-> 的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧已完成、
-> Upwork 素材未发布；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
+> 层级 0 与层级 1 演练已完成，层级 2 真实模型批次已跑——**未达验收线**
+> （DexAtlas 三轮合计 40.0%，验收线为每轮 ≥80%；见
+> [M6 层级 2 运行记录](docs/benchmarks/m6-level2-real.md)）；M8（干净安装、契约与
+> 导出安全）的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧
+> 已完成、Upwork 素材未发布；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
 > 详见[路线图](#路线图)与
 > [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)。
 > 本文档不会声称任何尚未实际可运行的功能。
@@ -90,7 +92,7 @@ DexAtlas 要解决的正是这个问题：
 | **Phase 1** | `v0.1.2`  | 验收清单补齐   | 5 个自建测试 APK、演示视频，并把退出清单恢复成计划书的原话                                        |
 | **Phase 1** | `v0.1.3`  | 证据能指回原处 | 交叉引用成为证据、locator 随报告迁移、文档与代码互相校验                                          |
 | **Phase 2** | `v0.2.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
-| **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程（题集冻结、层级 0/1 判分完成，真实模型批次待授权）、可迁移证据报告（`--html`/`export` 已交付）、干净安装验证与公共契约表（演练完成）、客户式案例（已交付）、独立验收（准备包就绪，未执行） |
+| **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程（题集冻结、层级 0/1 判分完成，层级 2 真实模型批次已跑——未通过：40.0%，低于 80% 验收线）、可迁移证据报告（`--html`/`export` 已交付）、干净安装验证与公共契约表（演练完成）、客户式案例（已交付）、独立验收（准备包就绪，未执行） |
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。
 
@@ -319,6 +321,12 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   20 道冻结题，以及统一判定规则
 - **[M6 层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)** —— 冻结题集上
   用 scripted 替身 provider 走通发题/trace/判分的全流程；不是模型能力基线
+- **[M6 层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)** —— 一个具名模型对
+  冻结 20 题独立跑 3 轮、三配置：DexAtlas agent 24/60（40.0%）、A 源码文本 24/60、
+  B 结构化检索 18/60——**未达每轮 ≥80% 的验收线，验收结论「未通过」**。全部 trace
+  合计 853,103 tokens，超出 800,000 授权上限，92 题全量轮因此未执行。三配置预算与
+  可见信息不同，这些数字是执行条件对比，不是模型质量对比。它说明的是：agent 当前
+  默认配置在该冻结集上未达验收线，服务承诺范围待失败模式分析后重定
 
 ### 项目记录
 
@@ -393,7 +401,7 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | 里程碑 | 范围 | 状态 |
 |---|---|---|
 | M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；真实模型批次待单独授权 |
+| M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 三轮合计 24/60 = 40.0%，验收线为每轮 ≥80%）——服务承诺范围待失败模式分析后重定 |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码问题已决策并记录为已知限制 |
 | M9 | GitHub 展示入口（本页）与 Upwork 素材 | **展示入口已完成；素材未发布** —— 本页与[项目简介](docs/outreach/project-brief.md)草稿已就位；Upwork 素材未发布 |
