@@ -24,9 +24,11 @@ DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权
 > Web 工作台的 M4 八屏——项目面板、上传与分析进度、检索与证据溯源、单方法调用
 > 关系、Agent 工作区、报告导出、M3 基准视图——已全部建成并随 `v0.2.0` 发布。
 > M4 已于 2026-11-14 通过源码评审。Phase 3 正按[作品集计划](docs/roadmap/phase3-plan.md)
-> 推进：M5（声明基线）与 M7（客户可审阅交付包）已完成；M6（有限 Agent 任务）与
-> M8（干净安装、契约与导出安全）进行中；M9（本页展示入口）与 M10（独立验收、
-> 发布候选）尚未开始。详见[路线图](#路线图)与
+> 推进：M5（声明基线）与 M7（客户可审阅交付包）已完成；M6（有限 Agent 任务）的
+> 层级 0 与层级 1 演练已完成、真实模型批次待授权；M8（干净安装、契约与导出安全）
+> 的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧已完成、
+> Upwork 素材未发布；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
+> 详见[路线图](#路线图)与
 > [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)。
 > 本文档不会声称任何尚未实际可运行的功能。
 
@@ -88,7 +90,7 @@ DexAtlas 要解决的正是这个问题：
 | **Phase 1** | `v0.1.2`  | 验收清单补齐   | 5 个自建测试 APK、演示视频，并把退出清单恢复成计划书的原话                                        |
 | **Phase 1** | `v0.1.3`  | 证据能指回原处 | 交叉引用成为证据、locator 随报告迁移、文档与代码互相校验                                          |
 | **Phase 2** | `v0.2.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
-| **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程、可迁移证据报告、干净安装验证、客户式案例与独立验收 |
+| **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程（题集冻结、层级 0/1 判分完成，真实模型批次待授权）、可迁移证据报告（`--html`/`export` 已交付）、干净安装验证与公共契约表（演练完成）、客户式案例（已交付）、独立验收（准备包就绪，未执行） |
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。
 
@@ -142,11 +144,15 @@ cd dexatlas
 uv sync --extra analysis
 
 uv run dexatlas backends              # 哪些后端可用、版本号是多少
-uv run dexatlas analyze app.apk -o report.md --json report.json
+uv run dexatlas analyze app.apk -o report.md --json report.json --html report.html
 uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
+uv run dexatlas export <project-id> -o evidence-package.zip
 ```
+
+所有命令都接受同一组 `--workspace`/`-w` 选项：`analyze` 可以创建工作区，
+其余只读命令要求工作区已存在。
 
 REST API 是同一套分析内核的 HTTP 接口：
 
@@ -271,10 +277,14 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 `503 agent_not_configured` 拒绝，而不是由一个替身模型回答。
 
 一条如实的披露，来自 M4 端到端实测：当时试用的真实模型（MiniMax-M3.1-Flash）
-在 5/5 个任务里于写出带引用的结论之前耗尽了默认预算。链路每一环都按设计工作，
-每份报告都如实标注 *did not finish* 而不是编造答案；随后已落地串行工具修复与
-`DEXATLAS_AGENT_MAX_STEPS` 预算开关。缺口与证据：
-**[M4 端到端实测报告](docs/reports/m4-e2e-run.md)**。
+在 5/5 个任务里于写出带引用的结论之前耗尽了当时默认的预算。链路每一环都按设计工作，
+每份报告都如实标注 *did not finish* 而不是编造答案。随后已落地串行工具修复与
+`DEXATLAS_AGENT_MAX_STEPS` 预算开关，并把默认预算上调到实测所需——120,000 tokens、
+16 轮迭代、40 次计划内工具调用、120 秒——在收束机制下读完关键证据的任务现在能
+正常完成。每个默认值仍可通过环境变量整体替换（`DEXATLAS_AGENT_MAX_TOKENS`、
+`..._ITERATIONS`、`..._SECONDS`、`..._STEPS`），且修改默认值仍属公共契约变更。
+缺口与证据：**[M4 端到端实测报告](docs/reports/m4-e2e-run.md)**；
+默认值与停止策略：**[Agent 架构](docs/architecture/agent.md)**。
 
 ## 文档
 
@@ -294,6 +304,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[MCP server](docs/architecture/mcp-server.md)** —— 十个只读工具，以及调用方在提问前要知道的三件事
 - **[证据优先的 Agent](docs/architecture/agent.md)** —— 一个循环、一份预算、一份状态机，以及线索与 finding 的边界
 - **[报告渲染与证据包](docs/architecture/report-rendering.md)** —— 同一份分析的三种渲染，以及可交给客户的证据导出
+- **[公共契约表](docs/architecture/public-contracts.md)** —— CLI、REST、MCP 与报告
+  schema 的对外契约，经实测并受版本政策约束，附已知限制
 
 ### 基准——测了什么，没测什么
 
@@ -305,6 +317,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   它拒绝声称什么，以及它没有测量什么
 - **[服务回归集](docs/benchmarks/service-regression-set.md)** —— agent 服务承诺所对标的
   20 道冻结题，以及统一判定规则
+- **[M6 层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)** —— 冻结题集上
+  用 scripted 替身 provider 走通发题/trace/判分的全流程；不是模型能力基线
 
 ### 项目记录
 
@@ -379,10 +393,10 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | 里程碑 | 范围 | 状态 |
 |---|---|---|
 | M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | 冻结回归集上的有限 agent 任务 | **进行中** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20 |
+| M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；真实模型批次待单独授权 |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
-| M8 | 干净安装、故障恢复、契约与导出安全验收 | **进行中** |
-| M9 | GitHub 展示入口（本页）与 Upwork 素材 | **进行中** |
-| M10 | 独立验收、重新评分、发布候选 | **未开始** |
+| M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码问题已决策并记录为已知限制 |
+| M9 | GitHub 展示入口（本页）与 Upwork 素材 | **展示入口已完成；素材未发布** —— 本页与[项目简介](docs/outreach/project-brief.md)草稿已就位；Upwork 素材未发布 |
+| M10 | 独立验收、重新评分、发布候选 | **准备包已就绪；验收未执行** —— [准备包](docs/reports/m10-acceptance-pack.md)已就位；独立复现与重新评分尚未开始 |
 
 只有本计划的退出标准全部通过，才会考虑 `v1.0.0`——阶段推进靠证据，不靠日历。
