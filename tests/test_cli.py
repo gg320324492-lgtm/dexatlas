@@ -1076,10 +1076,14 @@ def test_every_command_that_reads_the_workspace_accepts_it(
     result = _run(command, "--help")
 
     assert result.exit_code == 0
+    # CI's GitHub runner colours the output, and the colour codes land between
+    # the characters of "--workspace" and "-w". Strip them before matching:
+    # the claim is about the rendered option, not about its escape sequences.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
     # The help table prints the long option and its short form side by side:
     # "--workspace  -w". A bare substring check for "-w" would also match the
     # "--workspace" it is part of, and pass on a command that has only one.
-    assert re.search(r"--workspace\s+-w\b", result.stdout), result.stdout
+    assert re.search(r"--workspace\s+-w\b", plain), result.stdout
 
 
 def test_a_query_reads_the_workspace_it_is_given(
