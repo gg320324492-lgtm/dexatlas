@@ -65,6 +65,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **逐例客户交付附件落盘（Phase 3 M7 收尾）。** 三个[案例](docs/case-studies/README.md)
+  的可下载交付件入库至 `docs/case-studies/attachments/`（9 个文件）：demo 与
+  API 集成案例（同一分析 `apk_80a8fe0e81204c9f`）与混淆案例
+  （`apk_2f8d476fb9e71ac4`）各含 Markdown/JSON/离线 HTML 报告与最小证据包
+  （`analyze --html` / `export` 生成，工具版本 jadx 1.5.2 / apktool 2.11.1 /
+  androguard 4.1.4 与报告内记录一致）；三个证据包均通过 `verify_package`
+  校验（manifest 含逐文件 sha256 与 `not_included` 三键声明）。三篇案例文档
+  与案例 README 增补附件引用节，注明生成命令与可复现性——读者无需安装
+  DexAtlas 即可审阅证据。
 - **v1.0.0 发版流程本地 dry-run 报告。** 按
   [发版前检查清单](docs/reports/v1.0.0-release-checklist.md) 完成一次本地预演
   （不创建 tag、不发布、不改版本号）：7 步流程逐项核对、5 项阻断与 4 项披露的

@@ -207,6 +207,14 @@ The Markdown answer opens:
 `summary` — so a pipeline can archive the byte-identical artefact either
 way.
 
+**Ready-made attachments for this case study** (from the same analysis,
+`apk_80a8fe0e81204c9f`, exported over HTTP per §3.4 and via
+`dexatlas export`): [Markdown report](attachments/demo-report.md),
+[JSON report](attachments/demo-report.json),
+[offline HTML report](attachments/demo-report.html),
+[evidence package](attachments/api-integration-evidence-package.zip). The
+Markdown and JSON files are the same artefacts the HTTP endpoint returns.
+
 ### 3.5 The Python client
 
 [`examples/api_client.py`](../../examples/api_client.py) wraps the flow above

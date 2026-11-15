@@ -1,0 +1,298 @@
+{
+  "schema_version": 3,
+  "generated_at": "2026-11-15T20:46:23.920919+00:00",
+  "project": {
+    "id": "apk_2f8d476fb9e71ac4",
+    "apk": {
+      "sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+      "size_bytes": 1892,
+      "path": "obfuscated.apk",
+      "dex_files": [
+        "classes.dex"
+      ],
+      "native_libraries": [],
+      "has_signed_certificate": false
+    },
+    "status": "completed",
+    "created_at": "2026-11-15T20:46:17.850246+00:00",
+    "class_count": 4,
+    "method_count": 11,
+    "reference_count": 10,
+    "call_site_count": 10,
+    "call_edge_count": 9,
+    "evidence_count": 8,
+    "resource_count": 0
+  },
+  "run": {
+    "id": "run_8d6735d410174df6",
+    "status": "completed",
+    "completeness": "complete",
+    "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+    "tool_versions": {
+      "jadx": "1.5.2",
+      "apktool": "2.11.1",
+      "androguard": "4.1.4"
+    },
+    "started_at": "2026-11-15T20:46:17.850246+00:00",
+    "finished_at": "2026-11-15T20:46:23.890215+00:00",
+    "duration_seconds": 6.030999999959022
+  },
+  "latest_attempt_status": null,
+  "tools": {
+    "jadx": "1.5.2",
+    "apktool": "2.11.1",
+    "androguard": "4.1.4"
+  },
+  "errors": [],
+  "manifest": {
+    "package": "a.a.a",
+    "version_code": "1",
+    "version_name": "0.1",
+    "min_sdk": "21",
+    "target_sdk": "30",
+    "permissions": [
+      {
+        "name": "android.permission.ACCESS_FINE_LOCATION",
+        "protection_level": null
+      },
+      {
+        "name": "android.permission.READ_PHONE_STATE",
+        "protection_level": null
+      },
+      {
+        "name": "android.permission.SEND_SMS",
+        "protection_level": null
+      }
+    ],
+    "components": [
+      {
+        "kind": "application",
+        "name": "a.a.a",
+        "exported": null,
+        "permission": null,
+        "intent_filters": []
+      },
+      {
+        "kind": "activity",
+        "name": "a.a.a.a",
+        "exported": true,
+        "permission": null,
+        "intent_filters": [
+          "actions=android.intent.action.MAIN; categories=android.intent.category.LAUNCHER"
+        ]
+      },
+      {
+        "kind": "service",
+        "name": "a.b.a",
+        "exported": false,
+        "permission": null,
+        "intent_filters": []
+      },
+      {
+        "kind": "receiver",
+        "name": "a.a.b.a",
+        "exported": true,
+        "permission": null,
+        "intent_filters": []
+      }
+    ],
+    "shared_user_id": null
+  },
+  "evidence": [
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "androguard:AndroidManifest.xml"
+        }
+      ],
+      "id": "E-0001",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "SDK levels read from the APK's binary manifest: minSdk=21, targetSdk=30",
+      "detail": {
+        "min_sdk": "21",
+        "target_sdk": "30"
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "apktool",
+          "tool_version": "2.11.1",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "apktool:AndroidManifest.xml"
+        }
+      ],
+      "id": "E-0002",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Package a.a.a (versionName=0.1, minSdk=21, targetSdk=30)",
+      "detail": {
+        "permissions": [
+          "android.permission.ACCESS_FINE_LOCATION",
+          "android.permission.READ_PHONE_STATE",
+          "android.permission.SEND_SMS"
+        ],
+        "components": 4
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "apktool",
+          "tool_version": "2.11.1",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "apktool:AndroidManifest.xml#/application"
+        }
+      ],
+      "id": "E-0003",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "2 component(s) are explicitly exported",
+      "detail": {
+        "components": [
+          {
+            "kind": "activity",
+            "name": "a.a.a.a",
+            "permission": null
+          },
+          {
+            "kind": "receiver",
+            "name": "a.a.b.a",
+            "permission": null
+          }
+        ]
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "jadx",
+          "tool_version": "1.5.2",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "jadx:sources"
+        }
+      ],
+      "id": "E-0004",
+      "kind": "observation",
+      "level": "verified",
+      "summary": "jadx produced real Java for 7 of 11 methods in 4 of 4 classes",
+      "detail": {
+        "decompilation": {
+          "methods_decompiled": 7,
+          "methods_total": 11,
+          "classes_with_source": 4,
+          "classes_total": 4,
+          "methods_jadx_failed": [],
+          "methods_jadx_failed_truncated": false,
+          "classes_without_source": [],
+          "classes_without_source_truncated": false
+        }
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "androguard:classes.dex#a.a.a"
+        }
+      ],
+      "id": "E-0005",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class a.a.a (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "androguard:classes.dex#a.a.b.a"
+        }
+      ],
+      "id": "E-0006",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class a.a.b.a (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "androguard:classes.dex#a.a.b"
+        }
+      ],
+      "id": "E-0007",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class a.a.b (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540",
+          "locator": "androguard:classes.dex#a.b.a"
+        }
+      ],
+      "id": "E-0008",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class a.b.a (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    }
+  ],
+  "summary": {
+    "classes": 4,
+    "methods": 11,
+    "call_sites": 10,
+    "call_edges": 9,
+    "call_sites_with_evidence": 0,
+    "call_edges_with_evidence": 0,
+    "cross_references": 10,
+    "resource_strings": 0,
+    "cross_references_with_evidence": 0,
+    "cross_reference_records": 0,
+    "evidence_by_level": {
+      "verified": 8
+    },
+    "decompilation": {
+      "methods_decompiled": 7,
+      "methods_total": 11,
+      "classes_with_source": 4,
+      "classes_total": 4,
+      "methods_jadx_failed": [],
+      "methods_jadx_failed_truncated": false,
+      "classes_without_source": [],
+      "classes_without_source_truncated": false
+    },
+    "index_complete": true,
+    "index_gaps": [],
+    "duration_seconds": 6.03,
+    "backends_with_errors": []
+  }
+}
