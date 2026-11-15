@@ -55,6 +55,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--configuration` 的正常路径不变。回归测试
   `tests/test_comparison_configuration_routing.py`（8 项）在旧实现上先红
   （KeyError / 全选），修复后全绿。
+- **`scripts/m10_selfcheck.py` 的退出码契约检查期望滞后。** 退出码 6
+  （`EXIT_NO_INDEX`）落地后，契约表、CLI 常量与契约测试
+  `EXPECTED_EXIT_CODES` 均已更新为 0–6，但自查脚本的 F1 检查仍硬编码
+  期望 0–5，在契约一致的树上误报失败（自查一度 39/40）。现改为从契约
+  测试的 `EXPECTED_EXIT_CODES` 表读取期望（字面量 + 按 CLI 常量名解析），
+  三处互相印证，契约变更不再需要同步第三份副本；回归测试
+  `tests/test_m10_selfcheck.py` 在旧硬编码实现上先红，修复后转绿。
 
 ### Added
 
