@@ -51,6 +51,14 @@ SCHEMA_VERSION = 6
 #: index that is read on every search.
 MAX_SEARCH_NAME_CHARS = 200
 
+#: How many string constants the substring sweep reads before it stops.
+#:
+#: The sweep is a fallback for a token search that found nothing, not a
+#: general-purpose scan; a cap keeps its cost bounded on an APK whose pool
+#: is very large, and the constants it may miss past the cap are ones the
+#: token search was never going to surface either.
+_SUBSTRING_SCAN_CAP = 20_000
+
 #: The tables that hold a project's published snapshot.
 #:
 #: Everything a reader sees about a project's symbols and its evidence lives
@@ -1204,6 +1212,48 @@ class Store:
             }
             for row in rows
         ]
+
+    def search_string_substring(
+        self, project_id: str, keyword: str, *, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Scan the string-constant pool for a literal substring.
+
+        The FTS index is word-shaped: a query matches the tokens a value is
+        made of, so a constant like ``sk_live_4eC39...`` is found by "sk_live"
+        or "4eC39" but never by the phrase "api key" that merely describes it.
+        This scan answers the other question — does this exact text occur in
+        some string constant — by reading the ``strings`` table directly and
+        matching in Python. It is deterministic, bounded by the limit, and it
+        returns the same row shape as :meth:`search`, with the constant's own
+        value as its excerpt, so a caller can treat both answers alike.
+        """
+        needle = keyword.casefold()
+        if not needle:
+            return []
+        with self.transaction() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT value
+                FROM strings
+                WHERE project_id = ?
+                LIMIT ?
+                """,
+                (project_id, _SUBSTRING_SCAN_CAP),
+            ).fetchall()
+        hits: list[dict[str, Any]] = []
+        for row in rows:
+            value = str(row["value"])
+            if needle in value.casefold():
+                hits.append(
+                    {
+                        "kind": "string",
+                        "name": value[:MAX_SEARCH_NAME_CHARS],
+                        "excerpt": value,
+                    }
+                )
+                if len(hits) >= limit:
+                    break
+        return hits
 
     # -- evidence ----------------------------------------------------------
 
