@@ -198,24 +198,36 @@ def _score(question: Question, trace: TaskTrace) -> TaskTrace:
 
 
 def _analyse_samples(
-    workspace: Path, *, samples: set[Sample]
-) -> tuple[Any, dict[str, Any], dict[str, str]]:
-    """分析 81 道题用到的样本,三配置共用同一份工作区.
+    workspace: Path,
+    *,
+    samples: set[Sample],
+    configurations: set[Configuration] | None = None,
+) -> tuple[Any, dict[Configuration, dict[str, Any]], dict[str, str]]:
+    """按题面声明 Analyze 配置 Analyze 样本, 不再让配置字段落空.
 
-    只用 ``Configuration.FULL``:A 读样本自带源码,B/D 读同一份结构化索引.
+    ``partial.*`` 两题问的就是 ``no-jadx`` / ``no-apktool`` 配置下系统是否
+    如实记录后端缺失: 只用 ``Configuration.FULL`` Analyze, 等于把题目问的
+    现象从测量里删掉, agent 如实回答「没有缺失」反而判负. 这里为题面用到
+    的每个配置各 Analyze 一份, 后端路径环境变量照常生效, 空串即禁用.
+
+    返回 ``(analyzer, by_config_and_sample, project_ids)``; analyzer 仍取
+    full 配置的 workspace, 三系统共用的 MCP 工具面不变.
     """
     from dexatlas.config.settings import Settings
 
-    root = workspace / "full"
-    _prepare_workspace(root)
-    analyses = _analyse(Configuration.FULL, samples, root)
+    asked = (configurations or {Configuration.FULL}) | {Configuration.FULL}
+    by_config: dict[Configuration, dict[str, Any]] = {}
+    for configuration in sorted(asked, key=lambda item: item.value):
+        config_root = workspace / configuration.value
+        _prepare_workspace(config_root)
+        analyses = _analyse(configuration, samples, config_root)
+        by_config[configuration] = {sample.value: analysis for sample, analysis in analyses.items()}
+    root = workspace / Configuration.FULL.value
     settings = Settings(workspace=root)
-    analyzer = type(next(iter(analyses.values())).analyzer)(settings)
-    project_ids = {
-        sample.value: analysis.result.project.id for sample, analysis in analyses.items()
-    }
-    by_name = {sample.value: analysis for sample, analysis in analyses.items()}
-    return analyzer, by_name, project_ids
+    full = by_config[Configuration.FULL]
+    analyzer = type(next(iter(full.values())).analyzer)(settings)
+    project_ids = {name: analysis.result.project.id for name, analysis in full.items()}
+    return analyzer, by_config, project_ids
 
 
 def _sources() -> dict[str, Path]:
@@ -279,7 +291,7 @@ def _provider_factory(
 def _systems(
     *,
     analyzer: Any,
-    analyses: dict[str, Any],
+    analyses: dict[Configuration, dict[str, Any]],
     workspace: Path,
     budget: int,
     provider_factory: Callable[[], ModelProvider] | None = None,
@@ -296,14 +308,24 @@ def _systems(
     同一预算,可比. ``agent_budget`` 只给 D 配置的每请求上限:agent 的
     回答要装下 JSON 与证据引用,A/B 的 prose 不需要,给 A/B 的 4096
     不必跟着放大. None 表示与 A/B 相同.
+
+    ``analyses`` 现在按 Analyze 配置分组: full 之外还有题面声明的
+    ``no-jadx`` / ``no-apktool`` 工作区. B/D 的路由在各自 ``answer`` 里
+    按题选工作区; full 是它们的默认, 结构化工具面不因配置改变.
     """
-    project_ids = {name: analysis.result.project.id for name, analysis in analyses.items()}
+    full = analyses[Configuration.FULL]
+    project_ids = {name: analysis.result.project.id for name, analysis in full.items()}
     agent_request_budget = agent_budget or budget
     systems: tuple[System, ...]
     if provider_factory is None:
         systems = (
             SourceTextSystem(sources=_sources(), max_tokens=budget),
-            StructuredSystem(analyzer=analyzer, project_ids=project_ids, max_tokens=budget),
+            StructuredSystem(
+                analyzer=analyzer,
+                project_ids=project_ids,
+                max_tokens=budget,
+                analyses_by_config=analyses,
+            ),
             AgentSystem(
                 analyzer=analyzer,
                 analyses=analyses,
@@ -325,6 +347,7 @@ def _systems(
                 project_ids=project_ids,
                 provider=provider_factory(),
                 max_tokens=budget,
+                analyses_by_config=analyses,
             ),
             AgentSystem(
                 analyzer=analyzer,
@@ -380,7 +403,10 @@ def run_comparison(
     questions = _questions(tasks)
     selected = questions[:limit] if limit > 0 else questions
     needed_samples = {Sample(value) for value in {question.sample for question in selected}}
-    analyzer, analyses, _ = _analyse_samples(workspace, samples=needed_samples)
+    asked_configurations = {Configuration(question.configuration) for question in selected}
+    analyzer, analyses, _ = _analyse_samples(
+        workspace, samples=needed_samples, configurations=asked_configurations
+    )
     systems = _systems(
         analyzer=analyzer,
         analyses=analyses,

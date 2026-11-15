@@ -7,6 +7,25 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **M6 服务回归集 `partial.*` 两题的判定语义修订（Phase 3 M6-③）。**
+  新增 `benchmarks.model.Task.expect_backend_failure` 判定谓词：
+  `partial.no-jadx-the-failure-is-recorded` 与
+  `partial.no-apktool-there-is-no-manifest` 改由它判定——回答必须把缺失后端
+  名与失败标记（`not_installed` / "not installed" / "did not take part"）
+  写在同一处；`must_not_contain` 仍生效（无 Apktool 时答出包名即编造），
+  空答判负。修订动机：comparison harness 原先用 `Configuration.FULL` 分析
+  全部题目，题面声明的 `no-jadx` / `no-apktool` 配置没有消费者，agent 如实
+  回答「后端没有缺失」反而判负（m6-level2-failure-analysis.md §5.6，层级 2
+  共 6 题次无效失败）。同批修正 harness 执行层：按题面配置真实 Analyze
+  （缺失后端在对应工作区确实不参与），B/D 按题路由到对应工作区，A 的检索面
+  按题隐藏缺失后端的文件类别。**这是判分语义变更，不是放水**：对
+  m6-level2-traces.json 的 6 个 DexAtlas 题次以新谓词重判仍全部判负（旧
+  trace 里的回答描述的是"后端未缺失"这一旧测量事实）；历史报告数字不变，
+  新口径自下次测量生效。详见
+  `docs/benchmarks/service-regression-set.md` §3 判定规则与附录 B。
+
 ### Added
 
 - **Agent 回答契约与工具调优（Phase 3 M6-③）。** 依据 M6 层级 2 失败分析
