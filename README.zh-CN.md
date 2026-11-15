@@ -28,6 +28,10 @@ DexAtlas 把 Android 反编译、程序分析、AI Agent 与自动化能力整�
 该应用由同目录下的 smali 源码构建而成，不是预先编排的录像。完整的 85 秒端到端会话——
 上传、分析、符号检索、证据溯源、调用关系、Agent 工作区与报告导出——见
 [视频](docs/assets/demo.mp4)与下方 [GIF](docs/assets/demo.gif)，两者出自同一次录制。
+关于这段录像的一处披露：分析、检索、证据、调用关系与报告各屏展示的都是真实分析
+产物，但 **Agent 屏由仓库自带的 scripted 演示 provider 驱动——没有密钥，没有真实
+模型调用**。真实模型在该屏上的表现另行记录于
+[M4 端到端实测报告](docs/reports/m4-e2e-run.md)。
 
 <details>
 <summary><b>完整流程</b> —— 上传、分析、检索、证据、调用关系、Agent 与报告</summary>
@@ -73,7 +77,7 @@ DexAtlas 要解决的正是这个问题：
 | **Phase 1** | `v0.1.1`  | 基础能力加固   | 修复了此前对任何 APK 都从未生效过的 Smali 回退                                                    |
 | **Phase 1** | `v0.1.2`  | 验收清单补齐   | 5 个自建测试 APK、演示视频，并把退出清单恢复成计划书的原话                                        |
 | **Phase 1** | `v0.1.3`  | 证据能指回原处 | 交叉引用成为证据、locator 随报告迁移、文档与代码互相校验                                          |
-| **Phase 2** | `v0.5.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
+| **Phase 2** | `v0.2.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
 | **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程、可迁移证据报告、干净安装验证、客户式案例与独立验收 |
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。

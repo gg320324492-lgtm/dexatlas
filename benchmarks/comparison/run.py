@@ -71,9 +71,15 @@ class ComparisonRun:
     models: dict[str, str]
     budget: int
     task_count: int
+    budgets: dict[str, int] | None = None
+    """每个配置各自的每请求 ``max_tokens``.
+
+    ``None`` 是旧 trace 文件的形状:那时三配置同预算,一个数就够. 一份
+    逐配置记录了预算的 trace 一定是等长的三元组;不等长说明文件本身
+    坏了,不能当作一次测量再生报告."""
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        document: dict[str, Any] = {
             "schema_version": 1,
             "kind": "m3_comparison",
             "task_count": self.task_count,
@@ -83,6 +89,41 @@ class ComparisonRun:
             "metrics": self.metrics,
             "traces": [trace.to_dict() for trace in self.traces],
         }
+        if self.budgets is not None:
+            document["budgets"] = dict(self.budgets)
+        return document
+
+    @property
+    def budgets_identical(self) -> bool:
+        """三个配置的每请求预算是否一致.
+
+        没有逐配置记录的旧 trace 一律视为一致——那是它们唯一能声称的
+        形状. 有一致预算才允许报告写 "identical for all three".
+        """
+        if self.budgets is None:
+            return True
+        return len(set(self.budgets.values())) <= 1
+
+    def budget_of(self, name: str) -> int:
+        """一个配置的每请求预算,没有逐配置记录时回落到统一预算."""
+        if self.budgets is None:
+            return self.budget
+        return self.budgets.get(name, self.budget)
+
+    def budget_note(self) -> str:
+        """逐配置预算的一句话,报告里直接引用."""
+        if self.budgets is None or self.budgets_identical:
+            return (
+                f"Budget: {self.budget} `max_tokens` per request, "
+                "identical for all three configurations"
+            )
+        per_config = ", ".join(f"{name} {v}" for name, v in sorted(self.budgets.items()))
+        return (
+            "The per-request `max_tokens` budgets were **not identical** "
+            f"({per_config}); the agent's answer envelope was widened without "
+            "widening A/B's, so the configurations differ in execution "
+            "conditions as well as in what they could see."
+        )
 
 
 def _questions() -> tuple[Question, ...]:
@@ -334,6 +375,7 @@ def run_comparison(
         models={system.kind.value: system.model_name for system in systems},
         budget=budget,
         task_count=len(selected),
+        budgets={system.kind.value: system.max_tokens for system in systems},
     )
 
 
@@ -363,15 +405,24 @@ def _disclosure(run: ComparisonRun, stream: TextIO) -> None:
             "MEASURED WITH A REAL MODEL: configurations "
             + ", ".join(real)
             + (" (model " + ", ".join(models) + ")" if models else "")
-            + ". The three configurations saw the same questions, the same "
-            "model and the same budgets.",
+            + ". The three configurations saw the same questions and the "
+            "same model.",
             file=stream,
         )
-    print(
-        f"Tasks: {run.task_count}. Budget: {run.budget} max_tokens per request, "
-        "shared by all three configurations.",
-        file=stream,
-    )
+    if run.budgets_identical:
+        print(
+            f"Tasks: {run.task_count}. Budget: {run.budget} max_tokens per request, "
+            "shared by all three configurations.",
+            file=stream,
+        )
+    else:
+        per_config = ", ".join(f"{name} {run.budget_of(name)}" for name in sorted(run.providers))
+        print(
+            f"Tasks: {run.task_count}. Per-request max_tokens budgets were not "
+            f"identical: {per_config}. The agent's answer envelope was widened "
+            "without widening A/B's.",
+            file=stream,
+        )
     print(
         "The systems saw only reference/question/sample/configuration; "
         "the marking scheme was held by the scorer.",
@@ -490,11 +541,45 @@ _REAL_PROVIDER_SECTION = (
     "the provider and the model of every real measurement in its own table.",
     "",
     "Real runs are written to their own output directory "
-    "(`.scratch/comparison-real` above, not the scripted default), and the "
-    "checked-in report and traces under `docs/benchmarks/` remain the "
-    "scripted baseline until an accepted, key-backed run replaces them "
-    "explicitly.",
+    "(`.scratch/comparison-real` above, not the scripted default). A real "
+    "run whose traces are accepted into the repository is committed under "
+    "its own name beside the scripted baseline — as "
+    "`comparison-real-traces.json` and `comparison-stronger-traces.json` "
+    "already are — never as a replacement for it: a scripted measurement "
+    "and a real one answer different questions, and they stay separately "
+    "stated.",
 )
+
+
+def _regenerating_section(evidence: str = "", comparison_to: Path | None = None) -> list[str]:
+    """The regeneration commands, naming the evidence this report came from.
+
+    A report that names its own trace file must name that file in its
+    regeneration commands too: regenerating a real-model report from the
+    scripted traces would silently replace the measurement it describes.
+    The explicit ``--input`` on the ``--report`` command also keeps the
+    committed-traces fallback from pointing a real-model report at the
+    scripted file. A report that carries a comparison section has to name
+    the previous run as well, or the regenerated report would silently
+    lose that section.
+    """
+    if evidence.endswith("-traces.json"):
+        traces = f"docs/benchmarks/{evidence}"
+        report = f"docs/benchmarks/{evidence[: -len('-traces.json')]}.md"
+    else:
+        traces = "docs/benchmarks/comparison-traces.json"
+        report = "docs/benchmarks/comparison.md"
+    compare_to = f" --compare-to docs/benchmarks/{comparison_to.name}" if comparison_to else ""
+    return [
+        "## Regenerating",
+        "",
+        "```bash",
+        f"uv run --no-sync python benchmarks/comparison/run.py --input {traces} --metrics",
+        "uv run --no-sync python benchmarks/comparison/run.py "
+        f"--input {traces}{compare_to} --report {report}",
+        "```",
+        "",
+    ]
 
 
 def _markdown(
@@ -536,23 +621,30 @@ def _markdown(
             f"Configurations {', '.join(real)} were measured with a **real "
             "model**"
             + (f" ({', '.join(models)})" if models else "")
-            + ". The three configurations saw the same questions, the same "
-            "model and the same budgets. A difference between them is a "
-            "difference between what each configuration could see, and only "
-            "the numbers below support any such difference.",
+            + ". The three configurations saw the same questions and the "
+            "same model. A difference between them is a difference between "
+            "what each configuration could see, and only the numbers below "
+            "support any such difference.",
             "",
         ]
+    budget_line = run.budget_note()
+    if not run.budgets_identical:
+        budget_line += (
+            " A difference between them is a fact about this pair of runs, not about model quality."
+        )
     lines += [
-        f"Task count: {run.task_count}. Budget: {run.budget} `max_tokens` per request, "
-        "identical for all three configurations. Each system saw only "
+        f"Task count: {run.task_count}. {budget_line} Each system saw only "
         "`reference`, `question`, `sample` and `configuration`; the scorer "
         "alone read `benchmarks/tasks/`.",
         "",
-        "| Configuration | Provider | Model |",
-        "|---|---|---|",
+        "| Configuration | Provider | Model | Max tokens per request |",
+        "|---|---|---|---:|",
     ]
     for name in sorted(run.providers):
-        lines.append(f"| {name} | {run.providers[name]} | {run.models[name] or 'n/a'} |")
+        lines.append(
+            f"| {name} | {run.providers[name]} | {run.models[name] or 'n/a'} "
+            f"| {run.budget_of(name)} |"
+        )
     lines += [
         "",
         "## The eight metrics",
@@ -588,26 +680,33 @@ def _markdown(
             else " A difference between configurations is a difference "
             "between what each could see; nothing here says which is better."
         ),
-        "- The token budget per request is the same for all three "
-        "configurations, but the *shape* of the work is not: A and B make at "
-        "most two retrieval attempts, while the agent may go round its loop "
-        "up to eight times, each time with the tools it chose. The agent's "
-        "higher token total is what that shape costs, and it is not a "
-        "statement about the quality of its answers.",
+    ]
+    if run.budgets_identical:
+        lines.append(
+            "- The token budget per request is the same for all three "
+            "configurations, but the *shape* of the work is not: A and B make "
+            "at most two retrieval attempts, while the agent may go round its "
+            "loop up to eight times, each time with the tools it chose. The "
+            "agent's higher token total is what that shape costs, and it is "
+            "not a statement about the quality of its answers."
+        )
+    else:
+        lines.append(
+            "- The token budget per request was **not** the same for all "
+            "three configurations: the agent's answer envelope was widened "
+            "without widening A/B's, so the agent's higher token total "
+            "reflects both the wider envelope and the shape of its work — "
+            "A and B make at most two retrieval attempts, while the agent "
+            "may go round its loop many times, each time with the tools it "
+            "chose. Neither is a statement about the quality of its answers."
+        )
+    lines += [
         "",
         *_failure_causes(run),
         "",
         *_REAL_PROVIDER_SECTION,
         "",
-        "## Regenerating",
-        "",
-        "```bash",
-        "uv run --no-sync python benchmarks/comparison/run.py --input "
-        "docs/benchmarks/comparison-traces.json --metrics",
-        "uv run --no-sync python benchmarks/comparison/run.py --report "
-        "docs/benchmarks/comparison.md",
-        "```",
-        "",
+        *_regenerating_section(evidence, comparison_to),
     ]
     return "\n".join(lines)
 
@@ -641,16 +740,32 @@ def _comparison_section(run: ComparisonRun, previous: Path) -> list[str]:
     """
     document = json.loads(previous.read_text(encoding="utf-8"))
     base_run = _run_from_document(document)
+    if base_run.budgets_identical and run.budgets_identical:
+        budget_note = (
+            f"budget {base_run.budget} `max_tokens` per request on the "
+            f"previous run and {run.budget} on this one"
+        )
+    else:
+        base_budgets = ", ".join(
+            f"{name} {base_run.budget_of(name)}" for name in sorted(base_run.providers)
+        ) or str(base_run.budget)
+        this_budgets = ", ".join(
+            f"{name} {run.budget_of(name)}" for name in sorted(run.providers)
+        ) or str(run.budget)
+        budget_note = (
+            f"per-request budgets ({base_budgets}) on the previous run and "
+            f"({this_budgets}) on this one"
+        )
     lines = [
         "## Comparison with the previous run",
         "",
-        f"Previous run: `{previous.name}` ({base_run.task_count} tasks, budget "
-        f"{base_run.budget} `max_tokens` per request, model "
+        f"Previous run: `{previous.name}` ({base_run.task_count} tasks, "
+        f"{budget_note}, model "
         f"{', '.join(sorted(set(base_run.models.values())))}). This run: "
-        f"{run.task_count} tasks, budget {run.budget} `max_tokens` per request, "
-        f"model {', '.join(sorted(set(run.models.values())))}. The two runs are "
+        f"{run.task_count} tasks, same model "
+        f"{', '.join(sorted(set(run.models.values())))}. The two runs are "
         "separate measurements; the same tasks and the same scorer, but the "
-        "budgets and the model may differ, so a difference is a fact about "
+        "execution conditions may differ, so a difference is a fact about "
         "the pair of runs, not about the model alone.",
         "",
         "Delta = this run minus the previous run. For rates a rise in "
@@ -873,9 +988,24 @@ def _run_from_document(document: dict[str, Any]) -> ComparisonRun:
     traces = tuple(TaskTrace.from_dict(item) for item in document["traces"])
     providers: dict[str, str] = {}
     models: dict[str, str] = {}
+    budgets: dict[str, int] = {}
     for trace in traces:
         providers.setdefault(trace.system.value, trace.provider)
         models.setdefault(trace.system.value, trace.model)
+        previous = budgets.setdefault(trace.system.value, trace.max_tokens)
+        if previous != trace.max_tokens:
+            raise SystemExit(
+                f"configuration {trace.system.value} has more than one "
+                f"max_tokens in its traces ({previous} and {trace.max_tokens}); "
+                "the file cannot be reported as one measurement"
+            )
+    stated = document.get("budgets")
+    if isinstance(stated, dict) and set(stated) == set(budgets):
+        # The run's own record wins when it covers exactly the configurations
+        # present. A file that recorded budgets per configuration is the
+        # authority on them; a file that recorded them under other names is
+        # not this run's record and is not trusted.
+        budgets = {str(k): int(v) for k, v in stated.items()}
     return ComparisonRun(
         traces=traces,
         metrics=compare(traces),
@@ -883,6 +1013,7 @@ def _run_from_document(document: dict[str, Any]) -> ComparisonRun:
         models=models,
         budget=max((trace.max_tokens for trace in traces), default=0),
         task_count=len({trace.reference for trace in traces}),
+        budgets=budgets or None,
     )
 
 
