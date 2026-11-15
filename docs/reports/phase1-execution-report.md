@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1478<!--/fig-->（<!--fig:tests.fast-->1332<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.9%<!--/fig-->**（<!--fig:coverage.covered-->6775<!--/fig-->/<!--fig:coverage.total-->7375<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1492<!--/fig-->（<!--fig:tests.fast-->1346<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.8%<!--/fig-->**（<!--fig:coverage.covered-->6806<!--/fig-->/<!--fig:coverage.total-->7410<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -131,7 +131,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.9%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.8%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1332<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1346<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->146<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1478<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1492<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -226,7 +226,12 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_agent_serial_tools.py` | agent 每轮只执行一个工具调用：多工具轮次被抑制、回绝走 tool 通道、resume 不重跑被回绝的调用、单工具行为不变（M4 e2e P1 修法②新增） |
 | `test_agent_duplicate_calls.py` | agent 重复工具调用检测：同指纹成功调用直接复用并注明，不再原地打转耗尽预算（M6-② 新增） |
 | `test_partial_backend_failure_scoring.py` | partial.* 两题的判分修订：后端缺失的诚实记录（expect_backend_failure 谓词）能被判过，旧 expect_empty 口径对同一回答判负的红色证据锁定（M6-③ 新增） |
-| `test_comparison_configuration_routing.py` | 配置路由：no-apktool 工作区 Apktool 确实缺席且失败被记录、B 按题拿到 no_manifest、A 检索面过滤缺失后端的文件类别（M6-③ 新增） |
+| `test_comparison_configuration_routing.py` | 配置路由：no-apktool 工区 Apktool 确实缺席且失败被记录、B 按题拿到 no_manifest、A 检索面过滤缺失后端的文件类别（M6-③ 新增） |
+| `test_search_substring_fallback.py` | 字符串常量子串扫描兜底：语义词检索不到的常量（sk_live_…）按子串与池枚举仍可命中，词命中不重复、不编造（M6 复测修复 1 新增） |
+| `test_agent_literal_contract.py` | 整字面量契约：URL 连查询参数一起引用、不得截断改写；词检索空时去看常量池（M6 复测修复 2 新增） |
+| `test_agent_enumeration_contract.py` | 枚举完整性契约：问某类若干方法时逐方法成条，包括打破规律的第三个（M6 复测修复 3 新增） |
+| `test_agent_partial_subject_contract.py` | 问分析本身的问题（后端缺失是否被记录）允许引用过程记录作答；普通 APK 问题的进程注记仍降级（M6 复测修复 4 新增） |
+| `test_agent_no_manifest_closes.py` | no_manifest 失败视作完整读取：manifest 意图被失败事实闭合，模型基于错误作答而非空转耗尽预算（M6 复测修复 5 新增） |
 | `test_agent_stop.py` | agent 收束停止策略：关键事实集齐→宽限读取→关工具→两次作答，不再等预算耗尽（M6-② 新增） |
 | `test_agent_budget_defaults.py` | agent 默认预算上调（120k tokens/16 迭代/40 步）与显式覆盖优先级（M6-② 新增） |
 | `test_resource_references.py` | 资源之间的引用边：解析、存储、检索、CLI 与 API（resource-references 新增） |
@@ -853,10 +858,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1478<!--/fig--> 个：<!--fig:tests.fast-->1332<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1492<!--/fig--> 个：<!--fig:tests.fast-->1346<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.9%<!--/fig-->（<!--fig:coverage.covered-->6775<!--/fig-->/<!--fig:coverage.total-->7375<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1478<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.8%<!--/fig-->（<!--fig:coverage.covered-->6806<!--/fig-->/<!--fig:coverage.total-->7410<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1492<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -977,7 +982,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
       "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [552, 50],
+      "agent/orchestrator.py": [556, 50],
       "agent/planner.py": [47, 0],
       "agent/providers/__init__.py": [6, 0],
       "agent/providers/base.py": [84, 4],
@@ -987,7 +992,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [127, 12],
       "agent/state.py": [201, 5],
-      "agent/sufficiency.py": [23, 1],
+      "agent/sufficiency.py": [31, 1],
       "agent/tool_executor.py": [283, 30],
       "api/__init__.py": [3, 0],
       "api/app.py": [309, 22],
@@ -1007,7 +1012,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "core/paths.py": [36, 2],
       "core/pipeline.py": [518, 32],
       "core/runs.py": [70, 1],
-      "core/storage.py": [373, 7],
+      "core/storage.py": [392, 11],
       "mcp/__init__.py": [2, 0],
       "mcp/errors.py": [21, 1],
       "mcp/schemas.py": [173, 0],
@@ -1018,7 +1023,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "mcp/tools/projects.py": [45, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
-      "mcp/tools/symbols.py": [27, 0],
+      "mcp/tools/symbols.py": [31, 0],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
       "reports/evidence_package.py": [153, 17],
@@ -1043,8 +1048,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 600,
-    "statements": 7375
+    "missing": 604,
+    "statements": 7410
   },
   "history": {
     "v0.1.0": {
@@ -1061,10 +1066,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:7c3ab19e4d1be738879877b1b4363acfb90fe3fe488c1edb44357333fb21f190",
+  "source_fingerprint": "sha256:ce577e8ff3eeb39eacce313afcac67a7ee5be1adfbb958f76820dbc7587303d7",
   "suite": {
     "failed": 0,
-    "passed": 1478,
+    "passed": 1492,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1072,8 +1077,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1332,
+    "fast": 1346,
     "slow": 146,
-    "total": 1478
+    "total": 1492
   }
 }-->
