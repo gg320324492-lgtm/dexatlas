@@ -12,7 +12,7 @@ sees when the names are gone.
 
 ---
 
-## 1. Background
+## 1. Background and the question
 
 Real Android malware and aggressively optimized apps hide their structure
 behind name mangling: single-letter packages, single-letter classes and
@@ -29,10 +29,37 @@ declares dangerous permissions (`ACCESS_FINE_LOCATION`, `READ_PHONE_STATE`,
 shaped URL, and an SMS-shaped string constant — all inert placeholders, all
 committed in source beside the APK.
 
-The question this study answers: with every meaningful name destroyed, what
-does DexAtlas still establish, and how much of it is verifiable?
+The customer's question this study answers: **with every meaningful name
+destroyed, what does DexAtlas still establish, and how much of it is
+verifiable?**
 
-## 2. The analysis, and what the index holds
+## 2. Scope
+
+**In scope — what this analysis covers:**
+
+- everything the first study covers (manifest, symbols, call graph, source,
+  evidence), on a sample whose identifiers carry no information;
+- the specific question of what survives name obfuscation: manifest
+  metadata, string constants, structural call edges;
+- a multi-DEX appendix: what the index does when one class name is defined in
+  two DEX containers at once.
+
+**Out of scope — the boundary this sample demonstrates:**
+
+- this is hand-written name obfuscation only. Control-flow flattening, string
+  encryption, runtime packing and native (JNI/ELF) layers are **not**
+  exercised here, and DexAtlas does not claim to defeat them; the
+  [status page](../status.md) tracks real-world hardened samples as an open
+  gap;
+- obfuscated names are preserved as-is (`a.a.a.a`), not "deobfuscated" — the
+  tool does not invent names it cannot verify;
+- as in every study here, no malware classification or severity score is
+  produced: the dangerous-shaped permissions and strings are reported as
+  facts about the bytes, with the judgement left to the analyst.
+
+## 3. Procedure (reproducible commands)
+
+### 3.1 Analyze, and what the index holds
 
 ```bash
 uv run dexatlas analyze examples/obfuscated-app/obfuscated.apk
@@ -63,7 +90,7 @@ metadata, not code: the package name `a.a.a`, the three dangerous permissions,
 and the two unguarded exported components are read from the binary manifest
 and recorded as E-0001/E-0002/E-0003, all `verified`.
 
-## 3. What survives in the source
+### 3.2 Read what survives in the source
 
 ```bash
 uv run dexatlas source apk_2f8d476fb9e71ac4 a.a.a
@@ -102,7 +129,7 @@ readable enough to reconstitute the app's behaviour by hand:
 - `a.b.a` (the service) returns a fake IMEI string and the constant
   `"AES/ECB/PKCS5Padding"`.
 
-## 4. What the string index still finds
+### 3.3 Search the string index
 
 Name obfuscation destroys identifiers; it does nothing to string constants.
 Searching for the two recognisable substrings:
@@ -119,7 +146,7 @@ analyst can go from a suspicious keyword to the exact method that uses it —
 here, from `telemetry` to `a.a.a.a(String)` — without any readable name
 helping.
 
-## 5. Cross-references without names
+### 3.4 Cross-references without names
 
 ```bash
 uv run dexatlas xrefs apk_2f8d476fb9e71ac4 "a.a.a.a(Ljava/lang/String;)Ljava/lang/String;"
@@ -143,7 +170,7 @@ Intent.getStringExtra, Object.<init>), and no application-to-application edge
 exists. For this sample that is the true structure; for a real target the same
 query family maps exactly the edges a reviewer would walk.
 
-## 6. The evidence chain
+## 4. Key evidence (checkable, record by record)
 
 Eight evidence records, all `verified`, each with tool, version, APK sha256
 and locator:
@@ -160,13 +187,13 @@ Every claim in this study resolves to one of these. When this document says
 "7 of 11 methods decompiled", that is E-0004's recorded count, not an
 impression.
 
-## 7. Conclusions and their limits
+## 5. Conclusions
 
 **Established by the tools:** the app's identity, permission set and exported
 components survive obfuscation intact; the string index still finds the
-telemetry URL and the SMS-shaped constant; 7 of 11 methods decompile to
-readable Java; the class graph, method table and call-site table are complete;
-each of those claims carries a resolvable citation.
+telemetry URL and the SMS-shaped constant and points at the methods that use
+them; the call graph is complete for what this sample contains, and its
+emptiness between application classes is a measured fact, not a gap.
 
 **Not established here:** that this sample is malware. It *looks like* the
 shape of a telemetry-collecting, SMS-reading, permission-heavy app, and a
@@ -179,11 +206,45 @@ judgement to the analyst.
 more. Control-flow obfuscation, string encryption and runtime packing are
 outside what this sample exercises, and the [status page](../status.md) tracks
 real-world hardened samples as an open gap. The comparison that matters here
-is with the same code unobfuscated (the demo-app study above): everything the
-manifest and string index produce survives untouched, the class/method/call
-index is complete in both, and what obfuscation costs is readability of the
-decompiled source — 7 of 11 methods versus 7 of 8, with warnings on the
-recovered ones.
+is with the same code unobfuscated (the [demo-app study](demo-app-walkthrough.md)
+above): everything the manifest and string index produce survives untouched,
+the class/method/call index is complete in both, and what obfuscation costs is
+readability of the decompiled source — 7 of 11 methods versus 7 of 8, with
+warnings on the recovered ones.
+
+## 6. Limits and boundaries
+
+- **Name obfuscation only.** The sample strips names; it does not encrypt
+  strings, flatten control flow, or pack code into a native loader. Each of
+  those would further reduce what a static index sees, and this study makes
+  no claim against them.
+- **No deobfuscation.** DexAtlas preserves and locates the mangled names; it
+  does not rename them to something meaningful. The readability recovered
+  here comes from string constants, not from name recovery.
+- **Decompiler coverage drops.** 7 of 11 methods decompiled (versus 7 of 8 on
+  the unobfuscated sample). The misses are recorded (E-0004) and the smali
+  fallback remains; the boundary is reported, not papered over.
+- **A measured zero is not a failure.** "No callers of …" and the empty
+  application-to-application edge set are real measurements on this sample.
+  On a real target, the same emptiness would warrant checking whether a
+  backend failed — which is exactly what `get_project_status` /
+  `dexatlas backends` exist to distinguish.
+- **No classification.** Dangerous permissions and suspicious-shaped strings
+  are reported as indexed facts. Calling the sample malicious is a human
+  judgement this tool deliberately does not make.
+
+## 7. Recommended next steps
+
+1. **Compare against the unobfuscated twin.** Run the
+   [demo-app walkthrough](demo-app-walkthrough.md) commands on `demo.apk` and
+   diff the two evidence tables: the manifest records match, the decompilation
+   counts diverge. That diff is the honest cost of name obfuscation.
+2. **Push on the boundary that matters to you.** If your targets use string
+   encryption or packers, this sample does not represent that case — ask for
+   a scoped evaluation on a sample you own rather than assuming transfer.
+3. **Use `get_project_status` before quoting counts.** The discipline this
+   study models — check which backends ran before trusting a number — is the
+   same one an automated consumer of the API or MCP server should follow.
 
 ## Appendix — one class, two DEX files
 

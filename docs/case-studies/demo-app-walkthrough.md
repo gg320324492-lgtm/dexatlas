@@ -10,7 +10,7 @@ was read from.
 
 ---
 
-## 1. Background
+## 1. Background and the question
 
 `demo-app` is a deliberately small five-class application. It is not a real
 product — it is a sample with recognisable shapes in it: an exported activity
@@ -19,13 +19,37 @@ key-shaped string constant. Its purpose is to be analysed immediately after
 cloning, with nothing to download, and to exercise every part of the pipeline
 without any of them being obscured.
 
-This walkthrough follows the full path a user takes: analyze the APK, read the
-manifest, search the index, open source, follow a cross-reference, and land on
-the evidence records that say where every number came from. Every step was run
-with the commands shown, in one workspace, and the outputs quoted are the
-actual outputs of those commands.
+The customer's question this study answers: *given this APK, what can you tell
+me about it, and can I check every statement you make without taking your word
+for it?*
 
-## 2. The analysis
+## 2. Scope
+
+**In scope — what this analysis covers:**
+
+- the decoded manifest: package identity, versions, SDK levels, permissions,
+  exported components and their guards;
+- the symbol index: classes, methods, fields and string constants;
+- the call graph: call sites and caller → callee edges;
+- decompiled source for the classes, with the backend that produced it named;
+- an evidence record for every claim, each with tool, version, APK hash and
+  locator.
+
+**Out of scope — what this analysis does not do:**
+
+- it does not run the app, intercept traffic, or perform any dynamic analysis;
+- it does not classify the app as benign or malicious, and does not score
+  severity — a suspicious shape is reported as a shape, not as a verdict;
+- it does not assert exploitability; impact assessment stays with the reader;
+- the sample's constants are inert placeholders by construction, and the
+  analysis has no way to know that — it reports what the bytes contain.
+
+## 3. Procedure (reproducible commands)
+
+Every step below was run with the commands shown, in one workspace, and the
+outputs quoted are the actual outputs of those commands.
+
+### 3.1 Analyze
 
 ```bash
 uv run dexatlas analyze examples/demo-app/demo.apk
@@ -49,7 +73,6 @@ lands on the same project. The summary counts come from the run's report:
 | Cross-reference records | 3 |
 | Evidence records | 11 |
 | DEX files | 1 |
-| Analysis time | 4.9 s |
 
 Eight of the nine indexes are complete for this sample; jadx decompiled 7 of 8
 methods and 5 of 5 classes. The one method jadx did not decompile is not a
@@ -57,7 +80,7 @@ silence — the report's decompilation evidence (E-0007, below) records the
 count, and the class in question still has its smali representation available
 through the apktool fallback.
 
-## 3. The manifest
+### 3.2 Read the manifest
 
 ```bash
 uv run dexatlas manifest apk_80a8fe0e81204c9f
@@ -85,7 +108,7 @@ from a separate record, E-0001, read by androguard from the *binary* manifest �
 a deliberate double-read, because apktool writes some of those fields into
 `apktool.yml` rather than the decoded XML.
 
-## 4. Searching the index
+### 3.3 Search the index
 
 ```bash
 uv run dexatlas search apk_80a8fe0e81204c9f "Crypto"
@@ -104,7 +127,7 @@ constant is an inert placeholder placed so that search has something real to
 find; the analysis cannot know that, and does not claim to — it reports that
 the string is in the app, and where.
 
-## 5. Opening the source
+### 3.4 Open the source
 
 ```bash
 uv run dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity
@@ -137,7 +160,7 @@ The source line names its own provenance: this is jadx 1.5.2's Java, read from
 the `jadx:sources` tree of this run. If jadx had failed here, the same command
 would have fallen back to apktool's smali and said so in the same place.
 
-## 6. Following the cross-references
+### 3.5 Follow the cross-references
 
 ```bash
 uv run dexatlas xrefs apk_80a8fe0e81204c9f \
@@ -164,7 +187,7 @@ is called from 1 caller(s) at 1 call site(s)`), E-0005 (`MainActivity.describe
 …`), E-0006 (`NetworkClient.post …`), all level `verified`, all with locators
 into `classes.dex`.
 
-## 7. The evidence chain
+## 4. Key evidence (checkable, record by record)
 
 The run produces eleven evidence records. They are the difference between "the
 report says so" and "here is who read what, with which tool version, from
@@ -188,7 +211,7 @@ position inside it. Opening the report on screen 8, or via
 renderer's output byte for byte (measured in the
 [M4 end-to-end run](../reports/m4-e2e-run.md), 2026-11-14).
 
-## 8. Conclusions and their limits
+## 5. Conclusions
 
 **Established by the tools** (verified records): the app exports an activity
 and a service with no permission guard; it carries a credential-shaped string
@@ -207,7 +230,40 @@ map of a small app in under five seconds and can spend their time on the two
 findings that matter (the unguarded exported components, the credential in the
 code) instead of on rebuilding context.
 
-## 9. Exporting the report
+## 6. Limits and boundaries
+
+- **Static only.** No execution, no traffic capture, no runtime inspection.
+  Facts are read from the APK's bytes and nothing else.
+- **No verdict.** "Exported with no permission guard" and "carries a
+  credential-shaped constant" are measurements. Whether they constitute a
+  vulnerability in a real app depends on context this tool does not have.
+- **Backend-dependent completeness.** The counts above hold for androguard
+  4.1.4, apktool 2.11.1 and jadx 1.5.2. A missing backend shrinks the index
+  and is recorded as an error in the report, not silently absorbed.
+- **First-party sample.** The constants (`sk_live_…`, `api.example.com`) are
+  placeholders written into the sample's smali. They demonstrate that the
+  index finds such strings, not that this app leaks a credential.
+- **Decompiler gaps are recorded, not hidden.** jadx decompiled 7 of 8
+  methods; the eighth remains available as smali, and the evidence table
+  carries the exact count.
+
+## 7. Recommended next steps
+
+For a reader who has this report and wants to go further:
+
+1. **Verify one claim by hand.** Take E-0004's locator
+   (`androguard:classes.dex#…onCreate→…sign`), open `classes.dex` in any DEX
+   viewer, and confirm the call at the cited offset. The evidence chain is
+   designed to be checked, not trusted.
+2. **Ask the follow-up questions the report surfaces.** Why is `SyncService`
+   exported? Who can reach it? What does the signing helper actually do with
+   the key material? The index answers the structural part; the judgement is
+   yours.
+3. **Export and hand off the report.** The command in the next section
+   produces the Markdown/JSON pair a client can read without installing
+   anything.
+
+## 8. Exporting the report
 
 ```bash
 uv run dexatlas analyze examples/demo-app/demo.apk -o report.md --json report.json
