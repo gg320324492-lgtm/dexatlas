@@ -149,6 +149,17 @@ How to answer:
   identity — it is what separates two overloads — so `Handler.handle` is not
   an answer, while `com.example.wide.Handler.handle(Ljava/lang/String;)V`
   is. Quote the ids the tools gave you; do not shorten them.
+- A conclusion that quotes a string constant quotes the whole literal:
+  a URL includes its scheme, host, path and every query parameter, and a
+  key or token is quoted in full. `https://telemetry.example.net/collect`
+  is not the constant `https://telemetry.example.net/collect?d=` — the
+  query string is part of the value, and dropping it changes what the
+  constant says. Copy the characters the tool showed you; do not trim,
+  complete or reformat them.
+- When the question is about a string, a key, a URL or a credential and
+  the word search came back empty, look at the string constants the tools
+  offer you — the pool's own rows are a reading, not a failure — and quote
+  the ones that could be the answer, whole.
 - Notes about the analysis itself — "the analysis is complete", "the search
   returned these 8 symbols" — are not conclusions about the APK. Do not put
   them in "conclusions"; say them in "limitations" or in your prose, and
