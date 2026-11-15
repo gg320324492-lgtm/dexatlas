@@ -44,8 +44,14 @@ agent 配置应当能以可核查的证据完成回答，失败时给出可理�
 判定规则（对全部题目统一适用，见 `benchmarks/model.py` 的 `check()`）：
 `must_contain` 为大小写不敏感的子串匹配，多条须全部命中；`expect_count` 为精确
 计数；`expect_empty` 题先判「无证据」，答案带出任何证据即失败，再检查
-`must_not_contain`。配置一列中 `full` 为三后端齐全，`no-apktool` / `no-jadx`
-为对应后端被显式禁用的配置。
+`must_not_contain`；`expect_backend_failure` 题（§3.5 的 `partial.*` 两题）要求
+回答把缺失后端的名字与其失败标记（`not_installed` / "not installed" /
+"did not take part"）写在同一处，同时 `must_not_contain` 仍然生效——编造被禁
+后端的数据（如无 Apktool 时答出包名）与空答（什么都没说）都判负。
+`expect_backend_failure` 是 2026-11-15 的判定语义修订（M6-③），修订动机与
+对历史测量的影响见附录 B。配置一列中 `full` 为三后端齐全，`no-apktool` /
+`no-jadx` 为对应后端被显式禁用的配置（comparison harness 按该配置真实
+Analyze，缺失的后端在对应工作区里确实不参与）。
 
 ### 3.1 权限 / 组件清单（5 题）
 
@@ -104,12 +110,15 @@ SDK 级别以 APK 字节为准，见 `benchmarks/tasks/manifest.py` 模块说明
 |---|---|---|---|---|---|
 | `unanswerable.crypto-digestof-has-no-callers` | demo-app | full | 谁调用 Crypto.digestOf？ | 无调用者（空答） | expect_empty；答出任何调用者即失败 |
 | `unanswerable.demo-declares-no-receiver` | demo-app | full | 是否声明 broadcast receiver？ | 未声明（空答） | expect_empty |
-| `partial.no-apktool-there-is-no-manifest` | demo-app | no-apktool | 无 APK 阅读器时包名是什么？ | 无 manifest（空答） | expect_empty；错值与空串都算失败 |
-| `partial.no-jadx-the-failure-is-recorded` | demo-app | no-jadx | 分析是否记录了反编译器缺失？ | 记录 `jadx` / `not_installed` | must_contain 两条 |
+| `partial.no-apktool-there-is-no-manifest` | demo-app | no-apktool | 无 APK 阅读器时包名是什么？ | 记录 Apktool 缺失（`apktool` + `not_installed`），不给出包名 | expect_backend_failure（`apktool`）；不得含 `com.example.demo` |
+| `partial.no-jadx-the-failure-is-recorded` | demo-app | no-jadx | 分析是否记录了反编译器缺失？ | 记录 `jadx` / `not_installed` | expect_backend_failure（`jadx`） |
 
 依据：`examples/demo-app/smali/` 无任何指令引用 digestOf；demo-app manifest 只有
 activity 与 service；后端缺失是值不是异常（`ToolOutcome` 携带 `ToolError`）。
 无法回答题是**计分题**：合理编造即失败，不存在「部分正确」。
+`partial.*` 两题的判定形状是 `expect_backend_failure`（见 §3 判定规则与附录 B）：
+「Apktool 缺失，manifest 未能解码，错误已记录」这类失败记录型回答判**过**；
+给出包名等被禁后端的数据、或空答不置一词，判**负**。
 
 ### 3.6 结构补充（1 题）
 
@@ -232,3 +241,76 @@ uv run --no-sync python benchmarks/run.py \
   --task multidex.dex-file-count \
   --workspace E:/Dexatlas/.scratch/m6-freeze
 ```
+
+## 附录 B：`partial.*` 两题的判定语义修订（2026-11-15，M6-③）
+
+### B.1 修订了什么
+
+`partial.no-jadx-the-failure-is-recorded` 与 `partial.no-apktool-there-is-no-manifest`
+的判定从 `must_contain` / `expect_empty` 改为新增的
+`expect_backend_failure` 谓词：回答必须把缺失后端的名字与其失败标记
+（`not_installed` / "not installed" / "did not take part"）写在同一处，
+`must_not_contain` 仍然生效（无 Apktool 时答出 `com.example.demo` 即编造，
+判负），空答也判负——「什么都没说」不是「记录了失败」。
+
+### B.2 为什么必须修订
+
+[m6-level2-failure-analysis.md](m6-level2-failure-analysis.md) §5.6 的根因：
+comparison harness 只用 `Configuration.FULL` Analyze，题面声明的
+`no-jadx` / `no-apktool` 配置没有任何消费者。于是这两题问的现象（后端缺失）
+在测量里根本不存在：agent 如实回答「没有缺失 / manifest 存在」在事实层全对，
+判分层全错；层级 2 的 6 个题次失败没有一次反映 agent 能力。
+
+### B.3 harness 的对应修正（与判定同 commit）
+
+- `benchmarks/comparison/run.py`：`_analyse_samples` 按题面配置真实
+  Analyze（`Configuration.environment` 把对应后端路径置空即禁用），
+  full 之外的工作区按需创建；
+- `benchmarks/comparison/systems.py`：配置 B 按题路由到对应工作区的
+  `StructuredTools`，配置 D 的工具、证据与溯源读同一份分析；
+- `benchmarks/comparison/retrieval.py`：配置 A 的检索面按题藏掉缺失
+  后端的文件类别（无 Apktool 则无 manifest/资源/smali，无 JADX 则无 Java）；
+- `benchmarks/probes.py`：`recorded_errors` 在后端被配置性禁用（无错误
+  记录、`tool_versions` 置 `None`）时，把缺席事实写成与失败记录同形的
+  finding；`manifest_value` 在无 manifest 时带回失败记录。
+
+### B.4 对历史测量的影响：旧口径数字不变
+
+**历史报告（[m6-level2-real.md](m6-level2-real.md) 等）不重写。**
+用新谓词对 [m6-level2-traces.json](m6-level2-traces.json) 里 6 个 DexAtlas
+`partial.*` 题次重判，结果仍全部判负：旧 harness 下后端从未被禁用，trace 里
+「missing_backends 为空、JADX 1.5.2 正常」的回答是对旧测量状态的真实描述，
+不是失败记录，旧 trace 里不存在能判过的诚实回答。这正说明那 6 个题次在旧
+测量下不构成对 agent 能力的有效测量（§9 的结论），而不是「新判分放水」。
+
+新口径自本修订的下次测量起生效：层级 0（确定性判分，真实禁用后端）已验证
+两题判过；层级 1 scripted 三配置 20 题重跑，DexAtlas 在 q066/q067 判过，
+A/B 的 scripted 替身对 q067 的空答从旧口径的「判过」变为「判负」（空答
+不再是正确回答的形状），其余 18 题在三配置下的判定与 committed 基线
+（[comparison-traces.json](comparison-traces.json) 重叠题号）逐题一致。
+
+### B.5 复核方式
+
+```bash
+uv run --no-sync python - <<'PY'
+import json
+from benchmarks.comparison.adapters import answer_from_result
+from benchmarks.comparison.run import _run_from_document
+from benchmarks.model import check
+from benchmarks.tasks import ALL_TASKS
+
+doc = json.load(open("docs/benchmarks/m6-level2-traces.json", encoding="utf-8"))
+run = _run_from_document(doc)
+by_id = {t.id: t for t in ALL_TASKS}
+for tr in run.traces:
+    if tr.task_id and tr.task_id.startswith("partial.") \
+            and tr.task_id in by_id and ("no-manifest" in tr.task_id or "failure-is-recorded" in tr.task_id):
+        verdict = check(by_id[tr.task_id], answer_from_result(tr.result))
+        print(tr.reference, tr.system, "old=", tr.passed, "new=", verdict.passed)
+PY
+```
+
+层级 0 的复核命令即附录 A（`--workspace` 换新目录），两题在 no-apktool /
+no-jadx 配置下判过；回归测试见
+`tests/test_partial_backend_failure_scoring.py`（判分层）与
+`tests/test_comparison_configuration_routing.py`（执行层路由）。

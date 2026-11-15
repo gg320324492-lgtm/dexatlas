@@ -20,7 +20,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 
 from benchmarks.comparison.adapters import prose_to_conclusions
 from benchmarks.comparison.model import Assertion, Question, SystemKind, SystemResult, ToolCallTrace
@@ -30,6 +30,7 @@ from benchmarks.comparison.retrieval import (
     StructuredTools,
     keyword_from,
 )
+from benchmarks.model import Configuration
 from dexatlas.agent.orchestrator import Orchestrator
 from dexatlas.agent.planner import DEFAULT_MAX_SENSITIVE_CALLS, Planner
 from dexatlas.agent.providers.base import (
@@ -294,10 +295,15 @@ class StructuredSystem(_BaseSystem):
         provider: ModelProvider | None = None,
         max_tokens: int = 2048,
         max_calls: int = 2,
+        analyses_by_config: dict[Configuration, dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(
             kind=SystemKind.STRUCTURED,
-            tools=StructuredTools(analyzer=analyzer, project_ids=project_ids),
+            tools=StructuredTools(
+                analyzer=analyzer,
+                project_ids=project_ids,
+                analyses_by_config=analyses_by_config,
+            ),
             provider=provider or scripted_provider(),
             max_tokens=max_tokens,
             max_calls=max_calls,
@@ -333,7 +339,7 @@ class AgentSystem:
         self,
         *,
         analyzer: Any,
-        analyses: dict[str, Any],
+        analyses: dict[Configuration, dict[str, Any]] | dict[str, Any],
         provider_factory: Callable[[], ModelProvider],
         store_root: Path,
         max_tokens: int = 2048,
@@ -344,7 +350,20 @@ class AgentSystem:
         max_sensitive_calls: int | None = None,
     ) -> None:
         self._analyzer = analyzer
-        self._analyses = analyses
+        # 兼容两种形态: 新代码按 Analyze 配置分组 (题面 no-jadx/no-apktool
+        # 题路由到各自工作区), 旧调用与测试传平的 {sample: analysis}. 两者
+        # 的键类型不同 (Configuration 对 str), 看第一个键即可分辨.
+        first_key = next(iter(analyses), None)
+        grouped = cast(
+            "dict[Configuration, dict[str, Any]] | None",
+            analyses if isinstance(first_key, Configuration) else None,
+        )
+        flat = cast(
+            "dict[str, Any]",
+            analyses if grouped is None else {},
+        )
+        self._by_config: dict[Configuration, dict[str, Any]] | None = grouped
+        self._flat: dict[str, Any] = flat
         self._provider_factory = provider_factory
         self._store_root = store_root
         self.max_tokens = max_tokens
@@ -386,14 +405,32 @@ class AgentSystem:
     def model_name(self) -> str:
         return str(getattr(self._provider_factory(), "model", ""))
 
+    def _analysis_for(self, question: Question) -> Any | None:
+        """按题面配置选工作区; 未分组时退回平铺表."""
+        by_config = self._by_config
+        if by_config is not None:
+            try:
+                configuration = Configuration(question.configuration)
+            except ValueError:
+                return None
+            chosen = by_config.get(configuration) or {}
+            return chosen.get(question.sample)
+        return self._flat.get(question.sample)
+
     def answer(self, question: Question) -> SystemResult:
         started = time.monotonic()
-        analysis = self._analyses.get(question.sample)
+        analysis = self._analysis_for(question)
         if analysis is None:
             return SystemResult(failed=True, error=f"no analysis for {question.sample}")
+        # 工具与证据都读这份分析自己的工作区: no-jadx/no-apktool 题里
+        # 缺失的后端才真的缺席, get_manifest 的 no_manifest 错误、
+        # missing_backends 字段与探针看到的 project 才反映题面配置.
+        # 旧测试的 analysis stub 只带 builder 需要的字段, 回退到构造时的
+        # analyzer.
+        analyzer = getattr(analysis, "analyzer", self._analyzer)
 
         provider = self._provider_factory()
-        client = McpToolClient(self._analyzer)
+        client = McpToolClient(analyzer)
         store = TaskStore(self._store_root / question.reference)
         store_root = self._store_root / question.reference
         store_root.mkdir(parents=True, exist_ok=True)

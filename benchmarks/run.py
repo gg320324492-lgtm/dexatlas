@@ -146,6 +146,10 @@ def _self_check(tasks: list[Task]) -> list[str]:
                 findings=(Finding(text="a plausible but unfounded claim"),),
                 text=" ".join(task.must_not_contain[:1]),
             )
+        elif task.expect_backend_failure:
+            # The wrong answer here is the confident one: data produced
+            # without naming the failure, or a denial that anything failed.
+            fabricated = Answer(findings=(Finding(text="the analysis is complete"),))
         else:
             fabricated = Answer()
         if check(task, fabricated).passed:

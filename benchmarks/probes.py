@@ -34,12 +34,26 @@ def manifest_value(attribute: str) -> Probe:
     The attribute names are the ones :class:`~dexatlas.core.models.ManifestInfo`
     holds: ``package``, ``version_code``, ``version_name``, ``min_sdk`` and
     ``target_sdk``.
+
+    A configuration whose Apktool did not take part holds no manifest at all,
+    and the *answer* to such a question is why: the probe reports the
+    recorded backend failures (``<tool>/not_installed``) as findings, so a
+    scorer can tell "no manifest because the reader was absent" from a
+    silent empty query.
     """
 
     def probe(ctx: Context) -> Answer:
         info = _manifest(ctx)
         if info is None:
-            return Answer(note="the analysis recorded no manifest")
+            failures = tuple(
+                Finding(text=f"{error.tool}/{error.code.value}: {error.message}")
+                for error in ctx.project.errors
+            )
+            return Answer(
+                findings=failures,
+                note="the analysis recorded no manifest "
+                f"({len(failures)} recorded backend failure(s))",
+            )
         value = getattr(info, attribute, None)
         if value is None:
             return Answer(note=f"the manifest records no {attribute}")
@@ -402,14 +416,39 @@ def dex_files() -> Probe:
 
 
 def recorded_errors() -> Probe:
-    """Ask which backend failures the analysis recorded."""
+    """Ask which backend failures the analysis recorded.
+
+    A configuration that disables a backend deliberately — the harness's
+    ``no-jadx`` / ``no-apktool`` runs — never sees that backend fail, because
+    the pipeline never starts it: the absence shows up in the run's tool
+    versions, not in its error records. The question those tasks ask ("does
+    the analysis record that the backend was missing?") is still answerable,
+    so the probe turns the configured absence into the same finding shape a
+    recorded failure has, ``<tool>/not_installed``, and lets the scorer read
+    both the same way.
+    """
 
     def probe(ctx: Context) -> Answer:
-        findings = tuple(
+        recorded = tuple(
             Finding(text=f"{error.tool}/{error.code.value}: {error.message}")
             for error in ctx.project.errors
         )
-        return Answer(findings=findings, note=f"{len(findings)} recorded failure(s)")
+        if recorded:
+            return Answer(findings=recorded, note=f"{len(recorded)} recorded failure(s)")
+        # Nothing failed, so the question is whether a backend was configured
+        # away. The analysis holds the answer either way.
+        absent = tuple(
+            Finding(
+                text=f"{name}/not_installed: {name} did not take part in this analysis "
+                "(configured absent)"
+            )
+            for name, version in sorted(ctx.project.tool_versions.items())
+            if version is None
+        )
+        return Answer(
+            findings=absent,
+            note=f"{len(absent)} backend(s) configured absent, {len(recorded)} recorded failure(s)",
+        )
 
     return probe
 

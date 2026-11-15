@@ -99,7 +99,7 @@ def _tasks() -> list[Task]:
                 "A backend that cannot be found is a value, not an exception: the analysis "
                 "records the failure and carries on with what it has."
             ),
-            must_contain=("jadx", "not_installed"),
+            expect_backend_failure=("jadx",),
             note="The gap is recorded, not hidden.",
         ),
         Task(
@@ -114,7 +114,8 @@ def _tasks() -> list[Task]:
                 "The manifest is read by Apktool; with Apktool absent there is no manifest to "
                 "read, and the analysis holds none."
             ),
-            expect_empty=True,
+            expect_backend_failure=("apktool",),
+            must_not_contain=("com.example.demo", "com.example.multidex"),
             note="Nothing is not the same as something with the wrong value.",
         ),
         Task(

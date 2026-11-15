@@ -289,6 +289,23 @@ class Task:
     rather than passing it by saying nothing useful.
     """
 
+    expect_backend_failure: tuple[str, ...] = ()
+    """The backends whose absence the answer has to record, by name.
+
+    A task of this shape is not about the data the backends hold — it is
+    about whether the analysis *says* that a backend did not take part. The
+    answer has to name each backend listed here together with its recorded
+    failure (the ``not_installed`` code the pipeline writes), and it must not
+    pass off the backend's data as if it were there: anything in
+    ``must_not_contain`` still fails it.
+
+    The distinction from ``expect_empty`` matters: an honest system in the
+    no-apktool configuration answers "there is no manifest because Apktool
+    did not run", and that answer *is* evidence — of the failure, not of the
+    manifest. An ``expect_empty`` task rejects any finding at all, so it
+    cannot score that answer; this predicate can.
+    """
+
     note: str = ""
     """Why this task is in the set, in one line. Shown by the runner."""
 
@@ -304,11 +321,22 @@ class Task:
                 f"task {self.id!r} expects an empty answer and text in it; "
                 "those are two different answers"
             )
+        if self.expect_backend_failure and self.expect_empty:
+            raise ValueError(
+                f"task {self.id!r} expects a recorded backend failure and an "
+                "empty answer; those are two different answers"
+            )
+        if self.expect_backend_failure and self.expect_count is not None:
+            raise ValueError(
+                f"task {self.id!r} expects a recorded backend failure and a "
+                f"count of {self.expect_count}; those are two different answers"
+            )
         if (
             not self.expect_empty
             and not self.must_contain
             and self.expect_count is None
             and not self.must_not_contain
+            and not self.expect_backend_failure
         ):
             raise ValueError(
                 f"task {self.id!r} checks nothing: give it text to contain, "
@@ -342,6 +370,43 @@ def _contains(haystack: str, needle: str) -> bool:
     return needle.casefold() in haystack.casefold()
 
 
+#: The phrases that mean "a backend did not take part", as this project's own
+#: layers write them: the ``ToolErrorCode.NOT_INSTALLED`` value the pipeline
+#: records, the same words in prose, and the wording of the ``no_manifest``
+#: request error. The set is closed on purpose — extending it is a change to
+#: what "recording a failure" means, and it belongs to the judging-semantics
+#: note in ``docs/benchmarks/service-regression-set.md`` when it happens.
+_FAILURE_MARKERS: tuple[str, ...] = (
+    "not_installed",
+    "not installed",
+    "did not take part",
+)
+
+
+def _records_backend_failure(task: Task, answer: Answer) -> bool:
+    """Whether the answer records each backend failure the task names.
+
+    The pipeline writes a backend's absence as ``<tool>/not_installed`` in
+    the project's error records (:class:`~dexatlas.core.models.ToolError`),
+    and a probe turns each record into a finding of the same shape. A
+    configuration D answers in prose, so the same fact may be phrased as
+    "not installed" in ``Answer.text``. Either place counts, but the backend
+    name and a failure phrase have to meet in one finding, or in the prose
+    answer alone — an answer that names the backend in one finding and the
+    failure in another has not connected them.
+    """
+    candidates = [finding.text for finding in answer.findings]
+    if answer.text:
+        candidates.append(answer.text)
+    return all(
+        any(
+            _contains(text, backend) and any(_contains(text, marker) for marker in _FAILURE_MARKERS)
+            for text in candidates
+        )
+        for backend in task.expect_backend_failure
+    )
+
+
 def check(task: Task, answer: Answer) -> CheckResult:
     """Decide whether an answer satisfies a task.
 
@@ -352,6 +417,16 @@ def check(task: Task, answer: Answer) -> CheckResult:
     texts = [finding.text for finding in answer.findings]
     joined = "\n".join(texts)
     said = f"{joined}\n{answer.text}"
+
+    if task.expect_backend_failure and not _records_backend_failure(task, answer):
+        missing = ", ".join(task.expect_backend_failure)
+        return CheckResult(
+            task=task,
+            passed=False,
+            reason=f"the answer does not record the failure of {missing} "
+            "(the backend name with its not_installed code)",
+            findings=answer.findings,
+        )
 
     if task.expect_empty:
         if answer.findings:

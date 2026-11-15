@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1447<!--/fig-->（<!--fig:tests.fast-->1301<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1459<!--/fig-->（<!--fig:tests.fast-->1313<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->91.8%<!--/fig-->**（<!--fig:coverage.covered-->6677<!--/fig-->/<!--fig:coverage.total-->7277<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1301<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1313<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->146<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1447<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1459<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -217,6 +217,8 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_sdk_reconciliation.py` | manifest 的 SDK 级别不采信 Apktool 的重建值，从 binary manifest 读回并只补缺、失败照记（manifest.min-sdk 修复新增） |
 | `test_comparison_providers.py` | M3 对比接真实 provider：token 是端点上报值不是估算，key 只进请求头不进 trace |
 | `test_comparison_task_selection.py` | M6 层级 1 的 `--task` 前缀过滤：子集只改"问哪些题"，题号与判分对象不变，空匹配是错误不是空跑 |
+| `test_comparison_configuration_routing.py` | M6-③ comparison harness 按题面配置真实 Analyze：no-apktool 工作区里 Apktool 确实缺席且失败被记录，B 按题路由、A 的检索面按题隐藏缺失后端的文件 |
+| `test_partial_backend_failure_scoring.py` | M6-③ `partial.*` 两题的 `expect_backend_failure` 判定：诚实失败记录判过，编造包名与空答判负，旧 expect_empty 口径对同一回答判负（红→绿证据） |
 | `test_version_fields.py` | 五个自建 APK 的 versionCode/versionName：源码、入库 yml、真实解码产物与 ManifestInfo 都和二进制 manifest 一致（同源字段排查新增） |
 | `test_workbench.py` | M4 前四屏：列表与状态、上传与分析进度、符号检索与源码、证据记录与 locator 解析、调用关系都仍是 MCP 契约的形状；没有调用者的方法答 0 而不是 404 |
 | `test_workbench_agent.py` | M4 屏 6：agent 工作区的任务接口——问题被受理为可轮询的任务，报告是 agent reporter 自己的文档，未配置模型时明确拒绝，key 不离开 provider |
@@ -850,10 +852,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1447<!--/fig--> 个：<!--fig:tests.fast-->1301<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1459<!--/fig--> 个：<!--fig:tests.fast-->1313<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->91.8%<!--/fig-->（<!--fig:coverage.covered-->6677<!--/fig-->/<!--fig:coverage.total-->7277<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1447<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1458<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1057,10 +1059,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:d228182080e596616e23873086358f64c18445be34a56ecc6a32fd55d07ffcf1",
+  "source_fingerprint": "sha256:70da6f23ead415dba7dabd4be68dbb0775d71a4b6c5b6c0ed091b4d7c0341adf",
   "suite": {
-    "failed": 0,
-    "passed": 1447,
+    "failed": 1,
+    "passed": 1458,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1068,8 +1070,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1301,
+    "fast": 1313,
     "slow": 146,
-    "total": 1447
+    "total": 1459
   }
 }-->

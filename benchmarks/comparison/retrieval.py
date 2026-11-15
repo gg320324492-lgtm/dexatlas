@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, ClassVar, Protocol, runtime_checkable
 
 #: 问题文本里常见的,不该当检索词的词. 抽词不是理解题目,它只是把问题里
 #: 那个反引号包住的符号名挑出来;挑不到就退成空串 (全量检索).
@@ -83,10 +83,36 @@ class SourceTextTools:
     ``sources`` 是 ``{sample: 目录}``. 目录里是仓库自带的 smali,manifest,
     strings.xml,以及 (若后端跑过)JADX 的 Java 源码. 检索只读这些文件,
     不经过 DexAtlas 的结构化索引——这正是 A 与 B 的区别.
+
+    A 是单实例服务多道题, 而后端缺失是**题面配置**的属性: 每次检索按
+    ``question.configuration`` 现算缺失后端, 缺哪个后端就藏哪一类文件
+    (Apktool 缺则 manifest/资源/smali 都没有,JADX 缺则没有 Java). 这让
+    A 的检索面与 B/D 的工作区遵循同一事实, 而不是检索工具的想象.
     """
+
+    #: 每个后端缺席时,从这个配置的检索面里消失的文件后缀.
+    _ABSENT_SUFFIXES: ClassVar[dict[str, frozenset[str]]] = {
+        "apktool": frozenset({".smali", ".xml", ".yml"}),
+        "jadx": frozenset({".java"}),
+    }
 
     def __init__(self, sources: dict[str, Path]) -> None:
         self._sources = dict(sources)
+
+    @staticmethod
+    def _absent_for(question: Any) -> frozenset[str]:
+        """The backends the question's own configuration says are absent."""
+        from benchmarks.model import Configuration
+
+        try:
+            configuration = Configuration(str(getattr(question, "configuration", "") or ""))
+        except ValueError:
+            return frozenset()
+        if configuration is Configuration.NO_APKTOOL:
+            return frozenset({"apktool"})
+        if configuration is Configuration.NO_JADX:
+            return frozenset({"jadx"})
+        return frozenset()
 
     @property
     def available(self) -> tuple[str, ...]:
@@ -103,6 +129,8 @@ class SourceTextTools:
         if root is None or not root.is_dir():
             return {"hits": [], "error": f"no source directory for {question.sample}"}
         suffixes = {".smali", ".java", ".xml", ".yml"}
+        for backend in self._absent_for(question):
+            suffixes -= self._ABSENT_SUFFIXES.get(backend, frozenset())
         files = sorted(path for path in root.rglob("*") if path.suffix in suffixes)
         needle = keyword.casefold()
         hits: list[dict[str, str]] = []
@@ -161,9 +189,19 @@ class StructuredTools:
         }
     )
 
-    def __init__(self, *, analyzer: Any, project_ids: dict[str, str]) -> None:
+    def __init__(
+        self,
+        *,
+        analyzer: Any,
+        project_ids: dict[str, str],
+        analyses_by_config: dict[Any, dict[str, Any]] | None = None,
+    ) -> None:
         self._analyzer = analyzer
         self._project_ids = dict(project_ids)
+        # 按题面配置路由到对应工作区的分析结果: ``no-jadx`` / ``no-apktool``
+        # 题读它们自己的 project, manifest 与错误记录才反映那个配置的真实
+        # 状态. 没有分组表时退回单工作区行为 (现有调用与测试兼容).
+        self._analyses_by_config = dict(analyses_by_config or {})
 
     @property
     def available(self) -> tuple[str, ...]:
@@ -184,6 +222,29 @@ class StructuredTools:
             return "find_callers" if "(" in keyword else "search_symbols"
         return "get_manifest"
 
+    def _routing(self, question: Any) -> tuple[Any, str, str] | None:
+        """按题面配置选 (analyzer, project_id); 未路由到时返回 None.
+
+        返回 ``None`` 表示继续用构造时绑定的 full 工作区; 路由到分组表
+        里没有的配置也视为未路由, 不在这里编造一个分析.
+        """
+        by_config = self._analyses_by_config or {}
+        if not by_config:
+            return None
+        try:
+            from benchmarks.model import Configuration
+
+            configuration = Configuration(str(getattr(question, "configuration", "") or ""))
+        except ValueError:
+            return None
+        chosen = by_config.get(configuration)
+        if chosen is None:
+            return None
+        analysis = chosen.get(str(question.sample))
+        if analysis is None:
+            return None
+        return analysis.analyzer, analysis.result.project.id, str(question.sample)
+
     def call(self, name: str, question: Any, keyword: str) -> dict[str, Any]:
         from dexatlas.mcp.errors import RequestError
         from dexatlas.mcp.tools.projects import manifest as manifest_tool
@@ -191,19 +252,25 @@ class StructuredTools:
         from dexatlas.mcp.tools.references import find_callers as find_callers_tool
         from dexatlas.mcp.tools.symbols import search_symbols as search_symbols_tool
 
-        project_id = self._project_ids.get(str(question.sample))
+        routed = self._routing(question)
+        analyzer: Any = self._analyzer
+        project_id: str | None = None
+        if routed is not None:
+            analyzer, project_id, _sample = routed
+        else:
+            project_id = self._project_ids.get(str(question.sample))
         if project_id is None:
             return {"error": f"no analysis for {question.sample}"}
         try:
             view: Any
             if name == "get_manifest":
-                view = manifest_tool(self._analyzer, project_id)
+                view = manifest_tool(analyzer, project_id)
             elif name == "search_symbols":
-                view = search_symbols_tool(self._analyzer, project_id, keyword, limit=50, offset=0)
+                view = search_symbols_tool(analyzer, project_id, keyword, limit=50, offset=0)
             elif name == "find_callers":
-                view = find_callers_tool(self._analyzer, project_id, keyword, limit=50)
+                view = find_callers_tool(analyzer, project_id, keyword, limit=50)
             else:
-                view = find_callees_tool(self._analyzer, project_id, keyword, limit=50)
+                view = find_callees_tool(analyzer, project_id, keyword, limit=50)
         except RequestError as exc:
             # A backend that did not take part is a fact about the analysis,
             # not a failed task. The error carries which backends were absent,
