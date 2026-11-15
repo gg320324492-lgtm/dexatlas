@@ -88,9 +88,12 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.2` | Acceptance Checklist      | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words                      |
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.5.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
-| **3** | `v1.0.0` | Production-Ready          | Native (Ghidra) and dynamic (Frida) analysis, plugin ecosystem, HTML/PDF reports, public benchmark           |
+| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows, portable evidence reports, clean-install verification, client-facing examples and independent acceptance |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
+
+The [Phase 3 plan](docs/roadmap/phase3-plan.md) prioritizes reproducible GitHub demos
+and scoped client deliverables. Native/dynamic analysis and a plugin ecosystem are deferred.
 
 Phases are promoted on evidence, not on a calendar. Every phase ends with a source review,
 and the next phase's issue list is derived from that review.

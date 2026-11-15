@@ -31,9 +31,14 @@ the workbench. M4 passed its source review and acceptance on 2026-11-14
 | **M3** | Evaluation and benchmarking | **done** — 92 tasks with independently checked answers, scripted + real-model comparison runs, stronger-budget rerun (`docs/benchmarks/`) |
 | **M4** | Web workbench and portfolio | **done** — six screens live, benchmark view, end-to-end demo; review passed 2026-11-14 (`docs/reports/m4-review.md`) |
 
-The next planned work is Phase 3 (v1.0.0): the plan draft is in
-[`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md), pending revision
-after discussion.
+The next planned work is Phase 3 (target v1.0.0):
+[`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) was rewritten on
+2026-11-15 around GitHub portfolio value and scoped Upwork deliverables.
+M5–M10 now cover baseline reconciliation, bounded agent workflows, portable
+evidence packages, installation/reliability, presentation assets and independent
+acceptance. None has been accepted; native/dynamic analysis and plugin/SDK
+expansion are deferred. The [readiness assessment](reports/portfolio-readiness-2026-11-15.md)
+explains the scoring and its limits.
 
 The plan is in [`docs/roadmap/phase2-plan.md`](roadmap/phase2-plan.md), and
 the status page — in Chinese — is [`docs/status.md`](status.md). The
@@ -93,10 +98,11 @@ pass.** Read the skip count in the summary line, not just the exit code.
 
 Phase 2 (M0–M4) is **complete** — all five milestones delivered, M4's review
 passed on 2026-11-14, and v0.2.0 shipped the lot. The next planned work is
-**Phase 3 (v1.0.0)**; the draft plan is in
-[`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) (M5–M10), pending
-revision after discussion. Read [`docs/status.md`](status.md) for the current
-state and its open gaps.
+**Phase 3 (target v1.0.0)**; follow the revised
+[`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) (M5–M10), starting
+with baseline reconciliation. The milestone numbers have new meanings; do not
+start the old plugin/native expansion list. Read [`docs/status.md`](status.md)
+for the current state and its open gaps.
 
 ### Smaller things that are still open
 

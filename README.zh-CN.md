@@ -74,9 +74,12 @@ DexAtlas 要解决的正是这个问题：
 | **Phase 1** | `v0.1.2`  | 验收清单补齐   | 5 个自建测试 APK、演示视频，并把退出清单恢复成计划书的原话                                        |
 | **Phase 1** | `v0.1.3`  | 证据能指回原处 | 交叉引用成为证据、locator 随报告迁移、文档与代码互相校验                                          |
 | **Phase 2** | `v0.5.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
-| **Phase 3** | `v1.0.0`  | 生产级开源平台 | Native（Ghidra）与动态（Frida）分析、插件生态、HTML/PDF 报告、公开 Benchmark                        |
+| **Phase 3** | `v1.0.0`（计划） | 作品集与交付 | 有限 Agent 流程、可迁移证据报告、干净安装验证、客户式案例与独立验收 |
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。
+
+[第三阶段计划](docs/roadmap/phase3-plan.md)以 GitHub 可复现展示与 Upwork 有范围的交付为目标；
+原生/动态分析和插件生态延后，不再是本阶段退出条件。
 
 阶段推进依据证据而非日历。每个阶段以一次源码评审结束，下一阶段的任务清单由评审结果
 推导而来，而非照搬既有假设。

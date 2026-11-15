@@ -7,11 +7,10 @@ This document is the working contract for how DexAtlas grows. It is a plan, not 
 promise of features — the README describes what actually ships, this file describes
 what comes next.
 
-- **Current phase:** Phase 1 shipped `v0.1.0` on 2026-10-14, `v0.1.1` on 2026-10-19
-  (Foundation Hardening), `v0.1.2` on 2026-10-20 (Acceptance Checklist) and
-  `v0.1.3` on 2026-10-20 (Evidence That Points Back) — awaiting the Phase 1 source
-  review, which is the entry condition for Phase 2
-- **Plan version:** 2026-10
+- **Current phase:** Phase 2 delivered; M4 source review and acceptance passed
+  on 2026-11-14. Phase 3 is planned around portfolio value and scoped delivery;
+  see [current status](../status.md) and the [Phase 3 plan](phase3-plan.md).
+- **Plan version:** 2026-11-15 (Phase 3 scope revision; prior phase history retained)
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
@@ -319,62 +318,57 @@ Automation, LLM Integration and Backend Development roles.
 
 ---
 
-## Phase 3 — Production-Ready Open Source (`v1.0.0`)
+## Phase 3 — Portfolio & Delivery (target `v1.0.0`)
 
-**Goal:** an extensible, deliverable, maintainable platform with demonstrated external
-user value.
+**Replanned on 2026-11-15 for a personal GitHub / Upwork portfolio.**
+The executable scope and acceptance criteria are in the
+[Phase 3 plan](phase3-plan.md). It supersedes the earlier platform-expansion
+vision in this section. Phase 3 is planned, not implemented or accepted.
 
-### 3.1 Product-grade capabilities
+### 3.1 Goal and scope
 
-| Area               | Requirement                                              |
-| ------------------ | -------------------------------------------------------- |
-| Native analysis    | Ghidra integration, ELF/ARM symbol index, JNI relations   |
-| Dynamic analysis   | Frida instrumentation in authorized test environments, log correlation |
-| Plugin system      | Tool adapter SDK, plugin manifest, version compatibility   |
-| Multi-project      | Project isolation, persistence, history queries            |
-| Security           | Analysis sandboxing, least privilege, sensitive-data handling |
-| Observability      | Task logs, timings, token usage, error statistics          |
-| Report delivery    | HTML/PDF reports, evidence attachments, remediation notes |
-| Interfaces         | REST API, MCP server, CLI                                  |
-| Ecosystem          | SDK, plugin examples, third-party contribution docs        |
+A newcomer can reproduce a complete workflow, an engineer can follow each
+conclusion to its evidence, and a prospective client can inspect a scoped
+sample deliverable. Existing CLI, REST, MCP, agent and workbench interfaces
+continue to share one analysis core.
 
-Optional PostgreSQL, task queues and more complex deployment are considered **here**,
-not before.
+| Milestone | Deliverable |
+|---|---|
+| M5 | Reconcile public claims, existing measurements and the accepted baseline |
+| M6 | Reliable bounded agent tasks, explicit budgets and real-model evaluation |
+| M7 | Offline HTML and portable evidence packages, client-style case studies |
+| M8 | Clean installation, failure handling, data boundaries and public contracts |
+| M9 | GitHub presentation and ready-to-review English Upwork materials |
+| M10 | Independent reproduction, source review, readiness reassessment and release candidate |
 
-### 3.2 Three product entry points
+These are new meanings for the unaccepted M5–M10 draft milestone numbers.
+Native/Ghidra/JNI, Frida, plugin loading, a separate SDK, cross-workspace
+composition, PostgreSQL, queues and multi-tenant hosting are deferred until
+concrete demand justifies their own plans. PDF is optional; offline HTML and
+existing Markdown/JSON delivery are the required report surfaces.
 
-| Entry point    | Audience                | Emphasis                                     |
-| -------------- | ----------------------- | -------------------------------------------- |
-| DexAtlas CLI   | Learners, automation, CI | Speed, stability, reproducibility             |
-| Workbench      | Researchers              | Source, call graphs, evidence, Agent results  |
-| SDK / MCP      | Third-party developers   | Programmable access to the same analysis core |
+### 3.2 Evaluation and evidence
 
-All three share one analysis kernel.
+Keep the existing benchmark and publish failures alongside successes. Distinguish
+scripted demonstrations, actual model runs and changes to budgets/approval
+conditions. Do not infer stronger-model performance from a same-model budget rerun.
+Freeze the scoped service regression set before tuning and disclose its limits;
+retain evaluation on the complete existing set.
 
-### 3.3 Public benchmark
+### 3.3 Exit criteria
 
-A test set built entirely from self-authored or explicitly licensed samples, covering
-plain APKs, Kotlin, multi-DEX, resource references, obfuscation and JNI.
+The [readiness assessment](../reports/portfolio-readiness-2026-11-15.md)
+provides a manual portfolio rubric, distinct from the historical maturity rubric
+below. Reassess GitHub and Upwork separately, targeting at least 90% each, with
+source review and acceptance required regardless of score.
 
-Published metrics:
-
-- Task completion rate and invalid tool-call rate
-- Evidence location accuracy
-- False-conclusion rate, with human review results
-- Per-project analysis time and resource cost
-- A/B comparisons: with vs without agent, across models, across retrieval strategies
-
-Publish failures and version-to-version differences alongside the best runs. This is what
-separates an evaluable engineering system from an AI wrapper.
-
-### 3.4 Exit criteria for `v1.0.0`
-
-Reproducible local deployment; published test results; stable SDK/API; verifiable
-security reports; real permission isolation; and at least one complete user flow that
-needs no manual intervention from the author.
-
-Remote multi-user collaboration, commercial SaaS, and Android + iOS expansion are decided
-by real user demand at that time — not pre-announced.
+Required evidence includes clean-environment reproduction, inspectable client
+samples with portable citations, truthful agent demonstrations and evaluation,
+stable declared contracts, documented data boundaries, passing quality gates,
+and a complete workflow performed by a reader who did not implement it.
+Version `v1.0.0` remains a target; its stability promises cover the explicitly
+documented contracts. Portfolio readiness does not promise orders, revenue,
+security certification or commercial SaaS readiness.
 
 ---
 

@@ -1,553 +1,251 @@
-# Phase 3 plan — Production-Ready Open Source (`v1.0.0`)
+# Phase 3 — 可独立复现、可核查交付的个人作品集
 
-**Written after the Phase 2 acceptance, against the code that exists.**
-The roadmap says Phase 3 "will need the same treatment when its time comes"
-([phase2-plan.md](phase2-plan.md) §8): a plan written after the source review,
-from the real code, not from the vision section written before any of it existed.
-This is that document.
+**计划修订：2026-11-15。目标：GitHub 技术展示 + Upwork 有范围的工程服务。**
+**状态：已按作品集目标重写，M5–M10 均待实施、待源码评审和验收。**
+**目标版本：** `v1.0.0`（计划中）。
+只有完成本计划的退出标准才考虑发布，不因计划写好推进阶段。
+Phase 2 已验收的能力与公共契约保持有效。本文替代此前面向广泛平台扩展的 Phase 3 草案；
+旧草案保留在 Git 历史中（修订前基准 `752d10a`）。
 
-**Accepted baseline:** `v0.2.0` → `0446b13b55274e326446045d1385387c331a6dcf`
-**Phase 2 status:** accepted — M0 through M4 all shipped; the M4 acceptance review
-upgraded to a pass on 2026-11-14. The stronger-model rerun of the M3 comparison
-was still in flight when this plan was written; its outcome adjusts M7's budget
-defaults, not its scope.
+## 1. 目标、基准与停止点
 
-**Inputs:**
+本阶段要证明：**陌生人能试用，工程师能核查，客户能判断交付范围，作者能解释设计与限制。**
+在此范围内形成一个足以支撑技术面试、提案和小型付费试点的代表作；不以功能数量、星标或订单数验收。
 
-| | |
-|---|---|
-| Vision | [ROADMAP.md §3](ROADMAP.md) — nine capability areas, three product entry points, a public benchmark |
-| Current state | [status.md](../status.md) — v0.2.0 shipped, what remains open |
-| Phase 2 debrief | [phase2-plan.md §8](phase2-plan.md) — what the process cost, what to keep |
-| Open findings | [phase2-issue-list.md](../reports/phase2-issue-list.md) — F8 (dead code gate) still open; the rest closed |
-| Architecture | [architecture/](../architecture/README.md) — backend failure as a value, evidence invariants, runtime isolation, workbench |
+[作品集准备度评估](../reports/portfolio-readiness-2026-11-15.md)给出的人工基线是：
+GitHub 约 75%、Upwork 约 65%，两平台等权综合约 70%。这不是运行指标或接单概率。
+旧草案全部兑现后的粗估约为 85% / 80%；本计划以两平台**分别至少 90%**为验收目标，
+完成后预期约 90–95%，实际必须按同一评分表重评，不能把计划当成绩。
 
-**What the current code changes about the plan.** The roadmap's Phase 3 section
-was written as a vision: native analysis, dynamic analysis, a plugin system,
-multi-project, sandboxing, observability, HTML/PDF reports, an SDK. Reading the
-tree shows four things the vision did not know:
-
-- **The extension point already exists and is not a plugin system.**
-  `Backend` (`src/dexatlas/tools/base.py`) is an ABC with `resolve`, `version`,
-  `available`, `run`, `provenance`; `BackendRegistry` wires three adapters. But
-  `Analyzer.analyze` calls the three backends **by name** in a fixed order, and
-  `Settings` already carries `ghidra_path` / `rizin_path` fields that **nothing
-  reads** — placeholders for a direction that was never built. "Plugin system"
-  means making that registry real, not inventing a second one.
-- **The multi-process boundary already exists for one backend.** Androguard
-  parses untrusted DEX in a **separate worker process** with memory and file-size
-  bounds ([runtime-isolation.md](../architecture/runtime-isolation.md)) — that
-  pattern is the sandbox story, and it was paid for with real defects. The two
-  subprocess backends (JADX, Apktool) already run out-of-process with timeouts,
-  output caps and process-group kill. So "sandboxing" is largely **extending and
-  proving an existing pattern**, not building one.
-- **Multi-project exists at one level only.** The store is one SQLite database
-  keyed by `project_id` (a content hash), each project gets its own workspace
-  directory, and every analysis writes into its own run directory and publishes
-  atomically (P2-002). What does **not** exist: multiple workspaces in one
-  process, cross-project queries, history queries beyond per-project run rows,
-  and retention beyond the uploads window.
-- **Observability is nearly absent by design decision, not oversight.** There is
-  structured logging (`loguru`), run rows with timing and completeness, and
-  per-tool `ToolError` codes — but no metrics endpoint, no token-usage
-  aggregation beyond the agent's per-task budget counters, no error statistics,
-  no task log surface beyond the workbench's per-task timeline.
-
-So Phase 3 is not "build the nine vision areas". It is **"harden what a stranger
-will touch, expose what an operator needs, and buy only the new analysis
-capabilities whose acceptance can actually be demonstrated"**.
-
-**The development principle, unchanged and still the acceptance rule:**
-
-> **Evidence before inference. Correctness before autonomy.**
-
----
-
-## 1. What Phase 3 takes from the vision, and what it declines
-
-The roadmap lists nine areas ([ROADMAP.md §3.1](ROADMAP.md)). Each gets an
-explicit verdict, because an unpriced "yes" is how a phase rots.
-
-| Vision area | Verdict | Why |
+| 输入 | 已存在的证据 | 对计划的影响 |
 |---|---|---|
-| Plugin system / tool adapter SDK | **Yes — M5** | The `Backend` ABC and `BackendRegistry` are already the seam. Promoting them to a documented, tested contract is the cheapest large win Phase 3 can buy. |
-| Observability (task logs, timings, token usage, error statistics) | **Yes — M6** | The data already exists in `runs`, `ToolError` and the agent budget counters; it is simply not exposed. This is an exposure milestone, not an instrumentation project. |
-| Multi-project (isolation, persistence, history queries) | **Yes — M6** | Project-level isolation and atomic run publication exist. What is missing is workspace-level composition and history queries — bounded, testable work. |
-| HTML/PDF reports, evidence attachments | **Yes — HTML (M6); PDF declined** | One more renderer over the same `AnalysisResult` fits the existing markdown/JSON pattern and the "one renderer per transport" rule. PDF needs a typesetting engine and a maintenance burden the current report does not justify; see the declination note in M6. |
-| Sandboxing / least privilege / sensitive-data handling | **Yes — M8 (as hardening, not a new subsystem)** | Runtime isolation for untrusted input already shipped in Phase 2. M8 audits and closes the remaining gaps (worker coverage for all in-process parsing, workspace permissions, secret hygiene in reports), with tests. |
-| Security *analysis* capability (the tool finding vulnerabilities) | **Declined for Phase 3** | The roadmap's table says "analysis sandboxing, least privilege" — about the tool's own safety, not vulnerability research. Vulnerability-finding rules are a product direction of their own and would need their own benchmark; they are not priced here. |
-| Native analysis: Ghidra, ELF/ARM symbol index, JNI relations | **Yes — M9, gated on samples** | `ghidra_path`/`rizin_path` are read-nothing placeholders today. The acceptance problem is not the adapter — it is **what samples and rights are needed to demonstrate it**. Committed behind an explicit sample-and-license gate (see M9). |
-| Dynamic analysis: Frida instrumentation, log correlation | **Deferred, likely past v1.0.0** | Requires a rooted/emulated device fleet, per-sample harness scripts, and a legal/authorization envelope that self-authored `examples/` cannot supply (they are static APKs, not running apps under test). The evidence-first bar — every dynamic claim traceable to a recorded run — is currently unmeetable for want of harnesses. Revisit only when a partner environment exists; see the risk register. |
-| Ecosystem: SDK, plugin examples, third-party contribution docs | **Yes — M10** | Falls out of M5: the adapter contract *is* the SDK seed. Examples and a contribution guide close the phase. |
-| Public benchmark (self-authored, published metrics) | **Yes — M7** | M3 built the harness, the 92-task set and the disclosure discipline. Phase 3 publishes it as a standing artifact and adds the native-capability tasks if M9 lands. |
-| Interfaces: REST API, MCP server, CLI | **Already shipped in Phase 2** | M6/M10 only extend and freeze them. |
-| Optional PostgreSQL / task queues | **Declined until a deployment demands it** | The roadmap itself defers these to "here", meaning Phase 3 *considers* them. The current SQLite + local-files design meets every acceptance test below; adding a queue adds an operational surface no current user has asked for. Revisit on evidence of a real deployment need, not on speculativeness. |
+| Phase 2 验收 | [M4 评审](../reports/m4-review.md)、[端到端实测](../reports/m4-e2e-run.md) | CLI / REST / MCP / Agent / workbench 已有，不重建入口 |
+| 展示素材 | 双语 README、`docs/assets/` 视频、[案例](../case-studies/README.md)、[portfolio](../portfolio.md) | 改进现有素材的准确性与客户视角，不重复列为从零开发 |
+| 评测 | [scripted](../benchmarks/comparison.md)、[真实模型](../benchmarks/comparison-real.md)、[强预算](../benchmarks/comparison-stronger.md) | 三份分开披露；stronger 是同一模型的预算/执行条件变化，已完成而非等待中 |
+| Agent 限制 | [M4 复验](../reports/m4-e2e-run.md)、`agent/state.py` 的预算约束 | 放宽预算下有完成记录；默认预算与开放问题仍需收敛，不能承诺通用自主分析 |
+| 扩展边界 | `core/pipeline.py` 直接构造三个适配器，`tools/registry.py` 提供登记与查询 | 完整插件调度仍需改造，但作品集交付不依赖先造插件生态 |
+| 质量门禁 | `.github/workflows/ci.yml`、`pyproject.toml` | vulture 已守门，F8 不再作为未完成工作重复排期 |
 
-**The three product entry points** (CLI, workbench, SDK/MCP) all exist and share
-one kernel — that part of the vision is already true. Phase 3's job is to make
-them **survive a stranger**: stable contracts, docs, examples, and a benchmark
-that publishes failures alongside successes.
+这里引用的源码路径均相对 `src/dexatlas/`。生产测试数量、覆盖率与 benchmark 数字继续由原脚本生成；
+本次不重写已有测量，不把旧的生产成熟度分数换算成作品集分数。
 
----
+### 1.1 服务定位
 
-## 2. The milestones
+优先展示两类能力，并用同一个 Android 分析场景提供技术深度：
 
-| | Milestone | Version | What it delivers |
+| 方向 | 客户提供什么 | 可承诺的交付样例 | 边界 |
 |---|---|---|---|
-| **M5** | Backend contract & plugin seam | `v0.6.0` | A documented, registry-driven backend contract with a working third adapter path and a plugin example |
-| **M6** | Operator surfaces: multi-workspace, history, observability, HTML | `v0.7.0` | Multi-workspace composition, run history queries, a metrics/health surface, an HTML report |
-| **M7** | Published benchmark & budget tuning | `v0.8.0` | The 92-task benchmark as a published artifact; agent budget defaults set from the stronger-model rerun |
-| **M8** | Hardening & least privilege | `v0.9.0` | All untrusted parsing behind the worker boundary; workspace/secret/data-handling audit closed with tests |
-| **M9** | Native analysis (sample-gated) | `v0.9.x` (optional) | Ghidra/ELF/JNI capability, shipped only if the sample-and-license gate is met |
-| **M10** | SDK, examples & v1.0.0 release | `v1.0.0` | Frozen public contracts, plugin/SDK examples, contribution guide, release audit |
+| Python Backend & Automation | 现有工具、输入格式、预期流水线 | API / CLI 集成、可重复任务、结构化报告、部署及运行手册 | 按任务范围验收，不承诺任意规模、云端多租户或持续代运维 |
+| Evidence-first AI / MCP Integration | 已有数据/工具、有限问题集、模型与预算约束 | 只读工具接口、有证据的回答、预算及失败记录、评测包 | 模型输出是线索；不承诺全自动找漏洞或胜过任意模型 |
+| 有限范围 APK 静态分析 | 有权分析的样本与明确问题 | 权限/组件清单、相关符号/调用关系、可核查报告 | 不等同渗透测试、恶意软件定性、真实加固还原或 native/dynamic 分析 |
 
-**Why this order.** M5 comes first because every later milestone publishes the
-backend contract: M6's metrics count backends, M7's benchmark runs them, M9 *is*
-one. M6 precedes M7 because a published benchmark needs the observability to
-explain a failed run. M7 sits before M8/M9/M10 so that the stronger-model rerun
-(and any budget default it motivates) lands before contracts freeze. M8 is
-deliberately late-but-before-release: hardening is cheapest to audit against a
-feature-complete tree. M9 is the only milestone whose presence is conditional,
-and M10 cannot start until that condition resolves either way.
+本项目证明作者的集成、建模、验证和交付能力。展示中准确归属 JADX / Apktool / Androguard，
+说明作者贡献与实际 AI 辅助使用；个人项目不包装成客户项目，不虚构节省时间或商业收益。
 
-**Milestones M5–M7 are sequential by contract dependency.** M8–M10 each depend
-on all of M5–M7 but not on each other; M9 remains gated as described in its
-section.
+### 1.2 达标后的停止点
 
----
+两套无模型交付案例、一套真实模型的有限任务演练、干净安装记录、离线可核查报告包、
+GitHub 与 Upwork 英文素材，以及独立读者验收记录齐备后，优先用于投递和小型试点。
+真实客户反馈决定下一阶段；不继续扩功能来回避对外验证。
 
-## 3. M5 — Backend contract & plugin seam (`v0.6.0`)
+## 2. 范围与旧草案的调整
 
-**Goal:** make the backend registry a real extension point that a contributor
-can implement without reading the pipeline, and prove it with a plugin that
-ships in-tree.
-
-### 3.1 Tasks
-
-- **Freeze the `Backend` contract as a documented interface.** `Backend` in
-  [base.py](../../src/dexatlas/tools/base.py) already defines `resolve`,
-  `version`, `available`, `missing_error`, `run`, `provenance` and the
-  `ToolOutcome`/`ToolError` value model. Write the contract down as
-  architecture documentation: what a backend must never do (mutate host state,
-  raise instead of returning `ToolError`, trust its input), what `provenance`
-  must attest, and how the registry discovers adapters.
-- **Make `BackendRegistry` the single construction point.** Remove any direct
-  adapter construction from `Analyzer` and the CLI/API/MCP transports, so the
-  registry is the only place that maps a backend name to an instance. This is
-  the seam plugins plug into.
-- **Kill the read-nothing settings, or give them a reader.** `Settings.ghidra_path`
-  and `Settings.rizin_path` are currently declared and never consumed. Either
-  delete them until M9 needs them, or have the registry consult them during
-  discovery — but not both-neither. (Decision recorded in M9; until then the
-  fields are dead configuration, which is exactly what F8's lesson says not to
-  keep.)
-- **Add a first-party example backend.** A small, dependency-free adapter
-  (for example, a `ZipInspectBackend` that lists APK entry names and sizes from
-  the already-ingested file) that exercises the whole contract: discovery,
-  `ToolOutcome` on failure, provenance, evidence emission, report rendering.
-  It ships in `examples/` with its own tests and doubles as the plugin template.
-- **Plugin discovery shape.** Support in-tree registration first (a
-  `register_backend()` call and entry-point-style naming), and document why
-  out-of-tree loading (importlib paths, pip entry points) is deferred to M10's
-  SDK work — the contract must be stable before third parties load code
-  against it.
-
-### 3.2 Exit criteria
-
-1. The backend contract is documented in `docs/architecture/` with the same
-   rigor as [runtime-isolation.md](../architecture/runtime-isolation.md):
-   invariants, failure semantics, provenance obligations.
-2. `Analyzer` constructs no adapter directly; a test asserts the registry is
-   the sole source of backends (breaking the registry breaks the test).
-3. The example backend passes the full pipeline on a self-authored APK and its
-   evidence appears in the rendered report with valid locators.
-4. A test suite exercises the contract with a **deliberately broken** backend
-   (raises, returns malformed output, lies in provenance) and the pipeline
-   degrades per the failure-as-value rule — the report names what did not run.
-5. `ruff`, `mypy`, and the three backend CI configurations stay green.
-
-### 3.3 Acceptance
-
-Source review of the registry/contract diff plus an acceptance drill: run the
-example backend end-to-end from a clean worktree (the same drill Phase 2 used
-for M1's MCP tools), including the deliberately-broken-backend demo.
-
----
-
-## 4. M6 — Operator surfaces: multi-workspace, history, observability, HTML (`v0.7.0`)
-
-**Goal:** give an operator (not just a caller) the four things the vision
-names — multi-project composition, history, observability, richer report
-delivery — without changing the analysis kernel.
-
-### 4.1 Tasks
-
-- **Workspace composition.** `Settings.workspace` is a single root today. Add
-  explicit multi-workspace support at the transport layer: the CLI/API/MCP
-  accept a workspace selector, and the store layer refuses cross-workspace
-  `project_id` collisions loudly. Persistence and per-project isolation already
-  exist (P2-002); what changes is the *composition* boundary.
-- **History queries.** The `runs` table already records per-run status,
-  timing and completeness. Expose them: "runs for a project", "compare two
-  runs", "which runs hit truncation". CLI subcommands and REST/MCP read-only
-  endpoints, backed by the existing store — no new state.
-- **Observability surface.** One `/metrics`-style endpoint (format decided in
-  review: JSON by default, Prometheus text if trivially cheap) exposing: run
-  counts by status and completeness, backend failure counts by `ToolErrorCode`,
-  truncation counts, agent task outcomes and token budgets consumed, p50/p95
-  analysis durations. **Every number must be derivable from existing records** —
-  this milestone exposes data, it does not add new instrumentation; where a
-  number cannot be derived (e.g. per-request timings for the workbench), the
-  endpoint's docs say so rather than inventing it.
-- **HTML report renderer.** A third renderer over `AnalysisResult`, joining
-  `render_markdown` and `build_json_report`. Constraints carried over from
-  Phase 2: one source of truth (`AnalysisResult`), byte-identical exports per
-  format, evidence table with resolvable locators, the "class declarations are
-  the index" disclosure, and the figure markers remain generated — the HTML
-  renderer must not create a second place where hand-written numbers can hide.
-  Self-contained single-file HTML (inline CSS, no JS build step) so the report
-  is portable and the web workbench stays the interactive surface.
-- **PDF: declined, with reasons on record.** A faithful PDF of the current
-  report needs a typesetting dependency (WeasyPrint/ReportLab class), a
-  maintenance surface for CJK text and tables, and a licensing review — all to
-  serve a delivery format no current consumer requires (the CLI/API/workbench
-  all consume markdown/JSON/HTML). The HTML output is printable to PDF by any
-  browser, which is recorded as the supported path. Revisit only on a concrete
-  consumer demand.
-
-### 4.2 Exit criteria
-
-1. Two workspaces in one process serve disjoint projects with no cross-talk;
-   a test proves a `project_id` collision across workspaces is refused, not
-   merged.
-2. History endpoints answer run-status, truncation and comparison queries from
-   the existing store; each has a test seeded with known run rows.
-3. The metrics endpoint's every field is asserted equal to a value recomputed
-   from the store in the same test — no self-reported numbers.
-4. The HTML report of a fixture project is byte-stable across two runs and its
-   evidence locators all resolve (reusing the citation-checking discipline).
-5. All existing API/MCP/CLI contracts are unchanged (Phase 2's contract tests
-   pass unmodified); new surfaces are additive.
-
-### 4.3 Acceptance
-
-Source review plus an operator drill: from a clean worktree, create two
-workspaces, run analyses in both, query history and metrics, export an HTML
-report and verify its locators resolve — the drill recorded like the M4
-end-to-end run was.
-
----
-
-## 5. M7 — Published benchmark & budget tuning (`v0.8.0`)
-
-**Goal:** turn the M3 comparison harness into a published, standing benchmark,
-and fold in the stronger-model rerun's findings.
-
-### 5.1 Tasks
-
-- **Fold in the stronger-model rerun.** The comparison rerun (in flight in a
-  parallel session at planning time) decides whether agent budget defaults
-  (`DEXATLAS_AGENT_MAX_STEPS`, token budget) change. The M4 drills showed the
-  default budget exhausts on enumeration questions; the rerun's traces are the
-  evidence that sets the default. **No default changes without a trace-backed
-  measurement** — the same rule that governs every figure in this repo.
-- **Publish the benchmark as an artifact.** The 92-task set, both trace files,
-  the metrics definitions and both reports are already in-repo; M7 adds the
-  packaging: a benchmark README that states what each metric means, how to
-  reproduce it, and what the disclosures are. Publishing failures alongside
-  successes is already the harness's discipline (`unsupported_assertion_rate`,
-  `budget_exhausted` breakdowns) — the milestone formalizes it.
-- **Extend the task set only where acceptance allows.** New tasks may cover
-  resource/manifest questions and the example backend's capability (M5), and —
-  if M9 lands — native-code questions. **No dynamic-analysis tasks** (see the
-  Frida deferral); the benchmark never invents a capability the tool lacks.
-- **CI guard.** The existing "M3 comparison stays reproducible" job extends to
-  any newly published trace: a drift between trace and report is a red build.
-
-### 5.2 Exit criteria
-
-1. The benchmark README exists and a stranger can reproduce one metric from it
-   with the documented commands (verified in the drill).
-2. Any change to agent budget defaults cites the rerun trace in the change
-   description, and a test pins the new default.
-3. The CI reproducibility job covers every published trace file.
-4. The published reports still carry their disclosures verbatim.
-
-### 5.3 Acceptance
-
-Source review plus a reproduction drill: an evaluator follows only the
-benchmark README and regenerates one report and one metric table; the outputs
-match the committed artifacts byte-for-byte.
-
----
-
-## 6. M8 — Hardening & least privilege (`v0.9.0`)
-
-**Goal:** close the security/sandbox column of the vision as an audit with
-tests, over a feature-complete tree.
-
-### 6.1 Tasks
-
-- **Worker-boundary completeness.** Runtime isolation moved Androguard's DEX
-  parse into a bounded worker process. Audit every remaining in-process parse
-  of untrusted bytes (upload inspection, resource XML, any M9 native parsers if
-  present) and either move it behind the same worker pattern or document why
-  the process boundary is not needed for it (e.g. stdlib ZIP parsing with size
-  caps already bounded). Each decision is written down, not assumed.
-- **Least privilege review of the transports.** The MCP server and API are
-  read-only by construction; re-verify after M6's new endpoints that every
-  added surface is read-only or explicitly-gated, and that the agent's tool
-  allowlist still cannot reach a mutating operation. Extend the
-  model-capability-disabled verification drill (which already covers 43
-  endpoints) with the M6 surfaces.
-- **Sensitive-data handling.** Verify reports and logs never echo secrets:
-  agent provider keys stay in the environment, the workbench keeps them
-  server-side (M4's review covered this — re-run the checks on the new code),
-  and uploaded artifacts live only under the workspace with the retention
-  policy enforced.
-- **Workspace hygiene.** Retention currently covers `uploads/`. Decide and
-  document the retention story for run output trees and agent task records
-  (bounds, not unbounded growth), with a cleanup pass that is testable.
-- **Close F8.** The dead-code gate (vulture, exit code 0 in CI) is the one
-  Phase 2 finding still open; closing it here is cheap and prevents M5–M7 from
-  accumulating new dead seams.
-- **Dependency & supply-chain audit.** The existing audit job plus a review of
-  any new M5–M7 dependencies; pin and document them.
-
-### 6.2 Exit criteria
-
-1. Every untrusted-parse site is either behind the worker boundary or carries
-   a written justification; a table in `docs/architecture/runtime-isolation.md`
-   lists each site and its verdict.
-2. The model-disabled drill passes on the enlarged surface with zero agent
-   capabilities reachable.
-3. Retention/enforcement tests exist for uploads, run trees and task records;
-   each cleanup test fails if the cleanup is removed.
-4. The dead-code gate runs in CI and fails on a deliberately introduced dead
-   symbol (the F8 acceptance test).
-5. No new `Medium`+ advisory in the dependency audit.
-
-### 6.3 Acceptance
-
-Source review with a security reviewer's checklist, plus a drill: inject a
-malformed artifact at each parse boundary and observe graceful, recorded
-failure — never a process death, never a silent pass.
-
----
-
-## 7. M9 — Native analysis, sample-gated (`v0.9.x`, conditional)
-
-**Goal:** JNI/ELF/native-library visibility, via Ghidra — **only if the sample
-and license gate can be met.** This milestone is planned but not scheduled; its
-first task is to resolve the gate, and if it cannot be resolved, the milestone
-is formally skipped and the skip is recorded in the v1.0.0 release notes.
-
-### 7.1 The gate — what acceptance actually requires
-
-The evidence-first rule makes this milestone's hard part **samples and rights**,
-not code:
-
-- **Self-authored native sample.** The repo's boundary is: every analyzed
-  artifact is first-party with sources alongside. A native capability needs a
-  self-authored APK **with native code** — a small NDK library (one JNI
-  function, one exported symbol) whose C/C++ source, build script and built
-  artifacts live in `examples/` under the same first-party rule. Building it
-  needs the Android NDK on the build machine, which is a new fixture
-  prerequisite to document.
-- **Ghidra itself.** Ghidra is a large Java application; CI cannot install it
-  per-run cheaply. The realistic acceptance is: headless Ghidra invoked as a
-  subprocess backend (matching the existing `Backend` pattern — `resolve`,
-  `version`, `available`, timeout, output caps, process-group kill), with CI
-  running the **contract tests with the backend absent** (the same
-  skip-not-pass discipline the JADX/Apktool jobs already practice) and the
-  full drill run manually on a machine where Ghidra is installed. The repo has
-  already paid for this exact pattern: `ghidra_path` exists in `Settings` as
-  the discovery hook.
-- **Licensing.** Ghidra is Apache-2.0; invoking it as an external tool (not
-  vendoring it) matches how JADX and Apktool are treated. The contribution
-  docs must state that Ghidra is never bundled.
-- **What "done" means for JNI relations.** Bounded and honest: the APK's
-  `lib/<abi>/*.so` files are inventoried (sizes, exported symbols via the
-  parse), JNI `RegisterNatives`/`Java_*` exports are matched against Java-side
-  `native` declarations, and each relation is evidence with a locator on both
-  sides. **Not in scope:** full decompilation quality parity with JADX, ARM
-  instruction-level analysis beyond symbol/export extraction, or dynamic
-  hooks.
-
-### 7.2 Tasks (post-gate)
-
-- `NativeBackend` implementing the frozen M5 contract, subprocess-isolated,
-  with `ToolOutcome` failure semantics.
-- `lib/*.so` inventory and JNI-relation extraction into the store, with
-  evidence kinds and locators on both the Java and native sides.
-- Report sections (all three renderers) for native libraries and JNI
-  relations, with the same "index vs finding" honesty about what a symbol
-  export proves.
-- Benchmarks (M7) gain native questions only if this milestone lands.
-
-### 7.3 Exit criteria
-
-1. The gate table above is resolved item by item (sample built and committed
-   with sources; Ghidra discovery working; license statement written) — or the
-   milestone is skipped with the resolution recorded.
-2. If landed: a self-authored JNI sample's Java↔native relations appear in all
-   three report formats with resolvable locators, and a test fails if the
-   native backend's evidence is dropped.
-3. CI runs the native-backend contract suite in the backend-absent
-   configuration (skips, not silent passes), and the full drill is recorded
-   from a Ghidra-equipped machine.
-
-### 7.4 Acceptance
-
-Same review-protocol mechanism: source review plus a recorded drill on the
-sample APK, reproducing the JNI-relation evidence end to end.
-
----
-
-## 8. M10 — SDK, examples & the v1.0.0 release (`v1.0.0`)
-
-**Goal:** freeze the public contracts, ship the ecosystem pieces, and pass the
-v1.0.0 exit criteria from the roadmap.
-
-### 8.1 Tasks
-
-- **Freeze and document the public contracts.** The REST API, MCP tool
-  schemas, CLI commands, `ToolOutcome`/`ToolError` codes, evidence model and
-  the backend contract (M5) are the public surface. Each gets: a versioning
-  statement (what counts as breaking), a stability note, and a changelog entry.
-  Phase 2 already learned this lesson once (`schema_version` missed an
-  upgrade); the release audit re-checks every public shape.
-- **SDK packaging.** A thin, versioned client package (Python first) over the
-  REST API and/or MCP, generated or hand-written per review decision, with
-  tests against the live server. The plugin-example side of the SDK is M5's
-  example backend; this is the *consumer* side.
-- **Plugin examples.** Beyond M5's in-tree example: one example that adds a
-  report section and one that adds an agent tool, both first-party, both
-  tested, both documented as templates.
-- **Contribution guide.** How to add a backend (pointing at the M5 contract
-  and the example), how to add a report renderer, how the evidence invariants
-  constrain new features, how CI's three backend configurations work, and the
-  sample/licensing boundary (no third-party APKs, ever).
-- **Release audit.** Run the full gate battery, re-derive every cited line,
-  refresh every generated figure, verify the three product entry points end
-  to end, and record the v1.0.0 acceptance against the roadmap's exit
-  criteria: reproducible local deployment, published test results, stable
-  SDK/API, verifiable security posture, real permission isolation, one
-  complete no-intervention user flow.
-
-### 8.2 Exit criteria
-
-1. Every public contract carries a stability statement and breaking-change
-   policy; a test suite pins the REST/MCP/CLI response shapes.
-2. The SDK client's tests pass against the real server on all read surfaces.
-3. Both plugin examples run end-to-end in a clean worktree.
-4. The contribution guide's "add a backend" instructions produce a passing
-   backend when followed (verified in the drill by actually following them).
-5. The v1.0.0 release notes state what shipped, what was declined (PDF,
-   Frida, PostgreSQL/queues, out-of-tree plugin loading — with the reasons
-   recorded here), and what remains open.
-
-### 8.3 Acceptance
-
-The full review protocol from the roadmap, unchanged: version submission,
-architecture/code review, maturity assessment, review report — and the next
-phase is planned from that review, not from this document.
-
----
-
-## 9. Risks and dependencies
-
-| Risk | Milestones hit | Mitigation |
+| 原方向 | 本阶段决定 | 原因 |
 |---|---|---|
-| **Ghidra sample gate fails** — no NDK build environment, or the self-authored native sample proves too costly to maintain | M9 | The milestone is explicitly conditional; skipping it is a planned outcome, recorded in release notes. No other milestone depends on M9. |
-| **Frida/dynamic analysis stays out** — expectations set by the roadmap's vision | M9, M7, release notes | The declination is written here with reasons (harness fleet, authorization envelope, evidence traceability unmeetable). The benchmark gains no dynamic tasks, and the release notes repeat the boundary so the gap is visible, not hidden. |
-| **Contract freeze too early** — M5's backend contract hardens before M9's native backend reveals what it needed | M5, M9, M10 | M5 freezes the *interface* (ToolOutcome, provenance, registry) that all backends already share; M9 adds capability-specific evidence kinds, which are additive. The M10 audit re-opens the contract if M9 landed and strained it. |
-| **Observability becomes an instrumentation project** — scope creep into tracing/profiling | M6 | The milestone's rule: expose only what existing records already contain; every metric field must be recomputable from the store in its test. New instrumentation is out of scope and said so. |
-| **Stronger-model rerun lands late or contradicts budget hopes** | M7 | The rerun is input, not blocker: if it is not finished when M7 starts, budget defaults stay as-is and the change is deferred with the trace as required evidence. No default moves without a measurement. |
-| **Parallel-session conflicts** — the M3 rerun session owns `benchmarks/comparison/` and `docs/benchmarks/comparison-stronger*`; M4 reports are owned by their session | M7 | Those paths are excluded from this plan's work until their owners close; M7's packaging work touches the benchmark README and CI job, not the comparison harness internals. |
-| **CI cost growth** — more configurations (native-absent, HTML snapshot, dead-code gate) lengthen builds | M6, M8, M9 | Keep the backend-absent configurations as cheap contract suites (they already exist as a pattern); full drills stay manual and recorded. Native backend never runs Ghidra in CI. |
-| **Windows/macOS drift** — CI runs only on `ubuntu-latest`; the dev machine is Windows; process handling already carries `taskkill` fallbacks | M8, M10 | This plan does not promise multi-OS CI (that is a cost decision for the review). It does require: the three existing backend configurations keep covering the Windows-specific paths, the platform-specific code stays behind the tested helpers, and the release notes state plainly which platforms are CI-verified (Linux) versus developed-on (Windows). Overstating platform support would be exactly the "claims the measurement does not support" failure this project polices. |
-| **Scope breadth vs. review bandwidth** — six milestones is more surface than Phase 2's five | all | The milestones are ordered so each is independently acceptable and shippable; M9 is droppable without cascading. If bandwidth forces a cut, the cut order is: M9 (gated anyway) → M10's SDK (keep examples + guide) → M6's HTML (keep observability). The kernel and security hardening (M8) are never cut. |
+| 插件系统、adapter SDK、单独 Python SDK | 延后；只记录现有集成契约与一个真实 API/MCP 使用例 | 工程深度已能展示，尚无第三方扩展需求，不为作品集制造维护面 |
+| 多工作区、跨项目查询、完整 metrics 平台 | 延后；保留现有项目隔离，补齐交付所需运行信息 | 单机可复现交付比平台运营功能更直接 |
+| HTML/PDF 与证据附件 | 保留离线 HTML + 最小证据包；PDF 可作为人工附加件，非必需渲染器 | 客户无需安装项目即可审阅；Markdown/JSON 契约保持 |
+| 公开 benchmark | 核查现有数据与陈述，再补有限服务任务评测 | 已有公开产物；核心缺口是默认体验、口径与失败解释 |
+| 安全加固 | 保留，限定在声明的本地使用方式与新导出边界 | 证据可追溯和样本数据保护属于交付底线 |
+| Ghidra / ELF / JNI、Frida | 移出 Phase 3 必选与条件里程碑 | 有原生/动态需求、样本及运行环境时另立计划；不宣称能力已存在 |
+| PostgreSQL、队列、远程多租户、账号/计费 | 延后 | 本阶段不提供公开上传服务或 SaaS |
+| 新漏洞规则、风险评分 | 延后 | 需要独立验证集；已有静态事实不能直接升级成漏洞结论 |
 
-**Dependencies on parallel work.** The stronger-model rerun session owns the
-comparison harness and its traces; M7 consumes its output and must not edit its
-files. The M4 documentation sessions own `docs/reports/m4-*.md`; this plan
-reads them as inputs only. The generated figures in
-[phase1-execution-report.md](../reports/phase1-execution-report.md) are
-script-owned; nothing here touches them.
+**编号变更说明：** M5–M10 在旧草案中尚未验收，本次重新分配含义：
+旧 M5 插件 → 新 M5 基线校准；旧 M6 运营面 → 新 M6 有限 Agent；
+旧 M7 benchmark → 新 M7 交付包；旧 M8 加固 → 新 M8 安装与可靠性；
+旧 M9 native → 新 M9 对外素材；旧 M10 SDK/发布 → 新 M10 独立验收/发布。
+旧编号不代表新任务已完成；这里变更的是计划，不是 CLI/API/MCP 的公共契约。
 
----
+## 3. 执行顺序与资源边界
 
-## 10. Estimation (order of magnitude, no calendar dates)
+| 里程碑 | 核心交付 | 前置依赖 | 人工投入估计 |
+|---|---|---|---|
+| M5 | 对外陈述基线、问题清单、可复现演练清单 | 现有 Phase 2 验收记录 | 2–3 个工程日 |
+| M6 | 默认可用的有限 Agent 流程与诚实评测 | M5 | 5–8 个工程日 |
+| M7 | 客户式 HTML/JSON/Markdown 与证据包、案例 | M5；AI 案例需 M6 | 4–6 个工程日 |
+| M8 | 干净安装、故障恢复、契约与导出安全验收 | M6、M7 | 4–6 个工程日 |
+| M9 | GitHub 展示入口、Upwork 英文素材、服务说明 | M6–M8 已验收 | 2–3 个工程日 |
+| M10 | 独立复现、源码评审、重新评分、发布候选 | M5–M9 全部验收 | 3–4 个工程日 |
 
-Order-of-magnitude engineering effort, in the same spirit as the Phase 2
-issue list's estimates — deliberately coarse, to be refined per milestone at
-its own kickoff review:
+合计约 20–30 个工程日，约 4–6 个全职工程周；是排期假设，包含一轮常规修改，
+不包含等待外部读者、API 可用性或大规模缺陷返工。M5 后重估，不承诺固定发布日期。
+重实现和验收按依赖顺序推进，不以增加并行 agent 代替评审。
 
-| Milestone | Magnitude | Dominant cost |
-|---|---|---|
-| M5 backend contract & plugin seam | ~1–2 weeks | Contract documentation + registry refactor + example backend with tests |
-| M6 operator surfaces | ~2–3 weeks | Multi-workspace composition + metrics endpoint + HTML renderer (all three renderers kept in sync) |
-| M7 published benchmark | ~1 week | Packaging/reproduction docs + CI guard extension; budget tuning is measurement-gated, not effort-gated |
-| M8 hardening | ~1–2 weeks | Parse-boundary audit + retention tests + dead-code gate + drills |
-| M9 native analysis | ~2–3 weeks **if the gate opens** | The sample/NDK fixture and the Ghidra adapter dominate; the store/report plumbing is the smaller half. Gate resolution itself is days, not weeks |
-| M10 SDK & release | ~2 weeks | SDK client + examples + contribution guide + the full release audit |
+真实模型付费批次在执行前写清题集、重复次数、配置、token/费用上限与停止条件；
+使用已授权凭据，不自动扩大预算。可先做无模型的文档、报告和确定性验证。
+若 API 或独立读者暂不可用，记录未验收项，不用 scripted 结果代替真实模型或外部验收。
 
-The whole phase is therefore in the **8–13 engineering-week** range for one
-maintainer, excluding the calendar cost of the external dependencies (model API
-access for the rerun, an NDK-capable build machine, a Ghidra-equipped drill
-machine). As in Phase 2, the estimates name the dominant cost so the review can
-attack it; they are not commitments.
+## 4. M5 — 基线校准与对外陈述收口
 
----
+**目标：先让承诺与代码、trace、演示一致。**
 
-## 11. What this plan deliberately does not do
+工作：
 
-Recorded so the next review can check the reasoning, not just the outcome:
+- 建立声明清单：功能、安装前提、支持平台、默认预算、演示 provider、后端缺失行为，各自链接证据。
+- 修订双语 README、portfolio、安装/交接/状态的冲突；检查旧的手写测试数、过度完整性描述、
+  “无需外部后端即可完整复现案例”等表述。生成数字只经原脚本刷新，不手改。
+- 核对三份 benchmark 的原始 trace、scorer、逐配置预算、批准门与报告头部说明；
+  配置不等价时明确列出，缺少历史配置则标 unknown，不倒推、不补造。
+- 将“更强模型”纠正为实际运行条件；不要把预算变化的差值归因为模型变化。
+- 整理阻断/重要/可选问题，给出对应源码、回归测试或手工核验方法。
+  F8 以现有门禁为证据，不重复实现；独立记录仍有价值的真实加固与大样本缺口。
 
-1. **No Frida / dynamic analysis.** The authorization and harness prerequisites
-   cannot be met by this project's first-party sample discipline today; a
-   dynamic claim that cannot be traced to a recorded run would violate the
-   core rule. Revisit with a partner environment.
-2. **No PDF renderer.** HTML is the printable format; a PDF engine is
-   maintenance without a consumer.
-3. **No PostgreSQL / task queues / multi-node deployment.** SQLite + local
-   files meets every acceptance test in this plan; the roadmap defers these to
-   "considered here", and the consideration is: declined until a real
-   deployment demands them.
-4. **No out-of-tree plugin loading.** M5 registers in-tree; loading third-party
-   code needs the SDK's stability guarantees first (M10). Documented as the
-   follow-up.
-5. **No vulnerability-finding analysis rules.** The vision's "security" row is
-   read as the tool's own sandboxing/least-privilege posture (M8). Security
-   *research* capabilities would need their own benchmark and are not priced
-   here.
-6. **No multi-OS CI promise.** CI stays Linux; the platform story is stated
-   honestly in the release notes (see the risk register) rather than
-   overstated.
+验收：声明清单中的每项均标已验证、受限或未验证；三份指标能从原 trace 重算；
+展示视频在可见位置说明 scripted 与真实模型的区别；文档与版本检查通过。
+产物：`docs/reports/phase3-baseline.md`（实施时创建），包含核查命令、输出摘要与未决项。
+此文件名是待建产物，不代表本次已交付。
 
----
+## 5. M6 — 有限 Agent 任务可靠完成
 
-## 12. Process
+**目标：让一组明确承诺的任务在公开配置下可完成，失败时可理解。**
 
-Every milestone follows the mechanism Phase 2 used, which the roadmap's
-[review protocol](ROADMAP.md) defines:
+工作：
 
-- **Plan against real code.** Each milestone opens with a short current-state
-  note written from the tree (like this document's baseline), not from the
-  previous milestone's assumptions.
-- **Exit criteria are testable before work starts.** A milestone whose exit
-  criteria cannot name its tests, its benchmark or its documentation
-  deliverable is not ready to start.
-- **Every fix carries a regression test that fails on the previous
-  implementation** — proven by restoring the old code and watching the test go
-  red.
-- **No hand-written numbers.** Report figures, benchmark metrics and
-  observability fields are generated from measurements; a number nobody can
-  re-derive is not a claim.
-- **Acceptance = source review + acceptance drill.** Each milestone closes
-  with a review against the actual diff and a recorded end-to-end drill from a
-  clean worktree. The next milestone's plan is written from that review.
-- **Public contracts change loudly.** Any change to a status code, response
-  shape or count's meaning is versioned and called out in the release notes —
-  never silent.
+- 从现有题集选定并在调优前冻结一个服务回归集：权限/组件、指定方法、调用关系、资源出处、
+  无法回答/后端缺失。至少 12 题，覆盖这些类别；保留完整旧题集评测，防止只报成功子集。
+- 为默认的常见问题设置有限查询、重复工具检测、答案合成/停止策略；必要时改默认预算，
+  依据实测公布兼容影响，不能仅无限加大步骤或 token。
+- UI/CLI 明示 provider、有效预算、状态和失败原因；无模型配置下原有静态分析完整可用。
+  任何轻量确定性回答都标明执行路径，不能伪装成模型完成。
+- 全量旧题集在候选配置上真实运行一次；服务回归集用面向新用户的默认推荐配置独立运行三次。
+  保存全部成功、错误、空答、重试、暂停和预算耗尽，记录成本估算依据与运行时间。
+- 若声称不同模型间的可迁移性，补跑第二个具名真实模型；否则只声明已验证的配置。
+
+验收目标（未来门槛，不是当前结果）：
+
+1. 服务回归集三轮合计正确完成率至少 90%，每轮至少 80%；空答/预算耗尽计失败。
+   该承诺仅针对冻结的有限任务，不外推到任意 APK 或开放式问题。
+2. 成功答案的事实性断言均有可解析证据；不可回答题不编造结论。
+   违反 `verified` 不变量、证据指向错误样本，任一例即阻断，而非用平均分抵消。
+3. 工具成功率、正确完成率、无支撑断言率、预算/成本分开陈述；报告完整旧题集的所有结果。
+   正确率判定需检查答案内容，不能只看任务状态 `completed`。
+4. 核心事实与证据不变量用确定性测试守门；真实模型波动保留为手工验收记录，
+   不让付费外部模型成为每次 CI 的前置条件。
+
+优先复用 `tests/test_agent_failures.py`、`tests/test_agent_serial_tools.py`、
+`tests/test_agent_untrusted_input.py`、`tests/test_agent_verifier.py` 与 comparison 测试。
+未达标则继续修正或缩小并重测明确的服务承诺；不能删除失败题后宣布同一门槛通过。
+预算与原始 trace 不包含秘密。验收报告记录 commit、模型、配置、完整题集、费用依据和已知局限。
+
+## 6. M7 — 客户可直接审阅的交付包
+
+**目标：不安装 DexAtlas、不连接作者电脑，也能阅读结果并核对出处。**
+
+工作：
+
+- 复用现有报告数据模型增加离线 HTML；同时保留原 Markdown/JSON 的字段含义与字节级一致性约束。
+  设计说明界定共享数据层与新展示层，避免各格式重新计算事实。
+- 提供显式选择的最小证据包：样本哈希、项目/运行标识、工具版本、报告、证据目录、
+  必需源码片段、locators 和文件校验清单；本地绝对路径不能成为唯一定位方式。
+- 在复制到另一目录后验证关键引用；未包含内容明确为未打包/不可离线解析，不能假称完整。
+  客户原始 APK、全量源码、无关敏感字符串不默认随包导出；选取与脱敏有记录。
+- 将现有两个案例改造成客户式交付：问题、范围、操作、证据、结论、限制、下一步建议。
+  一例走完整工具链，一例展示混淆/缺后端时能力边界；沿用已有 first-party 样本。
+- 每例提供实际可下载的报告和最小证据包，不能只留下“运行命令即可导出”。
+  再增加一个 Python/API 或 MCP 集成使用例；AI 案例引用 M6 的真实记录。
+
+验收：读者不运行服务即可阅读报告，从至少一条 manifest 事实、一条源码事实、
+一条调用关系逐步核对至具体内容；迁移目录后结论不变。
+HTML 的不可信文本要转义，防止样本字符串执行脚本；包路径遍历、错误样本绑定、脱敏破坏证据链
+均有反向测试。授权、样本构建源码与第三方工具归属清楚；不得把静态线索自动写成漏洞或恶意行为。
+
+## 7. M8 — 首次安装、可靠性与数据边界
+
+**目标：把“作者机器能跑”变成有范围的可交付承诺。**
+
+工作：
+
+- 选定推荐安装路径并在干净工作树/虚机演练：无模型的完整后端路线、Docker 路线、
+  可选模型配置；先检查依赖，再运行样本，报告缺失后端与功能损失。
+- 记录下载、安装、首次启动、分析、导出各阶段时间与环境；提出试用时间目标并实测，
+  网络/硬件前提与超时记录同时公开，不先写“几分钟完成”的营销承诺。
+- 用 Linux CI 与 Windows 手工实测给出平台矩阵；未测 macOS 标未验证。
+  三种已有后端配置仍是不同门禁，缺失后端导致的意外 skip 必须解释。
+- 验证取消、超时、坏输入、截断、失败后重跑、重复分析与证据隔离；复用已有测试，
+  仅对发现的缺口添加回归，不重复造一套质量体系。
+- 审查解析进程边界、输出/内存/磁盘上限、上传清理、工作区隔离与新证据包的数据选择。
+  子进程不等于 OS 安全沙箱；安全说明区分已实现与未承诺的隔离。
+- 形成公共契约表：CLI 退出码、REST/MCP 响应形状、计数含义、报告 schema 与版本政策。
+  集成示例对真实接口运行；兼容变更有测试，破坏性变更显式版本化。
+
+验收：干净环境按文档完成上传/分析 → 检索 → 证据 → 报告链路；默认无模型不被卡住。
+失败能诊断且不会产生看似完整的成功报告；现有各质量门禁通过，平台/运行限制如实列出。
+公开展示使用静态素材或本地录屏即可，不为作品集上线无认证 APK 上传站。
+
+## 8. M9 — GitHub 与 Upwork 展示素材
+
+**目标：现有能力能在短时间内被看懂，深入后能被核查。**
+
+GitHub：整理双语 README 首屏的一句话价值、真实输出、短演示、安装入口、两篇案例、
+架构取舍、benchmark 摘要与限制。复用并按需重录现有视频，不为“新素材”重建工作台。
+AI 演示若 scripted，画面与说明均明确；另链真实模型记录。
+作者贡献、第三方引擎、测试与发布证据各有入口；生成徽章只由原脚本更新。
+
+Upwork：准备可上传的英文素材包，包含项目标题、角色、简短描述、技能/交付标签、
+封面与截图、案例附件，并按平台当前字段限制核对。
+以 Backend/Automation 和 AI/MCP 两个角度组织，均说明来自同一个个人项目；
+有限 APK 分析可作附加案例，不虚构成多个客户项目。
+
+每类服务各附一页范围说明：输入、交付、验收、排除项、数据处理、模型费用归属和变更处理；
+先按具体样本与需求估算，不凭作品集推导小时费率或承诺固定收益。
+本里程碑交付可审阅的素材，不默认替用户发布资料、发提案或联系客户。
+
+验收：首次读者能复述用途与边界，沿展示入口找到实际样例输出，并解释作者负责什么。
+Upwork 文案与附件按当前官方指南检查字符限制、个人项目身份和联系方式等发布约束；
+其规则来源为 [作品集指南](https://support.upwork.com/hc/en-us/articles/360016144974-How-to-enhance-your-freelancer-profile)。
+不以星标增长、投标转化率或第一单作为此里程碑的退出门槛。
+
+## 9. M10 — 独立验收、复评与发布候选
+
+至少邀请一位未参与实现的读者，在作者不补步骤的条件下完成推荐安装路线和一个完整案例；
+记录测试者背景、环境、耗时、命令、输出、卡点及修复后的复验。
+另以客户视角审阅交付样例：能否说明输入与结论、能否核查引用、能否区分事实和线索。
+同一读者可以承担两项，但源码评审必须具备审查对应代码的能力。
+若由作者先自测，明确标自测，不能代替独立验收。
+
+最终清单：
+
+- M5–M9 每项均有证据与评审结论；所有阻断项关闭，重要遗留项有边界与接受理由。
+- 对最终 commit 做源码审查与完整质量检查，生成数字属于同一棵树；发布说明明确实际支持范围。
+- 按准备度评估的原权重分别重评 GitHub / Upwork，目标各至少 90%；
+  分数通过不能抵消证据链、数据隔离、真实模型披露或首次安装中的阻断缺陷。
+- 列出交付文件、使用说明、兼容/破坏性变更、已知限制及不支持的 native/dynamic 能力。
+  `v1.0.0` 的稳定承诺限于明确列入契约表的范围；实验性 Agent 行为另行标明。
+- 完成源码评审和验收后才推进阶段、准备 tag；提交、推送和发布状态据实际记录书写。
+
+若外部读者或真实模型验证未完成，可发布诚实标注限制的预览素材，阶段仍不算验收完成。
+达到停止点后，下一轮投入由真实提案反馈或付费试点决定，另建需求与计划。
+
+## 10. 质量纪律与复现命令
+
+每个 bug fix 必须有旧实现会失败的回归测试，并实际还原旧文件验证失败；保存证据后恢复修复。
+命令执行在本工作树自己的虚拟环境，按项目要求把缓存、下载、临时产物放到指定 scratch；
+目标盘不存在时记录实际可用路径，避免回落系统盘。第三方 APK/DEX/so/秘密不入仓库。
+
+最终验证至少包含仓库规定的以下检查；后端配置、Docker、审计和手工演练另附记录。
+不把跳过当通过，不把本计划的目标门槛当作已测数据。
+
+```bash
+uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync mypy
+uv run --no-sync vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80
+uv run --no-sync pytest -q
+uv run --no-sync python scripts/check-doc-citations.py
+uv run --no-sync python scripts/check-version-claims.py --base auto
+```
+
+有源码变更时先格式化，再运行 `scripts/remap-citations.py` 与 citation checker，最后做完整测量并运行
+`scripts/refresh-report-figures.py`；生成数字更新前必须满足全部测量前提。
+仅文档修订不伪造新测量，也不改变 Phase 2 历史验收结果。

@@ -10,6 +10,7 @@
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
+- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，尚待实施与验收
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---
