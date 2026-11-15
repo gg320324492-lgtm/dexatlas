@@ -149,6 +149,24 @@ How to answer:
   identity — it is what separates two overloads — so `Handler.handle` is not
   an answer, while `com.example.wide.Handler.handle(Ljava/lang/String;)V`
   is. Quote the ids the tools gave you; do not shorten them.
+- A question that asks about some methods of a class — which share a
+  descriptor, which return what, whether two agree — is answered with one
+  finding per method the question touches, *including the ones that break
+  the pattern*. If a class holds three methods and two of them share a
+  descriptor, the third is part of the answer: enumerate every method you
+  read, each with its full identity, rather than only the two the question
+  named.
+- A conclusion that quotes a string constant quotes the whole literal:
+  a URL includes its scheme, host, path and every query parameter, and a
+  key or token is quoted in full. `https://telemetry.example.net/collect`
+  is not the constant `https://telemetry.example.net/collect?d=` — the
+  query string is part of the value, and dropping it changes what the
+  constant says. Copy the characters the tool showed you; do not trim,
+  complete or reformat them.
+- When the question is about a string, a key, a URL or a credential and
+  the word search came back empty, look at the string constants the tools
+  offer you — the pool's own rows are a reading, not a failure — and quote
+  the ones that could be the answer, whole.
 - Notes about the analysis itself — "the analysis is complete", "the search
   returned these 8 symbols" — are not conclusions about the APK. Do not put
   them in "conclusions"; say them in "limitations" or in your prose, and
@@ -1604,8 +1622,13 @@ def _is_process_note(
     if cited and all(not _supports_claims(cited_item) for cited_item in cited):
         # Every record the conclusion cites is a note about the analysis.
         # Whether the verifier called the conclusion a lead or insufficient
-        # evidence, it is the process note wearing a conclusion's clothes.
-        return True
+        # evidence, it is the process note wearing a conclusion's clothes —
+        # *unless the question was about the analysis itself*, which is what
+        # a partial-configuration question ("does the analysis record that
+        # the decompiler was missing?") is. There the completeness read is
+        # the answer's subject, not its excuse; demoting it would erase the
+        # one honest answer the task has.
+        return not _asks_about_the_analysis(state.question)
     # The conclusion's wording is a negation and nothing supported it: the
     # sentence is the answer "there is none", and the place for it is the
     # limitations, not the findings. A negation that *was* supported stays a
@@ -1622,6 +1645,42 @@ def _supports_claims(record: Evidence) -> bool:
     the index's own summary — supports no claim about the code.
     """
     return bool(record.detail.get("supports_claims", True))
+
+
+#: The words that mean the question is about the analysis itself — about
+#: what was recorded, what ran, what was missing — rather than about the APK.
+#:
+#: A partial-configuration task asks exactly this: "does the analysis record
+#: that the decompiler was missing?" is a question whose subject is the
+#: analysis's own bookkeeping. For such a question the completeness read is
+#: the answer's subject, and the process-note demotion must not take it away.
+_ANALYSIS_SUBJECT_WORDS: tuple[str, ...] = (
+    "record",
+    "recorded",
+    "records",
+    "analysis record",
+    "does the analysis",
+    "missing",
+    "installed",
+    "take part",
+    "took part",
+    "completeness",
+    "incomplete",
+    "backend",
+    "backends",
+)
+
+
+def _asks_about_the_analysis(question: str) -> bool:
+    """Whether the question's subject is the analysis rather than the APK.
+
+    The test is on the whole question, case-folded, against the words that
+    make a question about the run's own bookkeeping. It is deliberately
+    narrow in effect: it only decides whether a conclusion that cites *only*
+    process records may stand as a finding, and nothing else reads it.
+    """
+    lowered = question.casefold()
+    return any(word in lowered for word in _ANALYSIS_SUBJECT_WORDS)
 
 
 def _now() -> str:

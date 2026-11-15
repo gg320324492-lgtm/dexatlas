@@ -54,27 +54,66 @@ def read_tools(state: TaskState) -> frozenset[str]:
     )
 
 
+def failed_tools(state: TaskState) -> frozenset[str]:
+    """The tools whose call failed with a recorded answer about the analysis.
+
+    A tool error is not a reading of the APK, but some errors *are* the fact
+    a question is about: ``no_manifest`` on a workspace whose APK reader was
+    absent says "there is no manifest here" — which is the whole answer to
+    "what package does the manifest declare". The tools whose failures carry
+    that kind of fact count toward the question being settled, so a model
+    that keeps re-asking a tool that has already answered "no" is closed
+    instead of circling until the budget dies.
+    """
+    return frozenset(
+        turn.tool
+        for turn in state.turns
+        if isinstance(turn, Observation) and not turn.ok and turn.tool in FAILURE_IS_AN_ANSWER
+    )
+
+
+#: The tools whose failure is itself the fact a partial-configuration
+#: question asks about. A ``no_manifest`` error is not a malfunction: it is
+#: the analysis saying it holds no manifest, which is exactly what a
+#: question asked in a configuration without the APK reader needs to hear.
+FAILURE_IS_AN_ANSWER: frozenset[str] = frozenset({"get_manifest"})
+
+
 def ready_reason(plan: Plan, state: TaskState) -> str | None:
     """Why the reading is complete, or ``None`` while it is not.
 
     A plan with several intents is complete when every one of them has its
     key reading: "which permissions, and who calls this method" needs both
     the manifest and the callers. A general question — or a plan saved before
-    intents were recorded — is complete with any key reading.
+    intents were recorded — is complete with any key reading. A failed call
+    whose error states the fact the question needs (``no_manifest`` on a
+    workspace with no APK reader) closes the intent as well: the analysis
+    has answered, and the answer is "there is nothing here to read".
     """
     intents = [intent for intent in plan.intents if intent]
     read = read_tools(state)
+    failed = failed_tools(state)
 
     if not intents or "general" in intents:
-        if read & ANY_KEY_TOOL:
+        if read & ANY_KEY_TOOL or failed & ANY_KEY_TOOL:
             return "a key reading of the question has returned"
         return None
 
-    missing = [intent for intent in intents if not (_key_tools(intent) & read)]
+    missing: list[str] = []
+    for intent in intents:
+        if (_key_tools(intent) & read) or (_key_tools(intent) & failed):
+            continue
+        missing.append(intent)
     if missing:
         return None
 
-    tools = sorted({tool for intent in intents for tool in _key_tools(intent) & read})
+    tools = sorted(
+        {
+            tool
+            for intent in intents
+            for tool in (_key_tools(intent) & read) | (_key_tools(intent) & failed)
+        }
+    )
     if len(intents) == 1:
         return f"the key reading for the {intents[0]} question has returned: {', '.join(tools)}"
     return f"the key readings for the question have returned: {', '.join(tools)}"

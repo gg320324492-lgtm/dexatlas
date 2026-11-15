@@ -29,6 +29,16 @@ def search_symbols(
     The search runs over the whole index — classes, methods, fields and
     strings — and the excerpt is the index's own text around the match, so
     it says why a symbol matched.
+
+    The token search answers "what does the index say about these words". A
+    string constant whose value never spells the query as words — "api key"
+    asked, `sk_live_4eC39...` held — is invisible to it, so when the word
+    search comes back empty the constant pool is swept for the query as a
+    *substring*, and failing that the pool's constants are enumerated as
+    candidates. Both fallbacks are deterministic and free; they answer the
+    question a string-constant question actually asks — is there text in
+    this APK that a reader would want to see — rather than leaving an empty
+    word match to stand for an absence that was never established.
     """
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
@@ -39,6 +49,17 @@ def search_symbols(
     # happens to show.
     found = analyzer.store.search(project_id, query, limit=offset + limit)
     page = found[offset : offset + limit]
+
+    # The fallbacks run only when the word search found nothing: a question
+    # about a string constant whose value does not spell the query out is
+    # the case the failure analysis named. The sweep adds constants that
+    # contain the query as characters; the enumeration, last, shows the
+    # pool itself, so the answer "the index holds no such constant" is
+    # backed by the constants the index *does* hold.
+    if not page and query.strip():
+        page = list(analyzer.store.search_string_substring(project_id, query, limit=offset + limit))
+    if not page and query.strip():
+        page = list(analyzer.store.list_string_constants(project_id, limit=offset + limit))
 
     return SymbolList(
         symbols=[
