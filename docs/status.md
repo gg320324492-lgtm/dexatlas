@@ -1,6 +1,6 @@
 # DexAtlas 当前状态
 
-**最后更新：** 2026-11-15 · **对应版本：** v0.2.0（已发布；M4 已评审通过，详见[评审报告](reports/m4-review.md)）
+**最后更新：** 2026-11-15 · **对应版本：** v0.2.0（已发布；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** Phase 3 进行中（逐里程碑状态见 §4.0；M10 独立验收尚未开始，`v1.0.0` 未发布）
 
 这份文档回答两个问题：**现在在哪**，**还剩什么**。
 
@@ -10,7 +10,7 @@
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
-- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，尚待实施与验收
+- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收尚未开始
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---
@@ -101,6 +101,23 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 这一版关掉了原来五项里的四项。先说还开着的，再说这一轮新发现的。
 
+### 4.0 Phase 3 进度（截至 2026-11-15）
+
+Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表只列**已合入
+本分支**的产物，并写明每项还差什么；没有证据的一律标未开始或未验证。**M10
+独立验收尚未开始，Phase 3 的退出标准未达成，`v1.0.0` 未发布。**
+
+| 里程碑 | 状态 | 证据 / 还差什么 |
+|---|---|---|
+| M5 基线校准 | **已完成** | [phase3-baseline.md](reports/phase3-baseline.md)：声明清单、三份 benchmark 由已提交 trace 重算、演示素材的 scripted/真实模型标注 |
+| M6 服务回归集 | **部分完成** | 20 题已冻结在 `100b191`（[service-regression-set.md](benchmarks/service-regression-set.md)）；层级 0 确定性判分 **20/20**（零模型）；层级 1 scripted 演练完成（[m6-level1-scripted.md](benchmarks/m6-level1-scripted.md)）——scripted 是替身模型，成绩原样公开，只证明发题/trace/判分管线端到端可用，不是模型能力基线；**层级 2 真实模型批次待单独授权，尚未运行**，因此 M6 的验收门槛（三轮 ≥90%）未达成 |
+| M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例的可下载报告/证据包附件尚未落盘（可用这两条命令生成），M10 验收前核对 |
+| M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**修复进行中，未合入本分支**；M8-4（三后端全超时仍 `completed`、退出码 0）**已决策为已知限制**，不改退出码契约，复现与理由见演练报告 §6 |
+| M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；Upwork 英文素材为**草稿，未发布**（[outreach/](outreach/project-brief.md)） |
+| M10 独立验收 | **未开始** | 独立复现、准备度重评与 release candidate 均未开始；准备包在另一会话审阅，**未合入本分支** |
+
+4.1 起是此前记录、仍未关闭的缺口。
+
 ### 4.1 真实加固 APK
 
 `obfuscated-app` 覆盖了短类名和短方法名，但它是**手写的**混淆，
@@ -174,7 +191,10 @@ native 库、内存。这些要等下一个手里有真实样本的人。
 **证据链的每一环都自洽，指向的却是错的东西**——读者核对哈希会通过，
 因为哈希确实是它的。
 
-### 4.6 Phase 2 正在做的事
+### 4.6 Phase 2 交付了什么（M0–M4，已验收）
+
+Phase 2 已于 2026-11-14 通过 M4 源码评审与验收（[评审报告](reports/m4-review.md)）。
+以下是交付内容与退出标准核对，作为 Phase 3 的输入保留。
 
 M0 有五条，每条带验收标准，都在
 [Phase 2 计划](roadmap/phase2-plan.md)里。
