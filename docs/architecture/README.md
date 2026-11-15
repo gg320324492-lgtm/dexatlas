@@ -392,7 +392,8 @@ src/dexatlas/
 │   ├── apktool/    manifest and Smali
 │   ├── androguard/ DEX symbol index, and the worker that parses it
 │   └── registry.py backend discovery
-├── reports/      JSON and Markdown renderers, and the coverage they report
+├── reports/      JSON, Markdown and HTML renderings of one analysis, and the
+│   │             minimal evidence package; the shared metrics live in summary.py
 ├── cli/          Typer commands, plus the console-encoding layer
 ├── api/          FastAPI transport
 ├── mcp/          the read-only MCP server
@@ -407,4 +408,5 @@ duplicate any of it.
 The rest of this directory holds the detail: [Analysis runs](analysis-runs.md),
 [Call sites and call edges](call-sites-and-edges.md),
 [Evidence invariants](evidence-invariants.md), [Runtime isolation](runtime-isolation.md),
-[The MCP server](mcp-server.md) and [The agent](agent.md).
+[The MCP server](mcp-server.md), [The agent](agent.md) and
+[Report rendering and the evidence package](report-rendering.md).

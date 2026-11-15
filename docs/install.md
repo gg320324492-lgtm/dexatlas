@@ -133,7 +133,7 @@ analyse.**
 
 ```bash
 uv run dexatlas analyze fixtures/apk/TestActivity.apk \
-    --output report.md --json report.json
+    --output report.md --json report.json --html report.html
 ```
 
 ```text
@@ -143,11 +143,35 @@ uv run dexatlas analyze fixtures/apk/TestActivity.apk \
 !  jadx is not installed or not on PATH: Install the jadx decompiler: ...
 Markdown report → report.md
 JSON report → report.json
+HTML report → report.html
 ```
 
 That output is the degradation promise made visible: with no external tools at all you
 still get 340 classes, 2,600 methods and 6,033 cross-references from the in-process
 Androguard index, and the report says exactly which steps did not run.
+
+The three report formats are three renderings of one analysis — the numbers in
+the HTML page are the numbers in the Markdown and JSON reports. `--html` writes a
+single self-contained file: no scripts, no fetched resources, and every string the
+analysis did not produce (sample strings, class names) escaped, so a hostile APK
+cannot write markup into the reader's browser.
+
+## Export a minimal evidence package
+
+To hand a client the analysis without the workspace, export the evidence
+package:
+
+```bash
+uv run dexatlas export apk_3bb32dd50129690b --output evidence.zip
+```
+
+The package holds the report in all three formats, the evidence records, the
+source fragments the evidence cites, and a `manifest.json` with a SHA-256
+checklist of every file. It does not hold the analysed APK, the full source
+tree, or string constants no evidence record cites — the manifest says so
+explicitly. A reader who copies the package elsewhere can still follow every
+citation, because everything in it is located by a path relative to the
+package.
 
 ### Exit codes
 

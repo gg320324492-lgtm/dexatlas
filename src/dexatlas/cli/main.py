@@ -59,6 +59,8 @@ from dexatlas.core.models import (
     canonical_method_id,
 )
 from dexatlas.core.pipeline import AnalysisFailed, AnalysisResult, Analyzer
+from dexatlas.reports.evidence_package import build_evidence_package
+from dexatlas.reports.html_report import render_html
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
 
@@ -243,6 +245,13 @@ def analyze(
     json_output: Annotated[
         Path | None, typer.Option("--json", help="Write the JSON report here.")
     ] = None,
+    html_output: Annotated[
+        Path | None,
+        typer.Option(
+            "--html",
+            help="Write the offline HTML report here — one file, no scripts, no fetched resources.",
+        ),
+    ] = None,
     workspace: Annotated[
         Path | None, typer.Option("--workspace", help="Override the analysis workspace root.")
     ] = None,
@@ -314,6 +323,11 @@ def analyze(
             encoding="utf-8",
         )
         console.print(f"JSON report {mark(ARROW)} [bold]{json_output}[/bold]")
+
+    if html_output is not None:
+        html_output.parent.mkdir(parents=True, exist_ok=True)
+        html_output.write_text(render_html(result), encoding="utf-8")
+        console.print(f"HTML report {mark(ARROW)} [bold]{html_output}[/bold]")
 
     raise ExitCode(code=exit_code)
 
@@ -732,6 +746,52 @@ def search(
         console.print(
             f"[dim]{mark(ELLIPSIS)} more results not shown (use --limit to see more)[/dim]"
         )
+
+
+@app.command()
+def export(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Where to write the evidence package (a .zip).",
+        ),
+    ],
+) -> None:
+    """Export the minimal evidence package for a finished analysis.
+
+    The package is an explicit selection: the report in all three formats,
+    the evidence records, the source fragments the evidence cites, and a
+    manifest that hashes every file. It does not carry the client's APK, the
+    full source tree, or strings no evidence record cites — and the manifest
+    says so, rather than implying they are there.
+
+    A reader who copies the package elsewhere can still resolve every
+    citation, because everything in it is located by a path relative to the
+    package, never by a path on this machine.
+    """
+    analyzer = Analyzer()
+    _require_project(analyzer, project_id)
+    if analyzer.store.get_published_run(project_id) is None:
+        err_console.print(
+            f"[red]No published run for {project_id}.[/red] An evidence package "
+            "describes a completed analysis; run `dexatlas analyze` first."
+        )
+        raise ExitCode(code=EXIT_BAD_REQUEST)
+
+    try:
+        manifest = build_evidence_package(analyzer, project_id, output)
+    except Exception as exc:
+        err_console.print(f"[red]Could not build the evidence package:[/red] {exc}")
+        raise ExitCode(code=EXIT_FAILED) from exc
+
+    console.print(
+        f"[bold green]{mark(OK)}[/bold green] evidence package {mark(ARROW)} "
+        f"[bold]{output}[/bold] "
+        f"({len(manifest['files'])} files, apk {manifest['apk_sha256'][:16]})"
+    )
 
 
 @app.command()

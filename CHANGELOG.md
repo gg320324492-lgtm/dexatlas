@@ -9,6 +9,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **离线 HTML 报告与最小证据包（Phase 3 M7）。** `dexatlas analyze` 新增
+  `--html <file>`：把同一份分析渲染成单个自包含 HTML 页——无脚本、无外部资源，
+  样本字符串等不可信文本全部转义，防样本内容在读者浏览器里执行脚本。HTML 与
+  Markdown/JSON 共享同一数据层（`reports/summary.py` 的同一组指标），不重新计算
+  事实；新增 `dexatlas export <project> --output evidence.zip` 导出最小证据包：
+  三种格式报告、证据记录、证据引用到的源码片段，以及带 SHA-256 校验清单的
+  `manifest.json`。包内一切以相对路径定位（可迁移到其他目录后逐条核对引用），
+  客户 APK、全量源码、无关字符串不随包导出，未包含内容在 manifest 的
+  `not_included` 中明示。包校验（`verify_package`）拒绝路径遍历条目名、文件哈希
+  不符、manifest 与报告项目绑定不一致；`verify_citations` 在包迁移后核对引用仍可
+  解析。回归测试覆盖：HTML 转义、包路径遍历、错误样本绑定、篡改检测、迁移后
+  引用解析。设计说明见 `docs/architecture/report-rendering.md`。
+
 - **布局 XML 里硬编码的文本进入符号索引。** `res/layout*`、`res/menu`、`res/xml`
   里的 `android:text`、`android:hint`、`android:contentDescription`、`android:title`、
   `android:summary`、`android:label` 字面量，现在按 `layout_text` 类型进 `resources`
