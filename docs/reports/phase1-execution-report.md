@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1391<!--/fig-->（<!--fig:tests.fast-->1246<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.6%<!--/fig-->**（<!--fig:coverage.covered-->6501<!--/fig-->/<!--fig:coverage.total-->7100<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1411<!--/fig-->（<!--fig:tests.fast-->1266<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.5%<!--/fig-->**（<!--fig:coverage.covered-->6494<!--/fig-->/<!--fig:coverage.total-->7096<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -141,9 +141,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1246<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1266<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->145<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1391<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1411<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -227,6 +227,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_resource_references.py` | 资源之间的引用边：解析、存储、检索、CLI 与 API（resource-references 新增） |
 | `test_html_report.py` | 离线 HTML 报告：与 Markdown/JSON 同源的事实、样本文本转义、页面自包含、证据表上限（M7 新增） |
 | `test_evidence_package.py` | 最小证据包：清单校验、路径遍历拒绝、篡改检测、样本绑定、迁移后引用解析（M7 新增） |
+| `test_public_contracts.py` | 公共契约快照：REST 路由表、MCP 工具表、CLI 退出码表、报告/证据包 schema 固化为断言，契约变更先红测试（M8 新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -847,10 +848,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1391<!--/fig--> 个：<!--fig:tests.fast-->1246<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1411<!--/fig--> 个：<!--fig:tests.fast-->1266<!--/fig--> 快 + <!--fig:tests.slow-->145<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.6%<!--/fig-->（<!--fig:coverage.covered-->6501<!--/fig-->/<!--fig:coverage.total-->7100<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1391<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.5%<!--/fig-->（<!--fig:coverage.covered-->6494<!--/fig-->/<!--fig:coverage.total-->7096<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1410<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1053,10 +1054,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:df18b37df1494d7fbcfc8108677e1c18224a29de85cb85c20c9955ff003cc999",
+  "source_fingerprint": "sha256:d926fced42a388a5d330712f4b6069ccaf6b99d222bd633da980bf7542b656a7",
   "suite": {
-    "failed": 0,
-    "passed": 1391,
+    "failed": 1,
+    "passed": 1410,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1064,8 +1065,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1246,
+    "fast": 1266,
     "slow": 145,
-    "total": 1391
+    "total": 1411
   }
 }-->

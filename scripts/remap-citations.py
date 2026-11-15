@@ -43,6 +43,7 @@ REPO = Path(__file__).resolve().parent.parent
 #: citation nobody checks.
 DOCUMENTS = (
     REPO / "docs" / "analysis-provenance.md",
+    REPO / "docs" / "architecture" / "public-contracts.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
     REPO / "docs" / "benchmarks" / "large-apk.md",
 )

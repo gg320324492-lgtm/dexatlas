@@ -408,5 +408,6 @@ duplicate any of it.
 The rest of this directory holds the detail: [Analysis runs](analysis-runs.md),
 [Call sites and call edges](call-sites-and-edges.md),
 [Evidence invariants](evidence-invariants.md), [Runtime isolation](runtime-isolation.md),
-[The MCP server](mcp-server.md), [The agent](agent.md) and
-[Report rendering and the evidence package](report-rendering.md).
+[The MCP server](mcp-server.md), [The agent](agent.md),
+[Report rendering and the evidence package](report-rendering.md) and
+[The public contracts](public-contracts.md).

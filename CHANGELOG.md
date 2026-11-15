@@ -9,6 +9,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **公共契约表（Phase 3 M8）。** 新增 `docs/architecture/public-contracts.md`：
+  逐项固化对外承诺——CLI 全部 13 个子命令与退出码语义（0 成功 / 1 空答案 /
+  2 请求错误 / 3 分析失败 / 4 重载歧义 / 5 截断）、REST 全部 23 个端点的请求/
+  响应形状与状态码、MCP 十个只读工具的参数与返回形状、`SymbolCounts` 与证据
+  三级（verified/lead/insufficient）的判定边界、JSON 报告 `schema_version=3`
+  顶层结构、证据包 manifest `schema_version=1` 字段，以及语义化版本政策
+  （兼容变更进 CHANGELOG，破坏性变更显式升版本）。契约由真实接口验证：
+  新增 `scripts/verify-public-contracts.py` 起 uvicorn 逐端点实测（26 项）、
+  MCP 走协议实测（6 项）、CLI 退出码逐个触发（14 项），46/46 通过；结果
+  记录在契约表"验证记录"一节。新增契约快照测试
+  `tests/test_public_contracts.py`（22 项），把 REST 路由表、MCP 工具表、
+  退出码表、报告/证据包 schema 固化为断言——任何契约变更先红测试，防止
+  悄悄变更。
+
 - **离线 HTML 报告与最小证据包（Phase 3 M7）。** `dexatlas analyze` 新增
   `--html <file>`：把同一份分析渲染成单个自包含 HTML 页——无脚本、无外部资源，
   样本字符串等不可信文本全部转义，防样本内容在读者浏览器里执行脚本。HTML 与
