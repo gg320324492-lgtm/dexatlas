@@ -1056,7 +1056,9 @@ _WORKSPACE_COMMANDS = (
 
 
 @pytest.mark.parametrize("command", _WORKSPACE_COMMANDS)
-def test_every_command_that_reads_the_workspace_accepts_it(command: str) -> None:
+def test_every_command_that_reads_the_workspace_accepts_it(
+    command: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A workspace can be named on every command, the way ``analyze`` names it.
 
     The Docker path is why: an analysis writes into ``--workspace`` and the
@@ -1066,6 +1068,11 @@ def test_every_command_that_reads_the_workspace_accepts_it(command: str) -> None
     answered from ``DEXATLAS_WORKSPACE`` or from the default, without saying
     which.
     """
+    # Rich wraps the options table to the terminal width, and CI's terminal is
+    # narrow enough to truncate "--workspace" to "--worksp…". The claim under
+    # test is that the option exists on the command, not how Rich wraps it, so
+    # pin the width wide — the same thing the other help-output tests do.
+    monkeypatch.setenv("COLUMNS", "200")
     result = _run(command, "--help")
 
     assert result.exit_code == 0
