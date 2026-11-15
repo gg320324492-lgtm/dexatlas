@@ -440,3 +440,5 @@ not_included: {apk, full_sources, unrelated_strings}
   （或复用既有的 3/5），属于破坏性或新增的公共契约变更（§6），必须显式版本化并在
   CHANGELOG 声明。本次（Phase 3 M8）按用户决策只记录、不改契约；后续版本评估是否
   引入"无可用索引"的独立退出码。
+- **修复提案**：见 `docs/proposals/exit-code-partial-read.md`——候选方案对比、
+  推荐方案（新增退出码 6）、版本化措辞与红→绿测试计划。

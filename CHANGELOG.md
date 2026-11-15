@@ -28,6 +28,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **修复提案：退出码 6 分辨「跑完了但无可用的代码索引」。** 为公共契约
+  §8.1 记录的已知缺口（三后端全部失败但 manifest 可解析时 `analyze` 仍退
+  出 0）提供只含设计与版本化方案的提案文档
+  `docs/proposals/exit-code-partial-read.md`：候选方案对比、推荐方案
+  （新增 `EXIT_NO_INDEX = 6`，不改动 0–5 语义）、CHANGELOG 措辞草案与
+  红→绿测试计划。本条仅登记提案，未改任何实现；实施属后续版本决策。
 - **Agent 回答契约与工具调优（Phase 3 M6-③）。** 依据 M6 层级 2 失败分析
   （`docs/benchmarks/m6-level2-failure-analysis.md`）的失败模式，改 agent 的
   回答契约并补一个查询工具，不动题集与判分：
