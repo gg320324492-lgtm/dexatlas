@@ -21,13 +21,14 @@ automation together in one modular, reproducible workflow — built for develope
 researchers and engineers analysing applications they own or are authorized to assess.
 
 > [!IMPORTANT]
-> **Status: early development (Phase 2 in progress).** The CLI, analysis core and report
-> pipeline shipped in `v0.1.0` and have been released in every version since. The MCP
-> server and the evidence-first agent are built, and all eight of the web workbench's
-> M4 screens — the project dashboard, upload and analysis progress, search and
-> evidence, the cross-reference view, the agent workspace, report export, and the M3
-> benchmark view — are built and shipped in `v0.2.0`. See the
-> [Roadmap](#roadmap). Nothing on this page claims a feature that does not yet run.
+> **Status: early development (Phase 2 delivered, Phase 3 planned).** The CLI, analysis
+> core and report pipeline shipped in `v0.1.0` and have been released in every version
+> since. The MCP server, the evidence-first agent and the web workbench's M4 screens —
+> the project dashboard, upload and analysis progress, search and evidence, the
+> cross-reference view, the agent workspace, report export, and the M3 benchmark view —
+> are built and shipped in `v0.2.0`. M4 passed its source review on 2026-11-14. See the
+> [Roadmap](#roadmap) and [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)
+> for what is next. Nothing on this page claims a feature that does not yet run.
 
 <p align="center">
   <img src="docs/assets/demo-quick.gif" alt="DexAtlas analysing a bundled demo APK: backend discovery, the analysis summary, exported components from the manifest, and the evidence levels in the report" width="900">

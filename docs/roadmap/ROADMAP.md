@@ -54,7 +54,7 @@ extracting unauthorized data, or reproducing proprietary application code. See
 | Phase 1  | `v0.1.1`  | Foundation Hardening   | ✅ Shipped 2026-10-19                                        |
 | Phase 1  | `v0.1.2`  | Acceptance Checklist  | ✅ Shipped 2026-10-20                                        |
 | Phase 1  | `v0.1.3`  | Evidence That Points Back | ✅ Shipped 2026-10-20                                   |
-| Phase 2  | `v0.5.0`  | Agentic Intelligence   | Demonstrable, evaluable agentic analysis platform               |
+| Phase 2  | `v0.2.0`  | Agentic Intelligence   | ✅ Shipped 2026-11-14 — M0–M3 + the workbench; M4 review passed 2026-11-14 |
 | Phase 3  | `v1.0.0`  | Production-Ready       | Extensible, deliverable, maintainable platform with real users  |
 
 **Promotion rule:** a phase is complete when its exit checklist passes *and* the source
@@ -215,12 +215,17 @@ planned against real code rather than assumptions written before any code existe
 
 ---
 
-## Phase 2 — Agentic Intelligence (`v0.5.0`)
+## Phase 2 — Agentic Intelligence (`v0.2.0`)
 
 **Entry condition:** Phase 1 exit checklist passing and source review complete.
 
 **Goal:** move from automated tools to an assistant that plans, calls tools, verifies
 evidence, and recovers from failure.
+
+> **Status: delivered.** All five milestones shipped with v0.2.0 (2026-11-14);
+> M4 passed its source review and acceptance the same day
+> ([review report](../reports/m4-review.md)). Phase 3 planning is in
+> [phase3-plan.md](phase3-plan.md).
 
 > **Positioning.** JADX-MCP and JADX-AI-MCP already let a model read decompiled code.
 > "JADX + ChatGPT" is therefore not a differentiator. DexAtlas differentiates on

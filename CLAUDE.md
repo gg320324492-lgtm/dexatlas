@@ -59,7 +59,7 @@ the wrong code.
 
 ### The gates
 
-CI runs six jobs: lint/format/mypy, tests on Python 3.12 (every backend),
+CI runs six jobs (seven parallel runs): lint/format/mypy, tests on Python 3.12 (every backend),
 tests on Python 3.13 (no external backends), tests with Apktool only, the Docker
 image, and the dependency audit. The same configurations are worth running by
 hand before a push — the three backend configurations are separate
