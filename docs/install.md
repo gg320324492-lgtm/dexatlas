@@ -215,12 +215,21 @@ package.
 | `3` | The analysis itself failed: a step raised, or the workspace could not be written. |
 | `4` | The method name matches several overloads and no descriptor was given; the candidates are named. |
 | `5` | The analysis finished, but a limit cut a step short (`output_truncated`), so the report describes a shortened index. |
+| `6` | The analysis finished, but no symbol index could be built: every code backend failed, so the report describes no classes. |
 
 Code 5 is the difference between "the run fell over" (3) and "the run finished
 on a shortened index": a truncated run still completes, still writes its
 report, and every number in it is exactly what was indexed — but a caller that
 reads only the exit code can now tell a clipped run from a whole one without
 opening the project record.
+
+Code 6 is the difference between "the APK holds no code" (0, an APK with no
+DEX is a whole answer) and "the run indexed nothing because every code backend
+failed": the manifest may still be readable — Apktool can write it before it
+is stopped — but the index holds no classes. The report is still written and
+readable, and `summary.index_complete == false` carries the same fact; a
+caller that reads only the exit code can tell a run that read nothing from a
+whole one without opening the project record.
 
 ## Query the result
 

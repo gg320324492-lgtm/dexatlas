@@ -9,6 +9,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **公共契约变更：新增退出码 6（`EXIT_NO_INDEX`），分辨「跑完了但无可用的代码索引」。**
+  当所有读取 DEX 的后端（Androguard 等）全部失败（例如
+  `DEXATLAS_TOOL_TIMEOUT_SECONDS` 过小导致全部超时）而 Apktool 在被终止前已写出
+  可解析 manifest 时，`dexatlas analyze` 过去与完整成功同为退出码 0；现在返回
+  **6**，并在 stderr 说明。判定条件：项目 `completed` 且 `class_count == 0` 且
+  存在索引缺口（androguard 失败或分析失败，与报告 `summary.index_complete == false`
+  同源）；无 DEX 的资源型 APK（索引为空但无缺口）与部分后端失败（索引仍在）不受
+  影响，仍为 0。0–5 的语义与触发条件全部不变；受影响的仅是原先错误地落在 0 的
+  这类残缺运行——把非零一律当失败的调用方自动受益，把 0 当成功的调用方请按
+  `exit_code in (0, 6)` 区分「完整成功」与「跑完了但无可用的代码索引」。报告
+  （Markdown/JSON/HTML）与 manifest 照常产出，`schema_version` 不变。由提案
+  [docs/proposals/exit-code-partial-read.md](docs/proposals/exit-code-partial-read.md)
+  批准实施（方案 A），同步更新 `docs/install.md` 退出码表与
+  `docs/architecture/public-contracts.md` §1.2/§8.1。回归测试
+  `tests/test_public_contracts.py::test_cli_an_analysis_with_no_index_is_six`
+  等四项在未修复实现上先红（`assert 0 == 6`），修复后转绿。
+
 - **M6 服务回归集 `partial.*` 两题的判定语义修订（Phase 3 M6-③）。**
   新增 `benchmarks.model.Task.expect_backend_failure` 判定谓词：
   `partial.no-jadx-the-failure-is-recorded` 与
@@ -41,6 +58,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **v1.0.0 发版流程本地 dry-run 报告。** 按
+  [发版前检查清单](docs/reports/v1.0.0-release-checklist.md) 完成一次本地预演
+  （不创建 tag、不发布、不改版本号）：7 步流程逐项核对、5 项阻断与 4 项披露的
+  当日状态核对、新缺口清单（发版说明 `docs/releases/v1.0.0.md` 未落盘、契约表
+  未记录退出码 6、清单 ROADMAP 引用悬空、status.md M8 行过时、install.md
+  「No APK」与 examples/ 一方 APK 矛盾等）。报告见
+  `docs/reports/v1.0.0-dry-run.md`。仅预演与文档，不发版。
 - **M6 层级 2 复测下一轮的预算与判分方案与本地校验脚本。** 上一轮复测（DexAtlas 15/20，trace 合计 356,803 tokens）超出 35 万授权上限后，为修复合入后的下一轮复测定稿预算方案 `docs/benchmarks/m6-level2-retest-plan.md`：单题熔断 24,000 tokens（`--total-tokens`，取上轮通过题实测最大 22,776 之上）、总额 300,000 tokens（授权 350,000，留 50,000 缓冲）、总额熔断以逐题分批执行落实、判分与报告沿用既有脚本口径。新增本地校验脚本 `scripts/m6_retest_budget.py`：逐题与总额核对 trace token 用量，超支非零退出；无 trace 数据时校验方案文件存在与格式并退出 0。仅方案与脚本，不调用任何模型 API。
 - **M10 独立验收自查脚本与自查报告。** 把[验收准备包](docs/reports/m10-acceptance-pack.md)
   40 项中可自动化的 40 项检查写成 `scripts/m10_selfcheck.py`（仅读仓库、

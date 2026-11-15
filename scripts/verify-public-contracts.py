@@ -421,6 +421,7 @@ def cli_checks() -> None:
         ApkMetadata,
         ClassKind,
         ClassRef,
+        ManifestInfo,
         MethodRef,
         Project,
         ProjectStatus,
@@ -533,6 +534,41 @@ def cli_checks() -> None:
     with unittest.mock.patch("dexatlas.cli.main.Analyzer", _Truncating):
         result = runner.invoke(app, ["analyze", str(DEMO_APK)])
     check("a truncated analysis exits 5", result.exit_code == 5, str(result.exit_code))
+
+    no_index_project = Project(
+        id=Project.new_id("d" * 64),
+        apk=ApkMetadata(sha256="d" * 64, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=0,
+        errors=[
+            ToolError(
+                tool="androguard",
+                code=ToolErrorCode.TIMEOUT,
+                message="androguard timed out",
+            ),
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.TIMEOUT,
+                message="jadx timed out",
+            ),
+            ToolError(
+                tool="apktool",
+                code=ToolErrorCode.TIMEOUT,
+                message="apktool timed out",
+            ),
+        ],
+    )
+
+    class _NoIndex:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, apk: Path) -> AnalysisResult:
+            return AnalysisResult(project=no_index_project, manifest=ManifestInfo())
+
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _NoIndex):
+        result = runner.invoke(app, ["analyze", str(DEMO_APK)])
+    check("an analysis with no index exits 6", result.exit_code == 6, str(result.exit_code))
 
 
 def main() -> int:

@@ -32,6 +32,7 @@ from dexatlas.cli.main import (
     EXIT_BAD_REQUEST,
     EXIT_EMPTY,
     EXIT_FAILED,
+    EXIT_NO_INDEX,
     EXIT_TRUNCATED,
 )
 from dexatlas.cli.main import app as cli_app
@@ -41,6 +42,7 @@ from dexatlas.core.models import (
     ClassKind,
     ClassRef,
     EvidenceLevel,
+    ManifestInfo,
     MethodRef,
     MethodReference,
     Project,
@@ -126,6 +128,7 @@ EXPECTED_EXIT_CODES = {
     EXIT_FAILED: "the analysis itself failed",
     EXIT_AMBIGUOUS: "the answer is ambiguous",
     EXIT_TRUNCATED: "a limit cut a step short",
+    EXIT_NO_INDEX: "no symbol index could be built",
 }
 
 #: The fields of a project response, in the order the schema declares them.
@@ -453,9 +456,10 @@ def test_the_cli_exit_code_table_is_the_contract() -> None:
     from dexatlas.cli.main import EXIT_BAD_REQUEST as BAD
     from dexatlas.cli.main import EXIT_EMPTY as EMPTY
     from dexatlas.cli.main import EXIT_FAILED as FAILED
+    from dexatlas.cli.main import EXIT_NO_INDEX as NO_INDEX
     from dexatlas.cli.main import EXIT_TRUNCATED as TRUNCATED
 
-    assert (EMPTY, BAD, FAILED, AMBIGUOUS, TRUNCATED) == (1, 2, 3, 4, 5)
+    assert (EMPTY, BAD, FAILED, AMBIGUOUS, TRUNCATED, NO_INDEX) == (1, 2, 3, 4, 5, 6)
     epilog = cli_app.info.epilog or ""
     for code, phrase in EXPECTED_EXIT_CODES.items():
         assert str(code) in epilog, f"exit code {code} is not declared in the epilog"
@@ -548,6 +552,155 @@ def test_cli_a_truncated_analysis_is_five(seeded_workspace: Path, tmp_path: Path
 
     assert result.exit_code == EXIT_TRUNCATED
     assert str(EXIT_TRUNCATED) in result.output
+
+
+def test_cli_an_analysis_with_no_index_is_six(seeded_workspace: Path, tmp_path: Path) -> None:
+    """A finished run whose DEX reader failed but whose manifest survived is 6.
+
+    Three backends that all timed out leave the index empty while the
+    manifest Apktool wrote before it was stopped stays readable: the run
+    completed and its report is written, but a caller who reads only the exit
+    code must be able to tell "nothing was indexed" from a whole run. The
+    class count is the published count, so the stub publishes it.
+    """
+    project = Project(
+        id=Project.new_id("d" * 64),
+        apk=ApkMetadata(sha256="d" * 64, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=0,
+        errors=[
+            ToolError(
+                tool="androguard",
+                code=ToolErrorCode.TIMEOUT,
+                message="androguard timed out",
+            ),
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.TIMEOUT,
+                message="jadx timed out",
+            ),
+            ToolError(
+                tool="apktool",
+                code=ToolErrorCode.TIMEOUT,
+                message="apktool timed out",
+            ),
+        ],
+    )
+
+    class _NoIndex:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> AnalysisResult:
+            return AnalysisResult(project=project, manifest=ManifestInfo())
+
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _NoIndex):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == EXIT_NO_INDEX
+    assert str(EXIT_NO_INDEX) in result.output
+
+
+def test_cli_a_partial_index_stays_zero(seeded_workspace: Path, tmp_path: Path) -> None:
+    """A run that indexed something keeps exit code 0, despite backend errors.
+
+    The new code is for a run with no usable index at all; a partial index is
+    described by its errors and its completeness, and stays a success.
+    """
+    project = Project(
+        id=Project.new_id("e" * 64),
+        apk=ApkMetadata(sha256="e" * 64, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=3,
+        errors=[
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.TIMEOUT,
+                message="jadx timed out",
+            ),
+        ],
+    )
+
+    class _Partial:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> AnalysisResult:
+            return AnalysisResult(project=project, manifest=ManifestInfo())
+
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _Partial):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == 0
+
+
+def test_cli_an_empty_index_without_gaps_stays_zero(seeded_workspace: Path, tmp_path: Path) -> None:
+    """An APK with no DEX is a whole answer at 0, not a run that lost its index.
+
+    The class count being zero is only a gap when a DEX reader failed to fill
+    it; an APK that holds no code indexed nothing because there was nothing
+    to index.
+    """
+    project = Project(
+        id=Project.new_id("f" * 64),
+        apk=ApkMetadata(sha256="f" * 64, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=0,
+    )
+
+    class _ResourceOnly:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> AnalysisResult:
+            return AnalysisResult(project=project, manifest=ManifestInfo())
+
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _ResourceOnly):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == 0
+
+
+def test_cli_no_index_wins_over_truncation(seeded_workspace: Path, tmp_path: Path) -> None:
+    """An empty index with a capped step is still 6: no index is the stronger fact."""
+    project = Project(
+        id=Project.new_id("a1" * 32),
+        apk=ApkMetadata(sha256="a1" * 32, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectStatus.COMPLETED,
+        class_count=0,
+        errors=[
+            ToolError(
+                tool="androguard",
+                code=ToolErrorCode.TIMEOUT,
+                message="androguard timed out",
+            ),
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.OUTPUT_TRUNCATED,
+                message="output cut at the cap",
+            ),
+        ],
+    )
+
+    class _NoIndexAndTruncated:
+        def __init__(self, settings: object = None) -> None:
+            pass
+
+        def analyze(self, path: Path) -> AnalysisResult:
+            return AnalysisResult(project=project, manifest=ManifestInfo())
+
+    apk = tmp_path / "whatever.apk"
+    apk.write_bytes(b"")
+    with unittest.mock.patch("dexatlas.cli.main.Analyzer", _NoIndexAndTruncated):
+        result = runner.invoke(cli_app, ["analyze", str(apk)])
+
+    assert result.exit_code == EXIT_NO_INDEX
 
 
 # ---------------------------------------------------------------------------

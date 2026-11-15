@@ -58,6 +58,7 @@ from dexatlas.core.models import (
     SourceDocument,
     ToolErrorCode,
     canonical_method_id,
+    index_gaps,
 )
 from dexatlas.core.pipeline import AnalysisFailed, AnalysisResult, Analyzer
 from dexatlas.reports.evidence_package import build_evidence_package
@@ -74,7 +75,9 @@ app = typer.Typer(
         "is not an APK); "
         "3 the analysis itself failed; 4 the request was right and the answer is "
         "ambiguous (the method name matches several overloads); 5 the analysis "
-        "finished but a limit cut a step short, so the report has gaps in it."
+        "finished but a limit cut a step short, so the report has gaps in it; "
+        "6 the analysis finished but no symbol index could be built (every code "
+        "backend failed), so the report describes no classes."
     ),
     no_args_is_help=True,
     add_completion=False,
@@ -121,6 +124,15 @@ EXIT_AMBIGUOUS = 4
 #: either: a caller that reads only the exit code has to be able to tell a
 #: clipped run from a whole one without opening the project record.
 EXIT_TRUNCATED = 5
+
+#: The analysis ran to the end, but no symbol index could be built.
+#:
+#: Every backend that reads the DEX files failed, so the index holds no
+#: classes, while the manifest the resource reader wrote before it was
+#: stopped stays readable. The run finished and its report is written, but
+#: it is not a whole run: a caller that reads only the exit code has to be
+#: able to tell "nothing was indexed" from "the APK holds no code".
+EXIT_NO_INDEX = 6
 
 #: What a project id looks like, for the message that says "there is no such project".
 PROJECT_ID_SHAPE = "apk_0123456789abcdef"
@@ -172,6 +184,31 @@ def _truncated(result: AnalysisResult) -> bool:
     a caller should not read as the whole APK.
     """
     return any(error.code is ToolErrorCode.OUTPUT_TRUNCATED for error in result.project.errors)
+
+
+def _no_index(result: AnalysisResult) -> bool:
+    """Whether a completed analysis built no symbol index at all.
+
+    The run finished — the project completed and the report is written — but
+    every backend that reads the DEX files failed, so the index holds no
+    classes. The manifest may still have been written before the resource
+    reader was stopped, which is why the project completed at all: a run with
+    neither classes nor a manifest is a failed one, and it answers through
+    :data:`EXIT_EMPTY` instead.
+
+    Three facts together, each doing its own excluding: the project
+    completed (a failed run has its own answer); the class count is zero
+    (a partial index is a run whose gaps are named, not one that read
+    nothing); and an index gap is recorded (an APK that holds no DEX also
+    indexes nothing, and that is a whole answer, not a lost one). The gap is
+    the same fact ``index_completeness`` reports, so the exit code and the
+    report's own ``index_complete`` agree.
+    """
+    return (
+        result.succeeded
+        and result.project.class_count == 0
+        and bool(index_gaps(result.project.errors))
+    )
 
 
 def _use_workspace(workspace: Path | None, *, must_exist: bool) -> None:
@@ -337,6 +374,19 @@ def analyze(
             "(`dexatlas backends`) and re-run."
         )
         exit_code = EXIT_EMPTY
+    elif _no_index(result):
+        # The run finished, but nothing was indexed: every DEX reader failed,
+        # and only the manifest survived. The report is written and readable,
+        # but it describes no classes — a caller that reads only the exit
+        # code has to be able to tell that from a whole run. This is checked
+        # before truncation: an empty index is the stronger fact, and a run
+        # that indexed nothing is not merely a shortened one.
+        err_console.print(
+            f"[yellow]{mark(WARN)}[/yellow] The analysis finished, but no symbol "
+            f"index could be built — every code backend failed (exit code "
+            f"{EXIT_NO_INDEX})."
+        )
+        exit_code = EXIT_NO_INDEX
     elif _truncated(result):
         # The run finished, but a limit cut a step short: the report is
         # written, and the gaps are named in it and on the project. The exit
