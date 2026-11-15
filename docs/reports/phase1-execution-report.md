@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1466<!--/fig-->（<!--fig:tests.fast-->1320<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1478<!--/fig-->（<!--fig:tests.fast-->1332<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->91.9%<!--/fig-->**（<!--fig:coverage.covered-->6775<!--/fig-->/<!--fig:coverage.total-->7375<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1320<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1332<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->146<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1466<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1478<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -225,6 +225,8 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_backend_timeout_exit.py` | 后端超时分支被测试真实走到，而不是靠覆盖率测量碰巧经过 |
 | `test_agent_serial_tools.py` | agent 每轮只执行一个工具调用：多工具轮次被抑制、回绝走 tool 通道、resume 不重跑被回绝的调用、单工具行为不变（M4 e2e P1 修法②新增） |
 | `test_agent_duplicate_calls.py` | agent 重复工具调用检测：同指纹成功调用直接复用并注明，不再原地打转耗尽预算（M6-② 新增） |
+| `test_partial_backend_failure_scoring.py` | partial.* 两题的判分修订：后端缺失的诚实记录（expect_backend_failure 谓词）能被判过，旧 expect_empty 口径对同一回答判负的红色证据锁定（M6-③ 新增） |
+| `test_comparison_configuration_routing.py` | 配置路由：no-apktool 工作区 Apktool 确实缺席且失败被记录、B 按题拿到 no_manifest、A 检索面过滤缺失后端的文件类别（M6-③ 新增） |
 | `test_agent_stop.py` | agent 收束停止策略：关键事实集齐→宽限读取→关工具→两次作答，不再等预算耗尽（M6-② 新增） |
 | `test_agent_budget_defaults.py` | agent 默认预算上调（120k tokens/16 迭代/40 步）与显式覆盖优先级（M6-② 新增） |
 | `test_resource_references.py` | 资源之间的引用边：解析、存储、检索、CLI 与 API（resource-references 新增） |
@@ -851,10 +853,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1466<!--/fig--> 个：<!--fig:tests.fast-->1320<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1478<!--/fig--> 个：<!--fig:tests.fast-->1332<!--/fig--> 快 + <!--fig:tests.slow-->146<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->91.9%<!--/fig-->（<!--fig:coverage.covered-->6775<!--/fig-->/<!--fig:coverage.total-->7375<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1465<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1477<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1059,10 +1061,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:dd8493ad51fd1479ac088541b3b3fb4351a93a9f59fbd1cc19a6ef5f77298734",
+  "source_fingerprint": "sha256:c850398a82ff987780d94bf7d60e4ef92e67919646d3c8bc6cac45c8f54f5d31",
   "suite": {
     "failed": 1,
-    "passed": 1465,
+    "passed": 1477,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1070,8 +1072,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1320,
+    "fast": 1332,
     "slow": 146,
-    "total": 1466
+    "total": 1478
   }
 }-->
