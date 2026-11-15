@@ -18,7 +18,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
@@ -45,11 +45,10 @@ from benchmarks.comparison.systems import (  # noqa: E402
     System,
     scripted_agent_provider,
 )
-from benchmarks.model import Configuration, Sample, check  # noqa: E402
+from benchmarks.model import Configuration, Sample, Task, check  # noqa: E402
 from benchmarks.run import (  # noqa: E402
     _analyse,
     _prepare_workspace,
-    _questions_document,
     _self_check,
 )
 from benchmarks.tasks import ALL_TASKS  # noqa: E402
@@ -126,8 +125,30 @@ class ComparisonRun:
         )
 
 
-def _questions() -> tuple[Question, ...]:
-    """被测系统能看到的全部输入."""
+def _questions(tasks: list[Task] | None = None) -> tuple[Question, ...]:
+    """被测系统能看到的全部输入.
+
+    ``tasks`` 为 ``None`` 时覆盖全集; 传入子集时只发这些题, reference
+    编号仍是它们在全集中的题号--判分靠编号对回 ``ALL_TASKS``, 编号一乱
+    判分就答非所问, 所以这里不重排、不重编: 编号直接取自全集索引, 而不是
+    重新数一遍子集.
+    """
+    if tasks is None:
+        chosen: tuple[Task, ...] = ALL_TASKS
+        numbers: list[int] = list(range(1, len(ALL_TASKS) + 1))
+    else:
+        wanted = {id(task) for task in tasks}
+        chosen = tuple(task for task in ALL_TASKS if id(task) in wanted)
+        numbers = [index + 1 for index, task in enumerate(ALL_TASKS) if id(task) in wanted]
+    document = [
+        {
+            "reference": f"q{number:03d}",
+            "question": task.question,
+            "sample": task.sample.value,
+            "configuration": task.configuration.value,
+        }
+        for number, task in zip(numbers, chosen, strict=True)
+    ]
     return tuple(
         Question(
             reference=str(item["reference"]),
@@ -135,8 +156,24 @@ def _questions() -> tuple[Question, ...]:
             sample=str(item["sample"]),
             configuration=str(item["configuration"]),
         )
-        for item in json.loads(_questions_document(list(ALL_TASKS)))
+        for item in document
     )
+
+
+def _select_tasks(prefixes: Sequence[str] = ()) -> list[Task]:
+    """按 id 前缀挑题, 保持全集顺序.
+
+    前缀匹配与 ``benchmarks/run.py --task`` 同一规则: 一个前缀可以带出
+    多道题, 同一能力点的题共享前缀时一次就能全选上. 空串匹配一切, 所以
+    "传了前缀却一道都匹配不上"必须在这里报出来, 而不是让下游跑一个空集.
+    """
+    if not prefixes:
+        return list(ALL_TASKS)
+    patterns = tuple(prefixes)
+    selected = [task for task in ALL_TASKS if task.id.startswith(patterns)]
+    if not selected:
+        raise SystemExit("no task id starts with any of: " + ", ".join(prefixes))
+    return selected
 
 
 def _score(question: Question, trace: TaskTrace) -> TaskTrace:
@@ -317,25 +354,30 @@ def run_comparison(
     agent_budget: int | None = None,
     max_iterations: int = 16,
     max_sensitive_calls: int | None = None,
+    task_prefixes: Sequence[str] = (),
 ) -> ComparisonRun:
     """跑一次完整对比,返回可序列化的全部数据.
 
     ``limit`` 只用于冒烟:它截断的是被问的题,不会改变 reference 与题号的
     对应关系,也不改变判分规则.正式报告的数字必须来自 ``limit=0``.
 
+    ``task_prefixes`` 按 id 前缀选一个子集(如服务回归集的 20 题).它像
+    ``limit`` 一样只决定"问哪些题":reference 编号仍是全集题号,判分规则
+    不变. 部分集的报告必须写明它不是全集,不得与全集数字混排.
+
     ``budget`` is what one request may carry; ``total_tokens`` is what the
     whole task may spend. They are different numbers, and a real model
     answers an APK question in a few thousand tokens -- a task budget of one
     request's worth would stop the agent before it answered.
     """
-    tasks = list(ALL_TASKS)
+    tasks = _select_tasks(task_prefixes)
     tolerant = _self_check(tasks)
     if tolerant:
         raise SystemExit(
             "self-check failed: these tasks accept an answer that is wrong: " + ", ".join(tolerant)
         )
 
-    questions = _questions()
+    questions = _questions(tasks)
     selected = questions[:limit] if limit > 0 else questions
     needed_samples = {Sample(value) for value in {question.sample for question in selected}}
     analyzer, analyses, _ = _analyse_samples(workspace, samples=needed_samples)
@@ -947,6 +989,16 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=0,
         help="Smoke-test only: ask the first N questions. A reported measurement needs 0.",
     )
+    parser.add_argument(
+        "--task",
+        action="append",
+        default=[],
+        help=(
+            "Only run the task whose id starts with this. Repeatable. The "
+            "reference numbers stay the full-set numbers, so scoring is "
+            "unchanged; a partial run is a subset and is reported as one."
+        ),
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
         "--report",
@@ -1081,6 +1133,7 @@ def main(argv: list[str] | None = None) -> int:
         agent_budget=args.agent_budget or None,
         max_iterations=args.max_iterations or 16,
         max_sensitive_calls=args.max_sensitive_calls or None,
+        task_prefixes=tuple(args.task or ()),
     )
     args.output.mkdir(parents=True, exist_ok=True)
     document = run.to_dict()
