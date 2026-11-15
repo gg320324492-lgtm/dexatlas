@@ -41,6 +41,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **M6 层级 2 复测下一轮的预算与判分方案与本地校验脚本。** 上一轮复测（DexAtlas 15/20，trace 合计 356,803 tokens）超出 35 万授权上限后，为修复合入后的下一轮复测定稿预算方案 `docs/benchmarks/m6-level2-retest-plan.md`：单题熔断 24,000 tokens（`--total-tokens`，取上轮通过题实测最大 22,776 之上）、总额 300,000 tokens（授权 350,000，留 50,000 缓冲）、总额熔断以逐题分批执行落实、判分与报告沿用既有脚本口径。新增本地校验脚本 `scripts/m6_retest_budget.py`：逐题与总额核对 trace token 用量，超支非零退出；无 trace 数据时校验方案文件存在与格式并退出 0。仅方案与脚本，不调用任何模型 API。
+- **M10 独立验收自查脚本与自查报告。** 把[验收准备包](docs/reports/m10-acceptance-pack.md)
+  40 项中可自动化的 40 项检查写成 `scripts/m10_selfcheck.py`（仅读仓库、
+  无第三方依赖，`uv run --no-sync python scripts/m10_selfcheck.py` 运行，
+  退出码 0 表示无失败项；`--json` 输出机器可读结果）：验收包结构完整性、
+  文档相对链接、CHANGELOG 与版本一致性、README 徽章与报告数字一致、
+  报告 `<!--fig:-->` 标记一致性、退出码/MCP 工具/报告 schema/证据包
+  `not_included`/HTML 离线渲染等契约静态核对、门禁命令可执行性；40 项
+  人工判定项逐项标注原因留待读者执行。自查记录见
+  `docs/reports/m10-selfcheck.md`；[读者验收包](docs/reports/m10-reader-package.md)
+  末尾增加指向自查报告的入口。
 - **修复提案：退出码 6 分辨「跑完了但无可用的代码索引」。** 为公共契约
   §8.1 记录的已知缺口（三后端全部失败但 manifest 可解析时 `analyze` 仍退
   出 0）提供只含设计与版本化方案的提案文档
