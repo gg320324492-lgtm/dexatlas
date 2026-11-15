@@ -1622,7 +1622,14 @@ def _is_process_note(
     if cited and all(not _supports_claims(cited_item) for cited_item in cited):
         # Every record the conclusion cites is a note about the analysis.
         # Whether the verifier called the conclusion a lead or insufficient
-        # evidence, it is the process note wearing a conclusion's clothes.
+        # evidence, it is the process note wearing a conclusion's clothes —
+        # *unless the question was about the analysis itself*, which is what
+        # a partial-configuration question ("does the analysis record that
+        # the decompiler was missing?") is. There the completeness read is
+        # the answer's subject, not its excuse; demoting it would erase the
+        # one honest answer the task has.
+        if _asks_about_the_analysis(state.question):
+            return False
         return True
     # The conclusion's wording is a negation and nothing supported it: the
     # sentence is the answer "there is none", and the place for it is the
@@ -1640,6 +1647,42 @@ def _supports_claims(record: Evidence) -> bool:
     the index's own summary — supports no claim about the code.
     """
     return bool(record.detail.get("supports_claims", True))
+
+
+#: The words that mean the question is about the analysis itself — about
+#: what was recorded, what ran, what was missing — rather than about the APK.
+#:
+#: A partial-configuration task asks exactly this: "does the analysis record
+#: that the decompiler was missing?" is a question whose subject is the
+#: analysis's own bookkeeping. For such a question the completeness read is
+#: the answer's subject, and the process-note demotion must not take it away.
+_ANALYSIS_SUBJECT_WORDS: tuple[str, ...] = (
+    "record",
+    "recorded",
+    "records",
+    "analysis record",
+    "does the analysis",
+    "missing",
+    "installed",
+    "take part",
+    "took part",
+    "completeness",
+    "incomplete",
+    "backend",
+    "backends",
+)
+
+
+def _asks_about_the_analysis(question: str) -> bool:
+    """Whether the question's subject is the analysis rather than the APK.
+
+    The test is on the whole question, case-folded, against the words that
+    make a question about the run's own bookkeeping. It is deliberately
+    narrow in effect: it only decides whether a conclusion that cites *only*
+    process records may stand as a finding, and nothing else reads it.
+    """
+    lowered = question.casefold()
+    return any(word in lowered for word in _ANALYSIS_SUBJECT_WORDS)
 
 
 def _now() -> str:
