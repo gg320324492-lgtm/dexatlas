@@ -396,7 +396,14 @@ def measure_code_tests() -> Outcome:
     afterwards. Without it the androguard worker — a subprocess by design —
     would be reported as 0%, a statement about the measurement, not the code.
     """
-    rc_path = REPO_ROOT / ".coveragerc-measure.ini"
+    # The path carries this process's id. A config file with a fixed name is a
+    # footgun: the environment variable outlives the run that set it — a
+    # subprocess started later, by anything, would read the file — and a
+    # concurrent measurement (or a leftover from an earlier one) deleting or
+    # rewriting the file turns into a `ConfigError` printed onto some backend's
+    # stderr, which a truncation test then counts as output. A per-process name
+    # keeps one measurement's configuration from being another's.
+    rc_path = REPO_ROOT / f".coveragerc-measure-{os.getpid()}.ini"
     rc_path.write_text(COVERAGE_RC, encoding="utf-8")
     try:
         env = dict(os.environ)
