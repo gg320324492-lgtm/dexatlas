@@ -191,6 +191,9 @@ ignore = ["E501"]
 "scripts/m6_level2_verify_report.py" = ["RUF001"]
 # The level-2 narrow-verification report script does the same, in Chinese.
 "scripts/m6_level2_narrow_verify_report.py" = ["RUF001"]
+# The level-2 three-round full-rerun acceptance report script does the same,
+# in Chinese.
+"scripts/m6_level2_retest4_report.py" = ["RUF001"]
 # The M10 self-check prints Chinese check names and findings, and its
 # docstrings explain them in Chinese; same reason as above.
 "scripts/m10_selfcheck.py" = ["RUF001", "RUF002"]
