@@ -7,12 +7,14 @@ search had hit the decoy, and the fallback that sweeps the constant pool
 only ran when the word search came back *empty* — so one plausible hit
 shadowed the enumeration, and the agent concluded from a decoy.
 
-The fix: when a multi-word query already has string-kind hits, the pool's
+The fix: when a query already has string-kind hits, the pool's
 constants join the answer — the word hits keep their order, the pool
-follows, and neither identity is lost. A single-word query is left alone:
-one word is usually a name, and widening it would flood the answer with
-the whole pool. A multi-word query whose hits are code (classes, methods,
-fields) is left alone too: there the index answered the question asked,
+follows, and neither identity is lost. The original fix drew the line at
+two words; the M6 single-turn verification then showed the agent asking
+``api_key`` — one word — and taking the decoy for the answer all over
+again, so the line moved: any query whose word hits are string constants
+joins the pool. A query whose hits are code (classes, methods,
+fields) is left alone: there the index answered the question asked,
 and the pool would only pollute the answer.
 
 The workspace here is built by hand, as :mod:`tests.agent_harness` does,
@@ -131,15 +133,45 @@ def test_a_multiword_query_that_hits_a_decoy_still_enumerates_the_pool(analyzer)
     assert names.index(DECOY) < names.index(SECRET), names
 
 
-def test_a_single_word_query_is_left_to_the_word_search(analyzer) -> None:
-    """One word is a name: the pool does not flood the answer.
+def test_a_single_word_query_that_hits_a_decoy_still_enumerates_the_pool(analyzer) -> None:
+    """The union is not a phrase rule: one word that shadows is shadowing.
 
-    A single-word query that already hits is the normal search path, and
-    widening it would bury the hit under every constant in the pool. This
-    pins the boundary the union rule draws.
+    The single-turn verification had the agent query ``api_key`` — one
+    word, the decoy's own name — and the word search answered with the
+    decoy alone while the real key sat in the same pool. The old rule
+    widened only phrase-length queries, so the one-word shadowing case
+    kept its blind spot. Now the pool follows the word hits whatever the
+    word count, and the hit still leads.
     """
-    names = _names(analyzer, "api")
+    names = _names(analyzer, "api_key")
     assert DECOY in names, names
+    assert SECRET in names, names
+    assert names.index(DECOY) < names.index(SECRET), names
+
+
+def test_a_snake_free_single_word_query_still_enumerates_the_pool(analyzer) -> None:
+    """A one-word query FTS cannot split still finds the pool.
+
+    ``apikey`` is one token — FTS gives no word hits for it at all — so
+    the answer is the substring sweep's and the enumeration's, and the
+    real key must be among them. This is the exact shape of the
+    verification's failing question.
+    """
+    names = _names(analyzer, "apikey")
+    assert SECRET in names, names
+    assert URL in names, names
+
+
+def test_a_single_word_code_hit_is_left_to_the_word_search(analyzer) -> None:
+    """One word answered by code stays as it is.
+
+    The union rule fires when the word hits are string constants — the
+    case where the pool is plainly part of the answer. A one-word query
+    answered by a class or a method was answered, and adding the pool
+    would only bury the code the reader asked about.
+    """
+    names = _names(analyzer, "Crypto")
+    assert any("Crypto" in name for name in names), names
     assert SECRET not in names, names
 
 

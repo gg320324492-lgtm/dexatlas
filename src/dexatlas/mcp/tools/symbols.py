@@ -17,12 +17,13 @@ from dexatlas.mcp.security import bounded_text
 #: comes back unbounded, and the cut is stated in the response.
 _SYMBOL_TEXT_LIMITS = {"max_lines": 8, "max_bytes": 4096}
 
-#: The smallest query that reads as a phrase about content rather than a
-#: name. One word is usually a name — a class, a method, a constant — and
-#: widening it would bury the hit under the whole pool. Two words ("api
-#: key", "sign method") are a description, and a description's answer
-#: includes the pool the description is aimed at.
-_PHRASE_WORD_COUNT = 2
+#: The smallest query the pool-union rule answers. A query whose word
+#: search hits string constants is a question about the pool's contents —
+#: one word included, because the M6 single-turn verification had the agent
+#: ask ``api_key`` and take the decoy constant for the whole answer while
+#: the real key sat in the same pool. A query whose hits are code is left
+#: to the index that answered it.
+_MIN_WORD_COUNT = 1
 
 
 def _page_symbols(entries: list[dict[str, Any]]) -> list[SymbolView]:
@@ -85,12 +86,14 @@ def search_symbols(
     question, because a hit can shadow its neighbours. The M6 level-2
     retest had the agent query "api key" and take the decoy constant
     ``api_key`` for the whole answer while the real key sat in the same
-    pool, unseen — a decoy hit had silenced the enumeration. So for a
-    phrase-length query (two words or more) whose word hits are string
-    constants, the pool's constants join the answer: the word hits keep
-    their order, the pool follows, and no identity appears twice. A
-    single-word query, or one whose hits are classes, methods or fields,
-    was answered as asked and is left alone.
+    pool, unseen — a decoy hit had silenced the enumeration. So when a
+    query's word hits are string constants, the pool's constants join the
+    answer: the word hits keep their order, the pool follows, and no
+    identity appears twice. The first fix drew the line at two words; the
+    single-turn verification re-ran the same failure with one — the agent
+    asked ``api_key`` and got the decoy — so any word count joins now. A
+    query whose hits are classes, methods or fields was answered as asked
+    and is left alone.
     """
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
@@ -104,15 +107,15 @@ def search_symbols(
 
     # The fallbacks run when the word search found nothing — a question
     # about a string constant whose value does not spell the query out is
-    # the case the failure analysis named — or when a phrase-length query's
-    # word hits are themselves string constants, where a hit can shadow the
-    # rest of the pool. The sweep adds constants that contain the query as
-    # characters; the enumeration, last, shows the pool itself, so the
-    # answer "the index holds no such constant" is backed by the constants
-    # the index *does* hold.
-    phrase_query = len(query.split()) >= _PHRASE_WORD_COUNT
+    # the case the failure analysis named — or when the word hits are
+    # themselves string constants, where a hit can shadow the rest of the
+    # pool. The sweep adds constants that contain the query as characters;
+    # the enumeration, last, shows the pool itself, so the answer "the
+    # index holds no such constant" is backed by the constants the index
+    # *does* hold.
+    word_query = len(query.split()) >= _MIN_WORD_COUNT
     hit_strings = bool(page) and all(str(entry.get("kind", "")) == "string" for entry in page)
-    union_pool = query.strip() and phrase_query and hit_strings
+    union_pool = query.strip() and word_query and hit_strings
     if not page and query.strip():
         page = list(analyzer.store.search_string_substring(project_id, query, limit=offset + limit))
     if (not page or union_pool) and query.strip():
