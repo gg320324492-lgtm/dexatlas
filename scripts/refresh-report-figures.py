@@ -363,10 +363,10 @@ def measure_tests(args: list[str], env: dict[str, str] | None = None) -> Outcome
     """Run a set of tests and read both what they said and which ones sat out.
 
     The run's own report is asked for as well as its summary line: the summary
-    says how many tests skipped, the report says which. ``args`` is the
-    command that runs the tests — normally a ``pytest`` invocation, and a
-    ``coverage run -m pytest`` one when the measurement has to see the
-    subprocesses too.
+    says how many tests skipped, the report says which. ``args`` are the
+    arguments of a ``pytest`` invocation — or of a ``coverage run -m pytest``
+    one, when the measurement has to see the subprocesses too; the caller says
+    which by passing the whole command.
     """
     with tempfile.TemporaryDirectory() as directory:
         junit = Path(directory) / "outcomes.xml"
@@ -442,7 +442,7 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
         env = dict(os.environ)
         env[REPORT_PATH_ENV] = str(path)
         return measure_tests(
-            ["-m", "pytest", "--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
+            ["--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
             env=env,
         )
 
@@ -465,7 +465,7 @@ def measure_status_checks(
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
         return measure_tests(
-            ["-m", "pytest", "--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
+            ["--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
             env=env,
         )
 
