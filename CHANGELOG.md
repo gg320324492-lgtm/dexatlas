@@ -91,12 +91,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`search_symbols` 的词法命中遮蔽常量池枚举（M6 C2「诱饵遮蔽」）。**
   词法检索命中 string 类符号时，兜底链（子串检索 → 常量池枚举）不再触发：
   agent 查询 `api key` 命中诱饵常量 `api_key` 后，同池真密钥
-  `sk_live_2f8a91c4e7b3` 完全不可见，agent 据诱饵作答。修复：≥2 词的查询
-  若词法命中均为 string 类符号，则常量池枚举结果与词法命中**并集返回**——
+  `sk_live_2f8a91c4e7b3` 完全不可见，agent 据诱饵作答。修复：词法命中
+  均为 string 类符号的查询，把常量池枚举结果与词法命中**并集返回**——
   词法命中保序在前、枚举补充在后、按 (kind, name) 去重、分页作用于并集整体；
-  单词查询与命中为类/方法/字段的查询不触发并集，避免全池灌入或污染代码检索。
+  命中为类/方法/字段的查询不触发并集，避免污染代码检索。首版修复只对
+  ≥2 词的查询生效；单轮验证显示 agent 以单词 `api_key` 检索仍会只见到诱饵，
+  随后放宽到单词查询（含 FTS 拆不出词、走子串兜底的 `apikey` 一类），
+  不再按词数设限。
   回归测试 `tests/test_search_symbols_decoy.py` 在旧实现上先红
-  （`"api key"` 只返回 `['api_key']`），修复后转绿。
+  （`"api key"` 只返回 `['api_key']`），修复后转绿；单轮验证后补的
+  单词用例（`api_key`、`apikey`）在首版实现上同样红，放宽后转绿。
 - **REST API 导出的报告丢失 APK 档案事实。** 项目行过去只存哈希与大小，
   API 从行重建报告时 `ApkMetadata` 的 `dex_files` / `native_libraries` /
   `has_signed_certificate` 全部落默认值——同一项目 CLI 报告写

@@ -39,6 +39,17 @@ class Question:
     configuration: str
 
 
+#: ``SystemResult.outcome`` 的取值: 这一次运行是如何结束的.
+#:
+#: 结束方式与回答内容是两个维度: 一次被预算闸停下的运行没有作答,它
+#: 不能因为题面恰好可空答而判过; 一次作答的运行,其 limitations 记录
+#: 它没能确认什么. 旧 trace 没有这个字段,读回时是空串,仍按旧口径
+#: (failed/error)解释.
+OUTCOME_ANSWERED = "answered"
+OUTCOME_BUDGET_EXHAUSTED = "budget-exhausted"
+OUTCOME_FAILED = "failed"
+
+
 @dataclass(frozen=True, slots=True)
 class Assertion:
     """回答里的一个主张,以及它有没有证据.
@@ -84,6 +95,23 @@ class SystemResult:
 
     failed: bool = False
     """本次运行是否没能作答. 失败与"回答没有证据"是两件事. """
+
+    outcome: str = ""
+    """这次运行是如何结束的: :data:`OUTCOME_ANSWERED`、
+    :data:`OUTCOME_BUDGET_EXHAUSTED` 或 :data:`OUTCOME_FAILED`.
+
+    空串是旧 trace 的形状: 那时只有 ``failed``/``error``, 预算耗尽要从
+    error 文案里猜. 新 trace 必须写明结束方式——任务级预算闸停下的运行
+    没有作答, 不能被当作"回答了但答错", 更不能被当作"回答了且为空".
+    """
+
+    limitations: tuple[str, ...] = ()
+    """模型自己说没能确认的事, 原样保留.
+
+    一次降级作答 ("数不出来", "后端缺席所以无从读起") 的价值在
+    limitations 里, 不在 findings 里. 它们随 trace 落盘、进判分通道,
+    但永远不会变成 findings, 也不会替 ``must_contain`` 作证.
+    """
 
     error: str = ""
 
@@ -134,6 +162,8 @@ class TaskTrace:
         raw["tool_calls"] = tuple(ToolCallTrace(**item) for item in raw["tool_calls"])
         raw["findings"] = tuple(raw["findings"])
         raw["observations"] = tuple(raw.get("observations", ()))
+        raw["limitations"] = tuple(raw.get("limitations", ()))
+        raw.setdefault("outcome", "")
         return cls(
             reference=str(document["reference"]),
             task_id=str(document.get("task_id", "")),

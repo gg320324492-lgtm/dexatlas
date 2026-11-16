@@ -37,7 +37,11 @@ from benchmarks.comparison.metrics import (  # noqa: E402
     compare,
     format_value,
 )
-from benchmarks.comparison.model import Question, TaskTrace  # noqa: E402
+from benchmarks.comparison.model import (  # noqa: E402
+    OUTCOME_BUDGET_EXHAUSTED,
+    Question,
+    TaskTrace,
+)
 from benchmarks.comparison.systems import (  # noqa: E402
     AgentSystem,
     SourceTextSystem,
@@ -177,11 +181,20 @@ def _select_tasks(prefixes: Sequence[str] = ()) -> list[Task]:
 
 
 def _score(question: Question, trace: TaskTrace) -> TaskTrace:
-    """判分器:唯一允许读 marking scheme 的地方."""
+    """判分器:唯一允许读 marking scheme 的地方.
+
+    一次被任务级预算闸 (``total_tokens``) 停下的运行没有作答. 判分器在
+    判分之前先看结束方式: ``budget-exhausted`` 一律不判过——可空答的题
+    ("什么都没有") 会把空答判成通过,那是对"如实回答了没有"的判定,不是
+    对"没答就停了"的判定. 旧 trace 没有结束方式字段,维持原判分口径.
+    """
     index = int(question.reference.removeprefix("q")) - 1
     task = ALL_TASKS[index]
     answer = answer_from_result(trace.result)
-    result = check(task, answer)
+    if trace.result.outcome == OUTCOME_BUDGET_EXHAUSTED:
+        passed = False
+    else:
+        passed = check(task, answer).passed
     return TaskTrace(
         reference=trace.reference,
         task_id=task.id,
@@ -190,7 +203,7 @@ def _score(question: Question, trace: TaskTrace) -> TaskTrace:
         model=trace.model,
         max_tokens=trace.max_tokens,
         question=trace.question,
-        passed=result.passed,
+        passed=passed,
         answer_is_empty=is_empty(answer),
         expects_absence=task.expect_empty,
         result=trace.result,
@@ -870,14 +883,22 @@ def _failure_causes(run: ComparisonRun) -> list[str]:
     causes here are not the same for every configuration: one of them runs
     out of tool calls because the model keeps asking for them, and that is a
     fact about the model and the configuration, not about the analysis.
+
+    The ending a run recorded is read before its error text: a task the
+    total-token gate stopped is named as such, whether or not the error
+    mentions tokens, because "the budget stopped it" and "the answer was
+    wrong" are different facts about a measurement.
     """
     causes: dict[str, dict[str, int]] = {}
     for trace in run.traces:
         if trace.passed:
             continue
         bucket = causes.setdefault(trace.system.value, {})
+        outcome = trace.result.outcome
         error = trace.result.error
-        if "tool-call budget" in error:
+        if outcome == OUTCOME_BUDGET_EXHAUSTED:
+            key = "stopped by the total token budget"
+        elif "tool-call budget" in error:
             key = "ran out of tool calls"
         elif "iteration budget" in error:
             key = "ran out of iterations"

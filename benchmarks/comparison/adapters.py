@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from benchmarks.comparison.model import SystemResult
 from benchmarks.model import Answer, Finding
-from dexatlas.agent.evidence_verifier import parse_answer
+from dexatlas.agent.evidence_verifier import ParsedAnswer, parse_answer
 
 
 def answer_from_result(result: SystemResult) -> Answer:
@@ -35,13 +35,26 @@ def answer_from_result(result: SystemResult) -> Answer:
 
     The raw prose stays in ``text`` for ``must_contain`` matching. A system
     that names the right symbol in a sentence still gets credit for it.
+
+    The system's own ``limitations`` travel with the answer, but as
+    limitations: they are what the system said it could not settle, so they
+    are kept out of ``text`` — a limitation must never satisfy a
+    ``must_contain`` marker — and out of ``findings``. A backend-failure
+    task reads them (``Answer.limitations``), because an honest "apktool was
+    not installed" *is* the evidence that task asks for; a value task does
+    not, because "I could not read the value" is not the value.
     """
     findings = tuple(Finding(text=assertion.text) for assertion in result.assertions)
     # Only the claims themselves, not the JSON envelope or the retrieval dump.
     # Handing the scorer the whole observation would let a substring match
     # pass without the system having said anything.
     said = "\n".join(assertion.text for assertion in result.assertions)
-    return Answer(findings=findings, text=said, note="")
+    return Answer(
+        findings=findings,
+        text=said,
+        note="",
+        limitations=tuple(result.limitations),
+    )
 
 
 def is_empty(answer: Answer) -> bool:
@@ -49,6 +62,9 @@ def is_empty(answer: Answer) -> bool:
 
     Only findings count. The raw prose is kept for ``must_contain`` matching,
     but a JSON envelope that says "no conclusions" is still an empty answer.
+    A declared degradation ("the count could not be established") is also an
+    empty answer: it is honest, and it still fails a task that wanted the
+    things.
     """
     return not answer.findings
 
@@ -62,5 +78,15 @@ def prose_to_conclusions(content: str) -> tuple[str, ...]:
     An empty ``conclusions`` list (with the absence reported in
     ``limitations``) produces no claims at all.
     """
-    parsed = parse_answer(content)
-    return tuple(conclusion.statement for conclusion in parsed.conclusions)
+    return tuple(conclusion.statement for conclusion in prose_answer(content).conclusions)
+
+
+def prose_answer(content: str) -> ParsedAnswer:
+    """The model's final answer, parsed under the JSON contract.
+
+    The conclusions and the limitations are kept apart, the way the
+    instructions asked for them: a conclusion is a claim, a limitation is
+    what the model said it could not settle. A non-JSON answer is kept as
+    one unsupported claim with no limitations.
+    """
+    return parse_answer(content)

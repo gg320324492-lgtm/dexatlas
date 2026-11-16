@@ -143,7 +143,14 @@ How to answer:
   "Two DEX files" is two conclusions, one per file; the summary sentence and
   the reasoning stay in your prose around the document or in "limitations",
   and never become an extra conclusion of their own. Count the items, not
-  the sentences.
+  the sentences. Keep the counted items and nothing else in "conclusions":
+  a finding about the count answers the question, and a finding about
+  something else you happened to see does not.
+- When the reading does not establish the count — the index is incomplete,
+  the pool is too large to enumerate, the tools disagreed — say that the
+  exact count could not be established, in "limitations", and report the
+  items you did read there too. A count that is reported as a limitation is
+  an honest answer; a guessed count is not an answer at all.
 - A conclusion that names a method names it in full:
   `package.Class.name(descriptor)`. The descriptor is part of the method's
   identity — it is what separates two overloads — so `Handler.handle` is not
@@ -210,7 +217,8 @@ READY_DIRECTIVE = (
 CLOSED_DIRECTIVE = (
     "The tools are now closed: {reason}. No further tool call will be made. "
     "Answer with the JSON document described above, from what you have already "
-    'read; if the reading does not settle the question, say so in "limitations". '
+    "read; if the reading does not settle the question — including a count that "
+    'could not be established from what you read — say so in "limitations". '
     "A refusal to answer stops the task without one."
 )
 

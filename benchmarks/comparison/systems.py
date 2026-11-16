@@ -22,8 +22,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, cast, runtime_checkable
 
-from benchmarks.comparison.adapters import prose_to_conclusions
-from benchmarks.comparison.model import Assertion, Question, SystemKind, SystemResult, ToolCallTrace
+from benchmarks.comparison.adapters import prose_answer, prose_to_conclusions
+from benchmarks.comparison.model import (
+    OUTCOME_ANSWERED,
+    OUTCOME_BUDGET_EXHAUSTED,
+    OUTCOME_FAILED,
+    Assertion,
+    Question,
+    SystemKind,
+    SystemResult,
+    ToolCallTrace,
+)
 from benchmarks.comparison.retrieval import (
     RetrievalTool,
     SourceTextTools,
@@ -41,7 +50,7 @@ from dexatlas.agent.providers.base import (
     ToolSpec,
 )
 from dexatlas.agent.providers.scripted import ScriptedProvider, answer, conclusion
-from dexatlas.agent.state import ApprovalRequest, Budget, TaskStore
+from dexatlas.agent.state import ApprovalRequest, Budget, TaskStatus, TaskStore
 from dexatlas.agent.tool_executor import McpToolClient, ToolExecutor
 from dexatlas.core.evidence import EvidenceBuilder
 from dexatlas.core.models import EvidenceKind, EvidenceLevel
@@ -230,10 +239,16 @@ class _BaseSystem:
                 recovered = True
             break
 
-        parsed = prose_to_conclusions(content)
+        parsed = prose_answer(content)
         assertions = tuple(
-            Assertion(text=statement, grounded=False, locator="") for statement in parsed
+            Assertion(text=statement, grounded=False, locator="")
+            for statement in prose_to_conclusions(content)
         )
+        # The model's own limitations are part of its answer: what it could
+        # not settle is as much a fact about the task as what it claimed.
+        # They travel with the result and never become findings.
+        limitations = tuple(parsed.limitations)
+        failed = not content and bool(error)
         return SystemResult(
             answer_text=content,
             # Only what the system actually said is evidence. Handing the
@@ -248,7 +263,9 @@ class _BaseSystem:
             completion_tokens=completion_tokens,
             duration_seconds=time.monotonic() - started,
             recovered=recovered,
-            failed=not content and bool(error),
+            outcome=OUTCOME_FAILED if failed else OUTCOME_ANSWERED,
+            limitations=limitations,
+            failed=failed,
             error=error,
         )
 
@@ -348,6 +365,8 @@ class AgentSystem:
         max_seconds: float = 600.0,
         max_steps: int | None = None,
         max_sensitive_calls: int | None = None,
+        model_attempts: int = 3,
+        model_backoff: float = 0.0,
     ) -> None:
         self._analyzer = analyzer
         # 兼容两种形态: 新代码按 Analyze 配置分组 (题面 no-jadx/no-apktool
@@ -396,6 +415,16 @@ class AgentSystem:
         # the task until the run ended, and the measurement recorded the
         # gate, not the agent. ``None`` keeps the planner's default.
         self.max_sensitive_calls = max_sensitive_calls
+        # How many times a model request is tried before the task gives up on
+        # it, and how long to wait between tries. The M6 runs pinned this at
+        # 1, which meant the provider's own retryable failures — a 5xx, a
+        # rate limit, an empty message — never got the second attempt the
+        # orchestrator is built to make, and the measurement recorded the
+        # endpoint's bad minute as the agent's answer. The default is the
+        # orchestrator's own; a measurement that wants the old behaviour
+        # passes 1.
+        self.model_attempts = max(1, model_attempts)
+        self.model_backoff = model_backoff
 
     @property
     def provider_name(self) -> str:
@@ -481,7 +510,8 @@ class AgentSystem:
                 max_seconds=self.max_seconds,
             ),
             executor=ToolExecutor(client, timeout=10.0),
-            model_attempts=1,
+            model_attempts=self.model_attempts,
+            model_backoff=self.model_backoff,
         )
         try:
             state = orchestrator.run(question.question, project_id=analysis.result.project.id)
@@ -489,6 +519,7 @@ class AgentSystem:
         except Exception as exc:  # 一次 agent 失败是 trace 里的一行,不是崩溃
             return SystemResult(
                 duration_seconds=time.monotonic() - started,
+                outcome=OUTCOME_FAILED,
                 failed=True,
                 error=f"{type(exc).__name__}: {exc}",
             )
@@ -523,7 +554,32 @@ class AgentSystem:
             for record in conclusions
         )
         findings = tuple(record.summary for record in conclusions)
-        answer_text = " ".join(assertion.text for assertion in assertions)
+        # How the task ended is its own fact. A task the total-token gate
+        # stopped did not answer: the orchestrator says so in its status, and
+        # the result carries that outcome explicitly so the trace and the
+        # report can name it instead of guessing from the error text. An
+        # answered task keeps the model's own limitations — what it could not
+        # settle — as its declared degradation.
+        limitations = tuple(report.limitations)
+        # The prose answer carries the limitations beside the conclusions.
+        # The M6 retest graded two honest ``conclusions=[]`` answers as empty
+        # because only the conclusions reached the prose: an answer that said
+        # "apktool was not installed, so there is no manifest" arrived at the
+        # scorer as silence. The limitations are prose here — the scorer's
+        # backend-failure predicate reads them from this text — and they stay
+        # out of ``findings`` and ``assertions``: a degradation is not a
+        # claim about the APK, and an ``expect_empty`` task must keep
+        # rejecting one as a finding. Only an answered task has prose to
+        # speak; a failed or stopped task keeps its error instead.
+        answer_text = " ".join(
+            text for text in (*(assertion.text for assertion in assertions), *limitations) if text
+        )
+        if state.status is TaskStatus.BUDGET_EXHAUSTED:
+            outcome: str = OUTCOME_BUDGET_EXHAUSTED
+        elif state.status is TaskStatus.COMPLETED:
+            outcome = OUTCOME_ANSWERED
+        else:
+            outcome = OUTCOME_FAILED
         return SystemResult(
             answer_text=answer_text,
             findings=findings,
@@ -532,7 +588,9 @@ class AgentSystem:
             prompt_tokens=report.usage.tokens,
             duration_seconds=time.monotonic() - started,
             recovered=any(not call.ok for call in calls) and bool(answer_text),
-            failed=not answer_text,
+            outcome=outcome,
+            limitations=limitations,
+            failed=outcome != OUTCOME_ANSWERED,
             error=report.error or "",
         )
 

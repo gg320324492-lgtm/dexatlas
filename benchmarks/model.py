@@ -198,6 +198,21 @@ class Answer:
     Empty for DexAtlas's own API, whose answers are lists of evidence.
     """
 
+    limitations: tuple[str, ...] = ()
+    """What the system said it could not settle, in its own words.
+
+    A system that answers the JSON contract puts its degradations here —
+    "the count could not be established", "apktool was not installed, so
+    there is no manifest". Limitations are the honest shape of a partial
+    answer, and the backend-failure predicate reads them: an answer that
+    names a backend's failure in its limitations has recorded that failure.
+
+    They are evidence of absence or of an unfinished reading, never evidence
+    of a value: nothing here is checked against ``must_contain``, and nothing
+    here becomes a finding. A system that wants credit for a value has to
+    produce the value in a finding or in ``text``.
+    """
+
 
 @dataclass(frozen=True, slots=True)
 class Context:
@@ -398,6 +413,11 @@ def _records_backend_failure(task: Task, answer: Answer) -> bool:
     candidates = [finding.text for finding in answer.findings]
     if answer.text:
         candidates.append(answer.text)
+    # A partial configuration's honest answer puts the failure in its
+    # limitations ("apktool was not installed, so there is no manifest") with
+    # no findings at all. That is a record of the failure, not a claim about
+    # the APK, so the limitations are candidates here and nowhere else.
+    candidates.extend(answer.limitations)
     return all(
         any(
             _contains(text, backend) and any(_contains(text, marker) for marker in _FAILURE_MARKERS)
@@ -474,11 +494,14 @@ def check(task: Task, answer: Answer) -> CheckResult:
         and task.expect_count is None
         and not answer.findings
         and not answer.text
+        and not answer.limitations
     ):
         # A task that only forbids something checks nothing when the answer is
         # empty: "the evidence does not say X" is true of no evidence at all.
         # So a task of this shape has to have produced something to be wrong
-        # about.
+        # about. An answer that declared its limitations has produced
+        # something — what it could not settle is a fact about the task, and
+        # the backend-failure predicate above has already read it.
         return CheckResult(
             task=task,
             passed=False,

@@ -164,6 +164,18 @@ class OpenAICompatibleProvider:
             # error. It is a transient endpoint failure instead: raise it as
             # retryable, so the orchestrator's backoff asks again.
             raise ProviderError("the model endpoint answered with an empty message", retryable=True)
+        if isinstance(content, str) and _is_tool_call_leak(content):
+            # A model that speaks the tool-call protocol inside its prose —
+            # MiniMax's occasional ``<invoke>`` blocks — has not answered:
+            # the text is a protocol fragment, and parsing it as an answer
+            # let XML reach a benchmark as the final word on a question. The
+            # turn is broken the same way an empty message is, and retryable
+            # for the same reason: asking again is how the loop recovers a
+            # transient model failure.
+            raise ProviderError(
+                "the model answered with a tool-call protocol fragment instead of an answer",
+                retryable=True,
+            )
         usage = body.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}
         return ModelResponse(
@@ -228,6 +240,35 @@ def _as_int(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0
     return int(value)
+
+
+#: The tool-call protocol tags a model may leak into its prose. The open
+#: tag is what the leak looks like — a ``<invoke>`` the model wrote instead
+#: of an answer, sometimes with a ``<parameter>`` block inside it. Prose
+#: that only *mentions* one of these does not match: the tag has to appear
+#: with its bracket, which ordinary XML discussion rarely carries.
+_TOOL_CALL_LEAK_MARKERS: tuple[str, ...] = (
+    "<invoke",
+    "</invoke>",
+    "<function_call",
+    "<|tool_calls|>",
+    "<tool_call>",
+)
+
+
+def _is_tool_call_leak(content: str) -> bool:
+    """Whether the content is a tool-call protocol fragment, not an answer.
+
+    A model that is speaking the *tool-call* channel inside its ``content``
+    — an ``<invoke name="...">`` block with parameters — has not answered
+    the question. The fragment is raised as a retryable provider failure, so
+    the loop asks again, instead of the XML reaching a report as prose.
+    """
+    text = content.strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    return any(marker in lowered for marker in _TOOL_CALL_LEAK_MARKERS)
 
 
 __all__ = ["OpenAICompatibleProvider", "build_messages", "build_tools"]
