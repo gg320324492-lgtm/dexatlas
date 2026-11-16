@@ -10,6 +10,9 @@
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
 > （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）
+>
+> **第一次来？** 先看一页版[读者执行摘要](m10-executive-summary.md)；
+> 邀请与独立性要求见[验收邀请函](m10-invitation-template.md)。
 
 ## 0. 这份包是什么、不是什么
 
