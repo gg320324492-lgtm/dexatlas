@@ -19,6 +19,7 @@ pipeline is driven with a stand-in backend that says it was truncated.
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -50,6 +51,21 @@ class _NoisyBackend(Backend):
         return "1.0"
 
 
+def _coverage_free_env() -> dict[str, str]:
+    """The process environment without the coverage measurement's hooks.
+
+    A coverage measurement sets ``COVERAGE_PROCESS_START`` so that the
+    subprocesses it starts measure themselves. A subprocess whose rc file has
+    gone missing prints a traceback onto its stderr instead — two kilobytes of
+    it — and a test that asks for ten bytes of stderr then reads a stream the
+    cap had to cut. That traceback is the measurement's bookkeeping, not data
+    the tool produced, so the tests hand the runner an environment without it.
+    """
+    return {
+        name: value for name, value in os.environ.items() if not name.startswith("COVERAGE_PROCESS")
+    }
+
+
 def _a_script_that_writes(path: Path, amount: int) -> Path:
     """A script that writes ``amount`` bytes to stdout and to stderr."""
     path.write_text(
@@ -74,7 +90,9 @@ def test_a_backend_that_writes_too_much_says_that_it_did(
     script = _a_script_that_writes(tmp_path / "noisy.py", 5000)
     settings.tool_max_output_bytes = CAP
 
-    outcome = _NoisyBackend(settings).run(ToolInvocation(argv=[sys.executable, str(script)]))
+    outcome = _NoisyBackend(settings).run(
+        ToolInvocation(argv=[sys.executable, str(script)], env=_coverage_free_env())
+    )
 
     assert outcome.truncated == ("stdout", "stderr"), "the cut output was not reported"
 
@@ -89,7 +107,9 @@ def test_what_is_kept_is_the_first_of_the_output(settings: Settings, tmp_path: P
     script = _a_script_that_writes(tmp_path / "noisy.py", 5000)
     settings.tool_max_output_bytes = CAP
 
-    outcome = _NoisyBackend(settings).run(ToolInvocation(argv=[sys.executable, str(script)]))
+    outcome = _NoisyBackend(settings).run(
+        ToolInvocation(argv=[sys.executable, str(script)], env=_coverage_free_env())
+    )
 
     assert len(outcome.stdout) == CAP
     assert outcome.stdout == "x" * CAP
@@ -104,7 +124,9 @@ def test_an_output_that_fits_is_not_reported_as_cut(settings: Settings, tmp_path
     script = _a_script_that_writes(tmp_path / "quiet.py", 10)
     settings.tool_max_output_bytes = CAP
 
-    outcome = _NoisyBackend(settings).run(ToolInvocation(argv=[sys.executable, str(script)]))
+    outcome = _NoisyBackend(settings).run(
+        ToolInvocation(argv=[sys.executable, str(script)], env=_coverage_free_env())
+    )
 
     assert outcome.truncated == ()
     assert outcome.ok
