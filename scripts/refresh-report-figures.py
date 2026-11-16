@@ -399,37 +399,37 @@ def measure_code_tests() -> Outcome:
     afterwards. Without it the androguard worker — a subprocess by design —
     would be reported as 0%, a statement about the measurement, not the code.
     """
-    # The path carries this process's id. A config file with a fixed name is a
-    # footgun: the environment variable outlives the run that set it — a
-    # subprocess started later, by anything, would read the file — and a
-    # concurrent measurement (or a leftover from an earlier one) deleting or
-    # rewriting the file turns into a `ConfigError` printed onto some backend's
-    # stderr, which a truncation test then counts as output. A per-process name
-    # keeps one measurement's configuration from being another's.
-    rc_path = REPO_ROOT / f".coveragerc-measure-{os.getpid()}.ini"
+    # The rc file lives in the scratch area and is *left in place* after the
+    # measurement. Every subprocess the suite starts while
+    # ``COVERAGE_PROCESS_START`` names it — the androguard workers, the
+    # launcher grandchildren — reads it from its own ``site`` hook, and a file
+    # that disappears under them is a ``ConfigError`` printed onto some
+    # backend's stderr instead of coverage data. The name is fixed and the
+    # content is rewritten at the start of every measurement, so a stale copy
+    # never survives to describe an older tree; the scratch area keeps it out
+    # of the repository and out of ``discard_stale_coverage``'s way.
+    rc_path = REPO_ROOT / ".scratch" / "coveragerc-measure.ini"
+    rc_path.parent.mkdir(exist_ok=True)
     rc_path.write_text(COVERAGE_RC, encoding="utf-8")
-    try:
-        env = dict(os.environ)
-        env["COVERAGE_PROCESS_START"] = str(rc_path)
-        outcome = measure_tests(
-            [
-                sys.executable,
-                "-m",
-                "coverage",
-                "run",
-                f"--rcfile={rc_path}",
-                "-m",
-                "pytest",
-                "-k",
-                f"not {REPORT_CHECK} and not {STATUS_CHECK}",
-            ],
-            env=env,
-            full_command=True,
-        )
-        run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}")
-        return outcome
-    finally:
-        rc_path.unlink(missing_ok=True)
+    env = dict(os.environ)
+    env["COVERAGE_PROCESS_START"] = str(rc_path)
+    outcome = measure_tests(
+        [
+            sys.executable,
+            "-m",
+            "coverage",
+            "run",
+            f"--rcfile={rc_path}",
+            "-m",
+            "pytest",
+            "-k",
+            f"not {REPORT_CHECK} and not {STATUS_CHECK}",
+        ],
+        env=env,
+        full_command=True,
+    )
+    run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}")
+    return outcome
 
 
 def measure_report_checks(candidate: str, report_path: Path) -> Outcome:

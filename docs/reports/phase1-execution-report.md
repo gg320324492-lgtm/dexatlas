@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | <!--fig:tests.total-->1542<!--/fig-->（<!--fig:tests.fast-->1395<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.9%<!--/fig-->**（<!--fig:coverage.covered-->6859<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行） | ≥80% |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.1%<!--/fig-->**（<!--fig:coverage.covered-->6947<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -89,15 +89,15 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 <!--fig:coverage.weak_modules-->
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
-| `tools/androguard/worker.py` | 0.0% | 112 / 112 |
 | `workbench/__main__.py` | 58.0% | 29 / 69 |
+| `tools/androguard/worker.py` | 72.3% | 31 / 112 |
 | `mcp/server.py` | 78.9% | 12 / 57 |
 | `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
 | `cli/console.py` | 82.4% | 6 / 34 |
-| `tools/androguard/adapter.py` | 86.8% | 38 / 287 |
 | `tools/base.py` | 88.4% | 21 / 181 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
+| `tools/androguard/adapter.py` | 88.9% | 32 / 287 |
 | `reports/evidence_package.py` | 88.9% | 17 / 153 |
 | `agent/tool_executor.py` | 89.4% | 30 / 283 |
 <!--/fig-->
@@ -114,8 +114,8 @@ v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测�
 （13 个测试）在两个平台上跑过，那些测试断言的正是它做对了什么。
 本次测量改为 subprocess-aware（`COVERAGE_PROCESS_START` + parallel 数据合并），
 worker 进程的执行也并入统计，现在它记为
-**<!--fig:coverage.file.tools/androguard/worker.py.pct-->0.0%<!--/fig-->**
-（<!--fig:coverage.file.tools/androguard/worker.py.missed-->112<!--/fig-->/
+**<!--fig:coverage.file.tools/androguard/worker.py.pct-->72.3%<!--/fig-->**
+（<!--fig:coverage.file.tools/androguard/worker.py.missed-->31<!--/fig-->/
 <!--fig:coverage.file.tools/androguard/worker.py.statements-->112<!--/fig--> 未覆盖）。
 未覆盖的仍是错误分支（作业对象句柄失败、结果文件写不进等 Windows 专属路径），
 不是解析主逻辑。
@@ -134,7 +134,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.9%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.1%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -867,7 +867,7 @@ uv run python scripts/refresh-report-figures.py
 ```bash
 uv run pytest          # 收集 <!--fig:tests.total-->1542<!--/fig--> 个：<!--fig:tests.fast-->1395<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.9%<!--/fig-->（<!--fig:coverage.covered-->6859<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行）
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.1%<!--/fig-->（<!--fig:coverage.covered-->6947<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行）
                       # 完整环境下的结果：<!--fig:suite.passed-->1542<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
@@ -1040,9 +1040,9 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "reports/summary.py": [25, 2],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [287, 38],
-      "tools/androguard/isolation.py": [97, 5],
-      "tools/androguard/worker.py": [112, 112],
+      "tools/androguard/adapter.py": [287, 32],
+      "tools/androguard/isolation.py": [97, 4],
+      "tools/androguard/worker.py": [112, 31],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [317, 22],
       "tools/base.py": [181, 21],
@@ -1055,7 +1055,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 602,
+    "missing": 514,
     "statements": 7461
   },
   "history": {
@@ -1073,7 +1073,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:6bf86e3904395af0d359bd370f6487455c1feacd74e7774371a8b26ad0db2a7c",
+  "source_fingerprint": "sha256:e19c3633fb849501967830aad290a576b26691767ffd213b22d5dccb103192c5",
   "suite": {
     "failed": 0,
     "passed": 1542,
