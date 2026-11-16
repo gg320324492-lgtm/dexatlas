@@ -75,6 +75,31 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **M6 层级 2 执行层修复成套落地：降级作答进判分、预算耗尽单列、端点故障
+  可重试。** 针对三轮复测失败分析
+  （`docs/benchmarks/m6-level2-retest3-failure-analysis.md`）归类的执行层故障
+  与回答宽度缺口，在单轮验证（`1a7add6` A 类空响应、`192382f` C2 诱饵遮蔽）
+  之后补齐：
+  - **limitations 纳入判分**：`SystemResult` 新增 `limitations` 随 trace 落盘；
+    后端失效类任务（如 `partial.no-apktool-*`）的「后端缺席读不到」经
+    `Answer.limitations` 进判分通道——它本身就是该题要的证据。limitations
+    永不进 findings、永不满足 `must_contain`。
+  - **预算耗尽单列**：`SystemResult.outcome` 取 `answered`/`budget-exhausted`/
+    `failed`；判分器对 `budget-exhausted` 一律不判过，报告如实命名，不再从
+    error 文案里推断。
+  - **端点故障重试启用**：`AgentSystem` 新增 `model_attempts`（默认 3）与
+    `model_backoff`，替代写死的单次请求；retryable 端点故障现在有重试机会。
+  - **XML 工具调用泄漏容错**：最终回答含 `<invoke>`、`<|tool_calls|>` 等
+    协议泄漏标记时按 retryable 端点故障处理，泄漏文本不进最终答案。
+  - **C2 并集放宽到单词查询**：单轮验证显示单词 `api_key` 检索仍只见诱饵；
+    并集规则不再按词数设限（含 FTS 拆不出词、走子串兜底的 `apikey` 类），
+    命中类/方法/字段的查询仍不并集。同文件上文 C2 条目已同步改写。
+  - 另在系统提示补两条作答纪律（方法身份题枚举同类全部方法；计数读不出时
+    如实写入 limitations 并列出已读项）——提示词级软修复，不保证每轮触发。
+  回归测试：`tests/test_comparison_output_contract.py`（6 用例，旧实现先红）、
+  `tests/test_search_symbols_decoy.py` 单词用例（首版实现上先红）。
+  窄验证（6 题 × 3 轮，53/54 条 trace）显示 4/6 题转化、确定性子集 4/5；
+  修复后的完整效果见三轮重测报告（`docs/benchmarks/m6-level2-retest4.md`）。
 - **模型端点返回空 assistant 消息被记为解题失败（M6 A 类「降级空响应」）。**
   OpenAI 兼容端点偶发返回 `200`，其 `choices[0].message.content` 为空
   （`completion_tokens=0`）且无 `tool_calls`。`openai_compat.parse_response`
@@ -298,8 +323,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   完成/被截断（5）」「失败（3）」。0/1/2/3/4 的含义不变；此前截断的运行
   退出码是 0，依赖旧退出码的调用方需注意这一公共契约变更。
 
+- **M6 层级 2 修复后窄验证的 trace 与不完整审计。** 新增
+  `docs/benchmarks/m6-level2-narrow-verify-traces.json`（6 题 × 3 配置 × 3 轮，
+  应为 54 条，实捕 53 条）与 `docs/benchmarks/m6-level2-narrow-verify-incomplete.md`
+  （由新脚本 `scripts/m6_level2_narrow_verify_audit.py` 生成），并新增完整报告
+  脚本 `scripts/m6_level2_narrow_verify_report.py`——trace 不足 54 条时拒绝
+  生成完整报告（该拒绝保持有效）。本轮验证执行层成套修复（limitations 判分、
+  预算单列、重试启用、XML 泄漏容错、C2 单词并集）在 `claude/m6-level2-verify`
+  `31a7b45` 上的效果：DexAtlas 6 题中 4 题转化（每题 ≥2 轮正确），确定性修复
+  子集 4/5；`strings.api-key.demo` r2 出现 1 条空答，`resources.app-name.demo`
+  r1 与 `multidex.dex-file-count` r1 预算耗尽。运行不完整：原授权 400,000
+  tokens，追加至 406,000 后仍超支，实际 410,256 tokens，缺失的 1 条 trace
+  未跑。窄闸门（≥4/6 且 ≥3/5）在已捕获轮次上达标，但不构成 54-trace 验收判定。
+
+- **M6 层级 2 修复后三轮完整重测报告（B1 验收测量）。** 新增
+  `docs/benchmarks/m6-level2-retest4.md` 与三个 trace 文件
+  （`docs/benchmarks/m6-level2-retest4-traces-r1.json`、`-r2.json`、`-r3.json`，
+  各 20 题 × 3 配置 = 60 条，合计 180 条），全部数字由新脚本
+  `scripts/m6_level2_retest4_report.py` 从 trace 重算生成，任一轮 trace
+  缺失或不完整即拒绝生成报告。结果：MiniMax-M3.1-Flash 上 DexAtlas 逐轮
+  15/20、16/20、18/20，三轮合计 49/60 = 81.7%；A 源码文本 21/60、B 结构化
+  检索 21/60。**未达 B1 验收线（每轮 ≥16/20 且三轮合计 ≥54/60）**：r1
+  低于单轮线，三轮合计 81.7% 低于 90%。与修复前复测（retest3）合计分相同，
+  失败构成已从执行层故障转为判分不过与个别题预算耗尽/errored
+  （`multidex.dex-file-count` 三轮均 errored；`strings.api-key.demo` r3
+  预算耗尽）。三轮 trace 合计 1,182,356 tokens，在 1,200,000 授权之内，
+  无熔断中止、无 not-run；判分失败与空答未重跑。B1 保持未关闭，后续处置
+  待定。
+
 ### Fixed
 
+- **截断测试的子进程环境剥离 coverage 钩子（与测量脚本解耦）。**
+  `tests/test_output_truncation.py` 的用例把 `ToolInvocation.env` 换成
+  `_coverage_free_env()`——去掉 `COVERAGE_PROCESS*` 变量后的环境副本。
+  原因：coverage 测量形态下，测试用 venv python 启动的子进程会经
+  `a1_coverage.pth` 钩子自启 coverage；一旦 rc 文件读不到（被并发测量
+  删除/路径失效），钩子向子进程 stderr 打约 2KB 的 ConfigError 回栈，把
+  只写 10 字节的安静脚本顶过 1024 字节上限，测试误判「输出被截断」。这段
+  回栈是测量自身的簿记，不是工具产出。回归：污染环境下旧实现红
+  （`test_an_output_that_fits_is_not_reported_as_cut` 判 `('stderr',)`），
+  新实现绿。
+- **测量脚本的 coverage rc 文件改为按进程命名。**
+  `scripts/refresh-report-figures.py` 的 `.coveragerc-measure.ini` 改为
+  `.coveragerc-measure-<pid>.ini`：固定文件名会被并发的测量或残留进程
+  删除/改写，使 `COVERAGE_PROCESS_START` 指向失效配置。同时
+  `measure_tests` 的调用约定显式化：`args` 默认是 pytest 参数、函数补
+  `sys.executable -m pytest` 前缀，`full_command=True` 表示 args 已是完整
+  命令（`coverage run -m pytest` 形态）原样运行——修正自检两轮的命令
+  拼装（此前以 WinError 2 崩溃）。
 - **`docs/install.md` 的安装命令与实际 extras 组合对齐（Phase 3 M8）。**
   安装节改为 lockfile 驱动的 `uv sync --extra dev --extra analysis --extra mcp
   --extra demo`，并逐项说明四个 extra 的用途，以及「仅 `analysis`」最小安装
