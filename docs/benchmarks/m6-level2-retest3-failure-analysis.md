@@ -33,7 +33,7 @@
 - **本地复现（零成本）**：在当前树上对 demo.apk 直接调 `search_symbols`：查询 `api key` 只返回诱饵 `api_key`（词法匹配把 `api_key` 拆成 api+key 两词命中）；查询 `sk_live`/`live`/`2f8a91` 都能返回真密钥；**完整常量枚举（63 条）里 `sk_live_2f8a91c4e7b3` 在列**，但枚举兜底只在词法检索**完全为空**时才触发（`src/dexatlas/mcp/tools/symbols.py` 的 `if not page` 链）——诱饵命中**遮蔽**了枚举兜底。
 - **根因**：**诱饵遮蔽**。修复 2（整字面量契约）让密钥变得可检索，但没有解决「词法检索已有命中时不再枚举常量池」的遮蔽问题。
 - **可修复性**：高。候选修复（代码层，非提示词）：当查询像「找密钥/凭证」这类任务时，把常量池枚举与词法命中**并集返回**；或在 string 类命中旁附带「同池其他高熵常量」。r3 通过是模型方差（agent 恰好也搜了别的词），不是代码变好。
-- **已修复（本提交）**：采取通用并集规则——`search_symbols` 对 ≥2 词且词法命中均为 string 类符号的查询，把常量池枚举与词法命中并集返回（词法保序在前、枚举在后、去重、分页作用于并集）；单词查询与命中为类/方法/字段的查询不触发。回归测试 `tests/test_search_symbols_decoy.py`（旧实现红：`"api key"` 仅返回 `['api_key']`；新实现绿：`api_key` 与 `sk_live_2f8a91c4e7b3` 同返）。
+- **已修复（本提交）**：采取通用并集规则——`search_symbols` 对词法命中均为 string 类符号的查询，把常量池枚举与词法命中并集返回（词法保序在前、枚举在后、去重、分页作用于并集）；命中为类/方法/字段的查询不触发。首版只对 ≥2 词的查询生效；单轮验证（`m6-level2-verify`）显示 agent 以单词 `api_key` 检索仍只见诱饵，随后放宽到单词查询。回归测试 `tests/test_search_symbols_decoy.py`（旧实现红：`"api key"` 仅返回 `['api_key']`；新实现绿：`api_key` 与 `sk_live_2f8a91c4e7b3` 同返；首版实现红：单词 `api_key` 仅返回 `['api_key']`，放宽后绿）。
 
 ### 2.3 `manifest.permission.count-obfuscated`（r2、r3 失败，r1 通过）
 
