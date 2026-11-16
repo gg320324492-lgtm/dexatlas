@@ -359,18 +359,21 @@ def read_junit_outcomes(path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
     return tuple(sorted(skipped)), tuple(sorted(xfailed))
 
 
-def measure_tests(args: list[str], env: dict[str, str] | None = None) -> Outcome:
+def measure_tests(
+    args: list[str], env: dict[str, str] | None = None, *, full_command: bool = False
+) -> Outcome:
     """Run a set of tests and read both what they said and which ones sat out.
 
     The run's own report is asked for as well as its summary line: the summary
     says how many tests skipped, the report says which. ``args`` are the
-    arguments of a ``pytest`` invocation — or of a ``coverage run -m pytest``
-    one, when the measurement has to see the subprocesses too; the caller says
-    which by passing the whole command.
+    arguments of a ``pytest`` invocation; ``full_command`` says that they are
+    already a whole command — the ``coverage run -m pytest`` form the
+    subprocess-aware measurement uses — and are to run as they stand.
     """
+    command = args if full_command else [sys.executable, "-m", "pytest", *args]
     with tempfile.TemporaryDirectory() as directory:
         junit = Path(directory) / "outcomes.xml"
-        result = run(*args, f"--junitxml={junit}", env=env)
+        result = run(*command, f"--junitxml={junit}", env=env)
         skipped, xfailed = read_junit_outcomes(junit)
     outcome = read_outcome(result.stdout)
     return Outcome(
@@ -421,6 +424,7 @@ def measure_code_tests() -> Outcome:
                 f"not {REPORT_CHECK} and not {STATUS_CHECK}",
             ],
             env=env,
+            full_command=True,
         )
         run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}")
         return outcome
