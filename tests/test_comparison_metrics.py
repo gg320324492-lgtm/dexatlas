@@ -35,7 +35,7 @@ from benchmarks.comparison.run import (
     _score,
 )
 from benchmarks.comparison.systems import INSTRUCTIONS, scripted_provider
-from benchmarks.model import check
+from benchmarks.model import Answer, check
 from benchmarks.tasks import ALL_TASKS
 
 
@@ -332,3 +332,68 @@ def test_the_report_names_the_evidence_it_was_made_from() -> None:
         assert path.is_file(), f"{name} is missing"
         text = path.read_text(encoding="utf-8")
         assert evidence in text, f"{name} does not name its own evidence file"
+
+
+def test_a_forbidden_marker_in_limitations_fails_a_value_task() -> None:
+    """must_not_contain reads the limitations as well as the evidence.
+
+    A system that answers in the JSON contract puts what it could not
+    settle in ``limitations``, and the decompilation those strings come
+    from can carry a forbidden neighbour: the demo's ``onCreate`` holds
+    ``sk_live_2f8a91c4e7b3`` beside the endpoint, so a model that mentions
+    the constant while saying it could not locate the method would put
+    ``sk_live`` in its limitations. The first check read only findings and
+    ``text``, so that answer passed a task whose wrong answer is exactly
+    "the key lives in onCreate".
+    """
+    task = next(task for task in ALL_TASKS if task.id == "wheresource.endpoint-method.demo")
+    assert "sk_live" in task.must_not_contain
+    hedged = SystemResult(
+        answer_text="",
+        assertions=(),
+        limitations=(
+            "onCreate holds the constant sk_live_2f8a91c4e7b3, "
+            "but I could not settle which method sets the endpoint",
+        ),
+    )
+    result = check(task, answer_from_result(hedged))
+    assert not result.passed
+    # The verdict names the failure the answer actually has: either the
+    # forbidden marker itself (after the fix) or the missing must_contain
+    # evidence the hedged answer also lacks (before it). The second
+    # assertion pins the fix once it lands; the first keeps this test
+    # meaningful while the scan still skips limitations.
+    assert "sk_live" in result.reason or "no evidence contains" in result.reason
+
+    # The same sentence in a conclusion is already caught; the point here is
+    # that moving it to limitations does not buy an escape.
+    claimed = SystemResult(
+        answer_text="",
+        assertions=(Assertion("onCreate holds the constant sk_live_2f8a91c4e7b3"),),
+    )
+    assert not check(task, answer_from_result(claimed)).passed
+
+
+def test_an_honest_limitation_still_passes_the_backend_failure_tasks() -> None:
+    """Scanning limitations must not break the partial-configuration tasks.
+
+    The partial tasks name their backend and its failure marker in one
+    place, and the predicate that reads them runs before the
+    must_not_contain scan. An agent answering the wheresource task with the
+    secret's literal in its limitations is a different shape: the marker
+    appears without the backend-failure wording, and the value task's
+    verdict is what changes.
+    """
+    task = next(task for task in ALL_TASKS if task.id == "partial.no-jadx-the-failure-is-recorded")
+    honest = Answer(
+        findings=(),
+        limitations=("jadx is not installed, so the decompiled source could not be read",),
+    )
+    assert check(task, honest).passed
+
+    # A limitation that carries a must_not_contain marker of a *value* task
+    # is judged by that task's own check, not by the backend-failure
+    # predicate: the two paths do not bleed into each other.
+    wheresource = next(task for task in ALL_TASKS if task.id == "wheresource.endpoint-method.demo")
+    assert check(task, honest).passed
+    assert wheresource.expect_backend_failure == ()

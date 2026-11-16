@@ -165,17 +165,28 @@ class OpenAICompatibleProvider:
             # retryable, so the orchestrator's backoff asks again.
             raise ProviderError("the model endpoint answered with an empty message", retryable=True)
         if isinstance(content, str) and _is_tool_call_leak(content):
-            # A model that speaks the tool-call protocol inside its prose —
-            # MiniMax's occasional ``<invoke>`` blocks — has not answered:
-            # the text is a protocol fragment, and parsing it as an answer
-            # let XML reach a benchmark as the final word on a question. The
-            # turn is broken the same way an empty message is, and retryable
-            # for the same reason: asking again is how the loop recovers a
-            # transient model failure.
-            raise ProviderError(
-                "the model answered with a tool-call protocol fragment instead of an answer",
-                retryable=True,
-            )
+            if tool_calls:
+                # The same message can carry a leaked ``<invoke>`` fragment
+                # in ``content`` *and* well-formed tool calls. The calls are
+                # the turn's actionable part, so they win: the fragment is
+                # dropped (it is protocol, not prose, and it must not reach
+                # a report as an answer), and the calls are returned. Raising
+                # here would discard an answer the endpoint did give and
+                # spend a retry on a model that would answer the same way
+                # again.
+                content = ""
+            else:
+                # A model that speaks the tool-call protocol inside its prose
+                # — MiniMax's occasional ``<invoke>`` blocks — has not
+                # answered: the text is a protocol fragment, and parsing it
+                # as an answer let XML reach a benchmark as the final word on
+                # a question. The turn is broken the same way an empty
+                # message is, and retryable for the same reason: asking again
+                # is how the loop recovers a transient model failure.
+                raise ProviderError(
+                    "the model answered with a tool-call protocol fragment instead of an answer",
+                    retryable=True,
+                )
         usage = body.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}
         return ModelResponse(
