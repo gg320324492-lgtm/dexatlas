@@ -59,6 +59,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **模型端点返回空 assistant 消息被记为解题失败（M6 A 类「降级空响应」）。**
+  OpenAI 兼容端点偶发返回 `200`，其 `choices[0].message.content` 为空
+  （`completion_tokens=0`）且无 `tool_calls`。`openai_compat.parse_response`
+  过去把它原样解析为 `ModelResponse(content="")`：orchestrator 记 COMPLETED、
+  0 findings，benchmark 判分以 `failed = not answer_text` 标失败且 `error`
+  留空——端点抽风被计成解题失败（M6 三轮复测 r1
+  `partial.no-apktool-there-is-no-manifest`、r2 `strings.api-key.demo` 即此因）。
+  修复：content 为空/None 且无 tool_calls 时抛
+  `ProviderError("the model endpoint answered with an empty message",
+  retryable=True)`，走 orchestrator `_ask` 既有的退避重试；content 非空或带
+  tool_calls 的正常工具轮不受影响。回归测试 `tests/test_openai_empty_completion.py`
+  在旧实现上先红（空 completion 不抛错），修复后转绿；orchestrator 层测试
+  证明 retryable 错误触发重试、任务以非空答案完成。
 - **`search_symbols` 的词法命中遮蔽常量池枚举（M6 C2「诱饵遮蔽」）。**
   词法检索命中 string 类符号时，兜底链（子串检索 → 常量池枚举）不再触发：
   agent 查询 `api key` 命中诱饵常量 `api_key` 后，同池真密钥

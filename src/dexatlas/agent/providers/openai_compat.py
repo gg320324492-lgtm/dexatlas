@@ -155,11 +155,20 @@ class OpenAICompatibleProvider:
             raise ProviderError("the model endpoint answered without a message", retryable=False)
 
         content = message.get("content")
+        tool_calls = _read_tool_calls(message.get("tool_calls"))
+        if not (isinstance(content, str) and content.strip()) and not tool_calls:
+            # An endpoint that answers with an empty message — no content and
+            # no tool calls — has not answered. Parsing it as a normal turn
+            # made the orchestration record a completed task with zero
+            # findings, which the benchmark then graded as a failure with no
+            # error. It is a transient endpoint failure instead: raise it as
+            # retryable, so the orchestrator's backoff asks again.
+            raise ProviderError("the model endpoint answered with an empty message", retryable=True)
         usage = body.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}
         return ModelResponse(
             content=content if isinstance(content, str) else "",
-            tool_calls=_read_tool_calls(message.get("tool_calls")),
+            tool_calls=tool_calls,
             model=str(body.get("model", self.model)),
             prompt_tokens=_as_int(usage_map.get("prompt_tokens")),
             completion_tokens=_as_int(usage_map.get("completion_tokens")),

@@ -57,7 +57,7 @@
 
 - 形态：`completion_tokens=0`、`answer_text` 空、`error` 空、工具调用都 ok。这是 MiniMax 端点偶发的**空 assistant 消息**（温度 0 下仍会出现）。
 - 现有处理链：`orchestrator._finish` 把空回答记为 COMPLETED、0 findings；`systems.py` 以 `failed = not answer_text` 标记失败，`error` 留空。
-- **可修复性**：高，且是**执行层修复**——在 provider 解析处（`openai_compat.parse_response`）把「content 为空且无 tool_calls」识别为 `ProviderError(retryable=True)`，走既有的 `_ask` 重试通道。这不改判分、不改题面，只把「端点抽风」从「解题失败」里摘出来。r1/r2 的这两条若被重试救回，三轮合计变 51/60（85.0%），r2 变 16/20（80.0% 达单轮线）——但合计仍低于 90%，**单靠修 A 类不能关闭 B1**。
+- **可修复性**：高，且是**执行层修复**——在 provider 解析处（`openai_compat.parse_response`）把「content 为空且无 tool_calls」识别为 `ProviderError(retryable=True)`，走既有的 `_ask` 重试通道。这不改判分、不改题面，只把「端点抽风」从「解题失败」里摘出来。r1/r2 的这两条若被重试救回，三轮合计变 51/60（85.0%），r2 变 16/20（80.0% 达单轮线）——但合计仍低于 90%，**单靠修 A 类不能关闭 B1**。**已修复（本提交）**：`openai_compat.parse_response` 现对「content 空/None 且无 tool_calls」抛 `ProviderError("the model endpoint answered with an empty message", retryable=True)`（content 非空或带 tool_calls 的正常工具轮不受影响），回归测试 `tests/test_openai_empty_completion.py` 在旧实现上先红（空 completion 不抛错、被原样解析为 `ModelResponse(content="")`），修复后转绿；orchestrator 层测试证明 retryable 错误触发 `_ask` 退避重试、任务以非空答案完成。
 
 ### 3.2 B 类：单题预算耗尽（2 条）
 
