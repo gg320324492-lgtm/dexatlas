@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1505<!--/fig-->（<!--fig:tests.fast-->1358<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->91.9%<!--/fig-->**（<!--fig:coverage.covered-->6820<!--/fig-->/<!--fig:coverage.total-->7424<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1515<!--/fig-->（<!--fig:tests.fast-->1368<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.2%<!--/fig-->**（<!--fig:coverage.covered-->6938<!--/fig-->/<!--fig:coverage.total-->7445<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -89,33 +89,35 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 <!--fig:coverage.weak_modules-->
 | 模块 | 覆盖率 | 未覆盖行 / 总行数 |
 |------|--------|------------------|
-| `tools/androguard/worker.py` | 0.0% | 112 / 112 |
 | `workbench/__main__.py` | 58.0% | 29 / 69 |
+| `tools/androguard/worker.py` | 72.3% | 31 / 112 |
 | `mcp/server.py` | 78.9% | 12 / 57 |
 | `agent/providers/local.py` | 81.1% | 10 / 53 |
 | `mcp/security.py` | 82.1% | 5 / 28 |
 | `cli/console.py` | 82.4% | 6 / 34 |
-| `tools/androguard/adapter.py` | 86.8% | 38 / 287 |
 | `tools/base.py` | 88.4% | 21 / 181 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
 | `reports/evidence_package.py` | 88.9% | 17 / 153 |
 | `agent/tool_executor.py` | 89.4% | 30 / 283 |
-| `agent/providers/openai_compat.py` | 89.9% | 9 / 89 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
 v0.1.1 的 FIX-001 修好了它的 Smali 定位逻辑并补了 26 个单元测试，
 现在它是 **<!--fig:coverage.file.tools/apktool/adapter.py.pct-->93.1%<!--/fig-->（<!--fig:coverage.file.tools/apktool/adapter.py.missed-->22<!--/fig-->/<!--fig:coverage.file.tools/apktool/adapter.py.statements-->317<!--/fig--> 未覆盖）**，已经离开这份清单。
 
-**`tools/androguard/worker.py` 写着 0%，那个数字说的不是「没人跑它」。**
-这个模块是**在另一个进程里跑的**：不受信的 DEX 在那里解析，
+**`tools/androguard/worker.py` 曾长期写着 0%，那个数字说的不是「没人跑它」。**
+这个模块**在另一个进程里跑**：不受信的 DEX 在那里解析，
 服务进程只收结果（这正是 Phase 2 的 P2-005 要的隔离）。
-覆盖率测量在服务进程里做，**看不见另一个进程的代码**，
-所以它记成 0%——那是**测量看不见**，不是**代码没跑**。
-它由 `tests/test_androguard_isolation.py`（13 个测试）在两个平台上跑过，
-那些测试断言的正是它做对了什么。
-**这一栏要改成能看见子进程，需要改的是测量本身**（子进程覆盖率），
-不是改这份清单的数字——数字是多少就写多少。
+只测服务进程的覆盖率**看不见另一个进程的代码**，所以它曾记成 0%——
+那是**测量看不见**，不是**代码没跑**。它由 `tests/test_androguard_isolation.py`
+（13 个测试）在两个平台上跑过，那些测试断言的正是它做对了什么。
+本次测量改为 subprocess-aware（`COVERAGE_PROCESS_START` + parallel 数据合并），
+worker 进程的执行也并入统计，现在它记为
+**<!--fig:coverage.file.tools/androguard/worker.py.pct-->72.3%<!--/fig-->**
+（<!--fig:coverage.file.tools/androguard/worker.py.missed-->31<!--/fig-->/
+<!--fig:coverage.file.tools/androguard/worker.py.statements-->112<!--/fig--> 未覆盖）。
+未覆盖的仍是错误分支（作业对象句柄失败、结果文件写不进等 Windows 专属路径），
+不是解析主逻辑。
 
 **未覆盖的是什么：** 主要是错误分支（后端超时/非零退出后的恢复路径）和一些
 CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块都在 90% 以上。
@@ -131,7 +133,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->91.9%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.2%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -139,9 +141,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1358<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1368<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->147<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1505<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1515<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -239,6 +241,8 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_html_report.py` | 离线 HTML 报告：与 Markdown/JSON 同源的事实、样本文本转义、页面自包含、证据表上限（M7 新增） |
 | `test_evidence_package.py` | 最小证据包：清单校验、路径遍历拒绝、篡改检测、样本绑定、迁移后引用解析（M7 新增） |
 | `test_public_contracts.py` | 公共契约快照：REST 路由表、MCP 工具表、CLI 退出码表、报告/证据包 schema 固化为断言，契约变更先红测试（M8 新增） |
+| `test_openai_empty_completion.py` | 空 assistant 消息是可重试的端点故障：content 空且无 tool_calls 抛 retryable ProviderError，orchestrator 重试后正常作答（M6 三轮复测 A 类修复新增） |
+| `test_search_symbols_decoy.py` | 字符串检索诱饵遮蔽：多词查询命中 string 类符号时常量池枚举并集返回，诱饵常量不再遮蔽同池关键常量（M6 三轮复测 C2 修复新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -859,10 +863,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1505<!--/fig--> 个：<!--fig:tests.fast-->1358<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1515<!--/fig--> 个：<!--fig:tests.fast-->1368<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->91.9%<!--/fig-->（<!--fig:coverage.covered-->6820<!--/fig-->/<!--fig:coverage.total-->7424<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1505<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.2%<!--/fig-->（<!--fig:coverage.covered-->6938<!--/fig-->/<!--fig:coverage.total-->7445<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1515<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -988,7 +992,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "agent/providers/__init__.py": [6, 0],
       "agent/providers/base.py": [84, 4],
       "agent/providers/local.py": [53, 10],
-      "agent/providers/openai_compat.py": [89, 9],
+      "agent/providers/openai_compat.py": [92, 8],
       "agent/providers/scripted.py": [42, 2],
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [127, 12],
@@ -1024,7 +1028,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "mcp/tools/projects.py": [45, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
-      "mcp/tools/symbols.py": [31, 0],
+      "mcp/tools/symbols.py": [49, 0],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
       "reports/evidence_package.py": [153, 17],
@@ -1034,9 +1038,9 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "reports/summary.py": [25, 2],
       "tools/__init__.py": [3, 0],
       "tools/androguard/__init__.py": [3, 0],
-      "tools/androguard/adapter.py": [287, 38],
-      "tools/androguard/isolation.py": [97, 5],
-      "tools/androguard/worker.py": [112, 112],
+      "tools/androguard/adapter.py": [287, 24],
+      "tools/androguard/isolation.py": [97, 4],
+      "tools/androguard/worker.py": [112, 31],
       "tools/apktool/__init__.py": [3, 0],
       "tools/apktool/adapter.py": [317, 22],
       "tools/base.py": [181, 21],
@@ -1049,8 +1053,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 604,
-    "statements": 7424
+    "missing": 507,
+    "statements": 7445
   },
   "history": {
     "v0.1.0": {
@@ -1067,10 +1071,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:0de2fe1ab1cea507545784a5321ce43d7ea11b6d40bb621d46807389b50b283e",
+  "source_fingerprint": "sha256:4cba116fed33b5301f9d5e534a9fd98b5e26a7e45129ae21626efd256d507476",
   "suite": {
     "failed": 0,
-    "passed": 1505,
+    "passed": 1515,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1078,8 +1082,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1358,
+    "fast": 1368,
     "slow": 147,
-    "total": 1505
+    "total": 1515
   }
 }-->
