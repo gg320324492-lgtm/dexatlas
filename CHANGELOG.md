@@ -9,6 +9,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **M6 层级 2 服务回归集单轮验证复测报告（A+C2 修复验证）。** 新增
+  `docs/benchmarks/m6-level2-verify.md` 与 trace 文件
+  `m6-level2-verify-traces.json`（20 题 × 3 配置 = 60 条），全部数字由新脚本
+  `scripts/m6_level2_verify_report.py` 从 trace 重算生成（并对照
+  `m6-level2-retest3-traces-r1.json` 逐题比较），trace 缺失或不完整即拒绝
+  生成报告。本轮验证两项代码级修复（`1a7add6` A 类空响应、`192382f` C2
+  字符串诱饵遮蔽）在 `main` `fbca3d5` 上的效果：MiniMax-M3.1-Flash 上
+  DexAtlas 15/20 = 75.0%（A 7/20、B 7/20），未到 80% 单轮参考线；r1 失败
+  3 题中 `overloads.method-identity.descriptor-distinguishes` 转通过，
+  `strings.api-key.demo` 出现 1 条 A 类空响应（按修复后口径仍未能经重试
+  恢复），`partial.no-apktool-there-is-no-manifest` 答了但判分不过；
+  `resources.app-name.demo`、`multidex.dex-file-count` 两题 24,000 闸预算
+  耗尽如实判 budget-exhausted。trace 合计 359,697 tokens，在 400,000 单轮
+  授权之内；判分失败与空答未重跑。单轮数字受模型方差影响，不外推为稳定
+  通过率，不据此关闭或重开 B1 验收。
+
 - **M6 层级 2 服务回归集三轮完整复测报告（B1 关闭测量）。** 新增
   `docs/benchmarks/m6-level2-retest3.md` 与三个 trace 文件
   （`m6-level2-retest3-traces-r1/r2/r3.json`，各 20 题 × 3 配置 = 60 条），
