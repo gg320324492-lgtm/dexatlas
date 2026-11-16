@@ -147,27 +147,35 @@ analysis backends and are not yet read by any code path.
 
 ## Analyse an APK
 
-Get a fixture to analyse. No APK is committed to this repository, so fetch one:
+**Five first-party sample APKs are committed under [`examples/`](../examples/)** —
+`demo-app/demo.apk`, `multidex-app/multidex.apk`, `obfuscated-app/obfuscated.apk`,
+`strings-app/strings.apk` and `wide-app/wide.apk` — each with the Smali sources it
+was built from beside it. You can analyse them as they are, and the three
+[case studies](case-studies/README.md) run on two of them:
+
+```bash
+uv run dexatlas analyze examples/demo-app/demo.apk \
+    --output report.md --json report.json --html report.html
+```
+
+For the third-party integration fixtures the test suite uses — androguard's test
+data, fetched on demand — run:
 
 ```bash
 bash scripts/fetch-fixtures.sh
 ```
 
-The script reads androguard's test data through the GitHub API, so the
+That script reads the fixture APKs through the GitHub API, so the
 [`gh` CLI](https://cli.github.com/) has to be installed and authenticated
-(`gh auth login`). It is only needed for the fixtures, not for DexAtlas itself.
-
-These come from androguard's own test data under Apache-2.0, and their source and licence
-are recorded in `fixtures/apk/SOURCES.md`. **Never commit an APK you are not authorized to
+(`gh auth login`). It is only needed for those fixtures, not for DexAtlas itself,
+and nothing it fetches is committed: the fixtures come from androguard's own test
+data under Apache-2.0, and their source and licence are recorded in
+`fixtures/apk/SOURCES.md`. **Never commit an APK you are not authorized to
 analyse.**
 
-```bash
-uv run dexatlas analyze fixtures/apk/TestActivity.apk \
-    --output report.md --json report.json --html report.html
-```
-
 ```text
-✓ apk_3bb32dd50129690b — 340 classes, 2,600 methods, 6,033 cross-references (25.0s)
+✓ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges,
+  1 resource string (5.0s)
 !  apktool is not installed or not on PATH: Install Apktool and point
    DEXATLAS_APKTOOL_JAR at its jar, or put apktool on PATH: ...
 !  jadx is not installed or not on PATH: Install the jadx decompiler: ...
@@ -177,8 +185,8 @@ HTML report → report.html
 ```
 
 That output is the degradation promise made visible: with no external tools at all you
-still get 340 classes, 2,600 methods and 6,033 cross-references from the in-process
-Androguard index, and the report says exactly which steps did not run.
+still get the class, method and cross-reference index from the in-process Androguard
+backend, and the report says exactly which steps did not run.
 
 The three report formats are three renderings of one analysis — the numbers in
 the HTML page are the numbers in the Markdown and JSON reports. `--html` writes a
@@ -192,7 +200,7 @@ To hand a client the analysis without the workspace, export the evidence
 package:
 
 ```bash
-uv run dexatlas export apk_3bb32dd50129690b --output evidence.zip
+uv run dexatlas export apk_80a8fe0e81204c9f --output evidence.zip
 ```
 
 The package holds the report in all three formats, the evidence records, the
@@ -235,18 +243,18 @@ whole one without opening the project record.
 
 ```bash
 uv run dexatlas projects
-uv run dexatlas manifest  apk_3bb32dd50129690b
-uv run dexatlas classes   apk_3bb32dd50129690b --prefix tests
-uv run dexatlas search    apk_3bb32dd50129690b "eratosthenes"
-uv run dexatlas xrefs     apk_3bb32dd50129690b "java.lang.Object.<init>()V"
+uv run dexatlas manifest  apk_80a8fe0e81204c9f
+uv run dexatlas classes   apk_80a8fe0e81204c9f
+uv run dexatlas search    apk_80a8fe0e81204c9f "Crypto"
+uv run dexatlas xrefs     apk_80a8fe0e81204c9f "java.lang.Object.<init>()V"
 ```
 
 Method and class source, with a Smali fallback when decompilation fails:
 
 ```bash
-uv run dexatlas source apk_3bb32dd50129690b tests.androguard.Eratosthene
-uv run dexatlas source apk_3bb32dd50129690b tests.androguard.Eratosthene \
-    --method eratosthenes
+uv run dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity
+uv run dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity \
+    --method onCreate
 ```
 
 `source` needs JADX or Apktool. Without either it reports that rather than returning an
