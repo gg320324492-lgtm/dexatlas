@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from dexatlas.core.methods import AmbiguousMethodError
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.mcp.errors import unknown_project
@@ -14,6 +16,45 @@ from dexatlas.mcp.security import bounded_text
 #: than the ones a source file gets — but the point is the same: nothing
 #: comes back unbounded, and the cut is stated in the response.
 _SYMBOL_TEXT_LIMITS = {"max_lines": 8, "max_bytes": 4096}
+
+#: The smallest query that reads as a phrase about content rather than a
+#: name. One word is usually a name — a class, a method, a constant — and
+#: widening it would bury the hit under the whole pool. Two words ("api
+#: key", "sign method") are a description, and a description's answer
+#: includes the pool the description is aimed at.
+_PHRASE_WORD_COUNT = 2
+
+
+def _page_symbols(entries: list[dict[str, Any]]) -> list[SymbolView]:
+    """Turn store rows into the response's symbol views."""
+    return [
+        SymbolView(
+            kind=str(entry.get("kind", "")),
+            name=bounded_text(str(entry.get("name", "")), **_SYMBOL_TEXT_LIMITS),
+            detail=bounded_text(str(entry.get("excerpt", "")), **_SYMBOL_TEXT_LIMITS),
+            provenance=[],
+        )
+        for entry in entries
+    ]
+
+
+def _dedupe_by_identity(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop repeat rows, keeping the first order each identity appeared in.
+
+    The word search and the pool enumerate the same constants by different
+    routes, and a constant twice in one answer would read as two
+    constants. The first occurrence — the word search's own ranking — is
+    the one that stays.
+    """
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict[str, Any]] = []
+    for entry in entries:
+        identity = (str(entry.get("kind", "")), str(entry.get("name", "")))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(entry)
+    return unique
 
 
 def search_symbols(
@@ -39,6 +80,17 @@ def search_symbols(
     question a string-constant question actually asks — is there text in
     this APK that a reader would want to see — rather than leaving an empty
     word match to stand for an absence that was never established.
+
+    A word search that *did* hit string constants does not end the
+    question, because a hit can shadow its neighbours. The M6 level-2
+    retest had the agent query "api key" and take the decoy constant
+    ``api_key`` for the whole answer while the real key sat in the same
+    pool, unseen — a decoy hit had silenced the enumeration. So for a
+    phrase-length query (two words or more) whose word hits are string
+    constants, the pool's constants join the answer: the word hits keep
+    their order, the pool follows, and no identity appears twice. A
+    single-word query, or one whose hits are classes, methods or fields,
+    was answered as asked and is left alone.
     """
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
@@ -50,27 +102,25 @@ def search_symbols(
     found = analyzer.store.search(project_id, query, limit=offset + limit)
     page = found[offset : offset + limit]
 
-    # The fallbacks run only when the word search found nothing: a question
+    # The fallbacks run when the word search found nothing — a question
     # about a string constant whose value does not spell the query out is
-    # the case the failure analysis named. The sweep adds constants that
-    # contain the query as characters; the enumeration, last, shows the
-    # pool itself, so the answer "the index holds no such constant" is
-    # backed by the constants the index *does* hold.
+    # the case the failure analysis named — or when a phrase-length query's
+    # word hits are themselves string constants, where a hit can shadow the
+    # rest of the pool. The sweep adds constants that contain the query as
+    # characters; the enumeration, last, shows the pool itself, so the
+    # answer "the index holds no such constant" is backed by the constants
+    # the index *does* hold.
+    phrase_query = len(query.split()) >= _PHRASE_WORD_COUNT
+    hit_strings = bool(page) and all(str(entry.get("kind", "")) == "string" for entry in page)
+    union_pool = query.strip() and phrase_query and hit_strings
     if not page and query.strip():
         page = list(analyzer.store.search_string_substring(project_id, query, limit=offset + limit))
-    if not page and query.strip():
-        page = list(analyzer.store.list_string_constants(project_id, limit=offset + limit))
+    if (not page or union_pool) and query.strip():
+        pool = analyzer.store.list_string_constants(project_id, limit=offset + limit)
+        page = _dedupe_by_identity([*page, *pool])
 
     return SymbolList(
-        symbols=[
-            SymbolView(
-                kind=str(entry.get("kind", "")),
-                name=bounded_text(str(entry.get("name", "")), **_SYMBOL_TEXT_LIMITS),
-                detail=bounded_text(str(entry.get("excerpt", "")), **_SYMBOL_TEXT_LIMITS),
-                provenance=[],
-            )
-            for entry in page
-        ],
+        symbols=_page_symbols(page),
         total=len(found),
         offset=offset,
         limit=limit,
