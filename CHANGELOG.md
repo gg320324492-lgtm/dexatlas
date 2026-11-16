@@ -7,6 +7,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **M6 层级 2 服务回归集三轮完整复测报告（B1 关闭测量）。** 新增
+  `docs/benchmarks/m6-level2-retest3.md` 与三个 trace 文件
+  （`m6-level2-retest3-traces-r1/r2/r3.json`，各 20 题 × 3 配置 = 60 条），
+  全部数字由新脚本 `scripts/m6_level2_retest3_report.py` 从 trace 重算生成，
+  任一轮 trace 缺失或不完整即拒绝生成报告。结果：MiniMax-M3.1-Flash 上
+  DexAtlas 逐轮 17/20、15/20、17/20，三轮合计 49/60 = 81.7%；A 源码文本
+  20/60、B 结构化检索 22/60。**未达验收线（每轮 ≥80% 且三轮合计 ≥90%）**：
+  r2 低于单轮线，三轮合计 81.7% 低于 90%。三轮 trace 合计 1,080,116 tokens，
+  在 1,200,000 授权之内；单题 24,000 闸触发 2 题如实判 budget-exhausted；
+  运行中 MiniMax 端点两次成片 529 过载，对 errored（未判分）配置做了如实
+  重试并保留全部成功配置的原始 trace，判分失败与空答未重跑。
+
 ### Changed
 
 - **公共契约变更：新增退出码 6（`EXIT_NO_INDEX`），分辨「跑完了但无可用的代码索引」。**

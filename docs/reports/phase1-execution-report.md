@@ -862,7 +862,7 @@ uv run python scripts/refresh-report-figures.py
 uv run pytest          # 收集 <!--fig:tests.total-->1505<!--/fig--> 个：<!--fig:tests.fast-->1358<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->91.9%<!--/fig-->（<!--fig:coverage.covered-->6820<!--/fig-->/<!--fig:coverage.total-->7424<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1504<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1505<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1067,10 +1067,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:2dd58fc8a264fb68851a661b04427c9809cc31bed3d5cf044336adbafb35614a",
+  "source_fingerprint": "sha256:0de2fe1ab1cea507545784a5321ce43d7ea11b6d40bb621d46807389b50b283e",
   "suite": {
-    "failed": 1,
-    "passed": 1504,
+    "failed": 0,
+    "passed": 1505,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
