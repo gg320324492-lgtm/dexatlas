@@ -112,6 +112,22 @@ FINGERPRINT_FILES = ("pyproject.toml", "scripts/refresh-report-figures.py")
 #: Coverage is measured on the package, so module paths are relative to it.
 SOURCE_PREFIX = "src/dexatlas/"
 
+#: The coverage configuration that makes the measurement subprocess-aware.
+#:
+#: ``tools/androguard/worker.py`` never runs in the test process: it is the
+#: module an untrusted DEX is parsed in, and the service starts it as
+#: ``python -m dexatlas.tools.androguard.worker``. A plain ``pytest --cov``
+#: records nothing for it — not because the code did not run, but because
+#: coverage is recorded per process, and the worker is another process. With
+#: ``parallel = true`` every process writes its own data file, and
+#: ``COVERAGE_PROCESS_START`` tells a Python that starts *after* the config to
+#: measure itself; ``coverage combine`` then merges the parts into one
+#: measurement that includes the worker's execution.
+COVERAGE_RC = """[run]
+parallel = true
+source = dexatlas
+"""
+
 #: A first-party module below this coverage is a weak spot the report must disclose.
 WEAK_MODULE_PERCENT = 90.0
 
@@ -347,11 +363,14 @@ def measure_tests(args: list[str], env: dict[str, str] | None = None) -> Outcome
     """Run a set of tests and read both what they said and which ones sat out.
 
     The run's own report is asked for as well as its summary line: the summary
-    says how many tests skipped, the report says which.
+    says how many tests skipped, the report says which. ``args`` is the
+    command that runs the tests — normally a ``pytest`` invocation, and a
+    ``coverage run -m pytest`` one when the measurement has to see the
+    subprocesses too.
     """
     with tempfile.TemporaryDirectory() as directory:
         junit = Path(directory) / "outcomes.xml"
-        result = run(sys.executable, "-m", "pytest", *args, f"--junitxml={junit}", env=env)
+        result = run(*args, f"--junitxml={junit}", env=env)
         skipped, xfailed = read_junit_outcomes(junit)
     outcome = read_outcome(result.stdout)
     return Outcome(
@@ -370,15 +389,36 @@ def measure_code_tests() -> Outcome:
     failure would describe a tree as broken when it is merely out of date. They
     are measured on their own afterwards, against a report that is already
     consistent, and the two results are added up.
+
+    The run is subprocess-aware: the coverage configuration is written to a
+    file, ``COVERAGE_PROCESS_START`` points every Python that starts while it
+    is set at that file, and ``coverage combine`` merges the per-process data
+    afterwards. Without it the androguard worker — a subprocess by design —
+    would be reported as 0%, a statement about the measurement, not the code.
     """
-    return measure_tests(
-        [
-            "--cov=dexatlas",
-            "--cov-report=term",
-            "-k",
-            f"not {REPORT_CHECK} and not {STATUS_CHECK}",
-        ]
-    )
+    rc_path = REPO_ROOT / ".coveragerc-measure.ini"
+    rc_path.write_text(COVERAGE_RC, encoding="utf-8")
+    try:
+        env = dict(os.environ)
+        env["COVERAGE_PROCESS_START"] = str(rc_path)
+        outcome = measure_tests(
+            [
+                sys.executable,
+                "-m",
+                "coverage",
+                "run",
+                f"--rcfile={rc_path}",
+                "-m",
+                "pytest",
+                "-k",
+                f"not {REPORT_CHECK} and not {STATUS_CHECK}",
+            ],
+            env=env,
+        )
+        run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}")
+        return outcome
+    finally:
+        rc_path.unlink(missing_ok=True)
 
 
 def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
@@ -395,7 +435,7 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
         env = dict(os.environ)
         env[REPORT_PATH_ENV] = str(path)
         return measure_tests(
-            ["--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
+            ["-m", "pytest", "--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
             env=env,
         )
 
@@ -418,7 +458,7 @@ def measure_status_checks(
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
         return measure_tests(
-            ["--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
+            ["-m", "pytest", "--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
             env=env,
         )
 

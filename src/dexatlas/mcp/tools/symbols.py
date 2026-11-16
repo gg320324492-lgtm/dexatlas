@@ -94,6 +94,11 @@ def search_symbols(
     asked ``api_key`` and got the decoy — so any word count joins now. A
     query whose hits are classes, methods or fields was answered as asked
     and is left alone.
+
+    The answer is one list, paged: ``total`` counts the de-duplicated
+    union (or the index's own hit count when no union ran), and every page
+    is a cut of that same list, so ``total`` never describes a different
+    set than the rows on the page.
     """
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
@@ -113,18 +118,46 @@ def search_symbols(
     # the enumeration, last, shows the pool itself, so the answer "the
     # index holds no such constant" is backed by the constants the index
     # *does* hold.
+    # The union is de-duplicated *before* it is paged, from reads that are
+    # long enough to hold the whole answer: a constant the word search also
+    # found arrives twice, and cutting either source to `offset + limit`
+    # rows first drops rows behind the cut — which shortened the page and
+    # made the deduplicated order depend on the offset. The pool is read
+    # with a bound that grows with the page instead, the union's ``total``
+    # is the count of the de-duplicated rows — a number that describes the
+    # list the page is cut from — and the page itself never exceeds the
+    # caller's limit, so walking ``offset`` forward reads the union in
+    # order without repeating or skipping a row.
+    #
+    # The rows the union starts from are the whole first reading — the word
+    # search's full read when its hits are string constants, the substring
+    # sweep's page when that answered — and not the slice `offset` cut
+    # from them: the union's order is "the first reading, then the pool",
+    # and the page is cut from that order afterwards, so a later page keeps
+    # the rows an earlier page showed instead of replacing them with pool
+    # rows the offset moved past.
     word_query = len(query.split()) >= _MIN_WORD_COUNT
     hit_strings = bool(page) and all(str(entry.get("kind", "")) == "string" for entry in page)
-    union_pool = query.strip() and word_query and hit_strings
+    union_pool = bool(query.strip()) and word_query and hit_strings
+    total = len(found)
     if not page and query.strip():
         page = list(analyzer.store.search_string_substring(project_id, query, limit=offset + limit))
     if (not page or union_pool) and query.strip():
-        pool = analyzer.store.list_string_constants(project_id, limit=offset + limit)
-        page = _dedupe_by_identity([*page, *pool])
+        first_reading = found if (union_pool or not page) else page
+        pool = analyzer.store.list_string_constants(
+            project_id, limit=offset + limit + max(len(found), len(page))
+        )
+        union = _dedupe_by_identity([*first_reading, *pool])
+        total = len(union)
+        page = union[offset : offset + limit]
+    # A page is what its name says: no more than `limit` rows, whatever the
+    # reads above produced. The cut sits after `total` is set, so the count
+    # keeps describing the list the page was cut from.
+    page = page[:limit]
 
     return SymbolList(
         symbols=_page_symbols(page),
-        total=len(found),
+        total=total,
         offset=offset,
         limit=limit,
     )

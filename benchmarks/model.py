@@ -438,6 +438,19 @@ def check(task: Task, answer: Answer) -> CheckResult:
     joined = "\n".join(texts)
     said = f"{joined}\n{answer.text}"
 
+    # The forbidden-marker scan reads the limitations too. A limitation is
+    # what the system said it could not settle, and a model that hedged its
+    # way past a value task can carry the forbidden neighbour inside the
+    # hedge — "onCreate holds sk_live_..., but I could not settle which
+    # method sets the endpoint" is still the wrong answer to a question
+    # whose must_not_contain names ``sk_live``. What limitations never do is
+    # *satisfy* a check: they are read by the backend-failure predicate
+    # above (an honest "apktool was not installed" *is* the evidence that
+    # task asks for) and scanned here for forbidden text, and nowhere else —
+    # a limitation still cannot meet a ``must_contain`` marker or become a
+    # finding.
+    said = "\n".join([said, *answer.limitations])
+
     if task.expect_backend_failure and not _records_backend_failure(task, answer):
         missing = ", ".join(task.expect_backend_failure)
         return CheckResult(

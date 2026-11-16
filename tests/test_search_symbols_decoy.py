@@ -39,7 +39,7 @@ from dexatlas.core.models import (
     StringConstant,
 )
 from dexatlas.core.pipeline import Analyzer
-from dexatlas.mcp.tools.symbols import search_symbols
+from dexatlas.mcp.tools.symbols import _dedupe_by_identity, search_symbols
 
 DECOY = "api_key"
 SECRET = "sk_live_2f8a91c4e7b3"
@@ -198,3 +198,53 @@ def test_the_pool_union_is_deduplicated_and_paged(analyzer) -> None:
     assert len(names) == len(set(names)), names
     assert len(names) == 3, names
     assert URL in names and SECRET in names, names
+
+
+def test_the_union_page_never_exceeds_the_limit_and_total_covers_the_union(analyzer) -> None:
+    """A deduplicated union is cut to the page's limit, and total says so.
+
+    The first union implementation concatenated the word hits and the pool
+    and cut the *read* at ``offset + limit`` before de-duplicating, so a
+    query whose word hits repeat inside the pool came back with more rows
+    than the caller asked for — and its ``total`` was the word search's
+    count, a number that described neither the union nor the page. The
+    page a caller gets is at most ``limit`` rows, and ``total`` is the
+    count of the union the page is cut from.
+    """
+    # "api.example.com collect" word-hits the URL, and the pool holds the
+    # URL again, the decoy and the secret: the de-duplicated union is the
+    # three constants, which is more than the read of limit=2 rows carried.
+    result = search_symbols(analyzer, PROJECT_ID, "api.example.com collect", limit=2, offset=0)
+    names = [str(getattr(symbol.name, "text", symbol.name)) for symbol in result.symbols]
+    assert len(names) <= 2, names
+    assert len(names) == len(set(names)), names
+    # The total is the union's size — the distinct rows the page is cut
+    # from — not the word search's own hit count.
+    union_size = len(
+        {_kind_and_name(entry) for entry in _union_rows(analyzer, "api.example.com collect")}
+    )
+    assert result.total == union_size
+
+    # Paging walks the same union without repeating or skipping a row.
+    first = search_symbols(analyzer, PROJECT_ID, "api.example.com collect", limit=2, offset=0)
+    second = search_symbols(analyzer, PROJECT_ID, "api.example.com collect", limit=2, offset=2)
+    first_names = [str(getattr(symbol.name, "text", symbol.name)) for symbol in first.symbols]
+    second_names = [str(getattr(symbol.name, "text", symbol.name)) for symbol in second.symbols]
+    assert first_names + second_names == _union_names_in_order(analyzer, "api.example.com collect")
+    assert second.total == first.total
+
+
+def _kind_and_name(entry: dict) -> tuple[str, str]:
+    return (str(entry.get("kind", "")), str(entry.get("name", "")))
+
+
+def _union_rows(analyzer: Analyzer, query: str) -> list[dict]:
+    """The union the tool builds, read straight from the store."""
+    found = analyzer.store.search(PROJECT_ID, query, limit=50)
+    pool = analyzer.store.list_string_constants(PROJECT_ID, limit=50)
+    return _dedupe_by_identity([*found, *pool])
+
+
+def _union_names_in_order(analyzer: Analyzer, query: str) -> list[str]:
+    rows = _union_rows(analyzer, query)
+    return [str(getattr(entry["name"], "text", entry["name"])) for entry in rows]

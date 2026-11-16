@@ -137,3 +137,42 @@ def test_an_empty_completion_is_retried_and_the_task_completes(demo: Demo, tmp_p
     assert state.status is TaskStatus.COMPLETED, state.error
     assert len(provider.requests) == 2, "the empty message was retried once"
     assert state.findings, "the completed task carries a real finding"
+
+
+def test_a_leak_with_tool_calls_prefers_the_tool_calls() -> None:
+    """Content that leaks the tool protocol is dropped when tool calls exist.
+
+    A model can put a ``<invoke>`` fragment in its ``content`` *and* ask for
+    a tool call in the same message. The fragment is still protocol, not
+    prose, and raising it as a retryable failure would discard a turn the
+    endpoint did answer — and re-asking a turn that already named its tool
+    is how a loop burns its budget on a model that answers the same way
+    twice. The tool calls are the actionable part: they are returned, and
+    the leaked text does not travel with them.
+    """
+    provider = OpenAICompatibleProvider(base_url="https://example.invalid/v1", model="a-model")
+    body = {
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": '<invoke name="get_manifest"><parameter key="project_id">apk_one</parameter></invoke>',
+                    "tool_calls": [
+                        {
+                            "id": "call-1",
+                            "type": "function",
+                            "function": {
+                                "name": "get_manifest",
+                                "arguments": '{"project_id": "apk_one"}',
+                            },
+                        }
+                    ],
+                }
+            }
+        ]
+    }
+
+    response = provider.parse_response(body)
+
+    assert [call.name for call in response.tool_calls] == ["get_manifest"]
+    assert response.content == ""
