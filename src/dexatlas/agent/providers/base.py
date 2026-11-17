@@ -172,7 +172,13 @@ class ProviderError(Exception):
     state is saved so the task can be picked up again.
     """
 
-    def __init__(self, message: str, *, retryable: bool = True) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = True,
+        correction: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.retryable = retryable
@@ -181,6 +187,32 @@ class ProviderError(Exception):
         A rate limit or a dropped connection is worth another attempt; a
         malformed request is not, and retrying it only burns the budget.
         """
+        self.correction = correction
+        """What the next attempt should be told, when the model can fix it.
+
+        Most failures are the endpoint's — a retry sends the same request.
+        A failure the *model* caused by answering in the wrong shape, such
+        as a tool-call protocol fragment written into its prose, is not
+        fixed by asking the same thing again: the retry carries this text
+        as an added instruction, so the model knows what was wrong with its
+        previous reply. ``None`` means the retry is the same request.
+        """
+
+
+#: What a retry after a tool-call protocol leak tells the model.
+#:
+#: The leak — a model writing the tool-call channel into its prose — is the
+#: one failure the model itself can undo, and the M6 retest measured what an
+#: uninformed retry does: the same request came back with the same fragment,
+#: three rounds running. The correction names what was wrong and what the
+#: wanted shape is, so the retry is a correction rather than a repeat.
+PROTOCOL_LEAK_CORRECTION = (
+    "Your previous reply wrote a tool-call protocol fragment into its text. "
+    "That fragment was discarded — it is not an answer. Reply now with the "
+    'JSON answer document the instructions describe: {"conclusions": [...], '
+    '"limitations": [...]}, and nothing else. Do not write tool-call syntax '
+    "in your reply, and do not ask for tool calls."
+)
 
 
 @runtime_checkable

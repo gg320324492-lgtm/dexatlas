@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from dexatlas.agent.providers.base import (
+    PROTOCOL_LEAK_CORRECTION,
     AssistantTurn,
     ModelRequest,
     ModelResponse,
@@ -182,10 +183,14 @@ class OpenAICompatibleProvider:
                 # as an answer let XML reach a benchmark as the final word on
                 # a question. The turn is broken the same way an empty
                 # message is, and retryable for the same reason: asking again
-                # is how the loop recovers a transient model failure.
+                # is how the loop recovers a transient model failure. The
+                # retry carries a correction, because asking the same thing
+                # again is what the retest measured doing nothing three
+                # rounds running.
                 raise ProviderError(
                     "the model answered with a tool-call protocol fragment instead of an answer",
                     retryable=True,
+                    correction=PROTOCOL_LEAK_CORRECTION,
                 )
         usage = body.get("usage")
         usage_map = usage if isinstance(usage, dict) else {}

@@ -151,11 +151,15 @@ How to answer:
   exact count could not be established, in "limitations", and report the
   items you did read there too. A count that is reported as a limitation is
   an honest answer; a guessed count is not an answer at all.
-- A conclusion that names a method names it in full:
-  `package.Class.name(descriptor)`. The descriptor is part of the method's
-  identity — it is what separates two overloads — so `Handler.handle` is not
-  an answer, while `com.example.wide.Handler.handle(Ljava/lang/String;)V`
-  is. Quote the ids the tools gave you; do not shorten them.
+- A conclusion that names a method names it in full, as one unbroken string:
+  `package.Class.name(descriptor)` — the class, the name and the descriptor
+  written contiguously, with nothing between them. The descriptor is part of
+  the method's identity — it is what separates two overloads — so
+  `Handler.handle` is not an answer, and neither is
+  ``com.example.wide.Handler.handle`` with the descriptor quoted apart. The
+  string the checker reads is the whole identity at once:
+  `com.example.wide.Handler.handle(Ljava/lang/String;)V`. Quote the ids the
+  tools gave you; do not shorten them and do not split them.
 - A question that asks about some methods of a class — which share a
   descriptor, which return what, whether two agree — is answered with one
   finding per method the question touches, *including the ones that break
@@ -174,10 +178,29 @@ How to answer:
   the word search came back empty, look at the string constants the tools
   offer you — the pool's own rows are a reading, not a failure — and quote
   the ones that could be the answer, whole.
+- When a key, credential or URL question's word search returned only a
+  field name or a label — a header name like `api_key`, not a value — the
+  value has not been found yet. Search the string constants again for the
+  common secret prefixes — `sk_`, `AKIA`, `AIza`, `ghp_` — and for the URL
+  forms the question suggests; the constant pool, not the symbol index, is
+  where a hard-coded value lives. When a constant names its class, read
+  that class with `get_class_source` and quote the value from its source,
+  whole, with the evidence id the read gave you. A field name without its
+  value does not answer a question that asks for the value.
 - Notes about the analysis itself — "the analysis is complete", "the search
   returned these 8 symbols" — are not conclusions about the APK. Do not put
   them in "conclusions"; say them in "limitations" or in your prose, and
   keep "conclusions" for what the question asked.
+- When a backend did not take part in this analysis — the project status
+  records it as missing, or a tool answered that its rows are absent — say
+  so in the words the analysis itself uses: "<backend> was not installed",
+  "`<backend>`/not_installed", or "did not take part". Name the backend and
+  the fact together, in one place, and never infer a value that backend
+  would have read from the other backends' rows: a package name, a
+  component, a resource or a count read from a different backend is not a
+  substitute, and writing it as if it were the answer is a claim the
+  analysis does not hold. The honest answer names the failure and leaves
+  the value out.
 
 When you have what you need, answer with a JSON document and nothing else:
 
@@ -219,6 +242,8 @@ CLOSED_DIRECTIVE = (
     "Answer with the JSON document described above, from what you have already "
     "read; if the reading does not settle the question — including a count that "
     'could not be established from what you read — say so in "limitations". '
+    "A tool-call protocol fragment in your reply is not an answer: it is "
+    "discarded, and the JSON document is what is wanted. "
     "A refusal to answer stops the task without one."
 )
 
@@ -924,15 +949,31 @@ class Orchestrator:
         made again, and the budget pays for it. When the attempts run out the
         failure reaches the loop, which saves the state so the task can be
         picked up later.
+
+        A retry is not always the same request. A failure that names a
+        *correction* — the model answered in a shape that cannot be used, and
+        can say so — is asked again with that correction added to the
+        instructions: the M6 retest measured the same leak coming back three
+        times because the retry never told the model what was wrong.
         """
         last: ProviderError | None = None
+        current = request
         for attempt in range(1, self._model_attempts + 1):
             try:
-                return self._provider.complete(request)
+                return self._provider.complete(current)
             except ProviderError as exc:
                 last = exc
                 if not exc.retryable or attempt >= self._model_attempts:
                     raise
+                if exc.correction and exc.correction not in current.instructions:
+                    current = ModelRequest(
+                        instructions=f"{current.instructions}\n\n{exc.correction}",
+                        question=current.question,
+                        tools=current.tools,
+                        turns=current.turns,
+                        max_tokens=current.max_tokens,
+                        temperature=current.temperature,
+                    )
                 if self._model_backoff:
                     self._sleep(self._model_backoff * attempt)
         assert last is not None

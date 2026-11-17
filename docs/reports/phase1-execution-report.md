@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1542<!--/fig-->（<!--fig:tests.fast-->1395<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.1%<!--/fig-->**（<!--fig:coverage.covered-->6947<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1548<!--/fig-->（<!--fig:tests.fast-->1401<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.1%<!--/fig-->**（<!--fig:coverage.covered-->6953<!--/fig-->/<!--fig:coverage.total-->7467<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -142,9 +142,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1395<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1401<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->147<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1542<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1548<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -245,6 +245,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_openai_empty_completion.py` | 空 assistant 消息是可重试的端点故障：content 空且无 tool_calls 抛 retryable ProviderError，orchestrator 重试后正常作答（M6 三轮复测 A 类修复新增） |
 | `test_search_symbols_decoy.py` | 字符串检索诱饵遮蔽：多词查询命中 string 类符号时常量池枚举并集返回，诱饵常量不再遮蔽同池关键常量（M6 三轮复测 C2 修复新增） |
 | `test_comparison_output_contract.py` | 对比 harness 的输出契约：count/枚举题的受控降级（limitations 原样入 trace、永不成为 findings 或 must_contain 证据），任务级预算耗尽单独分类（budget-exhausted 不判过、报告如实命名）（M6 层级 2 B1 方案 2 新增） |
+| `test_agent_m6_next_round.py` | M6 下一轮修复成套：协议泄漏重试携带纠偏反馈、后端缺失的固定短语与禁止推断、密钥前缀二次检索与反查类源码、方法身份连续全串（M6 层级 2 深挖修复新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -865,10 +866,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1542<!--/fig--> 个：<!--fig:tests.fast-->1395<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1548<!--/fig--> 个：<!--fig:tests.fast-->1401<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.1%<!--/fig-->（<!--fig:coverage.covered-->6947<!--/fig-->/<!--fig:coverage.total-->7461<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1542<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.1%<!--/fig-->（<!--fig:coverage.covered-->6953<!--/fig-->/<!--fig:coverage.total-->7467<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1547<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -989,10 +990,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
       "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [556, 49],
+      "agent/orchestrator.py": [559, 49],
       "agent/planner.py": [47, 0],
       "agent/providers/__init__.py": [6, 0],
-      "agent/providers/base.py": [84, 4],
+      "agent/providers/base.py": [87, 4],
       "agent/providers/local.py": [53, 10],
       "agent/providers/openai_compat.py": [103, 8],
       "agent/providers/scripted.py": [42, 2],
@@ -1056,7 +1057,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 514,
-    "statements": 7461
+    "statements": 7467
   },
   "history": {
     "v0.1.0": {
@@ -1073,10 +1074,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:e36695f400aace1a7f68bea3244b96d08c96be13fb45d139afca179dba02ce69",
+  "source_fingerprint": "sha256:a668b5c1ce484e54c818e6e874eaa25541fcb3dbb4e7535758df87df446234f1",
   "suite": {
-    "failed": 0,
-    "passed": 1542,
+    "failed": 1,
+    "passed": 1547,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1084,8 +1085,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1395,
+    "fast": 1401,
     "slow": 147,
-    "total": 1542
+    "total": 1548
   }
 }-->
