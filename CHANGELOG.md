@@ -5,6 +5,27 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **M10 自查脚本的三条新判据——读者实走演练暴露的三处缺口。**
+  [读者实走演练](docs/reports/reader-dry-run.md)按材料在干净机器上真走一遍，
+  暴露出自查脚本没查的三件事：①装环境那一步不抓第三方样本，集成用例就
+  skip 而退出码仍是 0；②A6 要的降级证据必须当场记下，因为 CLI 没有按 run
+  选运行的命令、重跑会换掉最新一次运行；③证据包实为 4 个条目（3 份报告
+  + `manifest.json`）而 CLI 打印的是清单里的报告数 3。`scripts/m10_selfcheck.py`
+  新增 `FIXTURE.precondition`、`A6.on-the-spot`、`PACKAGE.entry-count` 三条判据，
+  自动化判定由 40 项增至 43 项（「需人工」仍为 40 项）。三条各带红→绿回归
+  （`tests/test_m10_selfcheck.py`，把材料改成缺口的样子判据必须判红）。
+
+### Changed
+
+- 自查判据条数在材料里的表述随之更新：`docs/reports/m10-selfcheck.md`、
+  `docs/reports/m10-invitation-sender-checklist.md`、`docs/reports/ci-gate-coverage.md`、
+  `docs/status.md`、`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md`。
+  验收包本身的 40 个验收项未变。
+
 ## [1.0.0] — 2026-11-17
 
 ### Added

@@ -187,9 +187,9 @@ FINGERPRINT_FILES = ("pyproject.toml", "scripts/refresh-report-figures.py")
 
 ### 4.5 M10 自查快照
 
-- **位置**：`docs/reports/m10-selfcheck.md`（手写快照，记录 40 项的通过 / 失败 / 需人工分布与执行日期）。
-- **为什么没人发现**：`scripts/m10_selfcheck.py` 的判据改过（`8524503`「自查脚本的变更记录判据改为版本无关」），改完要人重跑重写快照；`tests/test_m10_selfcheck.py` 只有 2 个测试（`:69`、`:76`），都不调 `main()`；CI 不跑该脚本。
-- **风险**：快照里的「通过 40 / 失败 0 / 需人工 40」随时可能不再是脚本的当前输出。
+- **位置**：`docs/reports/m10-selfcheck.md`（手写快照，记录 43 项自动化判定与 40 项「需人工」的分布与执行日期）。
+- **为什么没人发现**：`scripts/m10_selfcheck.py` 的判据改过（`8524503`「自查脚本的变更记录判据改为版本无关」），改完要人重跑重写快照；`tests/test_m10_selfcheck.py` 当时只有 2 个测试（`:69`、`:76`），都不调 `main()`；CI 不跑该脚本。
+- **风险**：快照里的「通过 43 / 失败 0 / 需人工 40」随时可能不再是脚本的当前输出。
 
 ### 4.6 源指纹覆盖不到的改动
 
@@ -199,8 +199,8 @@ FINGERPRINT_FILES = ("pyproject.toml", "scripts/refresh-report-figures.py")
 
 ### 4.7 验收包里 40 项「需人工」的判定
 
-- **位置**：`docs/reports/m10-acceptance-pack.md`（40 项）、`docs/reports/m10-invitation-sender-checklist.md:201-215`（通过 40 / 失败 0 / 需人工 40）。
-- **为什么没人发现**：这些**本来就该**由一位读者在真实机器上执行并填入 `docs/reports/m10-review-record-template.md`。`scripts/m10_selfcheck.py:738-740` 明确把它们标成 `manual`，且 `manual` 不算失败。
+- **位置**：`docs/reports/m10-acceptance-pack.md`（40 项）、`docs/reports/m10-invitation-sender-checklist.md:201-215`（通过 43 / 失败 0 / 需人工 40）。
+- **为什么没人发现**：这些**本来就该**由一位读者在真实机器上执行并填入 `docs/reports/m10-review-record-template.md`。`scripts/m10_selfcheck.py:1030-1032` 明确把它们标成 `manual`，且 `manual` 不算失败。
 - **如实说明**：这一项**不是缺陷**，是设计的边界。列在这里是为了不让「40 项全部自动化了」这种误读成立。
 
 ### 4.8 素材里需要人判断的占位
