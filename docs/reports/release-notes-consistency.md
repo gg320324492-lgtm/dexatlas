@@ -9,7 +9,7 @@
 |---|---|
 | 复核对象 A | `docs/releases/v1.0.0.md` —— 随 tag 发布的仓库内发版说明（已定稿） |
 | 复核对象 B | `docs/reports/v1.0.0-github-release-body.md` —— GitHub Release 正文草稿（本轮新出） |
-| A 的基线 commit | `78102a8`（`claude/m6-level2-verify`，= 共享树 `E:\Dexatlas` 的 HEAD） |
+| A 的基线 commit | `78102a8`（`origin/claude/m6-level2-verify`；复核期间共享树本地已前移到 `a44156a`，但两份发布文本与全部被引用的报告/基准文件**一个字都没改**，见 §0.3） |
 | B 的基线 commit | `23ec6fa`（`claude/release-body`），已合入 `78102a8`；`git diff 23ec6fa 78102a8 -- docs/reports/v1.0.0-github-release-body.md` 为空，两处内容逐字相同 |
 | 复核手段 | Read / Grep / `git show` / `git diff`。**未**运行 pytest、`pytest --cov`、coverage 或 `uv sync`；**未**打 tag、push tag、创建 GitHub Release |
 | 工作位置 | 本复核在独立 worktree `E:\Dexatlas\.claude\worktrees\release-notes-consistency-1c6965` 内完成（分支 `audit/release-notes-consistency`，基线已切到 `origin/claude/m6-level2-verify` = `78102a8`），未触碰共享树 `E:\Dexatlas` |
@@ -44,7 +44,36 @@ B 的「Verification」节声明这组数字测自 commit `277d0fa`，指纹 `sh
 - `git log -1 --format=%B 277d0fa` 的正文确实写着「完整测量在最终树刷新：指纹 ccea379b…，
   suite 1584 passed / 0 failed，覆盖率 93.2%」，与 B 附录 `:269` 的引述逐字相符。
 
-⇒ B:164-171 的测量声明**属实**，无需修改。
+⇒ B:164-171 的测量声明在 **`78102a8` 这一基线上属实**，无需修改。但见下一节 —— 该基线之后主线又前移了。
+
+### 0.3 主线在复核期间前移，测量指纹已随之改变（复核后新增发现）
+
+复核期间，共享树 `E:\Dexatlas` 的本地分支从 `78102a8` 前移到 **`a44156a`**
+（新增 9 个提交）。`git diff --name-only 78102a8 a44156a` 的全部改动只有 4 个文件：
+
+```
+docs/reports/coverage-guard-audit.md      （新增报告）
+docs/reports/outreach-final-review.md     （新增报告）
+scripts/refresh-report-figures.py         ← 指纹覆盖文件
+tests/test_refresh_coverage_hygiene.py    ← 指纹覆盖文件
+```
+
+**两份发布文本与 `docs/reports/phase1-execution-report.md` 本身一个字都没改**
+（发布文本的行号引用不受影响，本报告的所有行号仍然有效）。但指纹变了：
+
+- 指纹的覆盖范围是 `src/**/*.py` + `tests/**/*.py` + `pyproject.toml` +
+  `scripts/refresh-report-figures.py`（`scripts/refresh-report-figures.py:110`、`:583-601`），
+  计算方式是对每个文件的「相对路径 + 归一化内容」做 sha256（`:624-630`）；
+- 上表里 `scripts/refresh-report-figures.py` 与 `tests/test_refresh_coverage_hygiene.py`
+  **都是指纹覆盖文件**，且两者都变了 ⇒ **`a44156a` 的源指纹必然不再是 `sha256:ccea379b…`**；
+- `tests/test_docs.py:696-700` 会重算指纹并断言它等于报告里记录的那个，
+  断言消息就是「the coverage figures were measured on a different source tree
+  (`sha256:ccea379b…` -> <新指纹>)」。⇒ 在主线重跑完整测量之前，
+  **这个门禁在发布线上是红的**，而 B 的 Verification 节（`:164-171`）里
+  「measured on commit `277d0fa` / 指纹 `sha256:ccea379b…` / 后续只改文档的 `8868e30` 不影响指纹」
+  这段话**也已不再成立**（`8868e30` 之后出现了**不是**纯文档的改动）。
+
+**这不改变本报告的任何一致性结论**，但把 §7 U9 从「条件项」升级为「发版前必须处理」：见 U9。
 
 ---
 
@@ -248,6 +277,7 @@ B 侧**；另有 1 项（B 侧的「不含二进制制品」）只在 B 侧。�
 
 > **本窗口只读，不替主线程改。** 下列每条给出：文件、行号、现状、建议改法、依据。
 > 排序按「读者会得出不同结论」的风险从高到低。
+> **例外：U9 虽列在末位，但因 §0.3 的指纹漂移，它现在是发版前的硬前置 —— 先看 U9。**
 
 ### U1 ★最严重 —— 「M10 独立验收尚未开始」：B 有，A 完全没有
 
@@ -327,15 +357,15 @@ B 侧**；另有 1 项（B 侧的「不含二进制制品」）只在 B 侧。�
 | 建议改法 | 把因果句改为指向真正的前置修复，例如：`After the execution-layer fixes (four) and the C2 single-word fallback, the full three-round retest on the complete 20-question denominator scored 49/60 = 81.7% (15/16/18 per round …)`；若要保留「五项根因修复」，应把它挂在 retest2/retest3 上并写明那次是 17/15/17 |
 | 依据 | `docs/benchmarks/m6-level2-retest4.md:5`、`:85`；`docs/benchmarks/m6-level2-retest3.md:29-31`、`:39`、`:41`、`:101`；`docs/benchmarks/m6-level2-retest2.md:5`；`docs/status.md:37-38`、`:133`；`docs/reports/v1.0.0-release-runbook.md:79-82`（同句式，建议一并改） |
 
-### U9 —— 验证数字只在一侧；且需与主线重跑的完整测量同批次刷新
+### U9 —— 验证数字只在一侧；且**主线指纹已漂移**，发版前必须重测并同批次刷新
 
 | | |
 |---|---|
-| 文件 / 行 | B `:157-160`、`:236-237`、`:262-269` ↔ A **无** |
-| 现状 | B 给出 1584（1437 快 + 147 集成）、一方覆盖率 93.2%（7109/7631），并声明测自 commit `277d0fa`、指纹 `sha256:ccea379b…`（该声明已核实为真，见 §0.2）。A 全文没有任何验证数字 |
-| 风险 | 两份面向读者的文本，一份承诺了可验证的测试与覆盖率口径，另一份没有 —— 读者若交叉比对会看到两个口径。**另外**：主线正在重跑完整测量，若新测得值与 1584 / 93.2% 不同，B 的这组数字与 `docs/reports/phase1-execution-report.md` 必须同批次刷新（由 `scripts/refresh-report-figures.py` 生成，不得手改） |
-| 建议改法 | 三步：(1) 等主线测量定稿后，确认 `phase1-execution-report.md` 的 `<!--fig:-->` 标记已由脚本刷新；(2) 若数字有变，同步改 B 的 `:157-160`、`:236-237`、附录 `:262-269`；(3) 视版面决定是否在 A 增加一个简短的验证小节（至少 1584 = 1437 + 147、93.2% = 7109/7631，并注明测自哪个 commit 与指纹）—— 若要加，**必须与主线同批次**，不能照抄当前值 |
-| 依据 | `docs/reports/phase1-execution-report.md:76-77`、`:877`（HEAD 版本）；`scripts/refresh-report-figures.py:110`、`:487-506`；`tests/test_docs.py:687` |
+| 文件 / 行 | B `:157-160`、`:164-171`、`:236-237`、`:262-269` ↔ A **无** |
+| 现状 | B 给出 1584（1437 快 + 147 集成）、一方覆盖率 93.2%（7109/7631），并声明测自 commit `277d0fa`、指纹 `sha256:ccea379b…`。在基线 `78102a8` 上该声明为真（§0.2）。**但主线已前移到 `a44156a`，指纹覆盖的 `scripts/refresh-report-figures.py` 与 `tests/test_refresh_coverage_hygiene.py` 都变了 ⇒ 源指纹必然已不是 `ccea379b…`**（§0.3）。A 全文没有任何验证数字 |
+| 风险 | ① 两份面向读者的文本，一份承诺了可验证的测试与覆盖率口径，另一份没有 —— 读者交叉比对会看到两个口径；② **B 里的「测自 `277d0fa` / 指纹 `ccea379b…` / 后续只改文档的 `8868e30` 不影响指纹」这句话在当前树上已经不成立** —— `8868e30` 之后出现了不是纯文档的改动；③ `tests/test_docs.py:696-700` 会重算指纹并断言与报告记录一致，主线重测之前该门禁在发布线上是红的 |
+| 建议改法 | 四步：(1) 主线跑完整测量，由 `scripts/refresh-report-figures.py` 重新生成 `phase1-execution-report.md` 的 `<!--fig:-->` 标记与机器可读块（**不得手改数字**）；(2) 用新指纹、新测试数、新覆盖率、新测量 commit 同步改 B 的 `:157-160`、`:164-171`、`:236-237`、附录 `:262-269`；(3) `:164-171` 里「后续只改文档的 `8868e30` 不影响指纹」这句要改成对**新**提交列表的陈述，或直接删掉这句、只留指纹本身；(4) 视版面决定是否在 A 增加一个简短的验证小节 —— 若要加，**必须与主线同批次**，不能照抄当前值 |
+| 依据 | `docs/reports/phase1-execution-report.md:76-77`、`:877`、`:1083`；`scripts/refresh-report-figures.py:110`、`:583-601`、`:624-630`；`tests/test_docs.py:682-700`；`git diff --name-only 78102a8 a44156a` |
 
 ---
 
@@ -345,9 +375,10 @@ B 侧**；另有 1 项（B 侧的「不含二进制制品」）只在 B 侧。�
 2. **附录 40 条出处逐条命中**，无一处「引用的行不写着那个数字」，也无 off-by-one（§5）。
 3. **升级说明与 `docs/install.md` 完全一致**：四个 extras、`--workspace`/`-w`、退出码 6 与「0–5 语义不变」都对得上（§4）。
 4. **共享工作树的 35.4% 是污染值，不是发布文本的值**：以 `git show HEAD:docs/reports/phase1-execution-report.md` 为准是 93.2%（7109/7631），与 B 一致（§0.1）。
-5. **B 的测量声明属实**：`277d0fa` 与 `8868e30` 均为 `78102a8` 祖先，`8868e30` 只改 `docs/`，不动指纹覆盖的 `src/`、`tests/`、`pyproject.toml`、测量脚本；`277d0fa` 的提交正文确实逐字写着 B 引述的那段（§0.2）。
+5. **B 的测量声明在基线 `78102a8` 上属实**：`277d0fa` 与 `8868e30` 均为 `78102a8` 祖先，`8868e30` 只改 `docs/`，不动指纹覆盖的 `src/`、`tests/`、`pyproject.toml`、测量脚本；`277d0fa` 的提交正文确实逐字写着 B 引述的那段（§0.2）。**但主线前移到 `a44156a` 后指纹已漂移**，该声明不再成立 —— 见 §0.3 与 U9。
 6. **16 组中英事实里 15 组等价**，唯一不等价是 U2 的停止决策那一行（§6）。
 7. **没有一边多写、也没有一边漏写一整节**（除 Verification / Licence / 中文摘要 / Appendix 这几处归属差异外）：A 的 5 条「不包含什么」在 B 里逐条有对应，B 多出的 5 条 Known limitations 也都与 A 不冲突。
+8. **本报告所有行号引用在主线前移后依然有效**：`78102a8 → a44156a` 只改了 4 个文件，其中两个是新增报告，另外两个是 `scripts/refresh-report-figures.py` 与 `tests/test_refresh_coverage_hygiene.py`（见 §0.3）。**`docs/releases/v1.0.0.md`、`docs/reports/v1.0.0-github-release-body.md`、`docs/reports/phase1-execution-report.md` 与全部 M6 基准报告一个字都没改**，故本报告的行号不必重算；但**数字本身**（1584 / 93.2% / 指纹）要按 U9 重测后刷新。
 
 ---
 
@@ -356,4 +387,4 @@ B 侧**；另有 1 项（B 侧的「不含二进制制品」）只在 B 侧。�
 - B 的草稿注记（`:3-8`）与整个 `## Appendix`（`:251-318`）**都不贴进 Release**；实际发布体是
   `:10-249`（导语 + Highlights + Known limitations + Verification + Upgrade notes + 中文摘要）。
 - 草稿注记 `:7-8` 已写明「不声称独立验收已发生 —— 它尚未开始」；贴出前若按 U1 改了 A，B 侧此句保持不变即可。
-- `:174-177` 声明 M6 层级 2 数字「由脚本从已落盘 trace 重算」，`:164-171` 声明测量批次 —— 贴出前应确认这两段在主线重测后仍然成立。
+- `:174-177` 声明 M6 层级 2 数字「由脚本从已落盘 trace 重算」，`:164-171` 声明测量批次 —— 贴出前应确认这两段在主线重测后仍然成立（见 U9：指纹已随 `a44156a` 漂移，`:164-171` 那段需要按新测量批次重写）。
