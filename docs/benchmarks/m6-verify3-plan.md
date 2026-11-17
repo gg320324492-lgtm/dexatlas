@@ -4,7 +4,7 @@
 
 ## 1. 背景与授权边界
 
-窄验证二轮（[m6-level2-narrow-verify2.md](m6-level2-narrow-verify2.md)）未达判据：DexAtlas 转通过 2/6、确定性修复题 1/5（门槛 ≥4/6、≥3/5），总用量 420,826 tokens（授权 410,000，超支如实披露）。此后第三轮修复已在 `claude/budget-impl` 落地：行裁剪机制、resources 收口、string excerpt 截断、空转提示、提示词条款（均带红→绿回归）。
+窄验证二轮（[m6-level2-narrow-verify2.md](m6-level2-narrow-verify2.md)）未达判据：DexAtlas 转通过 2/6、确定性修复题 2/5（门槛 ≥4/6、≥3/5），总用量 420,826 tokens（授权 410,000，超支如实披露）。此后第三轮修复已在 `claude/budget-impl` 落地：行裁剪机制、resources 收口、string excerpt 截断、空转提示、提示词条款（均带红→绿回归）。
 
 本方案为修复后的第三轮窄验证，以及窄验证达标后的完整三轮重测，给出一次性授权的执行约束：
 

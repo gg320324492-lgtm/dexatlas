@@ -7,7 +7,50 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+<!-- 发版时应用（属发版 commit，本草案不执行）：把本节标题改为 “## [1.0.0] — <发布日期>”；
+     文末链接块新增 “[1.0.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...v1.0.0”，
+     并把 “[Unreleased]” 的 compare 链接改为 “https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...HEAD”。
+     版本号未改、tag 未打之前，本节保持 Unreleased 标题，不自称已发布。 -->
+
 ### Added
+
+- **Phase 3 M5 — 对外声明基线校准。** 新增 `docs/reports/phase3-baseline.md`：
+  对外声明逐条对照代码与已提交 trace 复核（Windows 启动器、证据三级、计数
+  口径等），三份 benchmark（scripted / real / stronger）的八项指标均可由
+  committed trace 经 `benchmarks/comparison/run.py --metrics` 重算再生，报告
+  逐字再生有脚本与核对记录；演示素材的 scripted/真实模型标注同步修正。
+  产物与剩余问题见该报告（基线 `6b08684` + 本分支改动）。
+
+- **Phase 3 M6 前置 — 服务回归集冻结与层级 0/1 演练。** 新增
+  `docs/benchmarks/service-regression-set.md`：从 92 题全集冻结 20 题服务
+  回归集（`benchmarks/m6_service_set.py`，冻结基线 `100b191`），覆盖
+  权限/组件、指定方法、调用关系、资源出处、无法回答/后端缺失五类，并写明
+  「只代表这 20 道题」的能力边界；层级 0 确定性判分 **20/20**（零模型）。
+  层级 1 scripted 演练（`docs/benchmarks/m6-level1-scripted.md`，零模型
+  零费用）打通发题/工具循环/trace 落盘/判分管线：comparison harness 新增
+  `--task <id前缀>` 按题过滤（`tests/test_comparison_task_selection.py`
+  5 项回归先行），20 题与 92 题全量各跑一轮，scripted 成绩原样公开
+  （20 题 A 4/20、B 4/20、DexAtlas 1/20；92 题 A 15/92、B 15/92、
+  DexAtlas 5/92）——它度量 harness 机械，不是模型能力基线。
+
+- **Phase 3 M6 层级 2 首轮真实模型批测（未达验收线，失败面分析驱动后续修复）。**
+  新增 `docs/benchmarks/m6-level2-real.md` 与
+  `docs/benchmarks/m6-level2-traces.json`（MiniMax-M3.1-Flash 对冻结 20 题
+  独立 3 轮 × 3 配置）：DexAtlas 24/60 = 40.0%（逐轮 45%/40%/35%）、
+  A 源码文本 24/60、B 结构化检索 18/60——**未达验收线（每轮 ≥80%、三轮
+  合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103 tokens，超出
+  800,000 授权上限 53,103，92 题全量轮因此未执行。失败模式分析
+  （`docs/benchmarks/m6-level2-failure-analysis.md`）归类执行层故障与回答
+  宽度缺口，驱动其后各轮修复与复测。
+
+- **M6 层级 2 修复后单轮复测与第二轮复测（中间测量，如实存档）。** 单轮
+  复测（`docs/benchmarks/m6-level2-retest.md`，修复后首测）DexAtlas 15/20
+  = 75.0%（差 1 题达 80% 单轮线），trace 合计 356,803 tokens 超出 350,000
+  授权上限；五项根因修复后的第二轮复测
+  （`docs/benchmarks/m6-level2-retest2.md`，20 题完整分母）DexAtlas
+  **16/20 = 80.0%，达到单轮验收线**（A 7/20、B 7/20；trace 合计 355,623
+  tokens，追加授权 +50,000 后在总授权内）。单轮达标不等于三轮合计 ≥90%
+  的 B1 验收线；三轮完整结论见下条与 [m6-level2-retest4.md](docs/benchmarks/m6-level2-retest4.md)。
 
 - **M6 层级 2 预算效率四项修复与行裁剪机制（窄验证三轮前置）。** 四项修复
   各带红→绿回归：① `resources` intent 加入 `KEY_TOOLS`，资源题首次成功读取
@@ -17,6 +60,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   连续无新行读取 N=3 次发软提示（不硬拦，带新行的合法翻页即清除）。另带
   transcript 三层行裁剪（单字段 4000 字符、行页 12000 字符，保 total/offset
   语义）。全量 suite 1575 项通过，覆盖率 93.2%。
+
+- **v1.0.0 发版流程预研与本地 dry-run。** 新增
+  `docs/reports/v1.0.0-release-runbook.md`：发版流程的完整操作方案——版本号
+  落点（`src/dexatlas/__init__.py:11` 单一来源，pyproject 经 hatch 读取）、
+  CHANGELOG 1.0.0 条目草稿、B4 完整重测与全门禁清单、annotated tag 与
+  push 命令、GitHub Release 步骤、HANDOVER 改指 v1.0.0 的替换文本、阻断项
+  B1–B5 现状核对（基于 `c3586d8`）。只准备、不发布：不打 tag、不改版本号、
+  不调用模型 API。dry-run 预演记录见
+  `docs/reports/v1.0.0-dry-run.md`（2026-11-16；tag、push 与 GitHub Release
+  均未执行）。
 
 - **M6 层级 2 窄验证三轮报告（预算效率修复验证，仍未达窄验证判据）。** 新增
   `docs/benchmarks/m6-level2-narrow-verify3.md` 与
@@ -207,6 +260,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   「No APK」与 examples/ 一方 APK 矛盾等）。报告见
   `docs/reports/v1.0.0-dry-run.md`。仅预演与文档，不发版。
 - **M6 层级 2 复测下一轮的预算与判分方案与本地校验脚本。** 上一轮复测（DexAtlas 15/20，trace 合计 356,803 tokens）超出 35 万授权上限后，为修复合入后的下一轮复测定稿预算方案 `docs/benchmarks/m6-level2-retest-plan.md`：单题熔断 24,000 tokens（`--total-tokens`，取上轮通过题实测最大 22,776 之上）、总额 300,000 tokens（授权 350,000，留 50,000 缓冲）、总额熔断以逐题分批执行落实、判分与报告沿用既有脚本口径。新增本地校验脚本 `scripts/m6_retest_budget.py`：逐题与总额核对 trace token 用量，超支非零退出；无 trace 数据时校验方案文件存在与格式并退出 0。仅方案与脚本，不调用任何模型 API。
+- **M6 层级 2 verify3 执行方案。** 新增
+  `docs/benchmarks/m6-verify3-plan.md`：窄验证三轮 + 达标后完整重测的一次性
+  授权与执行约束（窄验证 ≤450,000 tokens、完整重测 ≤1,250,000 tokens、
+  单题 24,000 闸不放松、判分七条红线零改动），并固化停止条件——窄验证
+  不达标即按验收方案三选一定稿服务承诺范围，不再追加修复轮或模型调用。
+  方案定稿，不含任何测量结果。
 - **M10 独立验收自查脚本与自查报告。** 把[验收准备包](docs/reports/m10-acceptance-pack.md)
   40 项中可自动化的 40 项检查写成 `scripts/m10_selfcheck.py`（仅读仓库、
   无第三方依赖，`uv run --no-sync python scripts/m10_selfcheck.py` 运行，
@@ -216,7 +275,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `not_included`/HTML 离线渲染等契约静态核对、门禁命令可执行性；40 项
   人工判定项逐项标注原因留待读者执行。自查记录见
   `docs/reports/m10-selfcheck.md`；[读者验收包](docs/reports/m10-reader-package.md)
-  末尾增加指向自查报告的入口。
+  末尾增加指向自查报告的入口。M10 验收材料定稿：验收包按最新代码状态修订
+  （邀请函钉定 commit、读者包补降级路径与工作区提示），读者彩排三项高优发现
+  修复（案例正文与验收包同步）。
+- **双语 README 与文档状态同步（Phase 3 M9 + B5）。** README（英文）与
+  README.zh-CN（简体中文）展示入口：双语状态段、路线图状态表、第三方署名表、
+  文档地图；Quick start 的 analyze 示例直接使用仓库自带
+  `examples/demo-app/demo.apk`（新读者克隆后即可运行，无需先取第三方
+  fixtures），并注明该 APK 可由 `scripts/build-demo-apk.sh` 重建。README /
+  README.zh-CN / status.md / ROADMAP 的 M6 表述按窄验证二轮、三轮结果与
+  「方案 3（现状披露）」决定同步；install.md 的安装命令与实际 extras 组合对齐
+  （uv sync 四 extras），并修正「No APK is committed」与 `examples/` 五个一方
+  样例 APK 的矛盾。
 - **修复提案：退出码 6 分辨「跑完了但无可用的代码索引」。** 为公共契约
   §8.1 记录的已知缺口（三后端全部失败但 manifest 可解析时 `analyze` 仍退
   出 0）提供只含设计与版本化方案的提案文档
@@ -338,12 +408,6 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   （`evidence_ready`/`repeated_calls`/`tools_closed`），Markdown 报告新增
   「How the task converged」小节（旧报告无此节即不出现，纯增量）。
 
-- **`dexatlas analyze` 在分析被截断时返回退出码 5（新退出码 `EXIT_TRUNCATED`）。**
-  分析跑完、报告照常写出，但只要有一步被上限截短（`output_truncated` 记在
-  项目上），退出码就是 5——调用方只看退出码就能区分「干净完成（0）」「部分
-  完成/被截断（5）」「失败（3）」。0/1/2/3/4 的含义不变；此前截断的运行
-  退出码是 0，依赖旧退出码的调用方需注意这一公共契约变更。
-
 - **M6 层级 2 修复后窄验证的 trace 与不完整审计。** 新增
   `docs/benchmarks/m6-level2-narrow-verify-traces.json`（6 题 × 3 配置 × 3 轮，
   应为 54 条，实捕 53 条）与 `docs/benchmarks/m6-level2-narrow-verify-incomplete.md`
@@ -369,8 +433,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   失败构成已从执行层故障转为判分不过与个别题预算耗尽/errored
   （`multidex.dex-file-count` 三轮均 errored；`strings.api-key.demo` r3
   预算耗尽）。三轮 trace 合计 1,182,356 tokens，在 1,200,000 授权之内，
-  无熔断中止、无 not-run；判分失败与空答未重跑。B1 保持未关闭，后续处置
-  待定。
+  无熔断中止、无 not-run；判分失败与空答未重跑。B1 保持未关闭；后续处置
+  按其后的窄验证结果定稿（见上方窄验证三轮条目：按方案 §7 停止，M6 以
+  现状披露方案（方案 3）定稿）。
 
 - **M6 层级 2 窄验证二轮报告（四项修复验证，未达窄验证判据）。** 新增
   `docs/benchmarks/m6-level2-narrow-verify2.md` 与
@@ -382,7 +447,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   引导、descriptor 连写模板）在 `claude/m6-level2-verify` `9b25835` 上的
   效果。结果：MiniMax-M3.1-Flash 上 DexAtlas 转通过 **2/6**
   （`manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo`
-  2/3），确定性修复相关题转通过 **1/5**——**未达窄验证判据（转通过
+  2/3），确定性修复相关题转通过 **2/5**——**未达窄验证判据（转通过
   ≥4/6 且确定性题 ≥3/5）**。协议泄漏纠偏重试生效（54 条 trace 协议失败
   0 条，retest4 中三轮全灭的 `multidex.dex-file-count` 本轮 r3 打通）；
   `strings.api-key.demo` 三轮全部预算耗尽，`overloads.method-identity.
@@ -675,6 +740,12 @@ release says so rather than counting them in.
   that is model-behaviour tuning, not an engineering gap.
 
 ### Changed
+
+- **`dexatlas analyze` 在分析被截断时返回退出码 5（新退出码 `EXIT_TRUNCATED`）。**
+  分析跑完、报告照常写出，但只要有一步被上限截短（`output_truncated` 记在
+  项目上），退出码就是 5——调用方只看退出码就能区分「干净完成（0）」「部分
+  完成/被截断（5）」「失败（3）」。0/1/2/3/4 的含义不变；此前截断的运行
+  退出码是 0，依赖旧退出码的调用方需注意这一公共契约变更。
 
 - **The health answers name the workspace, not its path.** The workbench's
   `/api/health` carried the workspace's absolute path, which the header then
