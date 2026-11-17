@@ -269,7 +269,8 @@ uv run --no-sync python -c \
 **首测 24/60（40.0%）→ 执行层修复 → 三轮完整重测 49/60（81.7%，逐轮 15/16/18），
 仍未达验收线（每轮 ≥80%、三轮合计 ≥90%）**。当前事实以执行层修复后的完整重测
 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为准（数字由
-`scripts/m6_level2_retest4_report.py` 从三个 committed trace 重算）；首测
+`scripts/m6_level2_retest4_report.py` 从三个 committed trace 重算——本文的
+「trace」指**一次模型运行落盘的可复查记录**，定义见本节末的术语块）；首测
 [m6-level2-real.md](../benchmarks/m6-level2-real.md)（24/60 = 40.0%，逐轮
 45% / 40% / 35%，trace 合计 853,103 tokens 超出当次 800,000 授权）与中间复测
 （[retest](../benchmarks/m6-level2-retest.md)、[retest2](../benchmarks/m6-level2-retest2.md)、
@@ -281,6 +282,11 @@ uv run --no-sync python -c \
 > [v1.0.0 发版演练](v1.0.0-dry-run.md)。它与[验收准备包](m10-acceptance-pack.md)
 > §2 判定表里的**验收项 B1**（B 组「完整案例」，★ 阻断项）是两回事：
 > 本节讲的是前者，判定表里那一项讲的是「案例能否从头走到尾」。
+>
+> **术语（就地定义）：** 本文的「**trace**」= **一次模型运行落盘的可复查记录**，
+> 即 `*-traces.json` 里的一条，含该次运行的输入、输出与 token 消耗。它既是上面
+> 那些百分比与 token 数的**原始数据**（可由 `scripts/m6_level2_retest4_report.py`
+> 重算复现），也是 E2 / E3 的核查对象。本节及其余各处的 trace 都是这个意思。
 
 **核查方法**：确认 retest4 的数字由 committed trace 重算得出（可用
 `scripts/m6_level2_retest4_report.py` 复现）；确认文档没有把 81.7% 说成达标，
