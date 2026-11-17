@@ -196,7 +196,7 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 所以 tag 上实际跑的是 **10 个 job**。仓库自己的 CI 记录就是这么写的
 （`docs/reports/v1.0.0-ci-run-record.md` §1）：
 
-> run [`44126968629`](...)，10 个 job 里 **4 个红**，6 个绿。
+> run [`44126968629`](https://github.com/gg320324492-lgtm/dexatlas/actions/runs/44126968629)，10 个 job 里 **4 个红**，6 个绿。
 
 括号里漏掉的三项是：`Public contracts (live)`、`M10 acceptance self-check`、
 `The report's figures describe the tagged tree`。而且它自称 six，却列了七项。

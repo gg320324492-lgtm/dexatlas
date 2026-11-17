@@ -110,6 +110,33 @@ def test_required_document_exists(doc: str) -> None:
     assert (REPO_ROOT / doc).is_file(), f"{doc} is missing"
 
 
+def _resolves_literally(base: Path, target: str) -> bool:
+    """Whether ``target`` names something, checked component by component.
+
+    ``Path.resolve()`` normalises the way Windows does: there, three dots
+    mean "the parent directory", so a placeholder link written as ``(...)``
+    resolved to a directory that exists and **passed** the check on Windows --
+    while CI, on Linux, saw a directory named ``...`` that does not exist and
+    failed. The names in a path are checked literally instead, which is what
+    a file system does on every platform.
+    """
+    current = base
+    for part in target.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            current = current.parent
+            continue
+        try:
+            names = {entry.name for entry in current.iterdir()}
+        except OSError:
+            return False
+        if part not in names:
+            return False
+        current = current / part
+    return current.exists()
+
+
 def test_all_relative_links_resolve() -> None:
     broken: list[str] = []
 
@@ -119,11 +146,27 @@ def test_all_relative_links_resolve() -> None:
             target = match.group(1).split("#")[0]
             if not target:
                 continue
-            if not (markdown.parent / target).resolve().exists():
+            if not _resolves_literally(markdown.parent, target):
                 relative = markdown.relative_to(REPO_ROOT)
                 broken.append(f"{relative}: {target}")
 
     assert not broken, "broken relative links:\n" + "\n".join(sorted(set(broken)))
+
+
+def test_the_link_check_does_not_accept_a_placeholder(tmp_path: Path) -> None:
+    """A placeholder target is a broken link, on every platform.
+
+    Windows normalises ``...`` to the parent directory, so a document that
+    wrote ``(...)`` where a URL should be passed the link check locally and
+    failed it in CI: the local gate was weaker than the one it stood in for,
+    and the difference only showed up when the tree was pushed.
+    """
+    (tmp_path / "here.md").write_text("x")
+
+    assert not _resolves_literally(tmp_path, "...")
+    assert not _resolves_literally(tmp_path, "nope.md")
+    assert not _resolves_literally(tmp_path, "here.md/nope")
+    assert _resolves_literally(tmp_path, "here.md")
 
 
 def test_link_check_ignores_the_local_working_state(tmp_path: Path) -> None:
