@@ -16,7 +16,7 @@
 
 ## Project title
 
-DexAtlas — Evidence-First Android APK Analysis Platform (Python, REST API, MCP, AI Agent)
+DexAtlas — Evidence-First Android APK Static Analysis
 
 ## Role
 
@@ -47,9 +47,9 @@ recorded as verified. A backend that fails is reported as a value, not a
 crash: an APK that defeats the decompiler still yields a manifest, an index
 and a report that says which steps did not run.
 
-- ~1,540 automated tests, 93.1% coverage, mypy strict, ruff, and a CI pipeline
+- 1,584 automated tests, 93.2% coverage, mypy strict, ruff, and a CI pipeline
   across Python 3.12/3.13 and multiple backend configurations.
-- Full documentation with two end-to-end case studies on first-party sample
+- Full documentation with three complete case studies on first-party sample
   APKs that anyone can reproduce from the repository.
 
 ## Skills
@@ -68,9 +68,9 @@ and a report that says which steps did not run.
 - **Two transports over one core.** A CLI (`dexatlas analyze / manifest /
   search / source / xref / evidence / report`) and a REST API (FastAPI) over
   the same analyzer.
-- **Read-only MCP server.** Ten tools over stdio exposing projects, symbols,
-  call sites, evidence and locators — bounded responses, no write path, no
-  shell, no model dependency.
+- **Read-only MCP server.** Eleven tools over stdio exposing projects,
+  symbols, call sites, evidence and locators — bounded responses, no write
+  path, no shell, no model dependency.
 - **Evidence-first agent.** A single-loop agent that plans tool calls over the
   MCP tools within a budget, and reports what was established, what is only a
   lead, and what could not be established.
@@ -82,7 +82,7 @@ and a report that says which steps did not run.
 - **Benchmark harness.** Scripted and real-model comparison runs with
   committed traces and reproducible metrics; scripted and real-model results
   are reported separately and never mixed.
-- **Engineering quality gates.** ~1,540 tests, coverage and dead-code gates,
+- **Engineering quality gates.** 1,584 tests, coverage and dead-code gates,
   strict typing, lint/format, documentation citation checks, and CI across
   multiple Python and backend configurations.
 
@@ -106,14 +106,20 @@ captured as values and surfaced in the report instead of aborting the run.
 - The agent is a bounded single-loop assistant over a completed analysis; it
   is not a general autonomous vulnerability finder, and its default budget
   and known open issues are documented.
-- The project is in early development (`v0.2.x`); the public contract covers
-  the documented CLI/API/MCP surfaces.
+- The project is in early development (`v0.2.0` is the newest release); the
+  public contract covers the documented CLI/API/MCP surfaces.
 
 ## Links
 
 - Repository: <https://github.com/gg320324492-lgtm/dexatlas>
-- Case studies: `docs/case-studies/README.md` in the repository
+- Case studies: [docs/case-studies/README.md](../case-studies/README.md) in the
+  repository
 - Benchmark reports: `docs/benchmarks/` in the repository
+- Evidence packages, one per case study, each a zip holding the report and a
+  manifest of hashes:
+  [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
+  [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
+  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip)
 
 ---
 

@@ -1,0 +1,255 @@
+# Upwork 素材发布前核对（publish review）
+
+> **本文件是一次校对记录，不是发布动作。** 本轮没有向 Upwork 或任何其它
+> 平台提交、发布、复制或发送任何内容；没有调用任何模型 API；没有改动共享
+> 工作树。四份素材仍然是草稿，状态是「Draft for review — not published」。
+>
+> **核对基准：** 分支 `claude/upwork-check`，基于 `origin/claude/m6-level2-verify`
+> @ `8868e30` 的独立 worktree（`E:\worktrees\upwork-check`）。
+
+---
+
+## 0. 核对基准与数据来源
+
+| 要核对的量 | 取值 | 来源（仓库内可复核） |
+|---|---|---|
+| 测试总数 | 1,584（1,437 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 一方代码覆盖率 | 93.2%（7,109 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
+| case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
+| M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
+| M6 窄验证二轮 | 转通过 3/6（门槛 ≥4），未达标 | `docs/benchmarks/m6-level2-narrow-verify2.md` |
+| 最新已发布版本 | `v0.2.0`（tag 与 `src/dexatlas/__init__.py` 一致） | `git tag` / `src/dexatlas/__init__.py` |
+
+报告里的数字由 `scripts/refresh-report-figures.py` 从真实测量生成，**本轮没有手改任何
+`<!--fig:...-->` 标记**，只按它们已落盘的值改写对外文案。
+
+---
+
+## 1. 对外数字核对：4 处不一致，已全部改正
+
+四处都是**文案比仓库落盘值旧**（写的是更早一次测量的数字），不是夸大。改正后
+数字与 `docs/reports/phase1-execution-report.md` 逐字一致。
+
+| # | 文件 | 修正前 | 修正后 | 落盘真值 |
+|---|---|---|---|---|
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,584 automated tests, 93.2% coverage` | 1,584 / 93.2% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,584 tests, coverage and dead-code gates` | 1,584 |
+| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,584 tests at 93.2% coverage` | 1,584 / 93.2% |
+| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,584 automated tests at 93.2% coverage` | 1,584 / 93.2% |
+
+覆盖率的措辞保持「一方代码覆盖率」的口径，没有写成「总覆盖率」——报告里
+`coverage.pct` 量的就是一方代码。
+
+## 2. 事实性错误：3 处，已全部改正
+
+| # | 文件 | 修正前 | 修正后 | 依据 |
+|---|---|---|---|---|
+| 5 | `project-brief.md` §Deliverables | `Read-only MCP server. Ten tools over stdio` | `Eleven tools over stdio` | server.py 注册 11 个工具；`README.md` 与 `docs/architecture/workbench.md` 写 “eleven” |
+| 6 | `scope-ai-mcp.md` §What I offer | `a read-only MCP server (ten tools over stdio)` | `(eleven tools over stdio)` | 同上 |
+| 7 | `project-brief.md` §Short description | `two end-to-end case studies` | `three complete case studies` | `docs/case-studies/` 下是三篇（demo / obfuscated / api-integration）；`end-to-end` 只适用于第 1 篇，改用仓库自己的说法 “complete” |
+
+`cover-letter-templates.md` Template 2 里原本就写的 `eleven tools over stdio` 是对的，
+未改动——这也说明同一批素材里的工具数曾经自相矛盾（10 / 10 / 11）。
+
+## 3. 版本措辞：1 处，已收紧
+
+| # | 文件 | 修正前 | 修正后 |
+|---|---|---|---|
+| 8 | `project-brief.md` §Honest limitations | `in early development (`v0.2.x`)` | `in early development (`v0.2.0` is the newest release)` |
+
+`v0.2.x` 不是一个 tag，也不是一个可核对的版本号；`v0.2.0` 是真实 tag，且是本分支
+上最新的一个，`scripts/check-version-claims.py` 能直接验证这句。**这一句在 v1.0.0
+发版后会变成假话，必须随发版一起改**——见 §6 第 1 条。
+
+---
+
+## 4. 证据包与链接核对
+
+### 4.1 引用到的文件是否真实存在
+
+四份素材里现在一共 11 条相对链接，**逐条打开确认存在**：
+
+| 引用位置 | 链接目标 | 存在 |
+|---|---|---|
+| `project-brief.md` §Links | `../case-studies/README.md` | ✅ |
+| `project-brief.md` §Links | `../case-studies/attachments/demo-evidence-package.zip` | ✅ |
+| `project-brief.md` §Links | `../case-studies/attachments/obfuscated-evidence-package.zip` | ✅ |
+| `project-brief.md` §Links | `../case-studies/attachments/api-integration-evidence-package.zip` | ✅ |
+| `cover-letter-templates.md` 用法说明 | `../case-studies/attachments/demo-evidence-package.zip` | ✅ |
+| `cover-letter-templates.md` 用法说明 | `../case-studies/attachments/obfuscated-evidence-package.zip` | ✅ |
+| `cover-letter-templates.md` 用法说明 | `../case-studies/attachments/api-integration-evidence-package.zip` | ✅ |
+| `cover-letter-templates.md` 头部 | `scope-backend-automation.md` | ✅ |
+| `cover-letter-templates.md` 头部 | `scope-ai-mcp.md` | ✅ |
+| `cover-letter-templates.md` 头部 | `project-brief.md` | ✅ |
+| `cover-letter-templates.md` 用法说明 | `publish-review.md`（本文件） | ✅ |
+
+这些链接是**相对 markdown 链接**，所以 `tests/test_docs.py::test_all_relative_links_resolve`
+每次跑都会强制它们存在——链接指向不存在的路径，测试就会红。修正前这些位置用的是
+纯文本（`docs/case-studies/README.md`），检查器管不到；现在是能自动验证的。
+
+### 4.2 证据包与 case study 的一一对应
+
+`docs/case-studies/attachments/` 下共 9 个文件，三个证据包与三篇 case study
+一一对应，没有多余也没有缺失：
+
+| case study | 引用的附件（4 个） | 证据包 zip 内容 |
+|---|---|---|
+| `demo-app-walkthrough.md` | `demo-report.md` / `.json` / `.html` + `demo-evidence-package.zip` | `reports/report.html`、`reports/report.json`、`reports/report.md`、`manifest.json` |
+| `obfuscated-app.md` | `obfuscated-report.md` / `.json` / `.html` + `obfuscated-evidence-package.zip` | 同上 4 项 |
+| `api-integration.md` | `demo-report.md` / `.json` / `.html` + `api-integration-evidence-package.zip` | 同上 4 项 |
+
+三个 zip 都已解压核对，内含报告三件套与一份 `manifest.json`（哈希清单），不是空壳。
+素材里对外的描述（「a zip holding the report and a manifest of hashes」）与内容一致。
+
+### 4.3 素材里没有指错的东西
+
+- `project-brief.md` §Links 原来只指到 `docs/case-studies/README.md`，读者拿不到
+  可以直接打开的证据包；现在补齐了三个 zip 的确切路径。
+- 三个 case study 的附件引用在 `docs/case-studies/` 内原本就是对的，本轮未改动。
+
+---
+
+## 5. 字段长度核对（实测字符数）
+
+口径：**raw** = Markdown 源码字符数（人从文件里复制的内容）；**plain** = 去掉
+Markdown 语法（`**粗体**`、列表符号、`>` 引用）后的正文字符数（粘进表单框的
+内容）。取两者较大者判定，所以口径是保守的。门限按任务给定：**标题 ≤60、
+简介 ≤5,000**。
+
+| 字段 | 文件 | raw | plain | 门限 | 判定 |
+|---|---|---:|---:|---:|---|
+| **Project title** | `project-brief.md` | **53** | 53 | 60 | ✅ |
+| Role | `project-brief.md` | 438 | 438 | 5,000 | ✅ |
+| **Short description** | `project-brief.md` | 1,410 | 1,397 | 5,000 | ✅ |
+| Skills | `project-brief.md` | 311 | 271 | 5,000 | ✅ |
+| Deliverables shown in the repository | `project-brief.md` | 1,455 | 1,405 | 5,000 | ✅ |
+| Third-party components (attribution) | `project-brief.md` | 458 | 439 | 5,000 | ✅ |
+| Honest limitations | `project-brief.md` | 443 | 433 | 5,000 | ✅ |
+| Links | `project-brief.md` | 707 | 478 | 5,000 | ✅ |
+| 全文（附件） | `scope-backend-automation.md` | 4,951 | 4,829 | 5,000 | ✅ |
+| §What I offer（粘贴段） | `scope-backend-automation.md` | 592 | 588 | 5,000 | ✅ |
+| 全文（附件） | `scope-ai-mcp.md` | **6,562** | **6,408** | 5,000 | ❌ 超 |
+| §What I offer（粘贴段） | `scope-ai-mcp.md` | 781 | 773 | 5,000 | ✅ |
+| Template 1 正文 | `cover-letter-templates.md` | 2,216 | 2,179 | 5,000 | ✅ |
+| Template 2 正文 | `cover-letter-templates.md` | 3,005 | 2,964 | 5,000 | ✅ |
+
+### 5.1 标题：唯一超出平台字段门限的字段，已改正
+
+| | 修正前 | 修正后 |
+|---|---|---|
+| 标题 | `DexAtlas — Evidence-First Android APK Analysis Platform (Python, REST API, MCP, AI Agent)` | `DexAtlas — Evidence-First Android APK Analysis` |
+| 字符数 | **89**（超 ≤60 门限 29） | **53** |
+
+去掉的技术关键词没有丢：`Python` / `REST API` / `MCP` 仍在 §Skills 与
+§Short description 里。
+
+### 5.2 `scope-ai-mcp.md` 全文超出 5,000 —— 未擅自删改，列为人工确认项
+
+- 它是**提案附件**，不是平台字段：按 `cover-letter-templates.md` 的用法说明，
+  「Attach the matching scope document」。
+- 若目标是 5,000 字符的简介框，可粘贴的是 **§What I offer（plain 773 字符）**，
+  这一点已经写进该文件的头部（§Where this goes），附件本体不受长度限制。
+- 把整篇压到 5,000 以内要删掉约 1,500 字符的承诺性文字（排除条款、验收条款、
+  模型预算边界），这是**编辑判断而不是校对**，所以本轮没有替人做这个决定。
+- **若确认要整篇粘贴**，按 §6 第 3 条处理。
+
+### 5.3 另按提案正文常规上限复核（需在真实表单上确认）
+
+Upwork 提案正文的常规上限是 2,500 字符，比任务给定的 5,000 更严：
+
+| | raw | plain | 对 2,500 |
+|---|---:|---:|---|
+| Template 1 正文 | 2,216 | 2,179 | ✅ 未超 |
+| Template 2 正文 | 3,005 | 2,964 | ❌ 超约 460 |
+
+两封信都含 `{{...}}` 占位符，实际发送前会删掉不适用的段落，所以真实长度会短于
+上表——但**两封信的模板正文都应按 2,500 再核一次**（§6 第 2 条）。
+
+---
+
+## 6. 措辞核对：不宣称未达成的里程碑
+
+| 检查项 | 结果 |
+|---|---|
+| 「已发布服务页」 | ✅ 四份文件首尾都写着 `Draft for review — not published`，没有任何「已上线 / 已发布服务」的措辞 |
+| 「M6 已达标」 | ✅ 四份文件**完全没有提到 M6 或层级 2**。M6 层级 2 实测 49/60 = 81.7%（未达 ≥90% 验收线），窄验证二轮转通过 3/6（门槛 ≥4），两件事都还没关闭 |
+| 「独立验收已完成」 | ✅ 四份文件没有提到 M10 或任何验收流程；`docs/status.md` 里 M10 独立验收尚未开始，素材口径与之一致 |
+| 「已验证可复现」类措辞 | ✅ 只在有落盘证据处使用：`docs/case-studies/` 的三篇走查、三个证据包、CI 配置 |
+| 「自主发现漏洞 / 替代分析师」类措辞 | ✅ 两份 scope 都明确排除，`project-brief.md` §Honest limitations 也写明 agent 不是通用自主漏洞发现器 |
+| 「把 APK 里的指令当数据而非命令」 | ✅ 有实现支撑：`src/dexatlas/agent/orchestrator.py` 的系统提示把工具输出定性为不可信数据，MCP 侧有 `UntrustedText` 包装，`tests/test_agent_untrusted_input.py` 是对应的性质测试 |
+| 第三方归属 | ✅ 三个分析引擎各自点名，注明不是自有工作 |
+
+**没有发现夸大之处。** 发现的问题都是**少说**（10 个工具说成 10、三篇说成两篇、
+旧一轮的测试数与覆盖率），因此这一轮没有需要下调的表述。
+
+### 需要注意的是反向风险
+
+素材里**现在不引用** M6 的 49/60 = 81.7%。这本身不违规（不提即不宣称），但如果
+发布时想在服务页上写「agent 实测准确率」，必须同时写明**未达验收线**，否则就是
+本项目 CLAUDE.md 第 2 条禁止的「无人能复算的断言」。
+
+---
+
+## 7. 发布时仍需人工确认的事项
+
+按重要性排序。
+
+1. **版本号会过期（本轮已改，发版后必须再改）。**
+   `project-brief.md` §Honest limitations 现在写 `v0.2.0` is the newest release。
+   v1.0.0 发版后这句就是假话，`scripts/check-version-claims.py` 会直接报出来。
+   **发版 commit 之后要回来改这一句。**
+2. **两封信的正文长度按 2,500 再核一次。** Template 2 模板态 plain 2,964 字符，
+   已超提案正文的常规上限；占位符删掉后应当回落，但要人工确认删完后仍在限内
+   （§5.3）。
+3. **`scope-ai-mcp.md` 到底是「整篇做附件」还是「只贴 §What I offer」。**
+   整篇 6,562 字符超过 5,000；本轮按「附件 + 只贴 What I offer」处理，并把这条
+   说明写进了文件头部。若要整篇粘贴，需要再压约 1,500 字符。
+4. **平台真实字段限制要在真实表单上复核。** 本轮用的是任务给定的门限（标题
+   ≤60、简介 ≤5,000）。Upwork 实际限制会随时间调整，素材头部本来就有
+   「Character limits should be re-checked against the live form」的提示——发版前
+   请在真实表单上逐个字段确认。
+5. **对外数字要跟最后一次测量同步。** 本轮的 1,584 / 93.2% 取自本分支基线
+   `8868e30` 落盘的报告。**共享工作树里正在跑发版完整测量**，测量完成后报告
+   里的 `<!--fig:...-->` 会变成新值；届时这四份素材的数字要按新值再核一遍。
+   （另见 §8 的额外发现：共享树当前写进报告的覆盖率是残缺值。）
+6. **`{{...}}` 占位符全部替换后才能发。** 模板里的占位符若漏改会直接发出去。
+7. **不要在发布文案里出现收益、工时节省或客户案例。** 四份素材目前都守住了
+   「个人开源项目、无客户」的边界，改写时不要破坏它。
+
+---
+
+## 8. 门禁结果
+
+在本 worktree（`E:\worktrees\upwork-check`，独立 venv）执行：
+
+| 门禁 | 结果 |
+|---|---|
+| `uv run --no-sync pytest tests/test_docs.py` | **60/60 通过，0 跳过** |
+| `uv run --no-sync python scripts/check-doc-citations.py` | 220 citations，unresolved 0，**drifted 0** |
+| `uv run --no-sync python scripts/check-version-claims.py --base auto` | **通过**（exit 0，findings 2 条均为历史遗留） |
+
+`check-doc-citations.py` 与 `check-version-claims.py` 都只读文档与 git，不写报告
+数字；本轮**没有跑** `scripts/refresh-report-figures.py`，因此没有触碰任何测量
+产物。
+
+> **复现这条门禁时的一个坑：** `uv sync` 只装 `--extra dev` 时，
+> `tests/test_mcp_tools.py` 与 `tests/test_public_contracts.py` 会因为缺 `mcp`
+> 包而**收集失败**，`test_docs.py` 于是报「报告说 1584，树上只有 1533」。
+> 要复现报告里的套件口径，需要装齐全部 extra：
+> `uv sync --extra dev --extra analysis --extra mcp --extra demo`（装齐后收集到
+> 1584，与报告一致，`test_docs.py` 才 60/60）。
+
+### 额外发现：共享工作树当前写进报告的覆盖率是残缺值
+
+在 `E:\Dexatlas`（共享树，本轮**未改动**）里，`docs/reports/phase1-execution-report.md`
+的未提交改动把覆盖率写成了 **35.4%（2,699/7,631）**，弱模块表里
+`core/pipeline.py` 18.2%、`cli/main.py` 23.0%、`tools/androguard/worker.py` 0.0%——
+这是多会话并发测量互相清掉 `.coverage` 之后的残缺结果，不是真值（基线是 93.2%）。
+按项目已有的经验（并发测量会污染覆盖率），**共享树的发版测量需要重跑并核对弱模块
+表**才能落盘。本轮没有碰共享树，那边的处置归发版那一轮。
+
+---
+
+*本文件是校对记录，不是发布记录。素材仍然是草稿：没有提交、发布、复制或发送
+到任何平台。*
