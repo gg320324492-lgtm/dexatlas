@@ -30,9 +30,11 @@ DexAtlas to review the evidence, only to reproduce it.
 | 2 | [Reading an obfuscated app](obfuscated-app.md) | [`examples/obfuscated-app/obfuscated.apk`](../../examples/obfuscated-app/obfuscated.apk), plus a multi-DEX appendix on [`examples/multidex-app/multidex.apk`](../../examples/multidex-app/multidex.apk) | What survives name obfuscation, what the string index still finds, how the index records a class defined in two DEX files at once — and where the capability boundary sits |
 | 3 | [Integrating from Python](api-integration.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk), via the REST API and the MCP server | The wire contract: upload → analyze → poll → query → report over HTTP, the same analysis over eleven read-only MCP tools, and a minimal Python client |
 
-Three walkthroughs, two samples: case studies 1 and 3 both analyse the same
-APK — [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
-(sha256 `80a8fe0e…`) — and case study 2 is the obfuscated one.
+Three walkthroughs cover three first-party APKs — `demo-app`, `obfuscated-app`
+and `multidex-app` (the multi-DEX appendix) — with case studies 1 and 3 both
+analysing the same `demo-app` APK; the three evidence packages cover only two
+analyses, because the demo and api-integration packages come from one run
+(`run_e112e717…`) and their `report.md` and `report.html` are byte-identical.
 
 Both APK samples are **first-party**: built from smali sources committed
 beside them, rebuildable with `scripts/build-test-apks.sh`, and free of
