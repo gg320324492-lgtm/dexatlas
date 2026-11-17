@@ -383,7 +383,7 @@ EXIT=0
 6. **`docs/reports/README.md:77`（建议 `:116` 同步）** —— 邀请函成稿「只差填 hash」的说法掩盖了 **N1 仍未关闭**：`v1.0.0` tag 仍停在 `8f9ddca`（落后当前树 61 个提交），`origin/main` 同样是 `8f9ddca`，**tag 重打前这封信不能发**。
 7. **`docs/how-to-verify.md:354`** —— 行号引用补上 `m6-level2-retest4.md` 的 **第 82 行**（逐轮 15/16/18 与「每轮 ≥16/20」在那儿，83 与 85 都不含）。
 8. **`README.zh-CN.md:368`–`:371`** —— 补上与 `README.md:462`–`:464` 对应的一行（中文读者的指路入口）；这一条属于本仓库自己 `final-outward-consistency.md` §3 的「I 组 —— 中英对等」。
-9. **`docs/how-to-verify.md:123` 与 §2.0–§2.2** —— 补上 **抓 fixture 的一步**（`bash scripts/fetch-fixtures.sh`，Apache-2.0 数据）。实测：按页面现在的三步走完，汇总行是 **27 skipped**，而页面写着「这一栏必须是 0」；这 27 个 skip 全部是「fixture not present; run scripts/fetch-fixtures.sh」。要么把这一步写进 §2.0，要么把 §2.3 的判据改成「skip 只允许来自未抓取的第三方 fixture，且每一条都要能说出是哪一类」。
+9. **`docs/how-to-verify.md:123` 与 §2.0–§2.3** —— 补上 **抓 fixture 的一步**（`bash scripts/fetch-fixtures.sh`，Apache-2.0 数据）。实测：按页面现在的三步走完，汇总行是 **27 skipped**，而页面写着「这一栏必须是 0」。页面给了「或你能说清每一个 skip 的原因」这个出口，**但它从头到尾没有说 fixture 的存在**（全文检索 `fixture` / `fetch-fixtures` 零命中；「样本」只出现在 §2.8、§4、§6，都不是这一步）——访客既不知道该去抓，也拿不到「0」。要么在 §2.0 补一步 `bash scripts/fetch-fixtures.sh`，要么把 §2.3 的判据改写成「skip 只允许来自未抓取的第三方 fixture，且每一条都要能说出是哪一类」。
 
 **建议项（不阻塞发布，但会被下一个访客撞上）：**
 
@@ -420,8 +420,9 @@ EXIT=0
    的第 2 步，几乎每个访客都会走到。
 2. **§2.3 的汇总行：页面说「skipped 那一栏必须是 0」，真跑是 27。**
    实跑完整套件：1,561 passed + **27 skipped**（全部是「fixture not present; run
-   scripts/fetch-fixtures.sh」）。页面从 §2.0 到 §2.2 讲完了装环境的三步，**唯独没有
-   抓 fixture 这一步**（见 §7 第 9 条）。访客若照页面走完，汇总行里那 27 个 skip 无从解释。
+   scripts/fetch-fixtures.sh」）。页面给了「或你能说清每一个 skip 的原因」这个出口，
+   但**全文检索 `fixture` / `fetch-fixtures` 零命中**——§2.0 到 §2.3 讲完了装环境的三步，
+   唯独没有抓 fixture 这一步（见 §7 第 9 条）。访客照页面走完，汇总行里那 27 个 skip 无从解释。
 3. **§2.2 的后端表格列宽与真机不符。** 影响小，但同样会让人怀疑「这页是不是手抄的」。
 
 ### 8.3 一个硬缺口：**「数出个数」这件事，访客没法自己完成**
