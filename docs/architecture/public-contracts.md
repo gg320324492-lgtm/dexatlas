@@ -342,27 +342,40 @@ not_included: {apk, full_sources, unrelated_strings}
 ## 7. 验证记录
 
 实测环境：Python 3.12.10。2026年11月15日的首次实测在 branch
-`claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑一次。
+`claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑两次。
 快照测试 `tests/test_public_contracts.py` 把同样的清单固化为回归门禁。
 
 **检查项清单共 49 项：28 REST + 6 MCP + 15 CLI**——即
-`scripts/verify-public-contracts.py` 里 `check()` 调用的条数（`_rest_requests()`
-28 项、`mcp_checks()` 6 项、`cli_checks()` 15 项）。下面三张表每行对应脚本里的一次
+`scripts/verify-public-contracts.py` 里 `check()` 调用点的条数（`_rest_requests()`
+28 个、`mcp_checks()` 6 个、`cli_checks()` 15 个）。下面三张表每行对应脚本里的一次
 `check()`，行数与分项数相等。
 
-REST 有两项是条件检查：服务起不来时才记 `server comes up`，源码端点返回 200 时
-才记 `X-DexAtlas-Source-* headers`。所以实跑条数依机器而定——缺 JADX 时源码端点
-返回 404，那一项不触发，2026年11月17日实测为 47/47 通过；三个后端齐备时是 49/49。
+**49 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
+`server comes up` 只在服务起不来时记（起不来则本段只记这 1 项并中止），
+`X-DexAtlas-Source-* headers` 只在源码端点返回 200 时记。所以实跑的**执行条数**依
+机器而定：
+
+| 实跑（均为 2026年11月17日，命令 `uv run --no-sync python scripts/verify-public-contracts.py`） | 可用后端 | 执行条数 | 通过 |
+|---|---|---|---|
+| 早先那次 | 仅 androguard，JADX 与 Apktool 都不在环境里 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** |
+| 本次（branch `claude/contract-49-live-run-99dbca`，commit `8524503`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **46/48** |
+
+两次的差在一处条件检查上：缺 JADX 时源码端点返回 404，`X-DexAtlas-Source-* headers`
+不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。
+
+**「三后端齐备时是 49/49」不成立**：三后端齐备时执行 48 项，其中 2 条 CLI 断言的
+前提是「没有源码/资源后端」，本实跑里它们不成立（见 §7.3）。本次脚本退出码为 1
+（有未通过的检查）。
 
 ### 7.1 REST 实测
 
 以 `uvicorn dexatlas.api.app:app` 起服务，上传 `examples/demo-app/demo.apk` 后逐
-端点核对（脚本 `scripts/verify-public-contracts.py` 的 `_rest_requests()`，28 项
-检查）：
+端点核对（脚本 `scripts/verify-public-contracts.py` 的 `_rest_requests()`，静态
+28 个调用点；服务起得来时本段实跑 27 项——`server comes up` 只在起不来的分支上记）：
 
 | 检查 | 结果 |
 |---|---|
-| 服务起来（起不来则记 `server comes up` 并中止本节） | ✅ |
+| 服务起来（起不来则记 `server comes up` 并中止本节；起得来时这一项不计入本段条数） | ✅ |
 | `GET /health` → `{status,version,backends}`，`status=="ok"` | ✅ |
 | `GET /backends` → `{available,missing,versions}`，两集合不相交 | ✅ |
 | `POST /analyze` → 202 `{project_id,status,detail}` | ✅ |
@@ -373,7 +386,7 @@ REST 有两项是条件检查：服务起不来时才记 `server comes up`，源
 | `GET /projects` → `ProjectResponse[]` | ✅ |
 | `GET /projects/{pid}/runs` → `{project_id,total,published_run_id,runs[]}`，RunResponse 11 字段 | ✅ |
 | `GET /projects/{pid}/runs/{rid}` → `published==True` | ✅ |
-| `GET /projects/{pid}/manifest` → 200（本机 Apktool 缺失时 404 带 reason） | ✅ |
+| `GET /projects/{pid}/manifest` → 200（三后端齐备时 200；本机 Apktool 缺失时 404 带 reason） | ✅ |
 | `GET /projects/{pid}/classes?limit=5` → `{project_id,total,classes}`，`len(classes) ≤ 5`，`total ≥ len(classes)` | ✅ |
 | `GET /projects/{pid}/methods?limit=5` → `{project_id,total,methods}`，`total ≥ 1` | ✅ |
 | `GET /projects/{pid}/resources` → `{project_id,total,resources}` | ✅ |
@@ -382,7 +395,7 @@ REST 有两项是条件检查：服务起不来时才记 `server comes up`，源
 | `GET /projects/{pid}/search?q=demo` → `{project_id,query,results}`，`query=="demo"` | ✅ |
 | `GET /projects/{pid}/evidence` → `{project_id,total,evidence}`，`level ∈ {verified,lead,insufficient}` | ✅ |
 | `GET /projects/{pid}/classes/{cls}/source` → 200 或 404 | ✅ |
-| 上一行返回 200 时，四个 `X-DexAtlas-Source-*` 头齐全 | ⚪ 条件项 |
+| 上一行返回 200 时，四个 `X-DexAtlas-Source-*` 头齐全 | ✅ 三后端齐备时触发 |
 | `GET /projects/{pid}/report?format=json` → `schema_version==3`，10 个顶层键 | ✅ |
 | `GET /projects/{pid}/report?format=markdown` → `text/markdown` | ✅ |
 | `GET /projects/{pid}/report?format=bogus` → 422 | ✅ |
@@ -391,8 +404,10 @@ REST 有两项是条件检查：服务起不来时才记 `server comes up`，源
 | `DELETE /uploads/{sha}` → 204 | ✅ |
 | `DELETE /projects/{pid}` → 204 | ✅ |
 
-⚪ = 条件项：本机没有源码后端（JADX），端点返回 404，该项未触发；后端齐备时它是
-一项常规检查。
+REST 段有两项是条件检查：`server comes up` 只在服务起不来时记（起不来则本段中止，
+只记这 1 项，REST 段合计 1 项）；`X-DexAtlas-Source-* headers` 只在源码端点返回
+200 时记。缺 JADX 的实跑里后者不触发（端点返回 404），REST 段执行 26 项；三后端
+齐备的实跑里它触发并通过（源码端点答 200，四个头齐全），REST 段执行 27 项。
 
 ### 7.2 MCP 实测
 
@@ -423,8 +438,8 @@ REST 有两项是条件检查：服务起不来时才记 `server comes up`，源
 | `backends` | 0 | ✅ |
 | `analyze examples/demo-app/demo.apk`（本机 Androguard 可用） | 0 | ✅ |
 | `projects` | 0，列出项目 | ✅ |
-| `source`（无源码后端，索引里无源码） | 1 | ✅ |
-| `resources`（无 Apktool，资源表为空） | 1 | ✅ |
+| `source`（无源码后端，索引里无源码） | 1 | ✅ 早先那次（无 JADX）；三后端齐备时退出码 0 → ❌ |
+| `resources`（无 Apktool，资源表为空） | 1 | ✅ 早先那次（无 Apktool）；三后端齐备时退出码 0 → ❌ |
 | `classes apk_nope` | 2 | ✅ |
 | `classes <pid> --limit 0`（Typer `min=1`） | 2 | ✅ |
 | `analyze 缺失文件` | 2 | ✅ |
@@ -434,6 +449,20 @@ REST 有两项是条件检查：服务起不来时才记 `server comes up`，源
 | `analyze` 桩抛 `AnalysisFailed` | 3 | ✅ |
 | `analyze` 项目带 `output_truncated` 错误 | 5，stderr 提到 exit code 5 | ✅ |
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ |
+
+三后端齐备那次实跑有 2 条未通过，都是脚本对环境的假设，不是契约的破口——CLI 的实际
+行为符合 §1.2（答案非空即 0）：
+
+- `source without a source backend exits 1 (empty)`：JADX 在场时
+  `dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity` 打出 JADX
+  反编译的 Java（出处 `jadx 1.5.2 -> jadx:sources/com/example/demo/MainActivity.java`），
+  答案非空 → 退出码 0；脚本这条断言写的是「无源码后端」时的 1。
+- `resources without a resource backend exits 1 (empty)`：Apktool 在场时资源表有
+  `app_name` = `DexAtlas Demo`（出处 `apktool 2.11.1 -> apktool:res/values/strings.xml`），
+  答案非空 → 退出码 0；脚本这条断言写的是「无 Apktool」时的 1。
+
+脚本的判定逻辑未改（只改了本表的记录）：这两条断言要成立，需要的是缺 JADX、缺
+Apktool 的环境，也就是上表「早先那次」那台机器。
 
 ## 8. 已知限制
 
