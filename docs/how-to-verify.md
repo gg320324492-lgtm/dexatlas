@@ -34,7 +34,7 @@
 |---|---|---|---|
 | 1 | **测试数与覆盖率** | [`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 1.2 / 1.3 / 6 节，数字夹在 `<!--fig:…-->` 标记之间 | 跑 `scripts/refresh-report-figures.py` 重测（见 §2.8）；或跑 `tests/test_docs.py`，它拿报告里记录的那次测量的源码指纹和当前树比对 |
 | 2 | **公共契约**（CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema、版本政策） | [`docs/architecture/public-contracts.md`](architecture/public-contracts.md)，验证记录在同文件 §7 | 跑 `scripts/verify-public-contracts.py`（见 §2.6）；契约快照在 `tests/test_public_contracts.py` |
-| 3 | **M6 层级 2 的得分** | [`docs/benchmarks/m6-level2-real.md`](benchmarks/m6-level2-real.md)、[`docs/benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 及窄验证各轮 | 跑对应的 `scripts/m6_level2_*_report.py` 从已提交的 trace 重算（见 §2.7）；缺 trace 时脚本不出报告 |
+| 3 | **M6 层级 2 的得分**（层级 2 = 用真实模型跑冻结题集的那一层评测） | [`docs/benchmarks/m6-level2-real.md`](benchmarks/m6-level2-real.md)、[`docs/benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 及窄验证各轮（窄验证 = 只在六道已知失败面上重跑的缩小复测，6 题 × 3 轮） | 跑对应的 `scripts/m6_level2_*_report.py` 从已提交的 trace 重算（见 §2.7）；缺 trace 时脚本不出报告 |
 | 4 | **退出码语义** | [`docs/architecture/public-contracts.md`](architecture/public-contracts.md) §1.2 | 同第 2 条：契约活检脚本会真的触发每一个退出码 |
 | 5 | **证据链与出处模型**（每条结论由哪个工具、哪个版本、从哪个字节位置读出来） | [`docs/analysis-provenance.md`](analysis-provenance.md) | 该文件 §4「读者如何自己验证一条结论」、§7「复现本文档的全部数字」给了逐步命令；§8 是一页速查表 |
 
@@ -132,6 +132,7 @@ uv run dexatlas backends
 ```
 
 若某一行不是 `available`，**去掉的测试会变成 skip，而不是 fail**（见 §0 第 3 条）。
+（「去掉的测试」= 被 pytest 的 `-m` 过滤掉的用例；pytest 把它记作 deselected，不是 removed。）
 这个表格的实物截图与读法见
 [`docs/analysis-provenance.md`](analysis-provenance.md) §4.1。
 
@@ -143,8 +144,9 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里三样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1632**（**1485** 快 + **147** 集成）。
-  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
+* **收集到的测试数** —— 当前这棵树上应当是 **1632**（**1485** 快 + **147** 集成；
+  「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
+  `@pytest.mark.slow`、要真调外部后端的集成用例）。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
@@ -162,9 +164,8 @@ uv run --no-sync pytest -q
 
 | 环境 | 汇总行 |
 |---|---|
-| 三后端齐备，**没**取第三方样本 | `1593 passed, 27 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
+| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `1605 passed, 27 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
 | 三后端齐备，**取了**第三方样本 | `1632 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
-
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -324,6 +325,7 @@ M6 层级 2 的每一个数字都由脚本从**已提交的 trace 文件**重算
 **还有一份不是验收测量。**
 [`benchmarks/m6-level2-verify.md`](benchmarks/m6-level2-verify.md) 是**单轮**验证，
 它自己的标题就写着「结果判定（对照参考线，**非验收**）」——别把它当成 B1 的成绩单。
+（「参考线」= 预先写下、只作对照比较的分数线，不等于「验收线」。）
 **B1 的验收测量是 `m6-level2-retest4.md`**（三轮完整重测）。
 
 例如重算三轮完整重测：
@@ -399,12 +401,15 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 ## 3. 哪些说法目前是「未达成 / 未验证」，请据此打折
 
+（「未达成」= 量过但没过线；「未验证」= 从未测过。两者对读者的意义不同：前者是坏消息，
+后者是不知道。）
+
 这一节是本页最该被读到的部分。**下面每一条都是仓库自己写的**，链接指向原文。
 
 | 说法 | 现在的状态 | 依据 |
 |---|---|---|
-| **M6 层级 2 的得分达标** | **未达。** 修复后三轮完整重测 DexAtlas **49/60 = 81.7%**（逐轮 15/16/18），**低于三轮合计 ≥90%（≥54/60）的验收线**；r1 未达每轮 ≥80%（≥16/20）。结论：**未达标** | [`benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 第 82、83、85 行；验收线（每轮 ≥80%、三轮合计 ≥90%）见 [`benchmarks/service-regression-set.md`](benchmarks/service-regression-set.md) §5「冻结纪律」第 2 条与 [`roadmap/phase3-plan.md`](roadmap/phase3-plan.md) §5 M6 |
-| **窄验证（六个已知失败面）达标** | **未达。** 窄验证二轮 DexAtlas 转通过 **2/6**、确定性修复题 **2/5**；三轮（预算效率修复后）转通过 **3/6**、确定性修复题 **3/5**——门槛都是 ≥4/6、≥3/5，**两轮都未达** | [`benchmarks/m6-level2-narrow-verify2.md`](benchmarks/m6-level2-narrow-verify2.md) 第 61 行；[`benchmarks/m6-level2-narrow-verify3.md`](benchmarks/m6-level2-narrow-verify3.md) 第 61 行 |
+| **M6 层级 2 的得分达标** | **未达。** 修复后三轮完整重测 DexAtlas **49/60 = 81.7%**（逐轮 15/16/18），**低于三轮合计 ≥90%（≥54/60）的验收线**（验收线 = 认定该里程碑通过所需的最低分数门槛）；r1 未达每轮 ≥80%（≥16/20）。结论：**未达标** | [`benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 第 82、83、85 行；验收线（每轮 ≥80%、三轮合计 ≥90%）见 [`benchmarks/service-regression-set.md`](benchmarks/service-regression-set.md) §5「冻结纪律」（冻结纪律 = 调优前冻结题集与门槛，不许靠删掉做对的题来提高通过率）第 2 条与 [`roadmap/phase3-plan.md`](roadmap/phase3-plan.md) §5 M6 |
+| **窄验证（六个已知失败面）达标** | **未达。** 窄验证二轮 DexAtlas 转通过 **2/6**、确定性修复题 **2/5**（转通过 = 原先判失败、这一轮改成通过；确定性修复题 = 预期修法确定、可判对错的题）；三轮（预算效率修复后）转通过 **3/6**、确定性修复题 **3/5**——门槛都是 ≥4/6、≥3/5，**两轮都未达** | [`benchmarks/m6-level2-narrow-verify2.md`](benchmarks/m6-level2-narrow-verify2.md) 第 61 行；[`benchmarks/m6-level2-narrow-verify3.md`](benchmarks/m6-level2-narrow-verify3.md) 第 61 行 |
 | **M10 独立验收已完成** | **尚未开始。** 准备包就绪（40 项验收检查表 + 读者一站式入口 + 作者侧自查 43/43 通过），但**独立复现、准备度重评与 release candidate 仍未开始**，需要一位真实的独立读者来跑 | [`docs/status.md`](status.md) §4.0 的 M10 行；[`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) 的 M10 行 |
 | **Phase 3 的退出标准已全部达成** | **未全部达成。** M6 层级 2 未达标、M10 验收未开始 | [`docs/status.md`](status.md) §4.0 开头；[`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) 开头段 |
 | **agent 的回答是事实** | **不是。** 「模型的结论永远不是事实」——工具读出来的东西才是事实，且带能解析的引用；模型的结论只能是**待核的线索（lead）** | [`architecture/agent.md`](architecture/agent.md) §「The boundary between a lead and a finding」；[`architecture/evidence-invariants.md`](architecture/evidence-invariants.md) |

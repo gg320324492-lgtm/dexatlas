@@ -1,7 +1,9 @@
 # GitHub / Upwork 作品集准备度复评（第二轮，作者自评）
 
 日期：2026-11-18。评估基准：`75976e0`（= `git rev-parse v1.0.0^{commit}`，与 `origin/main` 同指）。
-**本文是作者自评（self-assessment），不是 [M10 准备包](m10-acceptance-pack.md)所要求的独立验收。**
+**本文是作者自评（self-assessment），不是 [M10 准备包](m10-acceptance-pack.md)所要求的独立验收。
+（「准备包」= 交给外部读者的 M10 验收材料包；「独立验收」= 由一个没参与实现的人执行该准备包里的
+40 项检查并给出结论。）**
 维度、两平台权重与 0–4 等级定义全部沿用 [2026-11-15 基线评估](portfolio-readiness-2026-11-15.md)；
 「上一轮得分」取 [2026-11-15 复评](portfolio-readiness-2026-11-15-recheck.md) §6.5 的最终值
 （GitHub 81.25% / Upwork 76.9%）。分值是作者按同一评分表对当前树的保守判断，
@@ -17,6 +19,7 @@
 > tag `v1.0.0` 的那次 CI run（`44126968629`）以 `failure` 结束，**4 个 job 红**
 > （`Tests (Python 3.12)`、`Tests (Python 3.13)`、`Tests (Apktool only, no JADX)`、
 > `The report's figures describe the tagged tree`），根因是同一条契约判据，主会话已修。
+> （本文说的「绿」= 那次 CI run 里每个 job 的结论都是 success；只要有一个不是，就不叫绿。）
 > 本报告的**分数不变**——「核心工程与证据链 4/4」的依据是 `ci.yml` 里的**机制**
 > （tag 触发、三个新 job、两处门禁盲区收口），不是那次运行的结果；但凡写着「全绿」
 > 的地方都已改成事实。详见 §4.1、§7 第 7 条、§8 第 8 与第 17 条。
@@ -33,7 +36,9 @@
   **49 / 60 = 81.7%**，未达验收线（每轮 ≥80%、三轮合计 ≥90%），
   见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85。
 - **不是**：对仓库全部质量的重测。本轮未重新执行完整测试矩阵与覆盖率测量，
-  采用仓库里已落盘的最终测量：**1,620 项测试（1,473 快 + 147 集成）、
+  采用仓库里已落盘的最终测量：**1,620 项测试（1,473 快 + 147 集成；「快 / 集成」=
+  fast / slow 两套——fast 是 pytest 没标 `slow` 的用例，slow 是标了 `@pytest.mark.slow`、
+  要真调外部后端的集成用例）、
   一方代码覆盖率 93.3%（7,117/7,631 行）**，
   见 [phase1-execution-report.md](phase1-execution-report.md):76-77、:1097。
 - **不是**：接单计划、报价单或市场调研。
@@ -48,10 +53,10 @@
 
 | 维度 | 权重 | 上一轮 | 这一轮 | 变化理由（出处） |
 |---|---:|:---:|:---:|---|
-| 核心工程与证据链 | 30% | 4 | 4 | 已到等级上限；证据变厚但未跨档：CI 新增 tag 触发与只在 tag 上跑的测量 job（[ci.yml](../../.github/workflows/ci.yml):18、:493-525），契约活检进 CI（`ci.yml:442`），M10 自查进 CI（`ci.yml:471`）；两处门禁盲区收口（[check-doc-citations.py](../../scripts/check-doc-citations.py):107、[refresh-report-figures.py](../../scripts/refresh-report-figures.py):1012） |
+| 核心工程与证据链 | 30% | 4 | 4 | 已到等级上限；证据变厚但未跨档：CI 新增 tag 触发与只在 tag 上跑的测量 job（[ci.yml](../../.github/workflows/ci.yml):18、:493-525），契约活检进 CI（`ci.yml:442`；契约活检 = 真的把公共契约面跑一遍、失败就非零退出的脚本），M10 自查进 CI（`ci.yml:471`）；两处门禁盲区收口（[check-doc-citations.py](../../scripts/check-doc-citations.py):107、[refresh-report-figures.py](../../scripts/refresh-report-figures.py):1012） |
 | 首次试用与复现 | 20% | 3 | **3.5** | 升级：新增[读者实走演练](reader-dry-run.md)——真 clone 46 秒、`uv sync` 218 秒、后端 359 秒，九步路径与材料逐字相符，七道门禁退出码全 0（:39-45、:196-199）；并查出 **11 处材料与现实不符**（:108-118），已逐条改正。扣分见 §4.2 |
 | Agent 可用性与评测可信度 | 10% | 3.5 | 3.5 | 未变：M6 层级 2 三轮合计 **49/60 = 81.7%**，仍未达 ≥90%（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83）；层级 0/1 证据延续有效 |
-| 客户交付件与服务边界 | 10% | 3 | **3.5** | 升级：契约活检真跑通（[public-contracts.md](../architecture/public-contracts.md):348-362，三后端齐备 48/48、仅 androguard 47/47、退出码 0）；交付路径被演练全程走通。扣分见 §4.4 |
+| 客户交付件与服务边界 | 10% | 3 | **3.5** | 升级：契约活检真跑通（[public-contracts.md](../architecture/public-contracts.md):348-362，三后端齐备 = Apktool、JADX、androguard 三个后端都在，48/48、仅 androguard 47/47、退出码 0）；交付路径被演练全程走通。扣分见 §4.4 |
 | 对外展示与个人贡献说明 | 25% | 3 | 3 | 未变：v1.0.0 已发布、LICENSE 已换成官方全文（[LICENSE](../../LICENSE):1、:176、:178）、两轮走查与两轮审计已落盘；但 Upwork 素材仍是草稿未发布（[project-brief.md](../outreach/project-brief.md):3），独立首读复核结论未回填 |
 | 独立使用验证 | 5% | 1 | 1 | 未变：可见记录仍全部是作者自测；[M10 独立验收](m10-acceptance-pack.md)尚未发起（[status.md](../status.md):3、:138） |
 
@@ -288,7 +293,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 4. **「材料说的是不是真的」第一次被真机验过。**
    证据：读者实走演练（[reader-dry-run.md](reader-dry-run.md):39-45）——真 clone、
-   检出 tag、九步路径、七道门禁退出码全 0、契约 48/48、M10 自查 **43 条自动化判定全过、0 失败**（另有 40 项留人工——两个分母不是一回事）；
+   检出 tag、九步路径、七道门禁退出码全 0、契约 48/48、M10 自查 **43 条自动化判定全过、0 失败**（另有 40 项留人工——「留人工」= 这 40 项要由人读材料下结论，脚本判不了；两个分母不是一回事）；
    并查出 11 处材料与现实不符（:108-118）。
    改变的判断：上一轮所有安装/复现证据都来自项目自己的窗口（M8 演练也是作者执行），
    无法排除「材料按项目自己的想象写」。现在有了一份**逐字对照表**，
