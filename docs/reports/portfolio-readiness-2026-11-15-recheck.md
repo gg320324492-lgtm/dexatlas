@@ -17,6 +17,15 @@
 > 作为基线对照。剩余缺口仍未达 90%：M6 三轮完整验收、M10 独立验收、
 > Upwork 服务页发布、README 独立首读复核——全部属于需外部动作。
 
+> **2026-11-17 补注（测量数字更新，评分不变）：** M8 窗口之后的完整重测量
+> （见[执行报告](phase1-execution-report.md) measurement record）为 **1,542 项
+> 测试（1,395 快 + 147 集成）、一方代码覆盖率 93.1%（6,947/7,461 行）**，
+> `tools/androguard/worker.py` 72.3%（31/112）。§5 门禁记录中「1435 通过 /
+> 91.6%」与 §6 表内引用的 1435/91.6% 均为 M8 窗口（`da69f5d`）的历史记录，
+> 保持原文不动；此后测试数与覆盖率只增未减，不影响本文任何评分与缺口结论。
+> M6 层级 2 三轮完整重测 49/60 = 81.7%，仍未达 B1 线，表述与
+> [status.md §4.0](../status.md) 一致。
+
 ## 0. 这份复评是什么、不是什么
 
 - **是**：作者在 M5–M9 交付合入后，按原评分表做的一次自测快照，逐项给出证据链接与扣分原因。
@@ -34,7 +43,7 @@
 
 | 维度 | 基线分 | 本次分 | GitHub 权重 | Upwork 权重 | 主要证据与本次变化 |
 |---|:---:|:---:|---:|---:|---|
-| 核心工程与证据链 | 4 | 4 | 30% | 20% | 证据链模型、契约测试、隔离测试延续有效；[M4 评审](m4-review.md)、[公共契约表](../architecture/public-contracts.md)、[M8 演练](m8-install-rehearsal.md) |
+| 核心工程与证据链 | 4 | 4 | 30% | 20% | 证据链模型、契约测试、隔离测试延续有效（完整测量：1,542 测试 / 覆盖率 93.1%，见执行报告 measurement record）；[M4 评审](m4-review.md)、[公共契约表](../architecture/public-contracts.md)、[M8 演练](m8-install-rehearsal.md) |
 | 首次试用与复现 | 3 | 3 | 20% | 15% | 新增：[M8 安装/故障恢复演练](m8-install-rehearsal.md)（Windows 全链 + Docker + Linux CI）、[install.md](../install.md) extras 修正、CLI `--workspace` 统一；仍无独立首次用户记录 |
 | Agent 可用性与评测可信度 | 2 | 3 | 10% | 15% | 新增：[冻结回归集](../benchmarks/service-regression-set.md)（层级 0 确定性判分 20/20）、[层级 1 scripted 演练](../benchmarks/m6-level1-scripted.md)、[M5 声明核查](phase3-baseline.md)、Agent 收束/重复调用检测与有依据的预算上调；层级 2 真实模型批次未完成 |
 | 客户交付件与服务边界 | 2 | 2 | 10% | 25% | 案例按客户视角重写（[case-studies/](../case-studies/README.md)）、契约表新增已知限制节、证据包校验修复；逐例可下载附件仍未落盘，Upwork 服务页仍是草稿 |
