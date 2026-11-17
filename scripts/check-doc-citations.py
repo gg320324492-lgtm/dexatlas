@@ -116,9 +116,12 @@ RECORD_DOCUMENT = "docs/reports/phase1-execution-report.md"
 #: The measurement record inside that document.
 RECORD = re.compile(r"<!--report-figures:(.*?)-->", re.DOTALL)
 
-#: A source fingerprint a document quotes. The documents abbreviate it --
-#: ``sha256:4e72ac49…`` -- so what is compared is the prefix they give.
-FINGERPRINT = re.compile(r"sha256:([0-9a-f]{8,})")
+#: A source fingerprint a document quotes. The documents abbreviate it, and
+#: not always by the same amount: one release body quotes ``sha256:4e72ac49…``
+#: and another quotes ``sha256:787282…``. Six hex characters is the shortest
+#: abbreviation the documents use, so that is what is recognised -- a shorter
+#: match would fit half the fingerprints by accident.
+FINGERPRINT = re.compile(r"sha256:([0-9a-f]{6,})", re.IGNORECASE)
 
 
 def git_output(*args: str) -> str | None:
@@ -1045,8 +1048,8 @@ def check_declaration(document: pathlib.Path, tree: Tree) -> list[Finding]:
                 "",
             )
         ]
-    prefix = expected.removeprefix("sha256:")
-    if not any(prefix.startswith(part) for part in quoted):
+    prefix = expected.removeprefix("sha256:").lower()
+    if not any(prefix.startswith(part.lower()) for part in quoted):
         return [
             Finding(
                 where,
