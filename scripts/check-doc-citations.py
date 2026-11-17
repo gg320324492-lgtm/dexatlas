@@ -54,18 +54,40 @@ import sys
 from dataclasses import dataclass
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
+
+#: The documents whose citations are checked.
+#:
+#: Every document that states a ``file:line`` belongs here. A citation in a
+#: document nobody checks is a citation nobody has to keep true, and the
+#: release notes and the release body carry the appendix that says where each
+#: number of a release came from: those line numbers drifted for a long time
+#: because the documents were not on this list.
 DOCS = [
     REPO / "docs" / "analysis-provenance.md",
     REPO / "docs" / "architecture" / "public-contracts.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
     REPO / "docs" / "benchmarks" / "large-apk.md",
+    *sorted((REPO / "docs" / "releases").glob("*.md")),
+    *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
 
 #: A backticked span of the documentation.
 SPAN = re.compile(r"`([^`\n]+)`")
 
 #: path:line or path:start-end — the whole backticked span has to be a citation.
-CITATION = re.compile(r"^([\w./-]+\.(?:py|sh|toml|yml)):(\d+)(?:-(\d+))?$")
+#:
+#: Markdown is a target like any other: a document that says "the number is
+#: at ``docs/status.md:37``" has made a claim about a line of a file, and
+#: the claim is exactly as checkable as one about a line of Python.
+CITATION = re.compile(r"^([\w./-]+\.(?:py|sh|toml|yml|md)):(\d+)(?:-(\d+))?$")
+
+#: A bare line number: ``:143``. The file it belongs to is the one the same
+#: block of the text named before it — "``core/pipeline.py:296``, ``:143``"
+#: is the same file twice.
+BARE_LINE = re.compile(r"^:(\d+)(?:-(\d+))?$")
+
+#: The dashes that join two citations into one range.
+DASHES = "-–—"  # noqa: RUF001
 
 #: A backticked span that names a symbol: ``ApkMetadata``, ``ManifestComponent.kind``,
 #: ``read_resources()``, ``Project.tool_versions``, ``DEFAULT_METHOD_LIMIT = 200_000``.
@@ -173,6 +195,21 @@ class Citation:
     @property
     def where(self) -> str:
         return f"{self.document.name}:{self.line}  {self.rel}:{self.start}-{self.end}"
+
+
+@dataclass(frozen=True)
+class Resolved:
+    """One citation span, with the file and the range it names.
+
+    A span may name its file (``core/pipeline.py:296``) or only a line
+    (``:296``). The second form is read against the file the same block of
+    the text named before it, so the file is filled in here.
+    """
+
+    match: re.Match[str]
+    rel: str
+    start: int
+    end: int
 
 
 @dataclass(frozen=True)
@@ -529,39 +566,98 @@ def symbol_is_in_range(target: pathlib.Path, name: str, start: int, end: int) ->
     return any(start - SLACK <= line <= end + SLACK for line in where)
 
 
+def block_ends(text: str) -> list[int]:
+    """The offsets at which a block of a text ends.
+
+    A table row is a block of its own, and so is a paragraph. A bare
+    ``:143`` names a line of the file the *same block* named before it: a
+    number that referred to a file named in the previous row would be a
+    number nobody could check.
+    """
+    ends = set(table_row_ends(text))
+    for match in re.finditer(r"\n[ \t]*\n", text):
+        ends.add(match.end())
+    return sorted(ends)
+
+
+def joins_range(previous: re.Match[str], match: re.Match[str]) -> bool:
+    """Whether two spans are joined by a dash into one range.
+
+    ``file:37`` joined to ``:44`` by a dash is one range of lines;
+    ``file:37``, ``:44`` is two citations of the same file. The difference is
+    the dash, and nothing else may sit between the two spans.
+    """
+    between = previous.string[previous.end() : match.start()].strip()
+    return bool(between) and set(between) <= set(DASHES)
+
+
+def resolve_citations(text: str) -> list[Resolved]:
+    """Every citation of a text, with the file and the range each one names.
+
+    Two forms are read. A full citation names its file: ``core/pipeline.py:296``.
+    A bare one names only a line: ``:143``. The bare form is the same file as
+    the citation before it — that is how the release appendix cites one file
+    in several places — and it is the same file only as long as both sit in
+    the same block of the text.
+    """
+    ends = block_ends(text)
+    resolved: list[Resolved] = []
+    previous: Resolved | None = None
+    for match in SPAN.finditer(text):
+        inner = match.group(1)
+        citation = CITATION.match(inner)
+        if citation is not None:
+            start = int(citation.group(2))
+            previous = Resolved(match, citation.group(1), start, int(citation.group(3) or start))
+            resolved.append(previous)
+            continue
+        bare = BARE_LINE.match(inner)
+        if bare is None or previous is None:
+            continue
+        if any(previous.match.start() < end <= match.start() for end in ends):
+            # A block boundary lies between them: the bare line number has no
+            # file of its own, and guessing one would check the wrong file.
+            continue
+        start = int(bare.group(1))
+        end = int(bare.group(2) or start)
+        if joins_range(previous.match, match):
+            previous = Resolved(previous.match, previous.rel, previous.start, end)
+            resolved[-1] = previous
+            continue
+        previous = Resolved(match, previous.rel, start, end)
+        resolved.append(previous)
+    return resolved
+
+
 def document_clauses(document: pathlib.Path) -> list[Clause]:
     """Every clause of a document, with its citations and the symbols it names."""
     text = document.read_text(encoding="utf-8")
+    resolved = resolve_citations(text)
     found: list[Clause] = []
     for start, end in clauses(text):
         clause = text[start:end]
         names = span_names(clause)
-        spans = list(SPAN.finditer(clause))
         brackets = bracket_ranges(clause)
-        found_spans = [
-            (match, citation)
-            for match, citation in ((m, CITATION.match(m.group(1))) for m in spans)
-            if citation is not None
-        ]
-        if not found_spans:
+        inside = [item for item in resolved if start <= item.match.start() < end]
+        if not inside:
             continue
         citations: list[Citation] = []
-        for match, citation in found_spans:
-            rel, start_s, end_s = citation.group(1), citation.group(2), citation.group(3)
-            options = candidates(rel)
+        citation_spans: list[tuple[int, int]] = []
+        for item in inside:
+            options = candidates(item.rel)
             citations.append(
                 Citation(
                     document=document,
-                    line=text[: start + match.start()].count("\n") + 1,
-                    rel=rel,
-                    start=int(start_s),
-                    end=int(end_s or start_s),
+                    line=text[: item.match.start()].count("\n") + 1,
+                    rel=item.rel,
+                    start=item.start,
+                    end=item.end,
                     target=options[0] if len(options) == 1 else None,
                     ambiguous=len(options) > 1,
                     text=clause.strip()[:100],
                 )
             )
-        citation_spans = [match.span() for match, _ in found_spans]
+            citation_spans.append((item.match.start() - start, item.match.end() - start))
         claims = [claimed_names(brackets, span, names, citation_spans) for span in citation_spans]
         found.append(
             Clause(
@@ -607,6 +703,17 @@ def claimed_names(
     return tuple(symbol for symbol, _, _ in names)
 
 
+def holds_content(line: str) -> bool:
+    """Whether a line holds something a citation can point at.
+
+    A blank line holds nothing. A comment holds a sentence, and a citation
+    can be about what a comment says: the release appendix points at the
+    header of ``scripts/fetch-fixtures.sh`` for the claim that the script
+    fetches two fixtures, and that line is a comment.
+    """
+    return bool(line.strip())
+
+
 def check_citation(citation: Citation) -> list[Finding]:
     """The findings of one citation's location."""
     if citation.target is None:
@@ -624,12 +731,9 @@ def check_citation(citation: Citation) -> list[Finding]:
                 citation.text,
             )
         ]
-    if not any(
-        line.strip() and not line.strip().startswith("#")
-        for line in lines[citation.start - 1 : citation.end]
-    ):
+    if not any(holds_content(line) for line in lines[citation.start - 1 : citation.end]):
         return [
-            Finding(citation.where, "points at nothing", "the range holds no code", citation.text)
+            Finding(citation.where, "points at nothing", "the range holds nothing", citation.text)
         ]
     return []
 

@@ -1448,3 +1448,60 @@ def test_the_two_copies_of_the_project_rules_are_the_same() -> None:
         "AGENTS.md and CLAUDE.md have drifted apart: they are the same file "
         "under two names, and a tool that reads one must read the other"
     )
+
+
+# -- what the source fingerprint covers ---------------------------------------
+
+#: The markers around the paragraph that says what the fingerprint covers.
+FINGERPRINT_SECTION = ("<!--fingerprint-coverage-->", "<!--/fingerprint-coverage-->")
+
+
+def _the_fingerprint_section(report: str) -> str:
+    """The paragraph of the report that says what the fingerprint covers."""
+    start, end = FINGERPRINT_SECTION
+    assert start in report, "the report does not say what the fingerprint covers"
+    body = report.split(start, 1)[1].split(end, 1)[0]
+    return body
+
+
+def test_the_report_states_what_the_source_fingerprint_covers() -> None:
+    """The report says which files the fingerprint covers, and which it does not.
+
+    The fingerprint is the hash of the files the measurement read. A file
+    that is not in it can change without the report noticing — and the
+    release materials repeat a number that comes from a script under
+    ``scripts/``, so "not in the fingerprint" has to be said out loud rather
+    than left to be discovered.
+    """
+    script = _figure_script()
+    report = REPORT.read_text(encoding="utf-8")
+    section = _the_fingerprint_section(report)
+
+    for name in script.FINGERPRINT_FILES:
+        assert name in section, f"the report does not say the fingerprint covers {name}"
+    for root in ("src/dexatlas", "tests"):
+        assert root in section, f"the report does not say the fingerprint covers {root}"
+    for name in ("scripts/verify-public-contracts.py", "scripts/m10_selfcheck.py"):
+        assert name in section, f"the report does not say the fingerprint does not cover {name}"
+
+
+def test_the_readmes_state_what_the_source_fingerprint_covers() -> None:
+    """The readmes say it too: the number a reader sees is the measured one.
+
+    The badge in the readme is the measured test count. What it was measured
+    on has to be stated where the badge is, or the number is a claim with
+    nothing behind it.
+    """
+    for name in ("README.md", "README.zh-CN.md"):
+        text = (REPO_ROOT / name).read_text(encoding="utf-8")
+        for covered in (
+            "src/dexatlas",
+            "tests",
+            "pyproject.toml",
+            "scripts/refresh-report-figures.py",
+        ):
+            assert covered in text, f"{name} does not say the fingerprint covers {covered}"
+        for excluded in ("scripts/verify-public-contracts.py", "scripts/m10_selfcheck.py"):
+            assert excluded in text, (
+                f"{name} does not say the fingerprint does not cover {excluded}"
+            )

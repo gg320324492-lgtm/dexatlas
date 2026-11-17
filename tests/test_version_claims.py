@@ -21,6 +21,7 @@ can be broken and the test that pins it turns red.
 from __future__ import annotations
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -963,3 +964,146 @@ def test_the_checker_finds_a_claim_in_a_tree_that_has_no_git(
     written = capsys.readouterr().out
     assert "findings:" in written
     assert "Traceback" not in written
+
+
+# -- the outward materials -------------------------------------------------
+
+#: The documents that state the project's numbers to the outside world.
+OUTWARD_DOCUMENTS = (
+    "docs/outreach/cover-letter-templates.md",
+    "docs/outreach/project-brief.md",
+    "docs/outreach/publish-review.md",
+    "docs/outreach/scope-ai-mcp.md",
+    "docs/outreach/scope-backend-automation.md",
+    "docs/case-studies/README.md",
+    "docs/case-studies/api-integration.md",
+    "docs/case-studies/demo-app-walkthrough.md",
+    "docs/case-studies/obfuscated-app.md",
+    "docs/proposals/exit-code-partial-read.md",
+)
+
+
+#: The report the outward check reads. ``scripts/refresh-report-figures.py``
+#: points this at a *candidate* copy while it measures itself, so a check
+#: never sees a report that is half-refreshed.
+REPORT = Path(
+    os.environ.get(
+        "DEXATLAS_REPORT_PATH",
+        REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md",
+    )
+)
+
+
+def _the_report_figures(checker: ModuleType) -> dict[str, str]:
+    """The figures the execution report holds.
+
+    They are read from the report rather than written down here: the report
+    is what the measurement writes, and a number copied into this file would
+    be a second copy of the truth.
+    """
+    return dict(checker.FIGURE.findall(REPORT.read_text(encoding="utf-8")))
+
+
+def _the_outward_documents() -> list[tuple[str, str]]:
+    return [(name, (REPO_ROOT / name).read_text(encoding="utf-8")) for name in OUTWARD_DOCUMENTS]
+
+
+def _outward_findings(checker: ModuleType, documents: list[tuple[str, str]]) -> list[object]:
+    """The findings the outward-material check makes in a set of documents."""
+    return checker.check_outward_numbers(  # type: ignore[attr-defined]
+        documents, _the_report_figures(checker), "1.0.0"
+    )
+
+
+def test_execution_report_the_outward_materials_state_the_numbers_it_measured() -> None:
+    """The outward materials are checked against the current measurement.
+
+    Their coverage, their test count, their number of MCP tools and their
+    number of samples were written by hand and read by nobody. The publish
+    checklist that used to hold them together is a document, and a document
+    does not fail a build.
+
+    The name starts with ``test_execution_report`` on purpose: this check
+    compares the materials with the report's figures, and the measurement
+    script measures the checks of that group against a *candidate* report.
+    A check outside the group would read the report as it is on disk — the
+    report of the previous measurement — and would go red every time a
+    measurement changed the numbers it compares with.
+    """
+    checker = _checker()
+    findings = _outward_findings(checker, _the_outward_documents())
+
+    assert findings == [], "\n".join(finding.render() for finding in findings)
+
+
+def test_a_wrong_test_count_in_an_outward_material_is_a_finding() -> None:
+    """A test count that is not the measured one is caught."""
+    checker = _checker()
+    findings = _outward_findings(
+        checker, [("docs/outreach/project-brief.md", "1,500 automated tests, 93.3% coverage\n")]
+    )
+
+    assert "outward-tests" in _kinds(findings)
+
+
+def test_a_wrong_test_count_in_the_chinese_form_is_a_finding() -> None:
+    """The count the review table writes in fullwidth brackets is read."""
+    checker = _checker()
+    findings = _outward_findings(
+        checker,
+        [("docs/outreach/publish-review.md", "| 测试总数 | 1,500（1,441 快 + 147 集成） |\n")],  # noqa: RUF001
+    )
+
+    assert "outward-tests" in _kinds(findings)
+
+
+def test_a_wrong_mcp_tool_count_in_an_outward_material_is_a_finding() -> None:
+    """The number of MCP tools is checked against the tools the server registers."""
+    checker = _checker()
+    findings = _outward_findings(
+        checker,
+        [("docs/outreach/project-brief.md", "Read-only MCP server. Ten tools over stdio.\n")],
+    )
+
+    assert "outward-mcp-tools" in _kinds(findings)
+
+
+def test_a_wrong_sample_count_in_an_outward_material_is_a_finding() -> None:
+    """The number of first-party samples is checked against the studies."""
+    checker = _checker()
+    findings = _outward_findings(
+        checker, [("docs/outreach/project-brief.md", "They cover four first-party samples.\n")]
+    )
+
+    assert "outward-samples" in _kinds(findings)
+
+
+def test_a_quoted_number_in_an_outward_material_is_not_a_finding() -> None:
+    """A number in backticks is wording that was replaced, not a claim.
+
+    The review table keeps the wording a file had before the wording that
+    replaced it, in backticks, so that a reader can see which is which.
+    """
+    checker = _checker()
+    findings = _outward_findings(
+        checker,
+        [
+            (
+                "docs/outreach/publish-review.md",
+                "The wording was `1,540 automated tests, 93.1% coverage`.\n",
+            )
+        ],
+    )
+
+    assert findings == [], "\n".join(finding.render() for finding in findings)
+
+
+def test_a_number_of_an_earlier_release_in_an_outward_material_is_not_a_finding() -> None:
+    """A number that describes what was true then is not a claim about now."""
+    checker = _checker()
+    findings = _outward_findings(
+        checker,
+        [("docs/outreach/project-brief.md", "Coverage was previously 89.2% coverage.\n")],
+    )
+
+    assert findings == [], "\n".join(finding.render() for finding in findings)

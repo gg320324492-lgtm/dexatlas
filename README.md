@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1588%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1612%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
@@ -376,6 +376,9 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 
 ### Case studies — what a real run looks like
 
+- **[Case studies index](docs/case-studies/README.md)** — the three walkthroughs in one
+  place: what each study answers, the scope it covers, the commands it ran, the evidence
+  behind its claims, and its limits
 - **[From upload to evidence chain](docs/case-studies/demo-app-walkthrough.md)** — the
   full tool chain on the bundled demo APK: analyze, manifest, search, source,
   cross-references, and the evidence records behind them
@@ -384,6 +387,10 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   boundary sits
 - **[Integrating from Python](docs/case-studies/api-integration.md)** — the REST API and
   the MCP server as a caller sees them, endpoint by endpoint, with the wire contract
+- **Case-study attachments** — the two complete analysis reports the walkthroughs above
+  produced: [demo app](docs/case-studies/attachments/demo-report.md) and
+  [obfuscated app](docs/case-studies/attachments/obfuscated-report.md), with run ids,
+  tool versions and every record
 
 ### Architecture — how it fits together and why
 
@@ -401,6 +408,18 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   three renderings of one analysis, and the client-ready evidence export
 - **[Public contracts](docs/architecture/public-contracts.md)** — the CLI, REST, MCP
   and report-schema surfaces, tested and versioned, with their known limits
+- **[Analysis runs](docs/architecture/analysis-runs.md)** — how one analysis is
+  identified, staged, published and cleaned up, and why re-analysing does not overwrite
+  the run before it
+- **[Call sites and call edges](docs/architecture/call-sites-and-edges.md)** — the two
+  different things this project has called "a cross-reference", where each one lives,
+  and how they are told apart
+- **[Evidence invariants](docs/architecture/evidence-invariants.md)** — what a
+  `verified` record has to be true of, and what stops a record that is not
+- **[Runtime isolation](docs/architecture/runtime-isolation.md)** — how the Androguard
+  backend stays inside its box when it is embedded in a long-lived service
+- **[Architecture diagram](docs/architecture/diagram.md)** — one picture of how the
+  system is put together, with the prose behind each box linked
 
 ### Benchmarks — what was measured, and what was not
 
@@ -463,6 +482,30 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   scans found nothing across all traces. Per the plan's failure handling the
   round stopped there, no full retest and no further fix round followed, and
   the state-of-record disclosure plan is the final settlement for M6
+- **[Task set](docs/benchmarks/task-set.md)** — the questions the comparisons ask, how
+  an answer is judged, and how a second person confirms that an expected answer is
+  right without running anything
+- **[What the coverage figure was measured on](docs/reports/phase1-execution-report.md)** —
+  the execution report carries a fingerprint of the tree the measurement ran
+  on: `src/dexatlas/`, `tests/`, `pyproject.toml` and the measuring script
+  `scripts/refresh-report-figures.py`. Change any of them and the report's
+  numbers are declared stale instead of going on passing for the present. The
+  other scripts under `scripts/` are deliberately **not** in the fingerprint —
+  the measurement does not read them. That includes
+  `scripts/verify-public-contracts.py` (the contract live-check) and
+  `scripts/m10_selfcheck.py` (the M10 self-check); their results are held by
+  tests of their own, not by the fingerprint
+
+### Verifying our claims — how to check this project yourself
+
+- **[How to verify every claim](docs/how-to-verify.md)** — the commands to re-check this
+  project's own numbers yourself, what you should see, and
+  [§3](docs/how-to-verify.md#3-哪些说法目前是未达成--未验证请据此打折) lists which claims
+  are not met; needs a JDK, the three analysis backends and the third-party test
+  fixtures (Chinese; 怎么自己复核这个项目说的每句话). The same page in a parallel Chinese
+  edition is [docs/how-to-verify.zh-CN.md](docs/how-to-verify.zh-CN.md)
+- **[Service commitments](docs/service-commitments.md)** — what the agent service
+  promise covers and what it explicitly does not (Chinese; 服务承诺范围)
 
 ### Project records
 
@@ -472,13 +515,6 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Current status](docs/status.md)** — the project's own status page: where each
   milestone stands and what is left; §4.0 carries the M6 level-2 verdict, and the
   milestone stays open (Chinese; 当前状态)
-- **[Service commitments](docs/service-commitments.md)** — what the agent service
-  promise covers and what it explicitly does not (Chinese; 服务承诺范围)
-- **[How to verify every claim](docs/how-to-verify.md)** — the commands to re-check this
-  project's own numbers yourself, what you should see, and
-  [§3](docs/how-to-verify.md#3-哪些说法目前是未达成--未验证请据此打折) lists which claims
-  are not met; needs a JDK, the three analysis backends and the third-party test
-  fixtures (Chinese; 怎么自己复核这个项目说的每句话)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend
   produced which conclusion, and how to check it yourself; worth reading before
   trusting a figure a decompiler produced (Chinese; 分析覆盖度与证据来源)
@@ -489,6 +525,14 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   GitHub showcase, scoped client deliverables, independent acceptance
 - **[Phase 3 baseline](docs/reports/phase3-baseline.md)** — the claims inventory, the
   recomputed benchmark figures, and the open issues behind them
+- **[Report directory index](docs/reports/README.md)** — the index of `docs/reports/`:
+  what each report answers, when to read it, and which ones are history rather than
+  current state (Chinese; 报告目录索引)
+- **[v1.0.0 release notes](docs/releases/v1.0.0.md)** — what v1.0.0 contains, what was
+  checked before the tag, and what it does not claim
+- **[Earlier release notes](docs/releases/v0.1.0.md)** — the releases before v1.0.0:
+  [v0.1.1](docs/releases/v0.1.1.md), [v0.1.2](docs/releases/v0.1.2.md),
+  [v0.1.3](docs/releases/v0.1.3.md), [v0.2.0](docs/releases/v0.2.0.md)
 - **[Demo video](docs/assets/demo.mp4)** — the full 85-second session the GIFs were cut
   from (MP4)
 
@@ -504,6 +548,30 @@ re-verified against the tree it was found on.
   tree has not been re-scored since (Chinese; 成熟度评估)
 - **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings,
   each with two options and a recommendation (Chinese; Phase 2 任务清单)
+- **[Exit-code proposal](docs/proposals/exit-code-partial-read.md)** — the proposal
+  behind exit code 6 ("ran to completion, but read no code"), kept as the original
+  text after it shipped (Chinese; 退出码提案)
+- **[M10 invitation checklist](docs/reports/m10-invitation-sender-checklist.md)** — the
+  maintainer's own checklist for sending the M10 independent-acceptance invitation,
+  with the commands to run and what they showed (Chinese; M10 独立验收发起人发送前清单)
+
+### Client-facing material — the project as a portfolio entry
+
+- **[Portfolio description](docs/portfolio.md)** — the one-paragraph description for a
+  client brief, and the detail behind it
+- **[Upwork project entry](docs/outreach/project-brief.md)** — the portfolio entry
+  draft; it is in place but not published
+- **[Publish review](docs/outreach/publish-review.md)** — the check that was run over
+  the four Upwork drafts before publishing, and what it changed (Chinese; 发布前核对)
+- **[Upwork publish checklist](docs/reports/outreach-publish-checklist.md)** — the last
+  check before those four drafts go out: what to look at, and what this round did not
+  do (Chinese; 发布前最后点检清单)
+- **[Cover-letter templates](docs/outreach/cover-letter-templates.md)** — one proposal
+  letter per service direction
+- **[Scope: evidence-first AI and MCP integration](docs/outreach/scope-ai-mcp.md)** —
+  the one-page scope statement for that direction
+- **[Scope: Python backend and automation](docs/outreach/scope-backend-automation.md)** —
+  the one-page scope statement for that direction
 
 ## Authorship and third-party engines
 

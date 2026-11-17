@@ -73,6 +73,7 @@ the report by itself.
 from __future__ import annotations
 
 import argparse
+import ast
 import pathlib
 import re
 import subprocess
@@ -115,6 +116,66 @@ REPORT_AT_TAG = "docs/reports/phase1-execution-report.md"
 #: The release notes of a release.
 RELEASE_NOTES = "docs/releases/{tag}.md"
 
+#: The directories whose documents state the project's numbers to the outside
+#: world: the outreach materials, the case studies and the proposals.
+#:
+#: The release notes describe a release, and their numbers are checked against
+#: the measurement of that release. These describe the project as it is now,
+#: so their numbers are checked against the current measurement — the figures
+#: the execution report holds.
+OUTWARD_DIRECTORIES = ("docs/outreach/", "docs/case-studies/", "docs/proposals/")
+
+#: The MCP server, whose registered tools are the number of MCP tools.
+MCP_SERVER = "src/dexatlas/mcp/server.py"
+
+#: The index of the case studies, which names the samples they cover.
+CASE_STUDIES = "docs/case-studies/README.md"
+
+#: A backticked span: literal text. In the outward materials it is also the
+#: wording of a file that was replaced, kept next to the wording that
+#: replaced it.
+BACKTICKED = re.compile(r"`[^`\n]*`")
+
+#: The same test count in the form the review table writes it in:
+#: "1,588 (1,441 fast + 147 integration)", written with fullwidth brackets.
+OUTWARD_TESTS_CN = re.compile(
+    r"(?P<total>\d[\d,]*)\s*[（(]\s*(?P<fast>\d[\d,]*)\s*快\s*\+\s*(?P<slow>\d[\d,]*)\s*集"  # noqa: RUF001
+)
+
+#: A number a document writes in words: "eleven tools over stdio".
+WORD_NUMBERS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+}
+
+#: The number of MCP tools a document states: "eleven tools over stdio",
+#: "11 个 MCP 只读工具".
+#:
+#: The word has to be the plural: "two tool calls" is a statement about what
+#: a reader did, not about what the server offers.
+MCP_TOOLS_STATED = re.compile(
+    r"(?P<count>\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten|eleven)\s+"
+    r"(?:(?:MCP\s+)?(?:只读\s+)?tools\b|个\s*MCP)",
+    re.IGNORECASE,
+)
+
+#: The number of the first-party samples a document states: "three first-party
+#: samples".
+SAMPLES_STATED = re.compile(
+    r"(?P<count>\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+"
+    r"(?:first-party\s+|walkthrough\s+)?samples?\b",
+    re.IGNORECASE,
+)
+
 #: One section of the changelog: "## [0.1.3] — 2026-10-20" and what follows it.
 CHANGELOG_SECTION = re.compile(
     r"^## \[(?P<version>\d+\.\d+\.\d+)\][^\n]*\n(?P<body>.*?)(?=^## |\Z)",
@@ -134,9 +195,13 @@ COVERAGE_STATED = re.compile(
 PERCENTAGE = re.compile(r"(?<![\d.])(?P<number>\d+(?:\.\d+)?)\s*%")
 
 #: A test count a text states: "444 tests (347 fast, 97 integration)".
+#:
+#: The number may carry a thousands separator and the count may carry an
+#: adjective: the outward materials are read by people who have never opened
+#: a test file, and they write "1,588 automated tests".
 TESTS_STATED = re.compile(
-    r"(?P<total>\d+)\s+tests\b"
-    r"(?:\s*\(\s*(?P<fast>\d+)\s+fast\s*,\s*(?P<slow>\d+)\s+(?:integration|slow)\s*\))?"
+    r"(?P<total>\d[\d,]*)\s+(?:[A-Za-z]+\s+){0,2}?tests\b"
+    r"(?:\s*\(\s*(?P<fast>\d[\d,]*)\s+fast\s*,\s*(?P<slow>\d[\d,]*)\s+(?:integration|slow)\s*\))?"
 )
 
 #: A number that belongs to the version before this one: "up from 89.2%",
@@ -149,8 +214,12 @@ PREVIOUS_UP_FROM = re.compile(r"up\s+from", re.IGNORECASE)
 
 #: A marker that says the nearest number belongs to an earlier release:
 #: "previously", "the previous release", "上一版".
+#:
+#: "一度" and "曾经" are the same marker in Chinese: "一度把覆盖率写成了 35.4%"
+#: is a statement about a number that was once written down, not about the
+#: coverage of the project now.
 PREVIOUS_VERSION = re.compile(
-    r"previously|previous|prior|last\s+(?:release|version)|上一(?:版|个版本|版本)|以前",
+    r"previously|previous|prior|last\s+(?:release|version)|上一(?:版|个版本|版本)|以前|一度|曾经",
     re.IGNORECASE,
 )
 
@@ -1001,7 +1070,14 @@ def belongs_to_previous_version(
 
 
 def check_stated_numbers(
-    path: str, text: str, offset: int, expected: dict[str, str], version: str
+    path: str,
+    text: str,
+    offset: int,
+    expected: dict[str, str],
+    version: str,
+    subject: str = "the release",
+    kind: str = "release",
+    quoted: list[tuple[int, int]] | None = None,
 ) -> list[Finding]:
     """The numbers a release document states, against the numbers measured.
 
@@ -1017,6 +1093,10 @@ def check_stated_numbers(
     before it, of a module — and the checker cannot tell which is which. A
     percentage that belongs to an earlier release is not a claim about this
     one and is not checked against it.
+
+    ``quoted`` holds the spans of the text that are somebody else's words — a
+    wording that was replaced, kept in backticks to say so. A number inside
+    one is not a claim of this document and is not checked.
     """
     findings: list[Finding] = []
     measured = expected.get("coverage.pct")
@@ -1031,6 +1111,7 @@ def check_stated_numbers(
     for number, line in enumerate(lines, 1):
         spoken = spoken_lines[number - 1]
         excerpt = collapse(line)[:160]
+        line_quoted = quoted_in_line(quoted, number, lines)
 
         for item in stated[number - 1]:
             if not item.labelled and not bare_is_coverage:
@@ -1039,16 +1120,18 @@ def check_stated_numbers(
                 continue
             if belongs_to_previous_version(spoken, item.start, item.end):
                 continue
+            if any(start <= item.start and item.end <= end for start, end in line_quoted):
+                continue
             if percentage(item.value) == percentage(measured):
                 continue
             findings.append(
                 Finding(
                     path=path,
                     line=offset + number,
-                    kind="release-coverage",
+                    kind=f"{kind}-coverage",
                     version=version,
                     message=(
-                        f"it says the coverage is {item.value}%, "
+                        f"it says the coverage of {subject} is {item.value}%, "
                         f"the measured coverage is {measured}"
                     ),
                     excerpt=excerpt,
@@ -1056,34 +1139,39 @@ def check_stated_numbers(
             )
 
         for match in TESTS_STATED.finditer(spoken):
-            total = match.group("total")
-            fast = match.group("fast")
-            slow = match.group("slow")
+            total = plain_number(match.group("total"))
+            fast = plain_number(match.group("fast")) if match.group("fast") else None
+            slow = plain_number(match.group("slow")) if match.group("slow") else None
             if belongs_to_previous_version(
                 spoken, match.start("total"), match.end("total"), backward_only=True
             ):
                 continue
+            if any(
+                start <= match.start("total") and match.end("total") <= end
+                for start, end in line_quoted
+            ):
+                continue
             measured_tests = expected.get("tests.total")
-            if measured_tests is not None and total != measured_tests:
+            if measured_tests is not None and total != plain_number(measured_tests):
                 findings.append(
                     Finding(
                         path=path,
                         line=offset + number,
-                        kind="release-tests",
+                        kind=f"{kind}-tests",
                         version=version,
                         message=(
-                            f"it says the release had {total} tests, "
+                            f"it says {subject} had {total} tests, "
                             f"the measured number is {measured_tests}"
                         ),
                         excerpt=excerpt,
                     )
                 )
-            if fast is not None and slow is not None and int(fast) + int(slow) != int(total):
+            if fast is not None and slow is not None and fast + slow != total:
                 findings.append(
                     Finding(
                         path=path,
                         line=offset + number,
-                        kind="release-tests",
+                        kind=f"{kind}-tests",
                         version=version,
                         message=(
                             f"it says {fast} fast and {slow} integration, "
@@ -1175,6 +1263,227 @@ def check_release_numbers(
                 )
         for path, text, offset in release_documents(tag, version, by_path):
             findings.extend(check_stated_numbers(path, text, offset, expected, version))
+    return findings
+
+
+def _is_quoted(spans: list[tuple[int, int]], begin: int, finish: int) -> bool:
+    """Whether a span of a line sits inside a quoted span of the document."""
+    return any(start <= begin and finish <= end for start, end in spans)
+
+
+def plain_number(raw: str) -> int | None:
+    """A number as a document writes it: "1,588" is 1588, "eleven" is 11."""
+    text = raw.strip().lower()
+    if text in WORD_NUMBERS:
+        return WORD_NUMBERS[text]
+    try:
+        return int(text.replace(",", ""))
+    except ValueError:
+        return None
+
+
+def quoted_spans(text: str) -> list[tuple[int, int]]:
+    """The spans of a text that are somebody else's words.
+
+    The outward materials keep the wording of a file they replaced next to
+    the wording that replaced it, in backticks, so that a reader can see
+    which is which. A number inside one is a number that was true then.
+    """
+    return [match.span() for match in BACKTICKED.finditer(text)]
+
+
+def quoted_in_line(
+    quoted: list[tuple[int, int]] | None, number: int, lines: list[str]
+) -> list[tuple[int, int]]:
+    """The quoted spans of one line, with the offsets the line uses."""
+    if not quoted:
+        return []
+    start = sum(len(line) + 1 for line in lines[: number - 1])
+    end = start + len(lines[number - 1])
+    return [
+        (begin - start, finish - start)
+        for begin, finish in quoted
+        if start <= begin and finish <= end
+    ]
+
+
+def mcp_tool_count() -> int | None:
+    """The number of tools the MCP server registers.
+
+    The count is taken from the syntax tree: the tools are the functions the
+    ``@server.tool`` decorator is on, and a text search would count the
+    server's own name as a tool.
+    """
+    path = REPO / MCP_SERVER
+    if not path.is_file():
+        return None
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    tools = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for decorator in node.decorator_list:
+            if (
+                isinstance(decorator, ast.Call)
+                and isinstance(decorator.func, ast.Attribute)
+                and decorator.func.attr == "tool"
+            ):
+                tools += 1
+    return tools
+
+
+def sample_count() -> int | None:
+    """The number of the first-party samples the case studies cover.
+
+    The index of the case studies names the sample of every study, and the
+    same sample may be covered twice: the demo APK is analysed by two of the
+    studies. The samples are counted, not the studies.
+    """
+    path = REPO / CASE_STUDIES
+    if not path.is_file():
+        return None
+    text = path.read_text(encoding="utf-8")
+    return len(set(re.findall(r"examples/[\w.-]+/[\w.-]+\.apk", text)))
+
+
+def check_outward_numbers(
+    documents: list[tuple[str, str]], figures: dict[str, str], version: str
+) -> list[Finding]:
+    """The numbers the outward materials state, against the current measurement.
+
+    The release notes describe a release, and their numbers are checked against
+    the measurement of that release. The outward materials describe the
+    project as it is now, so their numbers are checked against the current
+    measurement — the figures the execution report holds.
+
+    Four kinds of number are read out of them:
+
+    * the **test count** and the **coverage** — the figures the report holds;
+    * the **number of MCP tools** — the tools the server registers;
+    * the **number of first-party samples** — the APKs the studies cover.
+
+    A number that belongs to an earlier release is not a claim about this one
+    and is left alone, exactly as it is in the release documents.
+    """
+    findings: list[Finding] = []
+    expected = {
+        "coverage.pct": figures.get("coverage.pct"),
+        "tests.total": figures.get("tests.total"),
+    }
+    tools = mcp_tool_count()
+    samples = sample_count()
+    for name, text in documents:
+        if not name.startswith(OUTWARD_DIRECTORIES):
+            continue
+        quoted = quoted_spans(text)
+        findings.extend(
+            check_stated_numbers(name, text, 0, expected, version, "the project", "outward", quoted)
+        )
+        findings.extend(check_outward_counts(name, text, figures, tools, samples, version, quoted))
+    return findings
+
+
+def check_outward_counts(
+    name: str,
+    text: str,
+    figures: dict[str, str],
+    tools: int | None,
+    samples: int | None,
+    version: str,
+    quoted: list[tuple[int, int]],
+) -> list[Finding]:
+    """The counts the outward materials state, against the counts the code has.
+
+    The test count is written in three ways: "1,588 automated tests", the
+    review table's "1,588 (1,441 fast + 147 integration)", and the fast/slow
+    split the report holds. The number of MCP tools and the number of samples are read
+    from the code and from the case studies.
+    """
+    findings: list[Finding] = []
+    total = figures.get("tests.total")
+    fast = figures.get("tests.fast")
+    slow = figures.get("tests.slow")
+    lines = text.splitlines()
+    for number, line in enumerate(lines, 1):
+        excerpt = collapse(line)[:160]
+        line_quoted = quoted_in_line(quoted, number, lines)
+
+        for match in OUTWARD_TESTS_CN.finditer(line):
+            if _is_quoted(line_quoted, match.start(), match.end()):
+                continue
+            stated = plain_number(match.group("total"))
+            stated_fast = plain_number(match.group("fast"))
+            stated_slow = plain_number(match.group("slow"))
+            if total is not None and stated != plain_number(total):
+                findings.append(
+                    Finding(
+                        path=name,
+                        line=number,
+                        kind="outward-tests",
+                        version=version,
+                        message=(
+                            f"it says the project has {stated} tests, "
+                            f"the measured number is {total}"
+                        ),
+                        excerpt=excerpt,
+                    )
+                )
+            if (
+                fast is not None
+                and slow is not None
+                and stated_fast is not None
+                and stated_slow is not None
+                and (stated_fast, stated_slow) != (plain_number(fast), plain_number(slow))
+            ):
+                findings.append(
+                    Finding(
+                        path=name,
+                        line=number,
+                        kind="outward-tests",
+                        version=version,
+                        message=(
+                            f"it says {stated_fast} fast and {stated_slow} integration, "
+                            f"the measured split is {fast} and {slow}"
+                        ),
+                        excerpt=excerpt,
+                    )
+                )
+        for match in MCP_TOOLS_STATED.finditer(line):
+            if _is_quoted(line_quoted, match.start(), match.end()):
+                continue
+            stated = plain_number(match.group("count"))
+            if tools is None or stated is None or stated == tools:
+                continue
+            findings.append(
+                Finding(
+                    path=name,
+                    line=number,
+                    kind="outward-mcp-tools",
+                    version=version,
+                    message=(
+                        f"it says the MCP server has {stated} tools, the server registers {tools}"
+                    ),
+                    excerpt=excerpt,
+                )
+            )
+        for match in SAMPLES_STATED.finditer(line):
+            if _is_quoted(line_quoted, match.start(), match.end()):
+                continue
+            stated = plain_number(match.group("count"))
+            if samples is None or stated is None or stated == samples:
+                continue
+            findings.append(
+                Finding(
+                    path=name,
+                    line=number,
+                    kind="outward-samples",
+                    version=version,
+                    message=(
+                        f"it says {stated} first-party samples, the case studies cover {samples}"
+                    ),
+                    excerpt=excerpt,
+                )
+            )
     return findings
 
 
@@ -1340,6 +1649,7 @@ def main(argv: list[str] | None = None) -> int:
     for name, text in documents:
         findings.extend(check_badges(name, text, badges))
         findings.extend(check_text(name, text, facts))
+    findings.extend(check_outward_numbers(documents, report_figures, facts.newest_tag.lstrip("v")))
 
     base: str | None = None
     known: set[tuple[str, str, str, str]] = set()
