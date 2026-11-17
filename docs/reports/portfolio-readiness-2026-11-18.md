@@ -31,7 +31,7 @@
   [准备包](m10-acceptance-pack.md)；本文不给任何验收项判「通过」。
 - **不是**：M6 的最终 Agent 评分。层级 2 真实模型三轮完整重测的结果是
   **49 / 60 = 81.7%**，未达验收线（每轮 ≥80%、三轮合计 ≥90%），
-  见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:86。
+  见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85。
 - **不是**：对仓库全部质量的重测。本轮未重新执行完整测试矩阵与覆盖率测量，
   采用仓库里已落盘的最终测量：**1,620 项测试（1,473 快 + 147 集成）、
   一方代码覆盖率 93.3%（7,117/7,631 行）**，
@@ -48,7 +48,7 @@
 
 | 维度 | 权重 | 上一轮 | 这一轮 | 变化理由（出处） |
 |---|---:|:---:|:---:|---|
-| 核心工程与证据链 | 30% | 4 | 4 | 已到等级上限；证据变厚但未跨档：CI 新增 tag 触发与只在 tag 上跑的测量 job（[ci.yml](../../.github/workflows/ci.yml):18、:493-537），契约活检进 CI（`:442`），M10 自查进 CI（`:471`）；两处门禁盲区收口（[check-doc-citations.py](../../scripts/check-doc-citations.py):107、[refresh-report-figures.py](../../scripts/refresh-report-figures.py):1012） |
+| 核心工程与证据链 | 30% | 4 | 4 | 已到等级上限；证据变厚但未跨档：CI 新增 tag 触发与只在 tag 上跑的测量 job（[ci.yml](../../.github/workflows/ci.yml):18、:493-525），契约活检进 CI（`ci.yml:442`），M10 自查进 CI（`ci.yml:471`）；两处门禁盲区收口（[check-doc-citations.py](../../scripts/check-doc-citations.py):107、[refresh-report-figures.py](../../scripts/refresh-report-figures.py):1012） |
 | 首次试用与复现 | 20% | 3 | **3.5** | 升级：新增[读者实走演练](reader-dry-run.md)——真 clone 46 秒、`uv sync` 218 秒、后端 359 秒，九步路径与材料逐字相符，七道门禁退出码全 0（:39-45、:196-199）；并查出 **11 处材料与现实不符**（:108-118），已逐条改正。扣分见 §4.2 |
 | Agent 可用性与评测可信度 | 10% | 3.5 | 3.5 | 未变：M6 层级 2 三轮合计 **49/60 = 81.7%**，仍未达 ≥90%（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83）；层级 0/1 证据延续有效 |
 | 客户交付件与服务边界 | 10% | 3 | **3.5** | 升级：契约活检真跑通（[public-contracts.md](../architecture/public-contracts.md):348-362，三后端齐备 48/48、仅 androguard 47/47、退出码 0）；交付路径被演练全程走通。扣分见 §4.4 |
@@ -101,12 +101,12 @@
 `tests/test_upload_isolation.py`。本轮新增的硬证据有四条：
 
 1. **CI 会验发版树本身**。[ci.yml](../../.github/workflows/ci.yml):4-18 的 push 触发
-   同时收 `branches: [main, 'release/**']` 与 `tags: ['v*']`；`:493-537` 新增的
+   同时收 `branches: [main, 'release/**']` 与 `tags: ['v*']`；`ci.yml:493-525` 新增的
    `measurement` job 以 `if: startsWith(github.ref, 'refs/tags/')` 为条件，
    在 tag 上装齐后端与 fixtures，跑 `scripts/refresh-report-figures.py --check`
    ——**只比较、不写盘**。它回答的是「报告里的数字描述的还是不是这棵被 tag 的树」。
-2. **三道本地门禁进了 CI**：契约活检（`:442`）、M10 自查（`:471`）、
-   测量比对（`:493-537`）。上一轮 [CI 门禁覆盖复核](ci-gate-coverage.md):70-77 记录的
+2. **三道本地门禁进了 CI**：契约活检（`ci.yml:442`）、M10 自查（`ci.yml:471`）、
+   测量比对（`ci.yml:493-525`）。上一轮 [CI 门禁覆盖复核](ci-gate-coverage.md):70-77 记录的
    「21 项门禁里 CI 只跑 14 项、6 道只在本地」是扩容前的状态。
 3. **两处「没人核对」的盲区收口在门禁里**，不是靠改文档口径：
    出处按文档自己声明的树解析（[check-doc-citations.py](../../scripts/check-doc-citations.py):107
@@ -179,9 +179,9 @@ Windows 要指向 `bin\jadx.bat`；`export` 提示改为按 manifest 实际文�
 
 **扣分**：**层级 2 真实模型三轮完整重测 49/60 = 81.7%，未达验收线**
 （逐轮 15/20 = 75.0%、16/20 = 80.0%、18/20 = 90.0%；r1 未达每轮 ≥16/20，
-三轮合计未达 ≥54/60，见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:86）。
+三轮合计未达 ≥54/60，见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85）。
 按冻结纪律，只能修正系统或缩小并重述服务承诺后重测，不得删题换通过率
-（同文件 :88）。因此维持 3.5，不给 4。
+（同文件 :85）。因此维持 3.5，不给 4。
 
 **要提升它要做什么**：两条路——(a) 授权真实模型预算，跑完三轮并达到每轮 ≥16/20、
 合计 ≥54/60；(b) 按冻结纪律缩小并重述承诺后重测。两条都需要外部动作，仓库内做不完。
@@ -265,14 +265,14 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 1. **「报告数字说的是哪棵树」有了机器答案。**
    证据：CI 的 `measurement` job 只在 tag 上跑，跑的是 `refresh-report-figures.py --check`
-   （[ci.yml](../../.github/workflows/ci.yml):493-537）。
+   （[ci.yml](../../.github/workflows/ci.yml):493-525）。
    改变的判断：上一轮 §6.6 的缺口表里没有这一项，因为那时 tag 推送根本不触发 CI
    （[ci-gate-coverage.md](ci-gate-coverage.md):13、:35、:49 仍记着旧状态）。
    影响：核心工程（4/4，但证据更硬）。
 
 2. **「CI 只跑 14 项门禁、6 道只在本地」不再成立。**
-   证据：契约活检（`:442`）、M10 自查（`:471`）、测量比对（`:493-537`）三个 job；
-   tag 推送也产生 run（`:18`）。
+   证据：契约活检（`ci.yml:442`）、M10 自查（`ci.yml:471`）、测量比对（`ci.yml:493-525`）三个 job；
+   tag 推送也产生 run（`ci.yml:18`）。
    改变的判断：上一轮把「本地门禁无人守护」当成结构性缺口；现在这三项在每次
    push 到 `main`、PR 到 `main` 与 tag 推送时都会自动核对一次。
    影响：核心工程（4/4）。
@@ -383,8 +383,8 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 - 为什么排第三而不是第一：它只影响一维，且**不阻塞服务页**——
   但它决定服务页上「Evidence-first AI / MCP Integration」这一方向能写多满：
   49/60 = 81.7% 的实测结果不支持「稳定优于基线」这类说法
-  （[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:88）。
-- 前置条件：需要真实模型预算授权；或走同文件 :88 给的另一半路——
+  （[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85）。
+- 前置条件：需要真实模型预算授权；或走同文件 :85 给的另一半路——
   修正系统或**缩小并重述服务承诺**后重测（不得删题换通过率）。
 
 > **三件做完之后的两平台分数**：GitHub 85.0 + 5.0 + 7.5 + 1.25 = **98.75**；
@@ -397,7 +397,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 | # | 缺口 | 现状与出处 |
 |---|---|---|
-| 1 | **M6 层级 2 未达验收线** | 三轮合计 **49/60 = 81.7%**（逐轮 15/16/18），未达「每轮 ≥80%、三轮合计 ≥90%」；r1 15/20 = 75.0% 未达每轮线（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:86） |
+| 1 | **M6 层级 2 未达验收线** | 三轮合计 **49/60 = 81.7%**（逐轮 15/16/18），未达「每轮 ≥80%、三轮合计 ≥90%」；r1 15/20 = 75.0% 未达每轮线（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85） |
 | 2 | **M10 独立验收未发起** | 材料已成稿，邀请函待发起人发出；commit 占位符未填（[m10-invitation-final.md](m10-invitation-final.md):60；[status.md](../status.md):3、:138） |
 | 3 | **Upwork 服务页与素材仍是草稿未发布** | [project-brief.md](../outreach/project-brief.md):3「Draft for review — not published」；发布前还有十项人工确认（[publish-review.md](../outreach/publish-review.md):307-340） |
 | 4 | **macOS 未验证** | 无 Apple 硬件，如实标注（[m8-install-rehearsal.md](m8-install-rehearsal.md):28） |
