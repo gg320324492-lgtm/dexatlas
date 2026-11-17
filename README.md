@@ -29,22 +29,24 @@ that fails is reported as a value, not a crash: an APK that defeats the decompil
 still yields a manifest, an index and a report that says which steps did not run.
 
 > [!IMPORTANT]
-> **Status: early development — v1.0.0 released (tag 2026-11-17); Phase 3 is
-> delivered, but the M6 agent acceptance line and the M10 independent
-> acceptance are still open.** The CLI,
+> **Status: early development — v1.0.0 released (tag 2026-11-17); Phase 3's
+> deliverables are released, but its exit criteria are not all met (M6 is not
+> closed and M10 has not started).** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in
 > every version since. The MCP server, the evidence-first agent and the web
 > workbench's M4 screens — the project dashboard, upload and analysis progress,
 > search and evidence, the cross-reference view, the agent workspace, report
 > export, and the M3 benchmark view — shipped in `v0.2.0`; all of them are
 > built in full except the search, source and evidence group, which is partly
-> built. M4 passed its source review on 2026-11-14. Phase 3 is under way
+> built. M4 passed its source review on 2026-11-14. Phase 3's milestone status
 > against the
 > [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
 > (client-ready deliverables) are done; M6 (bounded agent tasks) has its level-0
 > and level-1 drills complete, its level-2 real-model batch run — which did
-> **not** meet the acceptance line (DexAtlas 40.0% over three rounds against
-> ≥80%; see the [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and a
+> **not** meet the acceptance line (DexAtlas per-round 45%/40%/35% are all below
+> the ≥16/20 (≥80%) line, and the three-round total 40.0% is below the
+> ≥54/60 (≥90%) line; see the
+> [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and a
 > post-fix full three-round retest that scored 49/60 = 81.7% (15/16/18 per
 > round) — still below the three-round ≥90% bar (see the
 > [retest record](docs/benchmarks/m6-level2-retest4.md)) — and a post-fix
@@ -53,8 +55,8 @@ still yields a manifest, an index and a report that says which steps did not run
 > fixes 2/5) and missed the narrow-verification gate (≥4/6 and ≥3/5); a third
 > narrow round after the budget-efficiency fixes (resources closure, notice
 > folding, string-excerpt clipping, idle-tool notice) converted **3/6**
-> (deterministic 3/5) — still below the gate — so per the plan investment
-> stopped for good and M6 moved to the state-of-record disclosure plan (see the
+> (deterministic 3/5) — both narrow rounds still below the gate, so per the
+> plan investment stopped for good and M6 moved to the state-of-record disclosure plan (see the
 > [round-2 record](docs/benchmarks/m6-level2-narrow-verify2.md) and the
 > [round-3 record](docs/benchmarks/m6-level2-narrow-verify3.md));
 > M8 (clean
@@ -536,11 +538,13 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line); after failure-mode analysis and five root-cause fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round line, r1 did not, and 81.7% is below the three-round ≥90% bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan — the milestone stays open |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan — the milestone stays open |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
-| M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit-code question is decided and recorded as a known limitation |
+| M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit code is implemented as exit code 6 (`EXIT_NO_INDEX`) and written into the [public contract table](docs/architecture/public-contracts.md) |
 | M9 | GitHub showcase (this page) and Upwork materials | **showcase done; materials unpublished** — this page and the [project brief](docs/outreach/project-brief.md) draft are in place; the Upwork materials are not published |
 | M10 | independent acceptance, re-scoring, release candidate | **preparation ready; acceptance not run** — the [preparation pack](docs/reports/m10-acceptance-pack.md) exists; independent reproduction and re-scoring have not started |
 
-`v1.0.0` is considered only after this plan's exit criteria pass — phases advance on
-evidence, not on a calendar.
+This plan originally made `v1.0.0` conditional on all its exit criteria passing; `v1.0.0`
+was released on 2026-11-17 under the state-of-record disclosure scope, and the M6 and
+M10 acceptance criteria are still open (see [`docs/status.md`](docs/status.md)) —
+phases advance on evidence, not on a calendar.
