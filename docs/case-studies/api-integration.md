@@ -2,6 +2,8 @@
 
 **Sample:** [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
 (sha256 `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`)
+**Run:** the session quoted below is `run_6506002de5d8486a`; the attached
+package carries a different run of the same APK, `run_e112e71772d34a0e`
 **Surfaces:** REST API (`uvicorn dexatlas.api.app:app`), MCP server
 (`dexatlas-mcp`, stdio), plus a Python SDK-style client over HTTP
 (`examples/api_client.py`)
@@ -207,13 +209,22 @@ The Markdown answer opens:
 `summary` — so a pipeline can archive the byte-identical artefact either
 way.
 
-**Ready-made attachments for this case study** (from the same analysis,
-`apk_80a8fe0e81204c9f`, exported over HTTP per §3.4 and via
-`dexatlas export`): [Markdown report](attachments/demo-report.md),
+**Ready-made attachments for this study**: [Markdown report](attachments/demo-report.md),
 [JSON report](attachments/demo-report.json),
 [offline HTML report](attachments/demo-report.html),
-[evidence package](attachments/api-integration-evidence-package.zip). The
-Markdown and JSON files are the same artefacts the HTTP endpoint returns.
+[evidence package](attachments/api-integration-evidence-package.zip).
+
+**Which analysis they come from — read this before quoting a run id.** The
+package and the three loose report files carry run `run_e112e71772d34a0e` of
+project `apk_80a8fe0e81204c9f`, and the loose files are **case study 1's**:
+this study links them rather than copies of them, because both studies
+analyse the same `demo-app` APK. The session quoted in §3.4 is a **different
+run** of that APK — `run_6506002de5d8486a`, an id that appears in no
+attachment. Every count matches, because the APK matches; the run id and the
+timings do not. The package's manifest records the `report.json` **inside the
+package** (`2a08ab09…`), which differs from the loose `report.json` above
+(`6cd7fa0b…`) by two timestamp fields — `generated_at` and
+`project.created_at` — and by nothing else.
 
 ### 3.5 The Python client
 
