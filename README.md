@@ -14,6 +14,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
+  <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks" width="900">
 </div>
 
 DexAtlas turns an APK into a picture you can verify — as complete as the installed
