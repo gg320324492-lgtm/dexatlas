@@ -409,7 +409,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 
 - **[交接说明](docs/HANDOVER.md)** —— 项目现状、如何在另一台机器跑起来、接下来做什么
 - **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
-- **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
+- **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么；§4.0 带着 M6 层级 2 的判定，
+  里程碑仍未收口
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 - **[Phase 2 计划](docs/roadmap/phase2-plan.md)** —— 源码评审之后、对着真实代码写的
@@ -431,7 +432,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[Phase 1 验收记录](docs/releases/phase1-acceptance-2026-10-21.md)** —— 验收了什么，以及它**没有**声称什么
 
 - **[评审报告](docs/reports/phase1-review-report.md)** —— 发现了什么、修了什么、推迟了什么
-- **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分
+- **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分；
+  这个分数是修复前的基线，此后没有重新打分
 - **[Phase 2 任务清单](docs/reports/phase2-issue-list.md)** —— 推迟的发现，每条带两个方案和推荐
 - **[退出码提案](docs/proposals/exit-code-partial-read.md)** —— 退出码 6（「跑完了，但没读到任何
   代码」）背后的提案；落地后仍保留提案原文
