@@ -9,7 +9,7 @@
 |---|---|
 | 路径 | `.github/social-preview.png` |
 | 格式 | PNG、1280×640 |
-| 体积 | 71,404 字节 |
+| 体积 | 70,617 字节 |
 | 生成 | Pillow + Windows 自带字体（`msyh.ttc` / `msyhbd.ttc` / `consolab.ttf`），脚本见 §5 |
 
 图里没有渐变、没有阴影、没有装饰图形：这是一个文档工具的仓库，卡片要像文档而不像广告。
@@ -49,9 +49,9 @@
 | `从 APK 到可核查的证据` | `README.md:5` | 同一句 tagline 的中文表述 |
 | `开源、证据优先的 Android 逆向工程与移动应用分析平台。` | `README.zh-CN.md:7` | 逐字 |
 | `93.3%` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.pct-->` |
-| `7117/7631 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` / `<!--fig:coverage.total-->` |
-| `1620` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
-| `1473 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` / `<!--fig:tests.slow-->` |
+| `7135/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` / `<!--fig:coverage.total-->` |
+| `1632` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
+| `1485 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` / `<!--fig:tests.slow-->` |
 | `49` / `公共契约检查项` | `docs/architecture/public-contracts.md:348` | 检查项清单的静态条数 |
 | `28 REST + 6 MCP + 15 CLI`（合计 49 项） | `docs/architecture/public-contracts.md:348` | 同一行的分项 |
 | `MCP 只读工具 11 个` | `docs/architecture/public-contracts.md:207-217` | §3.1 工具清单的 11 行 |

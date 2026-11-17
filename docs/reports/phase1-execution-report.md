@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1620<!--/fig-->（<!--fig:tests.fast-->1473<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7117<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1632<!--/fig-->（<!--fig:tests.fast-->1485<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7135<!--/fig-->/<!--fig:coverage.total-->7650<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -96,8 +96,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | `cli/console.py` | 82.4% | 6 / 34 |
 | `tools/base.py` | 88.4% | 21 / 181 |
 | `tools/jadx/adapter.py` | 88.6% | 41 / 360 |
-| `reports/evidence_package.py` | 88.9% | 17 / 153 |
 | `mcp/security.py` | 89.3% | 3 / 28 |
+| `reports/evidence_package.py` | 89.5% | 18 / 172 |
 <!--/fig-->
 
 `tools/apktool/adapter.py` 原本是 82.7%（24/139 未覆盖），是这份清单里的薄弱项之一。
@@ -140,9 +140,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1473<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1485<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->147<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1620<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1632<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -872,10 +872,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1620<!--/fig--> 个：<!--fig:tests.fast-->1473<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1632<!--/fig--> 个：<!--fig:tests.fast-->1485<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7117<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1620<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7135<!--/fig-->/<!--fig:coverage.total-->7650<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1631<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1054,7 +1054,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "mcp/tools/symbols.py": [71, 1],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
-      "reports/evidence_package.py": [153, 17],
+      "reports/evidence_package.py": [172, 18],
       "reports/html_report.py": [86, 5],
       "reports/json_report.py": [27, 0],
       "reports/markdown.py": [97, 0],
@@ -1076,8 +1076,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 514,
-    "statements": 7631
+    "missing": 515,
+    "statements": 7650
   },
   "history": {
     "v0.1.0": {
@@ -1094,10 +1094,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:1bcf620d575390d5a912bbb72ee0100cf23b748063f05ff3a1b29aa4fda0b276",
+  "source_fingerprint": "sha256:80bf8b0af31312d996cd271c80bcfdc0fb4f51724844e39fc4b6cd301df7e227",
   "suite": {
-    "failed": 0,
-    "passed": 1620,
+    "failed": 1,
+    "passed": 1631,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1105,8 +1105,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "xpassed": 0
   },
   "tests": {
-    "fast": 1473,
+    "fast": 1485,
     "slow": 147,
-    "total": 1620
+    "total": 1632
   }
 }-->

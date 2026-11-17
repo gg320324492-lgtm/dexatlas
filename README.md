@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1620%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1631%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 
 > 徽章是**完整环境下**的一次测量（1612 个测试、0 跳过）。在没抓第三方样本的机器上，

@@ -64,7 +64,7 @@ questions with cited evidence, or in a local web workbench.
 - **Runtime isolation.** Untrusted DEX parsing runs in a separate worker
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.
-- **Quality gates.** Strict mypy typing, ruff lint/format, 1620 tests at
+- **Quality gates.** Strict mypy typing, ruff lint/format, 1632 tests at
   93.3% coverage on the first-party code, and six CI jobs: lint, format and
   typing; the test suite on Python 3.12 with all three backends and on Python 3.13
   with none of the Java-based ones; the test suite with Apktool only and no JADX;

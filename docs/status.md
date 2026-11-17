@@ -20,7 +20,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · v0.2.0（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） · **v1.0.0**（2026-11-17 已发布，见[发版说明](releases/v1.0.0.md)） |
-| 测试 | <!--fig:tests.total-->1620<!--/fig--> 个（<!--fig:tests.fast-->1473<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1632<!--/fig--> 个（<!--fig:tests.fast-->1485<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |

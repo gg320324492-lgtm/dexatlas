@@ -9,7 +9,7 @@
 > 目录下的四份素材本身。
 >
 > **核对基准：** `v1.0.0` 发版树（tag `v1.0.0`，2026-11-17），commit `0104ccb`
-> ——四份素材与本文件的最后一次改动都在这个发版 commit 里。更早一轮的核对以
+> ——四份素材与本文件的最后一次改动都在这个发版 commit 里。**（2026-11-18：四份素材里的数字已按最新一次完整测量同步；下文的核对结论仍锚在 `0104ccb`。）**更早一轮的核对以
 > `claude/upwork-check` @ `8868e30` 为基准，那一轮的历史值在下文各自标了出处。
 
 ---
@@ -18,7 +18,7 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,620（1,473 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 测试总数 | 1,632（1,485 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
 | 一方代码覆盖率 | 93.3%（7,117 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
@@ -45,10 +45,10 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,620 automated tests, 93.3% coverage` | 1,620 / 93.3% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,620 tests, coverage and dead-code gates` | 1,620 |
-| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,620 tests at 93.3% coverage` | 1,620 / 93.3% |
-| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,620 automated tests at 93.3% coverage` | 1,620 / 93.3% |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,632 automated tests, 93.3% coverage` | 1,632 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,632 tests, coverage and dead-code gates` | 1,632 |
+| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,632 tests at 93.3% coverage` | 1,632 / 93.3% |
+| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,632 automated tests at 93.3% coverage` | 1,632 / 93.3% |
 
 覆盖率的措辞保持「一方代码覆盖率」的口径，没有写成「总覆盖率」——报告里
 `coverage.pct` 量的就是一方代码。
@@ -329,8 +329,8 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
    请在真实表单上逐个字段确认。**素材顶部引用的官方指南链接也要联网核实**
    （`support.upwork.com/hc/en-us/articles/360016144974`）：本轮**没有联网**，
    那条链接与其中的限制值都还没对过现网。
-5. **对外数字要跟最后一次测量同步。** 本轮的 1,620 / 93.3% 取自最近一次完整
-   测量落盘的报告（源指纹 `sha256:975afa8e…`）——完整测量已重跑，这四份素材的
+5. **对外数字要跟最后一次测量同步。** 本轮的 1,632 / 93.3% 取自最近一次完整
+   测量落盘的报告（源指纹 `sha256:80bf8b0a…`）——完整测量已重跑，这四份素材的
    数字已按新值核过一遍。**以后任何一次测量都会再改这两个数**，发版前请再核
    一次。
 6. **`{{...}}` 占位符全部替换后才能发。** 模板里的占位符若漏改会直接发出去。
@@ -392,7 +392,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 **当前 `docs/reports/phase1-execution-report.md` 落盘的就是复原后的值**
-（1,620 / 93.3%），共享树在该文件上也没有未提交改动。
+（1,632 / 93.3%），共享树在该文件上也没有未提交改动。
 
 ---
 

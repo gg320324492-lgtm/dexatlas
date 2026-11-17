@@ -9,7 +9,7 @@
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1620%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1631%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录；英文版的徽章由
