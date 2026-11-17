@@ -240,6 +240,10 @@ uv run --no-sync python -c \
 预期：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定）；
 `citations_resolved` 为 `True`，`citations_unresolved` 为空。
 
+> **包里有几个文件**：zip 内是 **4 个条目** —— 3 份报告（`report.md` /
+> `report.json` / `report.html`）加一份 `manifest.json`。CLI 打印的「3 files」指的是
+> 那 3 份报告 ✓（清单在 `manifest.json` 里 ✓）——不是少了一个文件 ✓。
+
 **迁移复验（C6）**：把 `evidence.zip` 复制到另一个目录（或另一台机器）再跑一次
 校验，仍应通过；包内路径不得指向生成它的机器。
 
