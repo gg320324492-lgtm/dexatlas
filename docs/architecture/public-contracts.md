@@ -341,7 +341,7 @@ not_included: {apk, full_sources, unrelated_strings}
 
 ## 7. 验证记录
 
-实测环境：Python 3.12.10。2026年11月15日的首次实测在 branch
+实测环境：Windows 11，Python 3.12.10。2026年11月15日的首次实测在 branch
 `claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑两次。
 快照测试 `tests/test_public_contracts.py` 把同样的清单固化为回归门禁。
 
@@ -352,20 +352,24 @@ not_included: {apk, full_sources, unrelated_strings}
 
 **49 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
 `server comes up` 只在服务起不来时记（起不来则本段只记这 1 项并中止），
-`X-DexAtlas-Source-* headers` 只在源码端点返回 200 时记。所以实跑的**执行条数**依
-机器而定：
+`X-DexAtlas-Source-* headers` 只在源码端点返回 200 时记。CLI 段的 `source` 与
+`resources` 各有一个调用点按「这次分析里有没有对应后端参与」分支，两种配置走不同的
+那条（见 §7.3）。所以实跑的**执行条数**依机器而定：
 
-| 实跑（均为 2026年11月17日，命令 `uv run --no-sync python scripts/verify-public-contracts.py`） | 可用后端 | 执行条数 | 通过 |
-|---|---|---|---|
-| 早先那次 | 仅 androguard，JADX 与 Apktool 都不在环境里 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** |
-| 本次（branch `claude/contract-49-live-run-99dbca`，commit `8524503`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **46/48** |
+| 实跑（2026年11月17日） | 可用后端 | 执行条数 | 通过 | 退出码 |
+|---|---|---|---|---|
+| branch `claude/contract-check-premise-197604`（commit `8483db2`） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** | 0 |
+| branch `claude/contract-check-premise-197604`（commit `8483db2`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **48/48** | 0 |
+
+命令：`uv run --no-sync python scripts/verify-public-contracts.py`。本 worktree 没有
+自己的 `.venv`（`uv sync` 不在本次改动的范围内），实跑用的是主检出
+`E:\Dexatlas\.venv` 的解释器，`PYTHONPATH` 指向本 worktree 的 `src`——被测的就是本
+worktree 的代码；后端路径经 `DEXATLAS_JADX_PATH` / `DEXATLAS_APKTOOL_JAR` 指向
+`E:\Dexatlas\.scratch\backends`，临时目录指向本 worktree 的 `.scratch\tmp`。
 
 两次的差在一处条件检查上：缺 JADX 时源码端点返回 404，`X-DexAtlas-Source-* headers`
-不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。
-
-**「三后端齐备时是 49/49」不成立**：三后端齐备时执行 48 项，其中 2 条 CLI 断言的
-前提是「没有源码/资源后端」，本实跑里它们不成立（见 §7.3）。本次脚本退出码为 1
-（有未通过的检查）。
+不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。CLI 段的 15
+项两种配置下都记满——分支走的是同一个调用点。
 
 ### 7.1 REST 实测
 
@@ -430,39 +434,54 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 ### 7.3 CLI 退出码实测
 
 `CliRunner` 逐个触发（脚本 `scripts/verify-public-contracts.py` 的 `cli_checks()`，
-15 项检查）：
+静态 15 个调用点）：
 
-| 场景 | 期望 | 实测 |
+| 场景 | 期望 | 实测（仅 androguard / 三后端齐备） |
 |---|---|---|
-| `version` | 0 | ✅ |
-| `backends` | 0 | ✅ |
-| `analyze examples/demo-app/demo.apk`（本机 Androguard 可用） | 0 | ✅ |
-| `projects` | 0，列出项目 | ✅ |
-| `source`（无源码后端，索引里无源码） | 1 | ✅ 早先那次（无 JADX）；三后端齐备时退出码 0 → ❌ |
-| `resources`（无 Apktool，资源表为空） | 1 | ✅ 早先那次（无 Apktool）；三后端齐备时退出码 0 → ❌ |
-| `classes apk_nope` | 2 | ✅ |
-| `classes <pid> --limit 0`（Typer `min=1`） | 2 | ✅ |
-| `analyze 缺失文件` | 2 | ✅ |
-| `analyze 非APK文件` | 2 | ✅ |
-| `source` 歧义方法名（合成双重载项目） | 4 | ✅ |
-| 上一行的候选被列出（两个重载都在输出里） | 候选被列出 | ✅ |
-| `analyze` 桩抛 `AnalysisFailed` | 3 | ✅ |
-| `analyze` 项目带 `output_truncated` 错误 | 5，stderr 提到 exit code 5 | ✅ |
-| `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ |
+| `version` | 0 | ✅ / ✅ |
+| `backends` | 0 | ✅ / ✅ |
+| `analyze examples/demo-app/demo.apk` | 0 | ✅ / ✅ |
+| `projects` | 0，列出项目 | ✅ / ✅ |
+| `source <pid> com.example.demo.MainActivity`（demo 的类）与 `source <pid> com.example.demo.Missing`（项目没有的类） | 无源码后端：1（空），并点名缺源码的类；有源码后端：0，stdout 打出该类源码，stderr 点名后端。项目没有的类：1（空） | ✅ / ✅ |
+| `resources <pid>`（全部资源）与 `resources <pid> --name dexatlas_no_such_resource`（APK 没有的名字） | 无资源后端：1（空），并说明没有匹配；有资源后端：0，列出 `app_name` = `DexAtlas Demo`，点名 `apktool:`。APK 没有的名字：1（空） | ✅ / ✅ |
+| `classes apk_nope` | 2 | ✅ / ✅ |
+| `classes <pid> --limit 0`（Typer `min=1`） | 2 | ✅ / ✅ |
+| `analyze 缺失文件` | 2 | ✅ / ✅ |
+| `analyze 非APK文件` | 2 | ✅ / ✅ |
+| `source` 歧义方法名（合成双重载项目） | 4 | ✅ / ✅ |
+| 歧义方法的候选被列出（两个重载都在输出里） | 候选被列出 | ✅ / ✅ |
+| `analyze` 桩抛 `AnalysisFailed` | 3 | ✅ / ✅ |
+| `analyze` 项目带 `output_truncated` 错误 | 5，stderr 提到 exit code 5 | ✅ / ✅ |
+| `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
-三后端齐备那次实跑有 2 条未通过，都是脚本对环境的假设，不是契约的破口——CLI 的实际
-行为符合 §1.2（答案非空即 0）：
+`source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:983-998` 的
+`_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
-- `source without a source backend exits 1 (empty)`：JADX 在场时
-  `dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity` 打出 JADX
-  反编译的 Java（出处 `jadx 1.5.2 -> jadx:sources/com/example/demo/MainActivity.java`），
-  答案非空 → 退出码 0；脚本这条断言写的是「无源码后端」时的 1。
-- `resources without a resource backend exits 1 (empty)`：Apktool 在场时资源表有
-  `app_name` = `DexAtlas Demo`（出处 `apktool 2.11.1 -> apktool:res/values/strings.xml`），
-  答案非空 → 退出码 0；脚本这条断言写的是「无 Apktool」时的 1。
+- 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺
+  源码的类；有源码后端时：答 0，stdout 打出该类自己的源码，stderr 点名产出它的后端
+  （`jadx 1.5.2 -> jadx:sources/com/example/demo/MainActivity.java`）。
+- 无资源后端时：`resources` 答 1（空），并说明没有匹配；有资源后端时：答 0，列出 demo
+  自己的 `app_name` = `DexAtlas Demo`（出处
+  `apktool 2.11.1 -> apktool:res/values/strings.xml`），并点名读它的后端。
+- 两个调用点各自还核对一条与后端无关的「答案为空」：项目没有的类、APK 没有的名字——
+  两种配置下都得是 1（空），所以「答案为空即 1」这条契约在两种配置下都被核对。
 
-脚本的判定逻辑未改（只改了本表的记录）：这两条断言要成立，需要的是缺 JADX、缺
-Apktool 的环境，也就是上表「早先那次」那台机器。
+改动前，脚本把「没有源码/资源后端」写进了那两条断言的前提。后端齐备时前提不成立，
+脚本把一棵正确的树判成不合格——失败的是断言的前提，不是产品行为。本次把判定逻辑改成
+按后端可用性分支，红→绿如下（命令、环境与后端版本见本节开头的表）：
+
+| 脚本版本 | 可用后端 | 执行条数 | 通过 | 退出码 |
+|---|---|---|---|---|
+| 改动前 | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **46/48** | 1 |
+| 改动前 | 仅 androguard 4.1.4 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** | 0 |
+| 改动后 | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **48/48** | 0 |
+| 改动后 | 仅 androguard 4.1.4 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** | 0 |
+
+改动前那 2 条未通过，正是 `source`（JADX 在场、答案非空 → 0）与 `resources`
+（Apktool 在场、资源表有 `app_name` → 0）两条：脚本断言的是「无后端时的 1」，而
+§1.2 承诺的是「答案为空即 1」。改动后静态条数不变（仍是 49 = 28 REST + 6 MCP +
+15 CLI），实跑的条数也不变（47 / 48），变的只是那两条断言的判定依据。
 
 ## 8. 已知限制
 
