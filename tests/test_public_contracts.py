@@ -16,7 +16,9 @@ directly, the way ``tests/test_cli.py`` seeds its project.
 
 from __future__ import annotations
 
+import ast
 import asyncio
+import re
 import unittest.mock
 from collections.abc import Iterator
 from pathlib import Path
@@ -735,3 +737,147 @@ def test_the_evidence_package_manifest_is_versioned() -> None:
     assert PACKAGE_SCHEMA_VERSION == 1
     assert set(_REPORT_PATHS) == {"json", "markdown", "html"}
     assert set(NOT_INCLUDED) == {"apk", "full_sources", "unrelated_strings"}
+
+
+# ---------------------------------------------------------------------------
+# The number of the live checks
+# ---------------------------------------------------------------------------
+
+#: The live contract checks, by the section of the script that holds them.
+#:
+#: The number of ``check()`` call sites in ``scripts/verify-public-contracts.py``
+#: is written down by hand in several materials — the changelog, the release
+#: notes, the contract table, the release body — so that a reader of any one
+#: of them sees the same count. Nothing held the script and the materials
+#: together: the number was maintained by whoever remembered to count, and a
+#: new check could be added without the five places being touched.
+#:
+#: The counts are pinned here. A change to the script's checks has to change
+#: this, and the materials with it, in the same commit — which is the point
+#: of an invariant that is maintained by hand.
+CONTRACT_CHECK_SECTIONS = {"_rest_requests": 28, "mcp_checks": 6, "cli_checks": 15}
+
+#: The number those call sites add up to.
+CONTRACT_CHECK_TOTAL = 49
+
+#: The materials that repeat the number, and the count they have to repeat.
+MATERIALS_THAT_STATE_THE_COUNT = (
+    "CHANGELOG.md",
+    "docs/architecture/public-contracts.md",
+    "docs/how-to-verify.md",
+    "docs/how-to-verify.zh-CN.md",
+    "docs/releases/v1.0.0.md",
+    "docs/reports/v1.0.0-github-release-body.md",
+)
+
+#: A statement of the split: "28 REST + 6 MCP + 15 CLI".
+CHECK_SPLIT = re.compile(r"(\d+) REST \+ (\d+) MCP \+ (\d+) CLI")
+
+#: A number as a document writes it: "1,588" is one number, and "149" is not
+#: "49".
+STATED_NUMBER = re.compile(r"(?<![\d,])49(?![\d,])")
+
+#: Directories whose markdown is not the project's own.
+_NOT_DOCUMENTS = frozenset(
+    {".git", ".venv", ".scratch", "build", "dist", "node_modules", ".mypy_cache", ".pytest_cache"}
+)
+
+
+def _the_live_check_script() -> Path:
+    return Path(__file__).parent.parent / "scripts" / "verify-public-contracts.py"
+
+
+def _check_call_sites() -> dict[str, int]:
+    """The ``check()`` call sites of the live contract script, by section.
+
+    The count is taken from the syntax tree, not from the text: a ``check()``
+    in a comment or in a string is not a check, and a text search would count
+    it as one.
+    """
+    tree = ast.parse(_the_live_check_script().read_text(encoding="utf-8"))
+    counts: dict[str, int] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        calls = sum(
+            1
+            for inner in ast.walk(node)
+            if isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Name)
+            and inner.func.id == "check"
+        )
+        if calls:
+            counts[node.name] = calls
+    return counts
+
+
+def _the_documents() -> list[Path]:
+    """Every markdown document of the repository."""
+    root = Path(__file__).parent.parent
+    found: list[Path] = []
+    for path in sorted(root.rglob("*.md")):
+        if _NOT_DOCUMENTS & set(path.relative_to(root).parts):
+            continue
+        found.append(path)
+    return found
+
+
+def test_the_live_contract_script_has_the_number_of_checks_the_materials_state() -> None:
+    """The script's ``check()`` call sites are the number the materials repeat.
+
+    A new check that is not counted in the materials is a number that is
+    wrong in five places at once, and nothing used to notice.
+    """
+    counts = _check_call_sites()
+
+    assert counts == CONTRACT_CHECK_SECTIONS, (
+        f"the live contract script has {counts}, the materials say {CONTRACT_CHECK_SECTIONS}"
+    )
+    assert sum(counts.values()) == CONTRACT_CHECK_TOTAL
+
+
+def test_every_document_that_states_the_check_count_states_the_right_one() -> None:
+    """A document that repeats the split repeats the count that goes with it.
+
+    The live runs state fewer checks — one REST check does not fire without
+    a source backend — and those are left alone. The static count is the one
+    the script has, and a document that states it has to state 49 with it,
+    next to the split or right after it.
+    """
+    static = (
+        f"{CONTRACT_CHECK_SECTIONS['_rest_requests']} REST + "
+        f"{CONTRACT_CHECK_SECTIONS['mcp_checks']} MCP + "
+        f"{CONTRACT_CHECK_SECTIONS['cli_checks']} CLI"
+    )
+
+    for document in _the_documents():
+        text = document.read_text(encoding="utf-8")
+        for match in re.finditer(re.escape(static), text):
+            before = text[max(0, match.start() - 40) : match.start()]
+            after = text[match.end() : match.end() + 40]
+            assert STATED_NUMBER.search(before) or STATED_NUMBER.search(after), (
+                f"{document.name} states the split {static} without stating "
+                f"{CONTRACT_CHECK_TOTAL} next to it"
+            )
+
+
+def test_the_release_materials_repeat_the_check_count() -> None:
+    """The materials that repeat the count still repeat it.
+
+    The number is repeated so that a reader of any one of them sees the same
+    count. A material that stopped repeating it would leave the reader with
+    a number nobody had checked.
+    """
+    root = Path(__file__).parent.parent
+    split = (
+        f"{CONTRACT_CHECK_SECTIONS['_rest_requests']} REST + "
+        f"{CONTRACT_CHECK_SECTIONS['mcp_checks']} MCP + "
+        f"{CONTRACT_CHECK_SECTIONS['cli_checks']} CLI"
+    )
+
+    for name in MATERIALS_THAT_STATE_THE_COUNT:
+        document = root / name
+        assert document.is_file(), f"{name} is missing"
+        text = document.read_text(encoding="utf-8")
+        assert split in text, f"{name} does not state the split {split}"
+        assert str(CONTRACT_CHECK_TOTAL) in text, f"{name} does not state {CONTRACT_CHECK_TOTAL}"

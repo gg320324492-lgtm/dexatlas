@@ -9,7 +9,7 @@
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1588%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1611%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录；英文版的徽章由
@@ -361,6 +361,12 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   落地后的验收测量：三轮均跑满 20 题分母，DexAtlas 49/60 = 81.7%（逐轮 15/16/18；
   r2、r3 达单轮线，r1 未达），A 21/60、B 21/60；trace 合计 1,182,356 tokens。
   仍低于三轮合计 ≥90% 的验收门槛，里程碑保持未收口
+- **[覆盖率数字测在哪棵树上](docs/reports/phase1-execution-report.md)** —— 执行报告带着
+  那次测量所针对的源码指纹：`src/dexatlas/`、`tests/`、`pyproject.toml` 与测量脚本
+  `scripts/refresh-report-figures.py`。改了其中任何一处，报告里的数字会被立刻判为过期，
+  而不是继续冒充现状。`scripts/` 下的其它脚本**不在**指纹里——测量没有读它们。
+  其中包括 `scripts/verify-public-contracts.py`（契约活检）与 `scripts/m10_selfcheck.py`
+  （M10 自查）：它们的结果由各自的测试守着，不由指纹守着
 
 ### 项目记录
 

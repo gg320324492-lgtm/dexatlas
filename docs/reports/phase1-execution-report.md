@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1588<!--/fig-->（<!--fig:tests.fast-->1441<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1612<!--/fig-->（<!--fig:tests.fast-->1465<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7117<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -140,9 +140,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1441<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1465<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->147<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1588<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1612<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -171,6 +171,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_decompilation.py` | `decompiled` 标志的判定：占位符、构造器、警告不算失败（3.14 节新增） |
 | `test_provenance.py` | locator 的形状与可移植性、每条证据都带工具版本（v0.1.3 新增） |
 | `test_doc_citations.py` | 文档里的 `文件:行号` 引用必须仍指向它说的东西（v0.1.3 新增） |
+| `test_how_to_verify.py` | 「怎么复核」那页写着的期望输出，必须就是套件真打出来的：收集数、快慢两段的划分 |
 | `test_model_claims.py` | 字段的文档说的取值，必须就是它真能产出的取值（v0.1.3 新增） |
 | `test_resources.py` | 资源表里的文本：解析、存储、检索、计数、CLI 与 API |
 | `test_source_provenance.py` | 源码表示的出处：Java 还是 Smali，跟着源码一起走 |
@@ -871,10 +872,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1588<!--/fig--> 个：<!--fig:tests.fast-->1441<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1612<!--/fig--> 个：<!--fig:tests.fast-->1465<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7117<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1588<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1611<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -984,6 +985,20 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
 其中 `source_fingerprint` 是那次测量所针对的源码指纹——源码一改，指纹就对不上，
 上面的覆盖率数字会被立刻判为过期，而不是继续冒充现状。
 
+<!--fingerprint-coverage-->
+**指纹覆盖什么，不覆盖什么。** 指纹是这几处的哈希：`src/dexatlas/` 下的全部
+Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
+`scripts/refresh-report-figures.py`。凡是那次测量读到的东西，改了它，那次测量
+就不作数了——**`scripts/` 下的其它脚本不在指纹里**：
+`scripts/verify-public-contracts.py`（公共契约活检）与 `scripts/m10_selfcheck.py`
+（M10 自查）改了，不会让上面的数字过期，因为测量没有读它们。
+
+这是有意的：指纹量的是「那次测量读到了什么」，不是「这个仓库里有什么」。
+这两个脚本的结果由别的东西守着——`tests/test_public_contracts.py` 断言活检脚本
+的 `check()` 调用点数与发布材料复述的 **49**（28 REST + 6 MCP + 15 CLI）一致，
+`tests/test_m10_selfcheck.py` 断言自查脚本的判据。
+<!--/fingerprint-coverage-->
+
 <!--report-figures:{
   "code": {
     "api_endpoints": 23,
@@ -1079,10 +1094,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:78728268669a0179765a58ef637ab6acea7ecb92271550107b250ab38d4352fe",
+  "source_fingerprint": "sha256:4e72ac493a0cdf571ba92781df53da2f262a1d9f92ada3ed323cca279c820bf2",
   "suite": {
-    "failed": 0,
-    "passed": 1588,
+    "failed": 1,
+    "passed": 1611,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1090,8 +1105,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1441,
+    "fast": 1465,
     "slow": 147,
-    "total": 1588
+    "total": 1612
   }
 }-->

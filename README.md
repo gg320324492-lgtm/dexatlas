@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1588%20passing-brightgreen.svg)](tests)
+[![Tests](https://img.shields.io/badge/tests-1611%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
@@ -463,6 +463,16 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   scans found nothing across all traces. Per the plan's failure handling the
   round stopped there, no full retest and no further fix round followed, and
   the state-of-record disclosure plan is the final settlement for M6
+- **[What the coverage figure was measured on](docs/reports/phase1-execution-report.md)** —
+  the execution report carries a fingerprint of the tree the measurement ran
+  on: `src/dexatlas/`, `tests/`, `pyproject.toml` and the measuring script
+  `scripts/refresh-report-figures.py`. Change any of them and the report's
+  numbers are declared stale instead of going on passing for the present. The
+  other scripts under `scripts/` are deliberately **not** in the fingerprint —
+  the measurement does not read them. That includes
+  `scripts/verify-public-contracts.py` (the contract live-check) and
+  `scripts/m10_selfcheck.py` (the M10 self-check); their results are held by
+  tests of their own, not by the fingerprint
 
 ### Project records
 

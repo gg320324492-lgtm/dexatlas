@@ -21,6 +21,7 @@ checkers, and only one of them is ever fixed.
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -79,9 +80,7 @@ def test_the_checker_reaches_every_citation_the_documents_hold() -> None:
         if not document.is_file():
             continue
         text = document.read_text(encoding="utf-8")
-        counted += sum(
-            1 for span in checker.SPAN.finditer(text) if checker.CITATION.match(span.group(1))
-        )
+        counted += len(checker.resolve_citations(text))
 
     assert counted > 0
     assert report.citations == counted, "the checker did not look at every citation"
@@ -379,3 +378,170 @@ def test_the_exit_code_is_the_same_on_any_console(
     assert with_utf8 == 1
     assert "🔴" in written
     assert "Traceback" not in written
+
+
+def test_the_release_documents_are_checked() -> None:
+    """The release notes and the release body are on the checker's list.
+
+    The release body carries the appendix that says where every number of a
+    release came from. Those line numbers drifted for a long time — nobody
+    was checking them, because the document was not on this list.
+    """
+    checker = _checker()
+    names = {document.name for document in checker.DOCS}
+
+    assert "v1.0.0-github-release-body.md" in names, "the release body is not checked"
+    assert "v1.0.0.md" in names, "the release notes are not checked"
+
+
+def test_a_drifted_citation_in_the_release_body_fails_the_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A line number in the release appendix that no longer holds is drift.
+
+    The appendix is a table of "number in the body | source". Corrupting one
+    of its line numbers has to turn the check red: a table of claims that
+    nothing checks is a table of guesses.
+    """
+    checker = _checker()
+    body = REPO_ROOT / "docs" / "reports" / "v1.0.0-github-release-body.md"
+    text = body.read_text(encoding="utf-8")
+    corrupted = text.replace("docs/status.md:37", "docs/status.md:3737", 1)
+    assert corrupted != text, "the release body does not cite docs/status.md:37"
+
+    document = tmp_path / "body.md"
+    document.write_text(corrupted, encoding="utf-8")
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 1
+    written = capsys.readouterr().out
+    assert "docs/status.md:3737" in written, "the corrupted line number was not the finding"
+
+
+def _a_word_on_one_line_only(lines: list[str]) -> tuple[str, int]:
+    """A word that one line of a text holds and no other line does.
+
+    The word has to look like a symbol — a capital or an underscore in it —
+    because that is what the checker compares a citation against.
+    """
+    words: dict[str, list[int]] = {}
+    for number, line in enumerate(lines, start=1):
+        for word in set(re.findall(r"[A-Z][A-Za-z0-9_]{3,}", line)):
+            words.setdefault(word, []).append(number)
+    for word, numbers in sorted(words.items()):
+        if len(numbers) == 1:
+            return word, numbers[0]
+    raise AssertionError("no word appears on exactly one line")
+
+
+def _a_name_mentioned_on_one_line_only(lines: list[str]) -> tuple[str, int]:
+    """A name one line of a Python file mentions and no other line does.
+
+    The name must not be one the file defines: a defined name is checked
+    against its own definition, not against the line that mentions it.
+    """
+    defined: set[str] = set()
+    mentioned: dict[str, list[int]] = {}
+    for number, line in enumerate(lines, start=1):
+        if re.match(r"^\s*(?:async\s+)?(?:def|class)\s", line):
+            defined.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", line))
+            continue
+        for name in set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*_[A-Za-z0-9_]+", line)):
+            mentioned.setdefault(name, []).append(number)
+    for name, numbers in sorted(mentioned.items()):
+        if len(numbers) == 1 and name not in defined:
+            return name, numbers[0]
+    raise AssertionError("no name appears on exactly one line")
+
+
+def test_a_bare_line_number_is_read_as_a_line_of_the_file_named_before_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``:44`` after ``file:37`` is the line 44 of the same file.
+
+    The release appendix writes its sources that way, and the checker used to
+    read only the first half of the pair: it checked the line 37 of the file
+    and never looked at the 38 to 44 the sentence pointed at. A citation that
+    names a symbol on the second line of the range was therefore reported as
+    drift, when it was in fact right.
+    """
+    checker = _checker()
+    source = REPO_ROOT / "scripts" / "verify-public-contracts.py"
+    name, number = _a_name_mentioned_on_one_line_only(
+        source.read_text(encoding="utf-8").splitlines()
+    )
+
+    document = tmp_path / "doc.md"
+    document.write_text(
+        f"The `{name}` is at `scripts/verify-public-contracts.py:{number - 1}`–`:{number}`\n",  # noqa: RUF001
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    report = checker.check_documents([document])
+    assert report.citations == 1, "the range was not read as one citation"
+    assert checker.main() == 0, capsys.readouterr().out
+
+
+def test_a_citation_into_a_markdown_file_is_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``file:line`` into a Markdown file is a citation like any other.
+
+    The release appendix cites documents: the number it points at is in a
+    Markdown file, and the checker used to read no extension but the code
+    ones.
+    """
+    checker = _checker()
+    status = REPO_ROOT / "docs" / "status.md"
+    word, number = _a_word_on_one_line_only(status.read_text(encoding="utf-8").splitlines())
+
+    document = tmp_path / "doc.md"
+    document.write_text(f"The `{word}` is at `docs/status.md:{number}`\n", encoding="utf-8")
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    report = checker.check_documents([document])
+    assert report.citations == 1, "the citation into the Markdown file was not read"
+
+
+def test_a_bare_line_number_without_a_file_is_not_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``:44`` with no file named before it is not a citation.
+
+    A number whose file was never named cannot be checked, and guessing the
+    file would check the wrong one.
+    """
+    checker = _checker()
+    document = tmp_path / "doc.md"
+    document.write_text("The line is at `:44`\n", encoding="utf-8")
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 0
+
+
+def test_a_citation_to_a_comment_is_not_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A comment holds a sentence, and a citation can be about that sentence.
+
+    The release appendix points at the header of ``scripts/fetch-fixtures.sh``
+    for the claim that the script fetches two fixtures, and that line is a
+    comment. The checker used to call every comment "nothing".
+    """
+    checker = _checker()
+    source = REPO_ROOT / "scripts" / "fetch-fixtures.sh"
+    line = next(
+        number
+        for number, text in enumerate(source.read_text(encoding="utf-8").splitlines(), start=1)
+        if "Two fixtures were fetched here" in text
+    )
+
+    document = tmp_path / "doc.md"
+    document.write_text(
+        f"Two fixtures are fetched by `scripts/fetch-fixtures.sh:{line}`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 0
