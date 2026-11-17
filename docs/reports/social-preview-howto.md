@@ -63,8 +63,9 @@
 
 ## 5. 重新生成这张图
 
-脚本不入库——画一张图不需要给仓库增加依赖，Pillow 是 demo extra 已经带来的。把它存到
-仓库外的任意位置（例如 `make_social_preview.py`），然后：
+脚本不入库——画一张图不需要给仓库增加依赖，Pillow 是 demo extra 已经带来的。把它放在
+**项目根目录下**临时用（不要提交，用完删掉或加进 `.gitignore`），例如
+`make_social_preview.py`，然后：
 
 ```bash
 python make_social_preview.py E:/Dexatlas
