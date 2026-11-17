@@ -79,7 +79,7 @@
 
 | ID | 验收项与判定标准 | 阻断 | 状态 | 证据记录 |
 |---|---|:---:|---|---|
-| A1 | 取得固定副本：从验收发起人指定的 commit 取得干净副本，`git status` 干净；记录 commit hash、来源 URL、日期。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；commit：；日期： |
+| A1 | 取得固定副本：从验收发起人钉定的 commit 取得干净副本，`git status` 干净；记录 commit hash、来源 URL、日期。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；commit：；日期： |
 | A2 | 依赖安装：按 §3.2 或 §3.3 的推荐路线安装完成，退出码 0；记录 OS、Python、uv、JDK、extras、耗时；不得有未解释的编译/下载失败。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；耗时：；版本： |
 | A3 | 后端检查：`uv run dexatlas backends` 的输出与机器实际安装一致；缺失后端要写明缺失原因，不得把缺失记成通过。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；输出： |
 | A4 | 首次分析：`examples/demo-app/demo.apk` 分析退出码 0；project id 为 `apk_80a8fe0e81204c9f`；计数为 5 classes / 8 methods / 23 call sites / 21 call edges / 1 resource string。若不同，先核对后端配置，再判定。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；计数：；耗时： |
@@ -185,15 +185,15 @@
 | 磁盘 | 预留数 GB | 记录实际占用；不要写到系统盘根目录 |
 | 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11）；见 [M8 演练](m8-install-rehearsal.md) |
 
-**固定版本。** 验收针对验收发起人指定的 commit。不要用移动的 `main` 分支做验收；
-所有记录都写清 commit hash。
+**固定版本。** 验收针对验收发起人钉定的 commit（待项目里程碑定稿后确定并告知
+hash）。不要用移动的 `main` 分支做验收；所有记录都写清 commit hash。
 
 ### 3.2 路线 A：uv（推荐，可完成 CLI、案例、测试和契约检查）
 
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人指定的 commit>
+git checkout <验收发起人钉定的 commit>
 uv sync --extra dev --extra analysis --extra mcp --extra demo
 uv run dexatlas backends
 ```
@@ -221,7 +221,7 @@ Windows 下 `DEXATLAS_JADX_PATH` 指向 `bin\jadx.bat`。没有后端时不要�
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人指定的 commit>
+git checkout <验收发起人钉定的 commit>
 docker build -t dexatlas .
 docker run --rm dexatlas dexatlas backends
 ```
