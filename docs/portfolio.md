@@ -8,7 +8,8 @@ Written for potential clients; kept to what the repository demonstrates.**
 ## Short description
 
 DexAtlas is an open-source Android application analysis platform that turns an
-APK into a complete, verifiable picture: the manifest and permissions, the full
+APK into a picture you can verify — as complete as the installed backends allow,
+and the report names what is missing: the manifest and permissions, the full
 symbol index, decompiled Java source, the call graph, and an evidence trail
 that records — for every fact — which tool read it, at which version, from
 which byte position. It runs from the command line, over a REST API, from an
@@ -63,10 +64,12 @@ questions with cited evidence, or in a local web workbench.
 - **Runtime isolation.** Untrusted DEX parsing runs in a separate worker
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.
-- **Quality gates.** Strict mypy typing, ruff lint/format, 1,588 tests at
-  93.3% coverage on the first-party code, and six CI jobs covering different
-  backend configurations (all three backends; none of the Java-based ones;
-  Apktool only) plus Docker and dependency audit.
+- **Quality gates.** Strict mypy typing, ruff lint/format, 1588 tests at
+  93.3% coverage on the first-party code, and six CI jobs: lint, format and
+  typing; the test suite on Python 3.12 with all three backends and on Python 3.13
+  with none of the Java-based ones; the test suite with Apktool only and no JADX;
+  a check that the published M3 comparison still reproduces; the Docker image; and
+  the dependency audit.
 
 ## Who it is for, and when
 
@@ -93,17 +96,18 @@ each fact was read from, and leaves the judgement to you.
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-uv sync --extra analysis
+uv sync --extra analysis --extra mcp
 
 uv run dexatlas analyze examples/demo-app/demo.apk -o report.md --json report.json
 ```
 
 That analyses a bundled first-party sample in a few seconds and writes both
 report formats — no external downloads, no API keys, no model required. The
-same workspace can then be opened in the web workbench
-(`uv run dexatlas-workbench`) or served to an AI assistant
-(`uv run dexatlas-mcp`). Full setup, including the JADX/Apktool backends and
-Docker, is in [docs/install.md](install.md).
+same workspace can then be served to an AI assistant (`uv run dexatlas-mcp`,
+which is why the `mcp` extra is installed above) or opened in the web workbench
+(`uv run dexatlas-workbench`, which builds the front end with npm on first
+start). Full setup, including the JADX/Apktool backends and Docker, is in
+[docs/install.md](install.md).
 
 Three complete worked analyses — a walkthrough of the demo app from upload to
 evidence chain, an obfuscated-sample study, and an integration study that

@@ -4,6 +4,8 @@
 
 本文面向潜在客户与雇主，回答一个问题：**把一个 APK 分析任务交给 DexAtlas，当前可以期待什么、不可以期待什么。** 它不是营销页，每一句能力声明都挂在可点开的证据上。
 
+英文版对这几条的说明（agent service promise）见 [Architecture → Glossary](architecture/README.md#glossary)。
+
 ## 1. 本工具做什么 / 不做什么
 
 ### 1.1 做什么

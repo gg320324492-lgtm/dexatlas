@@ -166,6 +166,8 @@ wide-app（1）、multidex-app（1）——五个样本全覆盖，合计 20 题
 5. **判定以 `benchmarks/model.py::check` 为准**：本文档的「期望答案」是其输入的
    摘要；两者冲突时以代码与 `benchmarks/tasks/` 的任务定义为准，并修订本文。
 
+这五条纪律与判分七条红线的英文说明见 [Architecture → Glossary](../architecture/README.md#glossary)。
+
 ## 6. 无模型基线执行方案（本阶段执行，零模型调用）
 
 真实模型批次未获授权前，先用确定性手段验证题集 machinery 与判定标准。
