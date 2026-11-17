@@ -2,13 +2,34 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # Two filters, and they are a union: a push workflow runs when *either*
+    # the branch filter or the tag filter matches the ref. A tag push is not
+    # a branch push of main, and before this it produced no run at all --
+    # so re-pointing a release tag was an action no CI job could see.
+    #
+    # `release/**` is the release branch namespace. A release commit pushed
+    # there has to be verified where it is pushed, not only after it is
+    # merged into main. Dropping the branch filter altogether is the other
+    # option, and it is not free: every branch push would then run the whole
+    # matrix (the full suite with coverage, the Java backends, the fixtures),
+    # and this repository carries dozens of short-lived session branches.
+    # The filter stays; what it covers is wider.
+    branches: [main, 'release/**']
+    tags: ['v*']
   pull_request:
     branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A run that has started is not interrupted.
+  #
+  # Two pushes to main in a row used to cancel the first run, and its
+  # verdict -- the one the release checklist waits for -- was gone before
+  # anyone read it. GitHub keeps at most one pending run per concurrency
+  # group and replaces it with the newest, so the queue cannot grow without
+  # bound: the cost of keeping the verdict is that a superseded push may
+  # still be measured once.
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -67,6 +88,8 @@ jobs:
           # compared as a whole. A pull request does not use it: see below.
           BEFORE: ${{ github.event.before }}
           EVENT: ${{ github.event_name }}
+          # "branch" or "tag" -- the same distinction the push filters make.
+          REF_TYPE: ${{ github.ref_type }}
         run: |
           if [ "$EVENT" = "pull_request" ]; then
             # A pull request's "before" is the head the branch had before
@@ -78,6 +101,15 @@ jobs:
             # pull request wants: every claim the branch introduced is a
             # claim it added, however many times it has been pushed.
             uv run python scripts/check-version-claims.py --base auto
+          elif [ "$REF_TYPE" = "tag" ]; then
+            # A tag names a commit, and the claims to check are the ones that
+            # commit introduced: its parent. `--base auto` would pick the
+            # merge base with origin/main, and for a tag that sits on the
+            # mainline that base is the tagged commit itself -- an empty
+            # diff, and a check that cannot fail. The tagged commit's parent
+            # is the honest base, and it is what makes a tag that points at
+            # the wrong commit say so.
+            uv run python scripts/check-version-claims.py --base HEAD^
           elif git cat-file -e "${BEFORE}^{commit}" 2>/dev/null; then
             uv run python scripts/check-version-claims.py --base "$BEFORE"
           else
@@ -401,3 +433,93 @@ jobs:
           name: audited-requirements
           path: requirements.txt
           retention-days: 30
+
+  # The contract table (docs/architecture/public-contracts.md) states what the
+  # REST API, the MCP tools and the CLI are supposed to do; the live check is
+  # what proves it. Until now that check ran only on a maintainer's machine:
+  # a table that had stopped matching the code stayed in the repository with
+  # a green CI, because no automated job ever asked.
+  contracts:
+    name: Public contracts (live)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # JADX and Apktool are Java programs. Without a JRE the live check
+      # would measure a configuration the readers of the table do not have.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
+      - name: Install analysis backends
+        run: bash scripts/install-backends.sh
+      # The script starts a real uvicorn server over dexatlas.api.app and
+      # analyses the first-party demo APK that ships with the repository, so
+      # it needs no third-party fixture. It keeps its own workspace and its
+      # server's temporary files under .scratch.
+      - name: Verify the public contracts
+        run: uv run --no-sync python scripts/verify-public-contracts.py
+
+  # The M10 acceptance pack states forty checks, and the automatable part of
+  # them is this script. No job called it, so the pack could drift away from
+  # the code it describes with nothing going red. The script is read-only and
+  # needs no backend: its verdict is an exit code.
+  m10-selfcheck:
+    name: M10 acceptance self-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # The script itself needs nothing but the standard library. It does
+      # check that the gate commands it names are installed, though -- so the
+      # development tools have to be there for the check to have something to
+      # look at.
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+      - name: M10 self-check
+        run: uv run --no-sync python scripts/m10_selfcheck.py
+
+  # The report's figures are generated, and this job asks whether the ones in
+  # the repository still describe the tree the tag names. It runs on tag
+  # pushes only: it is the most expensive check here (the whole suite with
+  # coverage, the Java backends, the third-party fixtures), and what it
+  # answers matters at a release rather than on every commit.
+  measurement:
+    name: The report's figures describe the tagged tree
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The measurement reads the tags and the history: a shallow
+          # checkout has neither.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      # The `demo` extra is Pillow: the measurement is only complete when
+      # every test in the tree runs, and the test that draws a figure skips
+      # without it.
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --extra demo --extra mcp --frozen
+      - name: Install analysis backends
+        run: bash scripts/install-backends.sh
+      - name: Fetch test fixtures
+        env:
+          # The script uses the gh API, which needs a token even for public content.
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch-fixtures.sh
+      # --check compares and reports; it does not write. The report, the
+      # status page and the README badges stay as the repository has them.
+      - name: The report's figures still describe this tree
+        run: uv run --no-sync python scripts/refresh-report-figures.py --check
