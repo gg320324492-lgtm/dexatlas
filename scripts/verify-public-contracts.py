@@ -447,10 +447,84 @@ def cli_checks() -> None:
     result = runner.invoke(app, ["projects"])
     check("projects exits 0 and lists the project", result.exit_code == 0 and pid in result.stdout)
 
-    result = runner.invoke(app, ["source", pid, "com.example.demo.MainActivity"])
-    check("source without a source backend exits 1 (empty)", result.exit_code == EXIT_EMPTY)
-    result = runner.invoke(app, ["resources", pid])
-    check("resources without a resource backend exits 1 (empty)", result.exit_code == EXIT_EMPTY)
+    # Source and resources: the premise is read from the analysis, not from
+    # the machine.
+    #
+    # These two checks used to say "without a source backend" and "without a
+    # resource backend", and their premise was the machine. A box with JADX
+    # and Apktool installed had no way to answer them, so a tree that was
+    # right was judged wrong. The contract is not about the machine. It is
+    # about the answer: no source to show is the empty answer (exit 1), and a
+    # source to show is a real answer (exit 0).
+    #
+    # So each command is checked against both of the answers it can give —
+    # the one it has for the demo project, and the one it has for something
+    # the project does not hold — and which of the two the demo project gets
+    # is read from the run: the project records the backends that took part
+    # in it (``tool_versions``), and that is the record the pipeline reads
+    # when it asks the same question.
+    project = Store.open(get_settings().database_path).get_project(pid)
+    took_part = project.tool_versions if project is not None else {}
+
+    # JADX writes the Java, Apktool writes the Smali; with both, JADX wins.
+    source_backend = (
+        "jadx"
+        if took_part.get("jadx") is not None
+        else "apktool"
+        if took_part.get("apktool") is not None
+        else None
+    )
+    source = runner.invoke(app, ["source", pid, "com.example.demo.MainActivity"])
+    no_source = runner.invoke(app, ["source", pid, "com.example.demo.Missing"])
+    if source_backend is None:
+        name = (
+            "source without a source backend answers 1 (empty) and names the class it "
+            "has no source for, and so does a class the project does not hold"
+        )
+        ok = (
+            source.exit_code == EXIT_EMPTY
+            and no_source.exit_code == EXIT_EMPTY
+            and "No source for com.example.demo.MainActivity" in source.stderr
+        )
+    else:
+        name = (
+            f"source with {source_backend} answers 0 with the source it found, and a "
+            "class the project does not hold answers 1 (empty)"
+        )
+        ok = (
+            source.exit_code == 0
+            and "MainActivity" in source.stdout
+            and f"{source_backend}:" in source.stderr
+            and no_source.exit_code == EXIT_EMPTY
+        )
+    check(name, ok, f"exit={source.exit_code} missing={no_source.exit_code}")
+
+    resource_backend = "apktool" if took_part.get("apktool") is not None else None
+    resources = runner.invoke(app, ["resources", pid])
+    no_resource = runner.invoke(app, ["resources", pid, "--name", "dexatlas_no_such_resource"])
+    if resource_backend is None:
+        name = (
+            "resources without a resource backend answers 1 (empty) and says that "
+            "nothing matched, and so does a name the APK does not declare"
+        )
+        ok = (
+            resources.exit_code == EXIT_EMPTY
+            and no_resource.exit_code == EXIT_EMPTY
+            and "No resources matched." in resources.stderr
+        )
+    else:
+        name = (
+            f"resources with {resource_backend} answer 0 with the resources it found, "
+            "and a name the APK does not declare answers 1 (empty)"
+        )
+        ok = (
+            resources.exit_code == 0
+            and "app_name" in resources.stdout
+            and "DexAtlas Demo" in resources.stdout
+            and "apktool:" in resources.stdout
+            and no_resource.exit_code == EXIT_EMPTY
+        )
+    check(name, ok, f"exit={resources.exit_code} missing={no_resource.exit_code}")
 
     result = runner.invoke(app, ["classes", "apk_nope"])
     check("unknown project exits 2", result.exit_code == EXIT_BAD_REQUEST)
