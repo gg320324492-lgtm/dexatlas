@@ -43,7 +43,7 @@ DexAtlas 已完成从安装到交付样例的开发，进入 v1.0.0 的候选验
 
 **关于项目现状，我们如实告知**：Agent 能力层级 2（真实模型）的多轮验证
 均未达到项目自设的验收线（最终完整重测 DexAtlas 49/60 = 81.7%，逐轮
-15/16/18，低于「每轮 ≥80%、三轮合计 ≥90%」），连续三轮窄验证也未达判据后，
+17/15/17，低于「每轮 ≥80%、三轮合计 ≥90%」），连续三轮窄验证也未达判据后，
 项目已按既定验收方案停止投入，将 Agent 服务定稿为**现状披露**——即
 「有界、证据可核查的 agent 演练」，不宣称达到验收线。这是您在评审中
 会重点核对的高风险声明之一（见[读者验收包 §4](m10-reader-package.md)）。
@@ -54,12 +54,12 @@ DexAtlas 已完成从安装到交付样例的开发，进入 v1.0.0 的候选验
 的固定提交：
 
 ```text
-commit e4f3011
+commit 277d0fa
 （完整 hash 以 git rev-parse 输出为准；clone 后用
- git checkout e4f3011 检出该提交）
+ git checkout 277d0fa 检出该提交）
 ```
 
-- 请在 clone 后执行 `git checkout e4f3011`，此后**不要切换分支、不要拉取
+- 请在 clone 后执行 `git checkout 277d0fa`，此后**不要切换分支、不要拉取
   新提交**；所有记录写明该 hash。
 - 不要使用移动的 `main` 分支做验收。
 - 该 commit 已推送到 origin；若您 clone 时找不到该 hash，请先联系发起人
@@ -89,7 +89,7 @@ JADX 与 Apktool 是可选的第三方后端，不是本仓库依赖：没有它
 [读者验收包 §3](m10-reader-package.md) 为准；此处是路径概览：
 
 1. **clone 并检出固定 commit**：按[读者验收包 §3.1](m10-reader-package.md)
-   执行 `git clone` 与 `git checkout e4f3011`，`git status` 应为干净。
+   执行 `git clone` 与 `git checkout 277d0fa`，`git status` 应为干净。
 2. **环境准备**：按[读者验收包 §3.2](m10-reader-package.md) 执行
    `uv sync --extra dev --extra analysis --extra mcp --extra demo`
    （或 Docker 路线），运行 `uv run dexatlas backends` 确认后端状态。
@@ -160,7 +160,7 @@ JADX 与 Apktool 是可选的第三方后端，不是本仓库依赖：没有它
 3. **作者不补步骤**：发起人可以澄清名词含义，但不替您补命令、改环境或
    远程操作您的机器。凡是靠发起人口头补充才走通的步骤，相关验收项判
    不通过。
-4. **固定 commit**：全程只验 `e4f3011` 这一个提交，所有记录写明 hash。
+4. **固定 commit**：全程只验 `277d0fa` 这一个提交，所有记录写明 hash。
 5. **如实记录**：预期输出与实际输出不一致时，以实际输出为准，把差异写成
    卡点；文档缺步骤本身就是缺陷，不要替项目圆场。
 
