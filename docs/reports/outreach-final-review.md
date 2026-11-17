@@ -31,6 +31,13 @@
 > 结论逐条可复算。收到基线纠正后，分支已重切到 `origin/claude/m6-level2-verify` @ `78102a8`
 > 并把本文移到其上，所有结论已在工作树内重新核对一遍，**数值无变化**。
 
+补充观察（复核期间的仓库动态）：共享树的本地 `claude/m6-level2-verify` 已前进到 `7910195`
+（「测量隔离：覆盖率数据文件按次私有 + 同 checkout 互斥锁 + 红→绿回归」），远端仍停在
+`78102a8`。该提交只改 `scripts/refresh-report-figures.py` 与新增
+`tests/test_refresh_coverage_hygiene.py`，**没有动** `docs/reports/phase1-execution-report.md`、
+`docs/outreach/`、`docs/status.md`、`README.md`，所以本文所有落盘数字仍成立；但它新增了一个
+测试文件，意味着下一次完整测量写回的测试数与覆盖率**一定**会变——这正是 §6 M1 说的那件事。
+
 ---
 
 ## 1. 数字与表述逐行核对
