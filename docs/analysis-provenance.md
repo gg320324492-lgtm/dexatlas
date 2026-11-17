@@ -312,7 +312,7 @@ JSON 报告的 `project` 段和 `tools` 段（节选自真实输出）：
     "class_count": 5,
     "method_count": 8,
     "reference_count": 23,
-    "evidence_count": 10,
+    "evidence_count": 11,
     "resource_count": 1
   },
   "tools": {
@@ -388,14 +388,17 @@ Androguard 把两个 DEX 里的 `SharedConfig` 各索引一遍，会得到 14 �
 
 ### 4.4 五个自建样本的实际结果
 
-全部在 4.1 的环境里跑出来，数字原样：
+全部在 4.1 的环境里跑出来，数字原样。**`demo.apk` 与 `obfuscated.apk` 两行的证据数**按已提交的
+[`attachments/demo-report.json`](case-studies/attachments/demo-report.json) 与
+[`attachments/obfuscated-report.json`](case-studies/attachments/obfuscated-report.json) 核对过：
+这两个附件是当前代码的输出，各比那次运行多一条「SDK 版本」声明证据。其余三行仍是那次运行的数字：
 
 | 项目 id | APK | 大小 | 类 | 方法 | 交叉引用 | 证据 | 字符串 | 资源 | 反编译成功 | 状态 |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| `apk_80a8fe0e81204c9f` | demo.apk | 2951 B | 5 | 8 | 23 | 10 | 63 | 1 | 7 / 8 | completed |
+| `apk_80a8fe0e81204c9f` | demo.apk | 2951 B | 5 | 8 | 23 | 11 | 63 | 1 | 7 / 8 | completed |
 | `apk_a488e43e38c2b8e9` | multidex.apk | 2350 B | 4 | 11 | 13 | 8 | 44 | 0 | 7 / 11 | completed |
 | `apk_d342e11b7931077d` | wide.apk | 1440 B | 4 | 11 | 15 | 9 | 29 | 0 | 6 / 11 | completed |
-| `apk_2f8d476fb9e71ac4` | obfuscated.apk | 1892 B | 4 | 11 | 10 | 7 | 33 | 0 | 7 / 11 | completed |
+| `apk_2f8d476fb9e71ac4` | obfuscated.apk | 1892 B | 4 | 11 | 10 | 8 | 33 | 0 | 7 / 11 | completed |
 | `apk_17c6da79f2d5467b` | strings.apk | 1547 B | 1 | 10 | 6 | 4 | 33 | 0 | 9 / 10 | completed |
 
 「反编译成功」是 `MethodRef.decompiled` 为真的方法数——**JADX 真的把方法还原成了 Java**。
@@ -405,11 +408,11 @@ Androguard 把两个 DEX 里的 `SharedConfig` 各索引一遍，会得到 14 �
 
 `strings-app` 只有 1 个类——它本来就是「一个类塞满字符串」的样本。
 
-**五个样本、38 条证据，三种 `kind`，全部是 `verified`：**
+**五个样本、40 条证据，三种 `kind`，全部是 `verified`：**
 
 ```console
 $ python -c "import sqlite3; c=sqlite3.connect(r'C:/Users/admin/AppData/Local/Temp/dexatlas-prov-ws/dexatlas.db'); print(c.execute('SELECT kind, level, COUNT(*) FROM evidence GROUP BY kind, level').fetchall())"
-[('cross_reference', 'verified', 7), ('declaration', 'verified', 26), ('observation', 'verified', 5)]
+[('cross_reference', 'verified', 7), ('declaration', 'verified', 28), ('observation', 'verified', 5)]
 ```
 
 **管道里产出三种 `kind`：** `declaration`（类、manifest、导出组件）、

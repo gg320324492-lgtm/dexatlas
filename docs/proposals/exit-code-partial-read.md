@@ -1,6 +1,8 @@
 # 提案：让退出码能分辨「跑完了，但没读到任何代码」
 
-状态：**提案，未实施**。本文只给方案与版本化路线，不改任何实现。
+状态：**已实施（方案 A）**，随 `v1.0.0` 发布——退出码 6（`EXIT_NO_INDEX`）已落地，
+0–5 的语义不变。本文保留为**提案原文**：以下是提出时的方案、理由与测试计划，
+落地结果就是 §3 的方案 A。本文档自身仍不改任何实现。
 关联：[公共契约 §8.1](../architecture/public-contracts.md)、[install.md 退出码表](../install.md)、[CHANGELOG](../../CHANGELOG.md)。
 日期：2026年11月16日。
 
@@ -32,7 +34,7 @@
 | REST | 能 | `ProjectResponse.errors[]`、`RunResponse.completeness == "partial"`（`src/dexatlas/api/app.py:188-220`、`src/dexatlas/api/app.py:229-252`；run 记 completeness 的判定在 `src/dexatlas/core/pipeline.py:349-353`） |
 
 即：机器可读的补救通道已经存在，缺的只是退出码这一条「最廉价的通道」。
-M8 按用户决策只记录、不修复；本文补上修复方案，供后续版本决策。
+M8 按用户决策只记录、不修复；本文补上修复方案，供后续版本决策（后来的决定见文首状态行）。
 
 ## 2. 目标与非目标
 
@@ -206,7 +208,7 @@ def _no_index(result: AnalysisResult) -> bool:
 > - `dexatlas analyze` 对「索引为空且所有 DEX 后端失败」的运行不再返回 0，
 >   改返回 6。0–5 的语义不变。详见 `docs/proposals/exit-code-partial-read.md`。
 
-同步义务清单（实施时一次做完）：
+同步义务清单（实施时一次做完；这五项现已全部落地）：
 
 - epilog（`src/dexatlas/cli/main.py:71-78`）；
 - `docs/install.md` 退出码表；
