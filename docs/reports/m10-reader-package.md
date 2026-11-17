@@ -96,6 +96,21 @@ uv run dexatlas backends
 预期：`uv sync` 退出码 0；`backends` 打印一张表，每个后端是 `available` 或
 `not installed`。四个 extras 的分工见 [install.md](../install.md)。
 
+**再抓两个第三方集成样本（跑测试套件要用）：**
+
+```bash
+bash scripts/fetch-fixtures.sh
+```
+
+> **为什么这一步不能跳**：集成测试要读两个 APK，而它们**不在仓库里**——随仓库分发
+> 二进制，读者就无法从树里核对来源与许可 ✓，所以脚本把每一个是从哪儿来、什么许可
+> 都写在了脚本里 ✓。**前置条件**：一台能上网的机器 + 一个**已登录的 GitHub CLI**
+> （脚本用 `gh api` 取文件 ✓，`gh auth status` 能看到已登录即可 ✓）。
+> **不抓的后果**：案例分析照常能做 ✓，但测试套件里 **27 个集成用例会 skip**
+> （实测：三后端齐备但未取样本时汇总行是 `1585 passed, 27 skipped` ✓，27 个 skip
+> 全部出自缺样本 ✓；取到之后是 `1612 passed`、`0 skipped` ✓ ——**这才是报告里记录的
+> 那次完整测量** ✓）。**退出码 0 只说明没有失败，不说明该跑的都跑了** ✓。
+
 > **M8-3（历史问题，已修复并合入）：** [install.md](../install.md) 的安装节过去
 > 把最小安装（`uv venv` + `uv pip install -e ".[analysis]"`，不含 `mcp` 与
 > `demo` extras）写在前面，容易被读成推荐路线；现在 install.md **先**给四
