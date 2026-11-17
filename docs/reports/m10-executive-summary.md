@@ -31,6 +31,7 @@ SQLite 工作区，渲染出 Markdown / JSON 报告与证据包——报告里�
    全程只验这一个提交，**不要用移动的 `main` 分支**。
 2. **clone 并装环境**：`git clone` → `git checkout v1.0.0` →
    `uv sync --extra dev --extra analysis --extra mcp --extra demo`
+   → `bash scripts/fetch-fixtures.sh`（抓两个第三方集成样本，**不抓测试会 skip 27 个**）
    （或走 Docker 路线）。命令见[读者验收包 §3.1–3.2](m10-reader-package.md)。
 3. **跑一个完整案例**：对 `demo.apk` 做分析，做检索与引用核对，
    导出三格式报告与证据包（[读者验收包 §3.3–3.7](m10-reader-package.md)）。

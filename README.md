@@ -11,9 +11,14 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1620%20passing-brightgreen.svg)](tests)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
+
+> 徽章是**完整环境下**的一次测量（1612 个测试、0 跳过）。在没抓第三方样本的机器上，
+> `pytest` 会显示 27 个 skip —— 那是缺 `scripts/fetch-fixtures.sh` 抓的两个样本，
+> 不是失败。
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
+  <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks" width="900">
 </div>
 
 DexAtlas turns an APK into a picture you can verify — as complete as the installed

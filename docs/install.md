@@ -129,6 +129,17 @@ export PATH="$PATH:/path/to/apktool"   # provides apktool or apktool.jar
 > shell script. DexAtlas resolves the platform launcher itself when given `bin\jadx`, but
 > naming it directly is clearer.
 
+> **The exports above only affect the shell that runs them.**
+> `scripts/install-backends.sh` downloads both backends, but the `export PATH=…` and
+> `export DEXATLAS_JADX_PATH=…` it performs belong to *its own* process — a script
+> cannot change the environment of the shell that started it. Copy the two lines
+> it prints into your own shell (or set them in your environment) before running
+> `dexatlas backends`, otherwise it will still report the backend as missing.
+>
+> **Windows:** the `curl`/`unzip` steps above are the POSIX path. From Git Bash run
+> `scripts/install-backends.sh` instead, then set the two variables in your own
+> shell as above.
+
 ### Configuration
 
 | Variable                  | Purpose                                  | Default            |

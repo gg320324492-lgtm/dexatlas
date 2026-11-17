@@ -190,7 +190,7 @@
 | Docker | 可选 | 不想装 Python/JDK 时走 Docker 路线；镜像自带 JADX 与 Apktool |
 | 网络 | 首次需要 | clone、uv 依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写到系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 1.5–2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11）；见 [M8 演练](m8-install-rehearsal.md) |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 1.5–2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)）；[读者实走演练](reader-dry-run.md) 实测冷缓存 10 分 28 秒、clone + uv sync 4 分 24 秒 |
 
 **固定版本。** 验收针对验收发起人钉定的 commit（本轮为 v1.0.0 发版 commit，
 完整 hash 随[邀请函成稿 §2](m10-invitation-final.md)给出）。
@@ -247,8 +247,9 @@ docker run --rm \
   dexatlas sh -c 'dexatlas analyze /in/demo.apk -o /out/report.md --json /out/report.json --html /out/report.html && dexatlas export apk_80a8fe0e81204c9f -o /out/evidence.zip'
 ```
 
-预期：构建约 2 分钟（M8 实测 2 分 16 秒）；镜像内 JADX / Apktool 可用；
-分析加导出约 10 秒；`out/` 下出现四份文件。
+预期：构建**约 2–20 分钟**（两个口径：层已就绪时约 2 分 16 秒 —— M8 演练；首台机器无层缓存、
+走代理下载时实测 **1099 秒** —— [读者实走演练](reader-dry-run.md)）；镜像内
+JADX / Apktool 可用；分析加导出约 10 秒；`out/` 下出现四份文件。
 
 > **M8-2 已修复：** 容器内的查询类命令现在同样有 `--workspace`/`-w`，
 > 与其它路径一致；`DEXATLAS_WORKSPACE=/workspace/ws` 也仍可作为统一入口。
@@ -328,11 +329,11 @@ uv run --no-sync python -c \
 
 | 阶段 | 预期 | 备注 |
 |---|---|---|
-| clone + `uv sync` | 15 秒–2 分钟 | 冷缓存与网络差异大；M8 冷缓存实测 15 秒 |
+| clone + `uv sync` | 15 秒–4 分 30 秒 | 冷缓存与网络差异大；M8 冷缓存实测 15 秒，[读者实走演练](reader-dry-run.md)实测 4 分 24 秒（走代理下载） |
 | 后端安装/配置 | 0–10 分钟 | 已有二进制时接近 0；下载 JADX/Apktool 时更长 |
 | 首次分析 demo.apk | 5–10 秒 | M8 实测 6.8 秒；本包编写时复测 8.0 秒 |
 | 完整案例（§3.4） | 1–2 分钟 | 含重复分析与检索 |
-| Docker 构建 + 分析 | 约 3 分钟 | 构建 2 分 16 秒 + 分析约 10 秒 |
+| Docker 构建 + 分析 | 首次 15–20 分钟 | 有本地层缓存时构建 2 分 16 秒 + 分析约 10 秒；无层缓存、走代理下载的机器实测 1099 秒（[读者实走演练](reader-dry-run.md)） |
 | 证据包校验 | < 1 分钟 | 小样本 |
 
 这些是参考值，不是验收标准；读者记录自己的实际耗时。若明显超出，
