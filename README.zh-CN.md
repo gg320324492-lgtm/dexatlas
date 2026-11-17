@@ -28,8 +28,9 @@ DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权
 没能运行的分析报告。
 
 > [!IMPORTANT]
-> **当前状态：早期开发——v1.0.0 已发布（tag 2026-11-17，见发版说明）；Phase 3 的交付物
-> 已发布，但退出标准未全部达成（M6 未收口、M10 未开始）。** CLI、分析内核与报告
+> **当前状态：早期开发——v1.0.0 已发布（tag 2026-11-17，
+> 见[发版说明](docs/releases/v1.0.0.md)）；Phase 3 的交付物已发布，但退出标准未全部达成
+> （M6、M8 与 M10 的验收仍未关闭）。** CLI、分析内核与报告
 > 流水线在 `v0.1.0` 发布，此后每个版本都在交付。MCP server、证据优先的 Agent 与
 > Web 工作台的 M4 八屏——项目面板、上传与分析进度、检索与证据溯源、单方法调用
 > 关系、Agent 工作区、报告导出、M3 基准视图——随 `v0.2.0` 发布，其中除检索、
@@ -318,22 +319,37 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 
 ### 案例——一次真实运行长什么样
 
+- **[案例索引](docs/case-studies/README.md)** —— 三份走查报告的索引：每份回答什么问题、
+  覆盖什么范围、跑了哪些命令、结论背后是什么证据、边界在哪里
 - **[从上传到证据链](docs/case-studies/demo-app-walkthrough.md)** —— 在内置演示 APK 上
   走完整条工具链：analyze、manifest、检索、源码、交叉引用，以及背后的证据记录
 - **[读一个混淆过的应用](docs/case-studies/obfuscated-app.md)** —— 名称混淆后还剩什么、
   字符串索引还能找到什么，以及能力边界在哪里
 - **[从 Python 集成](docs/case-studies/api-integration.md)** —— REST API 与 MCP server
   的线缆契约，逐端点看调用方拿到什么
+- **案例附件** —— 上面两份走查各自产出的完整分析报告：[演示应用](docs/case-studies/attachments/demo-report.md)、
+  [混淆应用](docs/case-studies/attachments/obfuscated-report.md)，含 run id、工具版本与
+  全部记录
 
 ### 架构——如何组织，为什么
 
-- **[架构说明](docs/architecture/README.md)** —— 流水线、存储模型与设计取舍
+- **[架构说明](docs/architecture/README.md)** —— 流水线、存储模型与设计取舍，以及本项目用词的
+  [术语表](docs/architecture/README.md#glossary)（agent service promise、frozen discipline、
+  B1、七条评分规则）
 - **[Web 工作台](docs/architecture/workbench.md)** —— 只读浏览器界面：已有的屏幕、启动方式与选型
 - **[MCP server](docs/architecture/mcp-server.md)** —— 十一个只读工具，以及调用方在提问前要知道的三件事
 - **[证据优先的 Agent](docs/architecture/agent.md)** —— 一个循环、一份预算、一份状态机，以及线索与 finding 的边界
 - **[报告渲染与证据包](docs/architecture/report-rendering.md)** —— 同一份分析的三种渲染，以及可交给客户的证据导出
 - **[公共契约表](docs/architecture/public-contracts.md)** —— CLI、REST、MCP 与报告
   schema 的对外契约，经实测并受版本政策约束，附已知限制
+- **[分析批次](docs/architecture/analysis-runs.md)** —— 一次分析如何被标识、暂存、发布与清理，
+  以及为什么重跑不会把上一批覆盖掉
+- **[调用点与调用边](docs/architecture/call-sites-and-edges.md)** —— 本项目里被叫作「交叉引用」
+  的两件不同东西分别住在哪里，以及怎么区分
+- **[证据不变量](docs/architecture/evidence-invariants.md)** —— 一条 `verified` 记录必须成立在哪几点，
+  以及不成立时是什么拦住了它
+- **[运行时隔离](docs/architecture/runtime-isolation.md)** —— Androguard 后端嵌进长驻服务时，如何待在自己的盒子里
+- **[架构图](docs/architecture/diagram.md)** —— 一张画全系统的图，每个方框背后的文字都链到了
 
 ### 基准——测了什么，没测什么
 
@@ -343,8 +359,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   不是模型变化
 - **[大型 APK 基准](docs/benchmarks/large-apk.md)** —— 20 万个方法的 APK 上分析会变成什么样，
   它拒绝声称什么，以及它没有测量什么
-- **[服务回归集](docs/benchmarks/service-regression-set.md)** —— agent 服务承诺所对标的
-  20 道冻结题，以及统一判定规则
+- **[服务回归集](docs/benchmarks/service-regression-set.md)** —— agent
+  [服务承诺](docs/architecture/README.md#glossary)所对标的 20 道冻结题，以及统一判定规则
 - **[M6 层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)** —— 冻结题集上
   用 scripted 替身 provider 走通发题/trace/判分的全流程；不是模型能力基线
 - **[M6 层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)** —— 一个具名模型对
@@ -361,6 +377,25 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   落地后的验收测量：三轮均跑满 20 题分母，DexAtlas 49/60 = 81.7%（逐轮 15/16/18；
   r2、r3 达单轮线，r1 未达），A 21/60、B 21/60；trace 合计 1,182,356 tokens。
   仍低于三轮合计 ≥90% 的验收门槛，里程碑保持未收口
+- **[M6 层级 2 窄验证第二轮](docs/benchmarks/m6-level2-narrow-verify2.md)** —— 针对已知失败面
+  的四项修复后，在 6 题 × 3 轮 × 3 配置上重跑（54 条 trace 全部留存；数字由脚本重算）：
+  协议泄漏修正的重试生效（0 次协议失败；三轮复测都失败的那道 `multidex.dex-file-count`
+  在 r3 跑通），但 DexAtlas 只转通过 **2/6** 题
+  （`manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo` 2/3），
+  确定性子集 **2/5** —— 未达窄验证门槛（≥4/6 与 ≥3/5）。本轮花了 420,826 tokens，
+  超出 410,000 的授权上限（超额记录在案，未重跑）。按验收方案：停止投入，M6 转入
+  方案 3 现状披露
+- **[M6 层级 2 窄验证第三轮](docs/benchmarks/m6-level2-narrow-verify3.md)** —— 预算效率四项
+  修复（resources 收口、notice 折叠、string excerpt 截断、空转软提示）与 transcript
+  截断机制落地后，同六个失败面重跑 6 题 × 3 轮 × 3 配置（54 条 trace 全部留存；
+  数字由脚本重算）：DexAtlas 转通过 **3/6** 题（确定性子集 **3/5**）——
+  `manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo` 3/3、
+  `multidex.dex-file-count` 2/3 —— 仍低于 ≥4/6 的门槛。本轮花了 380,881 tokens，
+  在 450,000 的授权内（未触发熔断），且所有 trace 的关键扫描都没有发现异常。
+  按方案的失败处理，本轮就此打住：没有全量复测，也没有再开一轮修复，
+  现状披露方案是 M6 的最终收口方式
+- **[M3 题目集](docs/benchmarks/task-set.md)** —— 对比实验问的题目、答案如何判分、
+  以及第二个人如何在不跑任何东西的情况下确认一个期望答案是对的
 - **[覆盖率数字测在哪棵树上](docs/reports/phase1-execution-report.md)** —— 执行报告带着
   那次测量所针对的源码指纹：`src/dexatlas/`、`tests/`、`pyproject.toml` 与测量脚本
   `scripts/refresh-report-figures.py`。改了其中任何一处，报告里的数字会被立刻判为过期，
@@ -368,11 +403,20 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   其中包括 `scripts/verify-public-contracts.py`（契约活检）与 `scripts/m10_selfcheck.py`
   （M10 自查）：它们的结果由各自的测试守着，不由指纹守着
 
+### 怎么复核我们说的——自己核一遍
+
+- **[怎么复核这个项目说的每句话](docs/how-to-verify.zh-CN.md)** —— 自己复核本项目每个数字的
+  命令、应该看到什么、以及哪些说法尚未达成（[§3](docs/how-to-verify.zh-CN.md#3-哪些说法目前是未达成--未验证请据此打折)
+  列出了未达成的那些）；需要 JDK、三个分析后端与第三方测试样本。同一内容的另一版
+  （主文档）见 [docs/how-to-verify.md](docs/how-to-verify.md)
+- **[服务承诺范围](docs/service-commitments.md)** —— agent 服务承诺覆盖什么，以及明确不做什么
+
 ### 项目记录
 
 - **[交接说明](docs/HANDOVER.md)** —— 项目现状、如何在另一台机器跑起来、接下来做什么
 - **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
-- **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
+- **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么；§4.0 带着 M6 层级 2 的判定，
+  里程碑仍未收口
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 - **[Phase 2 计划](docs/roadmap/phase2-plan.md)** —— 源码评审之后、对着真实代码写的
@@ -380,6 +424,13 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   有范围的客户交付、独立验收
 - **[Phase 3 基线](docs/reports/phase3-baseline.md)** —— 声明清单、重算后的 benchmark 数字，
   以及其背后的未决问题
+- **[报告目录索引](docs/reports/README.md)** —— `docs/reports/` 的目录索引：每份报告回答什么、
+  什么时候该看它、哪些是历史记录而不是当前状态
+- **[v1.0.0 发版说明](docs/releases/v1.0.0.md)** —— v1.0.0 包含什么、打 tag 前复核过什么、
+  以及它不声称什么
+- **[更早的发版说明](docs/releases/v0.1.0.md)** —— v1.0.0 之前的各次发布：
+  [v0.1.1](docs/releases/v0.1.1.md)、[v0.1.2](docs/releases/v0.1.2.md)、
+  [v0.1.3](docs/releases/v0.1.3.md)、[v0.2.0](docs/releases/v0.2.0.md)
 - **[演示视频](docs/assets/demo.mp4)** —— GIF 所出自的完整 85 秒会话（MP4）
 
 源码评审已经做完：三份审核共 44 条发现，每一条都在发现它的那棵树上复验过。
@@ -387,8 +438,26 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[Phase 1 验收记录](docs/releases/phase1-acceptance-2026-10-21.md)** —— 验收了什么，以及它**没有**声称什么
 
 - **[评审报告](docs/reports/phase1-review-report.md)** —— 发现了什么、修了什么、推迟了什么
-- **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分
+- **[成熟度评估](docs/reports/phase1-maturity-assessment.md)** —— 六个加权维度，只用能跑出来的证据打分；
+  这个分数是修复前的基线，此后没有重新打分
 - **[Phase 2 任务清单](docs/reports/phase2-issue-list.md)** —— 推迟的发现，每条带两个方案和推荐
+- **[退出码提案](docs/proposals/exit-code-partial-read.md)** —— 退出码 6（「跑完了，但没读到任何
+  代码」）背后的提案；落地后仍保留提案原文
+- **[M10 邀请发送清单](docs/reports/m10-invitation-sender-checklist.md)** —— 发起 M10 独立验收
+  邀请前自己要走完的每一步：带命令的条目，以及编写时实测到了什么
+  （读者要做的部分在邀请函成稿与读者验收包里）
+
+### 对外材料——作品集与外包素材
+
+- **[作品集描述](docs/portfolio.md)** —— 放进客户简报的一段话，以及它背后的细节
+- **[Upwork 项目条目](docs/outreach/project-brief.md)** —— 作品集条目草稿：已就位，尚未发布
+- **[发布前核对](docs/outreach/publish-review.md)** —— 发布前对四份 Upwork 素材做的核对，
+  以及它改了什么（内部核对记录，不对外、不作附件、不随提案发送）
+- **[对外发布点检清单](docs/reports/outreach-publish-checklist.md)** —— 那四份素材发出前的
+  最后一次点检：逐条查什么，以及本轮没有做什么（内部清单，不随提案发送）
+- **[Cover letter 模板](docs/outreach/cover-letter-templates.md)** —— 两个服务方向各一封提案信
+- **[服务范围：证据优先的 AI / MCP 集成](docs/outreach/scope-ai-mcp.md)** —— 该方向的一页纸范围说明
+- **[服务范围：Python 后端与自动化](docs/outreach/scope-backend-automation.md)** —— 该方向的一页纸范围说明
 
 ## 作者贡献与第三方引擎
 
@@ -448,5 +517,5 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | M10 | 独立验收、重新评分、发布候选 | **准备包已就绪；验收未执行** —— [准备包](docs/reports/m10-acceptance-pack.md)已就位；独立复现与重新评分尚未开始 |
 
 本计划原本以退出标准全部通过为 `v1.0.0` 的前提；`v1.0.0` 已于 2026-11-17 按现状披露
-口径发布，M6 与 M10 的验收仍未关闭（见 [`docs/status.md`](docs/status.md)）——阶段推进靠
+口径发布，M6、M8 与 M10 的验收仍未关闭（见 [`docs/status.md`](docs/status.md)）——阶段推进靠
 证据，不靠日历。
