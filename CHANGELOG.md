@@ -351,6 +351,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   无熔断中止、无 not-run；判分失败与空答未重跑。B1 保持未关闭，后续处置
   待定。
 
+- **M6 层级 2 窄验证二轮报告（四项修复验证，未达窄验证判据）。** 新增
+  `docs/benchmarks/m6-level2-narrow-verify2.md` 与
+  `docs/benchmarks/m6-level2-narrow-verify2-traces.json`（6 题 × 3 轮 × 3
+  配置 = 54 条 trace，全部落盘），全部数字由新脚本
+  `scripts/m6_level2_narrow_verify2_report.py` 从 trace 重算生成，trace
+  缺失或不完整即拒绝生成报告。本轮验证首轮窄验证之后针对已知失败面的四项
+  修复（协议泄漏纠偏重试、partial 后端缺失措辞对齐、api-key 常量池检索
+  引导、descriptor 连写模板）在 `claude/m6-level2-verify` `9b25835` 上的
+  效果。结果：MiniMax-M3.1-Flash 上 DexAtlas 转通过 **2/6**
+  （`manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo`
+  2/3），确定性修复相关题转通过 **1/5**——**未达窄验证判据（转通过
+  ≥4/6 且确定性题 ≥3/5）**。协议泄漏纠偏重试生效（54 条 trace 协议失败
+  0 条，retest4 中三轮全灭的 `multidex.dex-file-count` 本轮 r3 打通）；
+  `strings.api-key.demo` 三轮全部预算耗尽，`overloads.method-identity.
+  descriptor-distinguishes` 三轮全 wrong。实测合计 420,826 tokens，超出
+  授权上限 410,000 达 10,826（最后一批跑完才到批间检查点，超出如实记录，
+  未补跑）。按验收方案 §2.2：转通过 2/6 ≤ 2，停止投入，**转方案 3
+  （现状披露）**；B1 保持未关闭。已知局限：窄题集不外推到 20 题完整
+  回归集、单模型、first-party 小样本、预算不对等，详见报告「已知局限」节。
+
 ### Fixed
 
 - **截断测试的子进程环境剥离 coverage 钩子（与测量脚本解耦）。**
