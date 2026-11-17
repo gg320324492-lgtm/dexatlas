@@ -15,8 +15,9 @@ The run itself was produced by ``benchmarks/comparison/run.py
 (see the report's configuration section for the exact budget). The API key
 travelled through the ``MINIMAX_API_KEY`` environment variable and is
 recorded nowhere. The comparison baseline is the first real-model batch
-(``m6-level2-traces.json`` round-1), read from its committed traces; that
-file stays untouched.
+(``m6-level2-traces.json``): round-1 for the per-task and failure-mode
+comparisons, and all three rounds pooled for the ``三轮首测合计`` column.
+That file stays untouched.
 """
 
 from __future__ import annotations
@@ -134,6 +135,29 @@ def _load_baseline_round1() -> _Round:
     if ids != set(FROZEN_IDS):
         raise SystemExit("baseline round-1 does not cover exactly the frozen 20 ids")
     return _Round(name="baseline", traces=traces, metrics=compare(traces))
+
+
+def _load_baseline_all_rounds() -> _Round:
+    """All three first-measurement rounds, pooled.
+
+    The ``三轮首测合计`` column of the report is a pooled count over the
+    three rounds, so it needs all three rounds' traces. Reading round-1
+    alone and dividing by 60 (three rounds' worth) produced a number that
+    described neither round-1 nor the three-round total.
+    """
+    document = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    items = document["traces"]
+    if len(items) != 183:
+        raise SystemExit(f"expected 183 baseline traces, found {len(items)}")
+    chunk = items[3:183]  # skip the 3 smoke traces, take all three rounds
+    traces = tuple(TaskTrace.from_dict(item) for item in chunk)
+    ids = {trace.task_id for trace in traces}
+    if ids != set(FROZEN_IDS):
+        raise SystemExit("baseline rounds do not cover exactly the frozen 20 ids")
+    per_system = Counter(trace.system.value for trace in traces)
+    if any(count != 60 for count in per_system.values()):
+        raise SystemExit("baseline does not hold exactly 60 traces per configuration")
+    return _Round(name="baseline-rounds", traces=traces, metrics=compare(traces))
 
 
 def _pct(value: float | int | None) -> str:
@@ -269,7 +293,7 @@ def _fail_mode_table(round_: _Round, baseline: _Round) -> list[str]:
     return lines
 
 
-def _report(round_: _Round, baseline: _Round) -> str:
+def _report(round_: _Round, baseline: _Round, baseline_rounds: _Round) -> str:
     passes = round_.passes
     tokens = round_.tokens
     total_tokens = round_.total_tokens
@@ -317,7 +341,7 @@ def _report(round_: _Round, baseline: _Round) -> str:
     for system in SYSTEMS:
         lines.append(
             f"| {system} | {passes.get(system, 0)}/20 | {baseline_passes.get(system, 0)}/20 "
-            f"| {baseline.pooled_passes().get(system, 0)}/60 | {tokens.get(system, 0)} "
+            f"| {baseline_rounds.pooled_passes().get(system, 0)}/60 | {tokens.get(system, 0)} "
             f"| {dur[system]:.1f} |"
         )
     lines += [
@@ -437,7 +461,8 @@ def _dexatlas_failure_notes(round_: _Round) -> list[str]:
 def main(argv: list[str] | None = None) -> int:
     retest = _load_retest()
     baseline = _load_baseline_round1()
-    report = _report(retest, baseline)
+    baseline_rounds = _load_baseline_all_rounds()
+    report = _report(retest, baseline, baseline_rounds)
     REPORT_PATH.write_text(report, encoding="utf-8")
     print(f"report -> {REPORT_PATH}")
     return 0

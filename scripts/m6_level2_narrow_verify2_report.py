@@ -289,7 +289,7 @@ def _render(run: _Run) -> str:
     parts = [
         "# M6 层级 2 —— 修复后窄验证二轮（6 题 × 3 轮）",
         "",
-        f"**状态：本 run 验证首轮窄验证（`m6-level2-narrow-verify.md`）之后的四项修复"
+        f"**状态：本 run 验证首轮窄验证（`m6-level2-narrow-verify-incomplete.md`）之后的四项修复"
         f"（协议泄漏纠偏重试、partial 后端缺失措辞对齐、api-key 常量池检索引导、"
         f"descriptor 连写模板）。代码状态 `{CODE_STATE}`。"
         f"本文所有数字由 `scripts/m6_level2_narrow_verify2_report.py` 从"
