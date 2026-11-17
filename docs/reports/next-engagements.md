@@ -324,14 +324,17 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 [github-repo-metadata-proposal.md:184](github-repo-metadata-proposal.md#L184) 列了 11 项缺口，
 其中三项是「元数据与仓库落盘事实对不上」：
 
-1. **许可证自相矛盾**：右侧栏写 `Other`，README 徽章与 `pyproject.toml` 写 Apache-2.0；
+1. **许可证自相矛盾**：右侧栏写 `Other`，README 徽章与 `pyproject.toml` 写 Apache-2.0
+   —— **已关闭**：`LICENSE` 原是「Apache-2.0 头部 + Apache-1.1 短版正文」的混本
+   （仓库宣称 Apache-2.0，却没授予它），已换成与官方逐字节一致的全文，GitHub 现已
+   识别为 `Apache-2.0`；
 2. **「已发布」在 Releases 页对不上**：README 与 `docs/status.md` 说 v1.0.0 已发布，
-   而 Releases 页最新是 v0.2.0；
+   而「当时 Releases 页列的还是 `v0.2.0`」—— **已关闭**：v1.0.0 的 Release 已发布；
 3. **报告索引不可达**：两份 README 都没有 `docs/reports/README.md` 入口。
 
-**第 3 项已经关闭**：本 worktree 的 `README.md:528` 与 `README.zh-CN.md:427`
+**三项现在都已关闭**：第 3 项在本 worktree 的 `README.md:528` 与 `README.zh-CN.md:427`
 都已有「报告目录索引」入口，索引文件 `docs/reports/README.md` 存在
-（commit `a494e13`）。**第 1、2 项需要联网操作 GitHub 设置**，本轮未做、也不该由本文做。
+（commit `a494e13`）；第 1 项由 `LICENSE` 修复；第 2 项由发布 v1.0.0 的 Release 关闭 ✓。
 
 **这一条为什么算「接活还缺」**：访客在仓库页上看到的每一个对不上的地方，
 都会被读成「文档没跟上」——对一份以「结论必须能指回来源」为纪律的项目，
