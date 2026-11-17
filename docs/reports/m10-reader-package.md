@@ -59,7 +59,7 @@
 | `gh` CLI | 仅 fixtures 需要 | `scripts/fetch-fixtures.sh` 经 GitHub API 拉取 androguard 测试数据 |
 | 网络 | 首次需要 | clone、依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写系统盘根目录 |
-| 时间 | 首次约 10–20 分钟到第一份报告；完整验收建议预留半天 | 暖缓存后到第一份报告约 30 秒（[M8 演练](m8-install-rehearsal.md)实测） |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒纯分析） |
 
 ## 3. 分步执行路径
 
@@ -152,14 +152,17 @@ uv run dexatlas xrefs apk_80a8fe0e81204c9f \
 |---|---|
 | manifest | 包名 `com.example.demo`；version 1.0 (1)；sdk min 24 / target 34；1 个权限；3 个组件；MainActivity 与 SyncService 均为 exported 且无权限保护 |
 | search `Crypto` | 命中 `com.example.demo.Crypto` 相关类与方法 |
-| search `sk_live` | 一条字符串命中 `sk_live_2f8a91c4e7b3`，并显示来自哪个索引 |
+| search `sk_live` | 一条字符串命中 `sk_live_2f8a91c4e7b3`；`Kind=string` 即表明命中来自字符串常量索引（search 输出无单独索引列，Kind 列就是索引条目类型：`class` / `method` / `field` / `string` / `resource`） |
 | source | 第一行标明 `source kind: java`（或 smali 回退）与 locator，例如 `jadx:sources/com/example/demo/MainActivity.java` |
 | xrefs | `1 call site(s), 1 call edge(s)`，调用点为 `classes.dex@34` |
 
 **证据核查（C 组核心）**：打开 JSON 报告或证据包，任选 3 条 evidence 记录，
 逐条核对工具、版本、locator、level 四个字段；理解三级语义——`verified` 是
 确定性工具产出且 citation 可解析，`lead` 是线索不是结论，`insufficient` 是
-证据不足；模型生成的文本永远不能是 `verified`。locator 解析规则见
+证据不足；模型生成的文本永远不能是 `verified`。三级定义的出处是
+[公共契约表 §证据三级](../architecture/public-contracts.md)；静态分析管线只
+产生 `verified`，demo 报告 11 条 evidence 全为 `verified`、`lead 0` 是设计而非
+缺失，`lead`/`insufficient` 由模型 claim 与人工复核产生。locator 解析规则见
 [准备包 §2.3 C2](m10-acceptance-pack.md)。
 
 ### 3.5 第 5 步：三格式报告导出（验收项 A5、D1–D2）
@@ -221,7 +224,8 @@ uv run --no-sync python -c \
 - **服务回归集（E1–E5）**：读[服务回归集](../benchmarks/service-regression-set.md)
   与[层级 1 scripted 演练](../benchmarks/m6-level1-scripted.md)，确认你能区分
   层级 0（确定性判分 20/20）、层级 1（scripted 替身演练）、层级 2（真实模型，
-  结果见[高风险声明清单](#4-需要重点核查的高风险声明)）各自证明什么、不证明什么。
+  已执行三轮完整重测，当前结果 49/60 = 81.7% 未达验收线，见
+  [高风险声明清单](#4-需要重点核查的高风险声明)）各自证明什么、不证明什么。
 - **故障恢复（G1–G4）**：坏输入（非 ZIP 当 APK）应退出码 2 且不留半成品；
   清空后端环境变量后分析仍完成并写明 `not_installed`；同一 APK 分析两次
   project id 相同。
@@ -240,15 +244,21 @@ uv run --no-sync python -c \
 
 ### 4.1 Agent 层级 2 未达验收线（对应 E2、E3，★）
 
-作者自述：层级 2 真实模型批次（MiniMax-M3.1-Flash，冻结 20 题 × 3 轮）中
-DexAtlas 配置合计 24/60（40.0%，逐轮 45% / 40% / 35%），**未达验收线
-（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103
-tokens，超出当次授权的 800,000 上限，92 题全量轮因此未执行。
-出处：[m6-level2-real.md](../benchmarks/m6-level2-real.md)。
+作者自述：层级 2 真实模型批次（MiniMax-M3.1-Flash，冻结 20 题 × 3 轮）的时间线是
+**首测 24/60（40.0%）→ 执行层修复 → 三轮完整重测 49/60（81.7%，逐轮 15/16/18），
+仍未达验收线（每轮 ≥80%、三轮合计 ≥90%）**。当前事实以执行层修复后的完整重测
+[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为准（数字由
+`scripts/m6_level2_retest4_report.py` 从三个 committed trace 重算）；首测
+[m6-level2-real.md](../benchmarks/m6-level2-real.md)（24/60 = 40.0%，逐轮
+45% / 40% / 35%，trace 合计 853,103 tokens 超出当次 800,000 授权）与中间复测
+（[retest](../benchmarks/m6-level2-retest.md)、[retest2](../benchmarks/m6-level2-retest2.md)、
+[retest3](../benchmarks/m6-level2-retest3.md)）是过渡数字，引用时不得替代 retest4。
+无论引用哪一轮，验收结论都是「未通过、B1 未关闭」。
 
-**核查方法**：确认该文档的数字是否由 committed trace 重算得出（文档声称可用
-`scripts/m6_level2_report.py` 逐字节复现）；确认文档没有把 40% 说成达标，
-没有只报成功子集；确认服务承诺范围是否因此收窄且对外表述一致。
+**核查方法**：确认 retest4 的数字由 committed trace 重算得出（可用
+`scripts/m6_level2_retest4_report.py` 复现）；确认文档没有把 81.7% 说成达标，
+没有只报成功子集；确认早期 40.0% 等过渡数字没有被当作当前能力引用；确认服务
+承诺范围收窄且对外表述一致。
 
 ### 4.2 演示视频是 scripted provider，不是真实模型（对应 E3，★）
 

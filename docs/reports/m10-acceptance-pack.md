@@ -31,7 +31,9 @@
 
 - **不是独立验收。** 目前没有外部读者参与，没有任何一项被判定为「通过」。
 - **不是分数。** 不预填重评分值；不把计划目标（各平台 ≥90%）当成成绩。
-- **不是真实模型批次。** M6 层级 2 尚未授权、尚未执行；scripted 结果不能替代模型能力。
+- **不是达标结论。** M6 层级 2 真实模型批次已执行（执行层修复后三轮完整重测，
+  DexAtlas 49/60 = 81.7%），但仍未达验收线（每轮 ≥80%、三轮合计 ≥90%）；
+  scripted 结果不能替代模型能力，81.7% 也不是通过。
 - **不是安全审计或渗透测试。** 不覆盖 native / 动态分析、恶意软件定性、加固还原。
 - **不替代原始证据。** 与[公共契约表](../architecture/public-contracts.md)、
   [服务回归集](../benchmarks/service-regression-set.md)、
@@ -94,7 +96,7 @@
 |---|---|:---:|---|---|
 | B1 | 按案例从 analyze 走到 xrefs 全程完成，不需要作者补命令；每一步退出码与案例预期一致。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 步骤数：；卡点： |
 | B2 | manifest：包名 `com.example.demo`、版本 1.0 (1)、min 24 / target 34、1 个权限、3 个组件、两个 exported 组件无权限保护，均可从输出复述。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；输出： |
-| B3 | search：`Crypto` 命中相关类/方法；`sk_live` 命中字符串 `sk_live_2f8a91c4e7b3`；读者能说出命中来自哪个索引。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；命中： |
+| B3 | search：`Crypto` 命中相关类/方法；`sk_live` 命中字符串 `sk_live_2f8a91c4e7b3`；读者能说明命中条目的索引来源——search 表格的 `Kind` 列即索引条目类型（`class` / `method` / `field` / `string` / `resource`），`sk_live` 的命中 `Kind=string`，即来自字符串常量索引（FTS `search_index` 表）；不要求输出中出现单独的索引列。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；命中： |
 | B4 | source：输出标注来源（java 或 smali）、后端与 locator；读者能顺着 locator 找到对应文件。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；locator： |
 | B5 | xrefs：区分 call site 与 call edge；本例为 1 call site、1 call edge、`classes.dex@34`；读者能解释两个计数为何不同。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；输出： |
 | B6 | 结论与限制：读者能复述案例的结论、限制和下一步，并指出哪些是事实、哪些是推断、哪些没有覆盖。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 复述要点： |
@@ -105,7 +107,7 @@
 |---|---|:---:|---|---|
 | C1 | 任选 3 条 evidence 记录，逐条写出工具、版本、locator 和 level；字段不得为空或臆造。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 记录编号：；字段： |
 | C2 | locator 解析：文件级 locator 在分析工作区内解析到真实文件；DEX 成员 locator 与裸树 locator（如 `jadx:sources`）按构造解析（`path=None` 是设计，不是失败）；无法解析的 locator 要单独列出。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | locator：；解析结果： |
-| C3 | 三级语义：`verified` 必须是确定性工具产出且 citation 可解析；模型文本不得为 `verified`；`lead` 是线索不是结论；`insufficient` 表示证据不足。读者能各举一例。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 例子： |
+| C3 | 三级语义：`verified` 必须是确定性工具产出且 citation 可解析；模型文本不得为 `verified`；`lead` 是线索不是结论；`insufficient` 表示证据不足。读者能准确复述三级定义与硬边界，并在文档中找到定义出处（如 [公共契约表 §证据三级](../architecture/public-contracts.md)）；不要求在 demo 案例中各找一个 `lead`/`insufficient` 实例——静态分析管线只产生 `verified`，`lead`/`insufficient` 由模型 claim 与人工复核产生，demo 报告中计数为 0 是设计而非缺失。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 复述：；出处： |
 | C4 | 计数一致：报告中的计数与证据记录/索引一致，没有无法追溯来源的数字；抽查 2 个计数复算。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 抽查：；复算： |
 | C5 | 证据包结构：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定）；失败时记录异常原文。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；结果： |
 | C6 | 引用迁移：`verify_citations` 返回 `citations_resolved=true`；把包复制到另一个目录后复验仍通过；包内路径不指向生成它的机器。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；复制路径：；结果： |
@@ -128,8 +130,8 @@
 | ID | 验收项与判定标准 | 阻断 | 状态 | 证据记录 |
 |---|---|:---:|---|---|
 | E1 | 范围：能说出冻结集是 20 题、覆盖权限/组件、指定方法、调用关系、资源出处、无法回答/后端缺失五类，并明确「只代表这 20 题，不外推到任意 APK」。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 复述： |
-| E2 | 层级：能区分层级 0（确定性判分，20/20）、层级 1（scripted 管线演练）、层级 2（真实模型，尚未授权/执行）各自证明什么、不证明什么。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 复述： |
-| E3 | 不冒充模型能力：不把 scripted 的 4/20、1/20 等数字当作模型通过率或能力结论；引用时保留 scripted 免责声明。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 引用原文： |
+| E2 | 层级：能区分层级 0（确定性判分，20/20）、层级 1（scripted 管线演练）、层级 2（真实模型，已执行三轮完整重测）各自证明什么、不证明什么；能说出层级 2 当前结果为 DexAtlas 49/60 = 81.7%（逐轮 15/16/18），仍未达验收线。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 复述： |
+| E3 | 不冒充模型能力：不把 scripted 的 4/20、1/20 等数字当作模型通过率或能力结论；引用层级 2 时以执行层修复后三轮完整重测的 49/60 = 81.7%（retest4）为当前事实，不把首测 24/60（40.0%）或中间复测的过渡数字当作现状，也不把 81.7% 说成达标；引用时保留 scripted 免责声明。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 引用原文： |
 | E4 | 失败解释：能解释层级 1 的「预算耗尽」是替身脚本步数耗尽，不是真实超时/扣费；能解释 DexAtlas 配置的判错来自断言形态。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 解释： |
 | E5 | 完整集同报：同时看到完整 92 题与冻结 20 题的结果，不只报成功子集；改动冻结集有版本化记录。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 报告位置： |
 
@@ -181,7 +183,7 @@
 | Docker | 可选 | 不想装 Python/JDK 时走 Docker 路线；镜像自带 JADX 与 Apktool |
 | 网络 | 首次需要 | clone、uv 依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写到系统盘根目录 |
-| 时间 | 首次 10–20 分钟 | 含下载；暖缓存到第一份报告约 30 秒（M8 实测，见 [M8 演练](m8-install-rehearsal.md)） |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11）；见 [M8 演练](m8-install-rehearsal.md) |
 
 **固定版本。** 验收针对验收发起人指定的 commit。不要用移动的 `main` 分支做验收；
 所有记录都写清 commit hash。
@@ -270,7 +272,7 @@ uv run dexatlas xrefs apk_80a8fe0e81204c9f \
 | analyze | `apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 resource string` |
 | manifest | `com.example.demo`；version 1.0 (1)；sdk min 24 / target 34；permissions 1；components 3；MainActivity 与 SyncService 均为 exported 且无权限保护 |
 | search `Crypto` | 命中 `com.example.demo.Crypto` 相关类与方法 |
-| search `sk_live` | 一条字符串命中 `sk_live_2f8a91c4e7b3`，并显示它来自字符串索引 |
+| search `sk_live` | 一条字符串命中 `sk_live_2f8a91c4e7b3`；输出表格的 `Kind=string` 即表明命中来自字符串常量索引（search 不输出单独的索引来源列，Kind 列就是索引条目类型） |
 | source | 第一行标明 `source kind: java`（或 smali 回退）与 locator，例如 `jadx:sources/com/example/demo/MainActivity.java` |
 | xrefs | `1 call site(s), 1 call edge(s)`，调用点为 `classes.dex@34` |
 
@@ -384,8 +386,10 @@ uv run --no-sync python -c \
 - `insufficient`：证据不足，需人工复核。
 - 硬边界：模型生成的文本永远不能是 `verified`；`BEHAVIOUR` 类记录永远不能是
   `verified`；报告里 `lead 0` 只表示「分析没有在这一级落结论」，不表示样本安全。
-- 通过信号：读者能各举一个 `verified` / `lead` / `insufficient` 的例子，并说出
-  为什么。
+- 通过信号：读者能复述 `verified` / `lead` / `insufficient` 三级的判定边界，
+  指出定义出处（[公共契约表 §证据三级](../architecture/public-contracts.md)），
+  并说明为什么 demo 报告的 11 条 evidence 全是 `verified`、`lead 0` 是设计
+  而不是证据缺失。
 - 不通过信号：把 `lead` 读成「已确认」；把 `lead 0` 读成「无风险」；把模型回答
   当成事实记录。
 
@@ -535,7 +539,11 @@ uv run --no-sync python benchmarks/comparison/run.py \
   不得把跳过记成通过。
 - 层级 1：核对 20 题 A 4/20、B 4/20、DexAtlas 1/20；完整 92 题 A 15/92、B 15/92、
   DexAtlas 5/92；trace 与报告一致。
-- 层级 2 未授权、未执行。评审结论不得写成「真实模型已验证」。
+- 层级 2 真实模型批次已执行：执行层修复后的三轮完整重测见
+  [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md)，DexAtlas 49/60 = 81.7%
+  （逐轮 15/16/18），仍未达 B1 验收线；首测 24/60（40.0%）与中间复测的过渡数字见
+  [m6-level2-real.md](../benchmarks/m6-level2-real.md) 及各 retest 文档，引用时以
+  retest4 为当前事实。评审结论不得写成「真实模型已达标」；scripted 结果不得写成模型能力。
 - 判分口径以 `benchmarks/model.py` 的 `check()` 为准；文档与代码冲突时以代码为准。
 
 **M7 — 案例、HTML、证据包**
@@ -628,7 +636,7 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 | M8-3 | install.md 的安装命令与推荐四 extras 不一致 | 按 install.md 装会缺 MCP/demo 依赖 | 增补推荐组合与各 extra 用途；验收记录实际路线 | 未关闭 |
 | M8-4 | 三后端全部超时后 run 仍 completed、退出码 0 | 只看退出码会把空索引运行误判为成功；涉及公共契约 | 明确接受边界，或修退出码并版本化契约；G3 记录 | 未关闭（重要） |
 | — | macOS 未验证 | 平台矩阵不完整 | 如读者使用 macOS，单独记录；不得外推 | 未验证 |
-| — | M6 层级 2（真实模型批次）未授权/未执行 | 不能声称真实模型在冻结集上的通过率 | 保持未验证；scripted 不得替代 | 未执行 |
+| — | M6 层级 2 已执行但未达验收线（retest4 三轮 49/60 = 81.7%，逐轮 15/16/18） | 不能声称真实模型在冻结集上达标；首测/中间轮的 24/60、40.0% 等是过渡数字 | 以 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为当前事实；B1 验收线未达，scripted 不得替代 | 未达标（B1 未关闭） |
 | — | 独立验收尚未执行 | M10 未完成 | 本包就是为此准备；执行后回填 §8 | 未执行 |
 | — | `install.md` 写「No APK is committed」，但 `examples/` 有一方 APK | 首次读者可能误以为必须 fetch fixtures | 记录为文档措辞问题；完整案例直接用 `examples/`；不阻断 | 文档缺陷（低） |
 | — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 最终 commit 上完整重测量后复跑；不得手改数字，不得用部分测量刷新 | 未关闭（阻断文档门禁） |

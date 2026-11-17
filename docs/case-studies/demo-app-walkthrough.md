@@ -122,10 +122,14 @@ constant the app carries:
 uv run dexatlas search apk_80a8fe0e81204c9f "sk_live"
 ```
 
-returns one string hit, `sk_live_2f8a91c4e7b3`. The sample's README says this
+returns one string hit, `sk_live_2f8a91c4e7b3`. The table's `Kind` column names
+the kind of index entry each hit came from (`class`, `method`, `field`,
+`string`, or `resource`); `Kind=string` here means the hit came from the
+string-constant index (a single FTS `search_index` table backs all five kinds).
+The sample's README says this
 constant is an inert placeholder placed so that search has something real to
 find; the analysis cannot know that, and does not claim to — it reports that
-the string is in the app, and where.
+the string is in the app.
 
 ### 3.4 Open the source
 
