@@ -44,7 +44,7 @@ questions with cited evidence, or in a local web workbench.
   position the fact was read from. A reader can follow any claim back to the
   bytes it came from — the project's documentation is itself checked by a
   script that validates every `file:line` citation.
-- **Read-only MCP server.** Ten tools over stdio that expose an existing
+- **Read-only MCP server.** Eleven tools over stdio that expose an existing
   analysis — projects, symbols, call sites, evidence, locators — with bounded
   responses and no write path, no shell, and no model dependency. An AI
   assistant can be pointed at a completed analysis without gaining any ability
@@ -63,8 +63,8 @@ questions with cited evidence, or in a local web workbench.
 - **Runtime isolation.** Untrusted DEX parsing runs in a separate worker
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.
-- **Quality gates.** Strict mypy typing, ruff lint/format, 1,542 tests at
-  93.1% coverage on the first-party code, and six CI jobs covering different
+- **Quality gates.** Strict mypy typing, ruff lint/format, 1,588 tests at
+  93.3% coverage on the first-party code, and six CI jobs covering different
   backend configurations (all three backends; none of the Java-based ones;
   Apktool only) plus Docker and dependency audit.
 
@@ -113,7 +113,7 @@ methodology and its disclosures are in [docs/benchmarks/](benchmarks/comparison.
 
 ## Licensing and status
 
-Apache-2.0. Actively developed; the current release is v0.2.0. Known
+Apache-2.0. Actively developed; the current release is v1.0.0. Known
 limitations are disclosed in the documentation rather than papered over — see
 [docs/status.md](status.md) for the honest list, including which agent
 configurations complete a question within default budgets.

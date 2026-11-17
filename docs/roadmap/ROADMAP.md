@@ -320,13 +320,13 @@ Automation, LLM Integration and Backend Development roles.
 
 ---
 
-## Phase 3 — Portfolio & Delivery (target `v1.0.0`)
+## Phase 3 — Portfolio & Delivery (tagged `v1.0.0`)
 
 **Replanned on 2026-11-15 for a personal GitHub / Upwork portfolio.**
 The executable scope and acceptance criteria are in the
 [Phase 3 plan](phase3-plan.md). It supersedes the earlier platform-expansion
 vision in this section. Phase 3 is under way and **has not been accepted**;
-`v1.0.0` is not released. The status below records only evidence merged into
+`v1.0.0` was tagged on 2026-11-17. The status below records only evidence merged into
 the repository.
 
 ### 3.1 Goal and scope
@@ -370,7 +370,7 @@ Required evidence includes clean-environment reproduction, inspectable client
 samples with portable citations, truthful agent demonstrations and evaluation,
 stable declared contracts, documented data boundaries, passing quality gates,
 and a complete workflow performed by a reader who did not implement it.
-Version `v1.0.0` remains a target; its stability promises cover the explicitly
+Version `v1.0.0`'s stability promises cover the explicitly
 documented contracts. Portfolio readiness does not promise orders, revenue,
 security certification or commercial SaaS readiness.
 
@@ -378,7 +378,7 @@ security certification or commercial SaaS readiness.
 
 Only work merged into the repository is listed; anything without merged
 evidence is marked as not started or unverified. **Independent acceptance has
-not begun; the Phase 3 exit criteria are not met and `v1.0.0` is not released.**
+not begun; the Phase 3 exit criteria are not met; `v1.0.0` was tagged on 2026-11-17 with the boundaries stated in its release notes.**
 
 | Milestone | Status | Evidence and what remains |
 |---|---|---|
@@ -484,7 +484,7 @@ engineering priorities get adjusted from real demand rather than trend-chasing.
 **Apache-2.0.** Chosen after auditing that no first-party file copies, modifies, links
 or redistributes third-party code. JADX, Apktool, Androguard, Ghidra, Rizin and Frida are
 invoked **as separate processes**, never embedded or vendored — which keeps their
-obligations distinct from this project's. Re-audit before `v1.0.0`.
+obligations distinct from this project's. Re-audited for `v1.0.0`; re-audit before the next minor.
 
 ---
 

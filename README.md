@@ -9,8 +9,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1584%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-93.2%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1588%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
@@ -29,7 +29,9 @@ that fails is reported as a value, not a crash: an APK that defeats the decompil
 still yields a manifest, an index and a report that says which steps did not run.
 
 > [!IMPORTANT]
-> **Status: early development (v0.2.0 released; Phase 3 in progress).** The CLI,
+> **Status: early development — v1.0.0 released (tag 2026-11-17); Phase 3 is
+> delivered, but the M6 agent acceptance line and the M10 independent
+> acceptance are still open.** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in
 > every version since. The MCP server, the evidence-first agent and the web
 > workbench's M4 screens — the project dashboard, upload and analysis progress,
@@ -124,7 +126,7 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.2` | Acceptance Checklist      | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words                      |
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.2.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
-| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar, post-fix narrow verification converted 2/6 then 3/6 after the budget-efficiency fixes — both below the ≥4/6 gate, moved to state-of-record disclosure), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
+| **3** | `v1.0.0` (tag 2026-11-17) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar, post-fix narrow verification converted 2/6 then 3/6 after the budget-efficiency fixes — both below the ≥4/6 gate, moved to state-of-record disclosure), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 

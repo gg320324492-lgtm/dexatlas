@@ -5,12 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-<!-- 发版时应用（属发版 commit，本草案不执行）：把本节标题改为 “## [1.0.0] — <发布日期>”；
-     文末链接块新增 “[1.0.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...v1.0.0”，
-     并把 “[Unreleased]” 的 compare 链接改为 “https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...HEAD”。
-     版本号未改、tag 未打之前，本节保持 Unreleased 标题，不自称已发布。 -->
+## [1.0.0] — 2026-11-17
 
 ### Added
 
@@ -77,7 +72,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   到 1 行/128 字节，工具描述与提示词增「先 limit=20 再翻页」引导；③ 同工具
   连续无新行读取 N=3 次发软提示（不硬拦，带新行的合法翻页即清除）。另带
   transcript 三层行裁剪（单字段 4000 字符、行页 12000 字符，保 total/offset
-  语义）。全量 suite 1575 项通过，覆盖率 93.2%。
+  语义）。全量 suite 1575 项通过，发版测量之前的覆盖率是 93.2%（commit `1e8d947`）。
 
 - **v1.0.0 发版流程预研与本地 dry-run。** 新增
   `docs/reports/v1.0.0-release-runbook.md`：发版流程的完整操作方案——版本号
@@ -495,6 +490,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `sys.executable -m pytest` 前缀，`full_command=True` 表示 args 已是完整
   命令（`coverage run -m pytest` 形态）原样运行——修正自检两轮的命令
   拼装（此前以 WinError 2 崩溃）。
+- **测量的覆盖率数据文件改为每次运行私有（并发不再顶掉报告数字）。**
+  `.coverage` 是整个 checkout 共享的：不带 `--cov-append` 的 `pytest --cov`
+  会把它整个替换掉。发版测量实测被顶成 2699/7631 = 35.4%（15 个 doc 测试
+  那一小撮的覆盖面），套件计数仍然正确、覆盖率却是残缺的，报告与 README
+  徽章因此写出了不实的数字。现在每次测量用自己的数据文件
+  （`.scratch/coverage/<pid>/.coverage`），并用 `COVERAGE_FILE` 告诉它启动的
+  每一个进程——套件、coverage 工具、测试拉起的 worker 子进程——写到这里，
+  别处碰不到它；同一 checkout 里的并发测量由操作系统级文件锁挡住，已有
+  测量在跑时新测量直接拒绝并说明，不与对方抢报告。回归：旧实现下 3 条新
+  用例全红（关键一条的失败原因正是「没告诉进程写哪个文件」），新实现绿。
 - **`docs/install.md` 的安装命令与实际 extras 组合对齐（Phase 3 M8）。**
   安装节改为 lockfile 驱动的 `uv sync --extra dev --extra analysis --extra mcp
   --extra demo`，并逐项说明四个 extra 的用途，以及「仅 `analysis`」最小安装
@@ -1379,7 +1384,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.2.0
 [0.1.3]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.3
 [0.1.2]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.1.2

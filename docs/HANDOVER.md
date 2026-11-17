@@ -8,7 +8,7 @@ Everything here is derivable from the repository. This document only says
 **where to look**, so that nobody has to read the whole tree to find out
 what state it is in.
 
-The state itself is the tag **`v0.2.0`** (2026-11-14), which is the latest
+The state itself is the tag **`v1.0.0`** (2026-11-17), which is the latest
 release; `main` may be ahead of it.
 
 ---
@@ -31,7 +31,7 @@ the workbench. M4 passed its source review and acceptance on 2026-11-14
 | **M3** | Evaluation and benchmarking | **done** — 92 tasks with independently checked answers, scripted + real-model comparison runs, plus a same-model wider-budget rerun (`docs/benchmarks/`; the "stronger" run changed budgets and approval conditions, not the model) |
 | **M4** | Web workbench and portfolio | **done** — six screens live, benchmark view, end-to-end demo; review passed 2026-11-14 (`docs/reports/m4-review.md`) |
 
-The next planned work is Phase 3 (target v1.0.0):
+Phase 3 was delivered in v1.0.0. The next planned work:
 [`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) was rewritten on
 2026-11-15 around GitHub portfolio value and scoped Upwork deliverables.
 M5–M10 now cover baseline reconciliation, bounded agent workflows, portable
@@ -97,8 +97,9 @@ pass.** Read the skip count in the summary line, not just the exit code.
 ## 3. What to do next
 
 Phase 2 (M0–M4) is **complete** — all five milestones delivered, M4's review
-passed on 2026-11-14, and v0.2.0 shipped the lot. The next planned work is
-**Phase 3 (target v1.0.0)**; follow the revised
+passed on 2026-11-14, and v0.2.0 shipped the lot. Phase 3 was delivered in
+v1.0.0; the remaining follow-ups (independent acceptance, readiness
+re-scoring) are tracked in docs/status.md; follow the revised
 [`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) (M5–M10), starting
 with baseline reconciliation. The milestone numbers have new meanings; do not
 start the old plugin/native expansion list. Read [`docs/status.md`](status.md)

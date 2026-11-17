@@ -1,5 +1,11 @@
 # M10 数字同源核对报告（v1.0.0 发版前）
 
+> **基线之后的变动（2026-11-17 发版完整测量落盘）：** 发版树的重测量已完成，
+> 权威值随之变为 **1,588 个测试（1,441 快 + 147 集成）、一方代码覆盖率 93.3%
+> （7,117/7,631 行）**，源指纹 `sha256:787282…`。本报告下文表格里的
+> 1,584 / 93.2% 是**基线 `78102a8` 当时**的值，留作对照；§3 A 类那三处污染已由
+> 那次测量复原。§3 C 类的五处（退出码 6、MCP 工具数、M8-4）已由主线程改完。
+
 **状态：只读核对。本文件只新增本文件本身，未修改任何其他文件；未运行 pytest / coverage / uv sync。**
 
 本报告回答一个问题：v1.0.0 对外发出的每个数字，能不能在仓库里找到出处？
@@ -198,7 +204,7 @@
 
 | # | 文件 | 行 | 现状文案 | 建议改成 | 依据 |
 |---|---|---|---|---|---|
-| 1 | `README.md` | 13 | `[![Coverage](https://img.shields.io/badge/coverage-35.4%25-brightgreen.svg)](pyproject.toml)` | `coverage-93.2%25` | `git show 78102a8:README.md:13`（提交版为 93.2%）；`phase1-execution-report.md:77` |
+| 1 | `README.md` | 13 | 徽章上的覆盖率数字 `35.4%`（污染值；徽章 URL 形如 `coverage-35.4%25`） | `coverage-93.2%25` | `git show 78102a8:README.md:13`（提交版为 93.2%）；`phase1-execution-report.md:77` |
 | 2 | `docs/status.md` | 24 | `\| 一方代码覆盖率 \| <!--fig:coverage.pct-->35.4%<!--/fig--> \|` | `<!--fig:coverage.pct-->93.2%<!--/fig-->` | `git show 78102a8:docs/status.md:24`（提交版为 93.2%） |
 | 3 | `docs/reports/phase1-execution-report.md` | 77 | `\| 一方代码覆盖率 \| **<!--fig:coverage.pct-->35.4%<!--/fig-->**（<!--fig:coverage.covered-->2699<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行） \| ≥80% \|` | `93.2%` + `7109`（`coverage.total` 7631 未被污染，保持不变） | `git show 78102a8:docs/reports/phase1-execution-report.md:77` |
 

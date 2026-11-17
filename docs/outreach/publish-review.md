@@ -17,8 +17,8 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,584（1,437 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
-| 一方代码覆盖率 | 93.2%（7,109 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| 测试总数 | 1,588（1,441 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 一方代码覆盖率 | 93.3%（7,117 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
 | M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
@@ -37,10 +37,10 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,584 automated tests, 93.2% coverage` | 1,584 / 93.2% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,584 tests, coverage and dead-code gates` | 1,584 |
-| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,584 tests at 93.2% coverage` | 1,584 / 93.2% |
-| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,584 automated tests at 93.2% coverage` | 1,584 / 93.2% |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,588 automated tests, 93.3% coverage` | 1,588 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,588 tests, coverage and dead-code gates` | 1,588 |
+| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,588 tests at 93.3% coverage` | 1,588 / 93.3% |
+| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,588 automated tests at 93.3% coverage` | 1,588 / 93.3% |
 
 覆盖率的措辞保持「一方代码覆盖率」的口径，没有写成「总覆盖率」——报告里
 `coverage.pct` 量的就是一方代码。
@@ -273,10 +273,10 @@ Template 2 的正文原为 **3,152** 字符（超 652），本轮裁掉重复表
    ≤60、简介 ≤5,000）。Upwork 实际限制会随时间调整，素材头部本来就有
    「Character limits should be re-checked against the live form」的提示——发版前
    请在真实表单上逐个字段确认。
-5. **对外数字要跟最后一次测量同步。** 本轮的 1,584 / 93.2% 取自本分支基线
-   `8868e30` 落盘的报告。**共享工作树里正在跑发版完整测量**，测量完成后报告
-   里的 `<!--fig:...-->` 会变成新值；届时这四份素材的数字要按新值再核一遍。
-   （另见 §8 的额外发现：共享树当前写进报告的覆盖率是残缺值。）
+5. **对外数字要跟最后一次测量同步。** 本轮的 1,588 / 93.3% 取自 v1.0.0 发版树
+   落盘的报告（源指纹 `sha256:787282…`）——发版完整测量已重跑，这四份素材的
+   数字已按新值核过一遍。**以后任何一次测量都会再改这两个数**，发版前请再核
+   一次。
 6. **`{{...}}` 占位符全部替换后才能发。** 模板里的占位符若漏改会直接发出去。
 7. **不要在发布文案里出现收益、工时节省或客户案例。** 四份素材目前都守住了
    「个人开源项目、无客户」的边界，改写时不要破坏它。
@@ -309,9 +309,11 @@ Template 2 的正文原为 **3,152** 字符（超 652），本轮裁掉重复表
 在 `E:\Dexatlas`（共享树，本轮**未改动**）里，`docs/reports/phase1-execution-report.md`
 的未提交改动把覆盖率写成了 **35.4%（2,699/7,631）**，弱模块表里
 `core/pipeline.py` 18.2%、`cli/main.py` 23.0%、`tools/androguard/worker.py` 0.0%——
-这是多会话并发测量互相清掉 `.coverage` 之后的残缺结果，不是真值（基线是 93.2%）。
-按项目已有的经验（并发测量会污染覆盖率），**共享树的发版测量需要重跑并核对弱模块
-表**才能落盘。本轮没有碰共享树，那边的处置归发版那一轮。
+这是多会话并发测量互相清掉 `.coverage` 之后的残缺结果，不是真值（真值是 93.3%：
+7,117/7,631）。按项目已有的经验（并发测量会污染覆盖率），**共享树的发版测量需要
+重跑并核对弱模块表**才能落盘。**发版那一轮已照此重跑并落盘**：弱模块表复原
+（`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
+测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 
 ---
 
