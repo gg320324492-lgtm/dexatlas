@@ -36,7 +36,7 @@ analysing the same `demo-app` APK; the three evidence packages cover only two
 analyses, because the demo and api-integration packages come from one run
 (`run_e112e717…`) and their `report.md` and `report.html` are byte-identical.
 
-Both APK samples are **first-party**: built from smali sources committed
+All three APK samples are **first-party**: built from smali sources committed
 beside them, rebuildable with `scripts/build-test-apks.sh`, and free of
 third-party code. They exist so that a reader can reproduce every step
 without fetching anything.
