@@ -21,7 +21,8 @@ Usage notes:
   that do not apply to the job post. A replaced placeholder is usually longer
   than the example it replaces, so measure the version you actually paste —
   the counting method and the measured lengths are in
-  [publish-review.md](publish-review.md) §5.
+  [publish-review.md](publish-review.md) §5. That file is an internal record —
+  it is not part of what is sent to a client.
 - Keep the first two paragraphs the same — they state the understanding of
   the job and the concrete plan, which is what a client reads first.
 - Attach the matching scope document and, where the platform allows, point to
@@ -31,6 +32,12 @@ Usage notes:
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
   [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip).
+  **How to read them:** the three walkthroughs are **three viewpoints on two
+  samples**, not three separate projects — case studies 1 and 3 analyze the
+  same first-party sample, and the demo and api-integration packages carry
+  **the same analysis report** (their `report.md` and `report.html` are
+  byte-identical; only `report.json` and `manifest.json` differ). Do not
+  present them as three independent pieces of work or three client cases.
 - Field lengths are accounted for in
   [publish-review.md](publish-review.md): every letter and every scope
   section is measured there against the platform's character limits. That

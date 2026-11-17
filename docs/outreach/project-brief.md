@@ -120,6 +120,12 @@ captured as values and surfaced in the report instead of aborting the run.
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
   [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip)
+- How to read the three walkthroughs: they are **three viewpoints on two
+  samples**, not three separate projects — case studies 1 and 3 analyze the
+  same first-party sample, and the demo and api-integration packages carry
+  **the same analysis report** (their `report.md` and `report.html` are
+  byte-identical; only `report.json` and `manifest.json` differ). They are
+  not client cases: this is my own open-source work on first-party samples.
 
 ---
 
