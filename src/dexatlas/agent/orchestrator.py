@@ -1221,7 +1221,15 @@ def _record_manifest(builder: EvidenceBuilder, payload: Any) -> Evidence:
 
 
 def _record_source(builder: EvidenceBuilder, tool: str, payload: Any) -> Evidence:
-    """The source a tool read, as a record."""
+    """The source a tool read, as a record.
+
+    The record carries the text it read, in bounded parts. The agent's
+    transcript clips a big source to a page, so the tail of a real APK's
+    class would otherwise be unreachable: the transcript said the full text
+    was "recorded as evidence", but the record held only the tool and the
+    kind. Now the record holds the text itself — a reader outside the task,
+    following ``get_evidence``, can read what the transcript dropped.
+    """
     found = bool(getattr(payload, "found", False))
     if not found:
         return builder.add(
@@ -1246,12 +1254,17 @@ def _record_source(builder: EvidenceBuilder, tool: str, payload: Any) -> Evidenc
             provenance=[],
             detail={"tool": tool, "kind": getattr(payload, "kind", None)},
         )
+    text = _payload_text(payload)
     return builder.add(
         kind=EvidenceKind.CODE_LOCATED,
         level=EvidenceLevel.VERIFIED,
         summary=f"{tool} read the source of {getattr(payload, 'kind', '')} code",
         provenance=provenance,
-        detail={"tool": tool, "kind": getattr(payload, "kind", None)},
+        detail={
+            "tool": tool,
+            "kind": getattr(payload, "kind", None),
+            **_text_parts_detail(text),
+        },
     )
 
 
@@ -1451,6 +1464,57 @@ def _locators_of(call_sites: list[Any]) -> list[str]:
         for locator in getattr(site, "provenance", []) or []:
             locators.append(str(locator))
     return locators
+
+
+#: The most text one evidence record carries, across all its parts.
+#:
+#: A record is stored, listed and read back whole, so it is bounded the way
+#: every other answer is bounded. The bound is generous — several whole
+#: classes — and what a bigger source gives up is stated by the record
+#: itself: the parts are a head, and ``text_total_chars`` says how long the
+#: whole reading was.
+MAX_EVIDENCE_TEXT_CHARS = 65_536
+
+#: How the text is cut into parts. One part is a block a reader can quote;
+#: the parts join to the whole with a plain concatenation.
+EVIDENCE_TEXT_PART_CHARS = 3_800
+
+
+def _text_parts_detail(text: str) -> dict[str, Any]:
+    """The fields a source record carries beside its tool and kind.
+
+    The text is cut into parts that join to the original with
+    ``"".join(parts)`` — no separator, so the record's text is byte-for-byte
+    the reading — and the total is the length of the whole text, whether or
+    not the parts carry all of it.
+    """
+    if not text:
+        return {
+            "text_parts": [],
+            "text_total_chars": 0,
+            "text_parts_truncated": False,
+        }
+    parts: list[str] = []
+    kept = 0
+    while kept < len(text) and kept < MAX_EVIDENCE_TEXT_CHARS:
+        parts.append(text[kept : kept + EVIDENCE_TEXT_PART_CHARS])
+        kept += EVIDENCE_TEXT_PART_CHARS
+    return {
+        "text_parts": parts,
+        "text_total_chars": len(text),
+        "text_parts_truncated": kept < len(text),
+    }
+
+
+def _payload_text(payload: Any) -> str:
+    """The text a source read carries, whether or not it is wrapped."""
+    wrapped = getattr(payload, "text", None)
+    inner = getattr(wrapped, "text", None)
+    if isinstance(inner, str):
+        return inner
+    if isinstance(wrapped, str):
+        return wrapped
+    return ""
 
 
 def _text(value: Any) -> str:

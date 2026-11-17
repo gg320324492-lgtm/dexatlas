@@ -208,19 +208,22 @@ server instructions（`src/dexatlas/mcp/server.py:47-68`）向调用方声明三
 | 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[]}` | `src/dexatlas/mcp/server.py:126-139` |
 | 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:141-152` |
 | 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:154-174` |
-| 5 | `get_class_source` | `project_id`、`class_name` | `SourceView` | `src/dexatlas/mcp/server.py:177-191` |
-| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?` | `SourceView` | `src/dexatlas/mcp/server.py:207-220` |
-| 7 | `find_callers` | `project_id`、`method_id`、`limit` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:220-242` |
-| 8 | `find_callees` | `project_id`、`method_id`、`limit` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:244-265` |
-| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:269-280` |
-| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:283-295` |
-| 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:295-330` |
+| 5 | `get_class_source` | `project_id`、`class_name`、`offset≥0=0`、`limit(1..200000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:178-200` |
+| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?`、`offset≥0=0`、`limit(1..200000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:203-233` |
+| 7 | `find_callers` | `project_id`、`method_id`、`limit(1..200)=50`、`offset≥0=0` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated,offset}` | `src/dexatlas/mcp/server.py:239-263` |
+| 8 | `find_callees` | `project_id`、`method_id`、`limit(1..200)=50`、`offset≥0=0` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated,offset}` | `src/dexatlas/mcp/server.py:265-290` |
+| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:302-312` |
+| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:315-330` |
+| 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:322-357` |
 
 ### 3.2 响应形状与"有界、说清"语义
 
 `SourceView`（`src/dexatlas/mcp/schemas.py:282-315`）用 `found: bool` 区分"分析
 查过但没有"（`found=false` + `reason`）与"分析没跑过"；歧义名在 `candidates`
-里列 descriptor。`Completeness`（`src/dexatlas/mcp/schemas.py:68-90`）携带
+里列 descriptor。`text_offset`/`text_total_chars` 说明本页在整篇源码中的位置
+（`offset=0`、`limit=200000` 时整篇返回）；agent transcript 对超过 4000 字符
+的文本字段裁剪，裁剪提示指向分页（同工具 `offset=` 续读），不再宣称全文
+已录为 evidence。`Completeness`（`src/dexatlas/mcp/schemas.py:68-90`）携带
 `complete`、`missing_backends[]`、`truncated`、`errors[]`——"没找到"与"没查"
 分开。错误以 `RequestError` 抛出，形状 `{code,message,detail}`
 （`src/dexatlas/mcp/errors.py:14-29`），已知码：`unknown_project`

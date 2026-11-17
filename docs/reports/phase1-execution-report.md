@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1575<!--/fig-->（<!--fig:tests.fast-->1428<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.2%<!--/fig-->**（<!--fig:coverage.covered-->7073<!--/fig-->/<!--fig:coverage.total-->7590<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1584<!--/fig-->（<!--fig:tests.fast-->1437<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.2%<!--/fig-->**（<!--fig:coverage.covered-->7109<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -141,9 +141,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1428<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1437<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->147<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1575<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1584<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -251,6 +251,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_agent_idle_notice.py` | 同工具无新行连发 N=3 软提示：只附注不拦截，带来新行的合法翻页即清除（M6 预算效率 ③ 新增） |
 | `test_agent_round3_budget.py` | 返回体裁剪回归：长文本字段截断保形状、整页 scaffold 超限时按 offset 裁行，total/offset 不失真（M6 第三轮修复新增） |
 | `test_agent_round3_transcript_budget.py` | 真实工具 + 计量 provider 的整链路预算回归：字符串常量页任务在门限内作答而非预算耗尽（M6 第三轮修复新增） |
+| `test_review_fixes.py` | 审查遗留修复回归：证据记录承载被裁源码文本（分块 + 截断声明）、source/reference 四工具 offset 分页、call_sites/callees 纳入行裁剪、裁剪提示如实指向分页续读（M-1/L-1 修复新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -871,10 +872,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1575<!--/fig--> 个：<!--fig:tests.fast-->1428<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1584<!--/fig--> 个：<!--fig:tests.fast-->1437<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.2%<!--/fig-->（<!--fig:coverage.covered-->7073<!--/fig-->/<!--fig:coverage.total-->7590<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1575<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.2%<!--/fig-->（<!--fig:coverage.covered-->7109<!--/fig-->/<!--fig:coverage.total-->7631<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1584<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -995,7 +996,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "__init__.py": [3, 0],
       "agent/__init__.py": [8, 0],
       "agent/evidence_verifier.py": [122, 6],
-      "agent/orchestrator.py": [593, 49],
+      "agent/orchestrator.py": [613, 53],
       "agent/planner.py": [47, 0],
       "agent/providers/__init__.py": [6, 0],
       "agent/providers/base.py": [87, 4],
@@ -1006,7 +1007,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "agent/reporter.py": [127, 12],
       "agent/state.py": [201, 5],
       "agent/sufficiency.py": [31, 1],
-      "agent/tool_executor.py": [366, 35],
+      "agent/tool_executor.py": [368, 35],
       "api/__init__.py": [3, 0],
       "api/app.py": [309, 22],
       "api/uploads.py": [181, 14],
@@ -1028,7 +1029,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "core/storage.py": [396, 11],
       "mcp/__init__.py": [2, 0],
       "mcp/errors.py": [21, 1],
-      "mcp/schemas.py": [173, 0],
+      "mcp/schemas.py": [181, 0],
       "mcp/security.py": [28, 3],
       "mcp/server.py": [57, 12],
       "mcp/tools/__init__.py": [1, 0],
@@ -1036,7 +1037,7 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "mcp/tools/projects.py": [45, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
-      "mcp/tools/symbols.py": [60, 0],
+      "mcp/tools/symbols.py": [71, 1],
       "reports/__init__.py": [4, 0],
       "reports/coverage.py": [11, 0],
       "reports/evidence_package.py": [153, 17],
@@ -1061,8 +1062,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 517,
-    "statements": 7590
+    "missing": 522,
+    "statements": 7631
   },
   "history": {
     "v0.1.0": {
@@ -1079,10 +1080,10 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:c7daf9135e62fdd59bc532c9510f0b4d0513d52f5c043c2c471954b7c3099beb",
+  "source_fingerprint": "sha256:ccea379b61a11bec190f9a5656f1f990494c585848b2f3489c12c5ba9507350a",
   "suite": {
     "failed": 0,
-    "passed": 1575,
+    "passed": 1584,
     "skipped": 0,
     "skipped_tests": [],
     "xfailed": 0,
@@ -1090,8 +1091,8 @@ cb11aa3  Record the v0.1.1 findings in the report and the changelog
     "xpassed": 0
   },
   "tests": {
-    "fast": 1428,
+    "fast": 1437,
     "slow": 147,
-    "total": 1575
+    "total": 1584
   }
 }-->

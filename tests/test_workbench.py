@@ -635,6 +635,7 @@ def test_a_method_nobody_calls_answers_zero_counts_not_404(
         "call_site_count": 0,
         "call_edge_count": 0,
         "truncated": False,
+        "offset": 0,
     }
 
 
@@ -649,6 +650,7 @@ def test_a_method_that_calls_nothing_says_so(client: TestClient, called_project_
         "call_site_count": 0,
         "call_edge_count": 0,
         "truncated": False,
+        "offset": 0,
     }
 
 

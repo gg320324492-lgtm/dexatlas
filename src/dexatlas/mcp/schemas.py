@@ -303,6 +303,21 @@ class SourceView(BaseModel):
     text: UntrustedText | None = None
     """The source itself, when there is any."""
 
+    text_offset: int = 0
+    """Where in the class's source this answer starts.
+
+    ``0`` for a whole reading. A caller that asked for a page further in
+    sees the offset it asked for, so it can tell which slice of the source
+    it is holding.
+    """
+
+    text_total_chars: int = 0
+    """How long the class's source is, before any paging.
+
+    A caller that is walking through a source larger than one answer can
+    hold reads pages until it has seen this many characters.
+    """
+
     provenance: list[str] = Field(default_factory=list)
     """The locators the source was read from."""
 
@@ -352,6 +367,13 @@ class CallerView(BaseModel):
 
     truncated: bool = False
 
+    offset: int = 0
+    """How many call sites were skipped before this page.
+
+    ``0`` for a first page. A caller that pages forward passes the offset it
+    was given, so the pages join up without repeating a site.
+    """
+
 
 class CalleeView(BaseModel):
     """What a method calls."""
@@ -360,6 +382,13 @@ class CalleeView(BaseModel):
     call_site_count: int
     call_edge_count: int
     truncated: bool = False
+
+    offset: int = 0
+    """How many call sites were skipped before this page.
+
+    ``0`` for a first page. A caller that pages forward passes the offset it
+    was given, so the pages join up without repeating a site.
+    """
 
 
 class EvidenceView(BaseModel):

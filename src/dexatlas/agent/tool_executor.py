@@ -178,21 +178,26 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "get_class_source": (
         "Read one class's source — Java when the decompiler produced it, Smali "
-        "otherwise — with the provenance that says which backend produced it."
+        "otherwise — with the provenance that says which backend produced it. A "
+        "very large class is read in windows: pass offset (characters to skip) "
+        "to reach what one answer did not carry."
     ),
     "get_method_source": (
         "Read one method's source, with its provenance. Pass descriptor to pick "
         "one of several methods that share a name; a name that matches more than "
-        "one method is answered with the candidates instead of one of them."
+        "one method is answered with the candidates instead of one of them. Pass "
+        "offset to reach what one answer of a long body did not carry."
     ),
     "find_callers": (
         "Find the calls into a method: each call site, with the caller, the DEX "
         "file and the instruction offset, and the call-site and call-edge counts "
-        "kept apart."
+        "kept apart. A wide caller list is paged: pass offset to continue where "
+        "a page stopped."
     ),
     "find_callees": (
         "Find the calls out of a method: what it calls, with the call-site and "
-        "call-edge counts kept apart."
+        "call-edge counts kept apart. A wide callee list is paged: pass offset "
+        "to continue where a page stopped."
     ),
     "find_resource_declarations": (
         "Find where a resource string is declared: by its name ('app_name') or by "
@@ -780,15 +785,22 @@ MAX_CONTENT_CHARS = 12_000
 MAX_FIELD_TEXT = 4_000
 
 #: The announcement that replaces the dropped middle of a clipped text.
+#:
+#: It names the one path that really reaches the dropped characters: the
+#: same tool, one ``offset`` further in. It must not promise that the full
+#: text is "recorded as evidence" and nothing more — the evidence record
+#: carries the text in bounded parts for a reader outside the task, but the
+#: way for *this* agent to read the rest is to page the tool.
 _CLIP_NOTICE = (
     "\n… [clipped {dropped} characters to keep the transcript readable; "
-    "the full text is recorded as evidence]"
+    "{shown} of {total} characters shown — read the rest with the same tool, "
+    "offset={kept}]"
 )
 
 #: The announcement that replaces the rows a page dropped.
 _ROW_NOTICE = (
     "… [{dropped} of {total} rows clipped to keep the transcript readable; "
-    "the full page is recorded as evidence — page again with offset={kept}]"
+    "page again with offset={kept}]"
 )
 
 
@@ -830,7 +842,9 @@ def _clip_value(value: Any, limit: int) -> Any:
         if len(value) <= limit:
             return value
         head = value[:limit]
-        return head + _CLIP_NOTICE.format(dropped=len(value) - limit)
+        return head + _CLIP_NOTICE.format(
+            dropped=len(value) - limit, shown=limit, total=len(value), kept=limit
+        )
     if isinstance(value, list):
         clipped_items = [_clip_value(item, limit) for item in value]
         if any(new is not old for new, old in zip(clipped_items, value, strict=False)):
@@ -844,27 +858,41 @@ def _clip_value(value: Any, limit: int) -> Any:
     return value
 
 
+#: The list keys a paged answer carries its rows under, and the count field
+#: that goes with each when the answer spells its total differently.
+#:
+#: ``find_callers`` and ``find_callees`` are in the list because their pages
+#: are the widest a tool returns — a wide fan-in method at the 200-row cap
+#: carries hundreds of long class names and locators, and a page that sailed
+#: past this clip whole was re-billed on every turn after it.
+_ROW_KEYS: tuple[tuple[str, str], ...] = (
+    ("symbols", "total"),
+    ("declarations", "total"),
+    ("call_sites", "call_site_count"),
+    ("callees", "call_site_count"),
+)
+
+
 def _clip_rows(document: Any, *, max_chars: int = MAX_CONTENT_CHARS) -> Any:
     """Cut a page of rows to the transcript allowance, saying what was dropped.
 
     A page that fits is returned unchanged. One that does not keeps its
     first rows — the ones a reader reads first — and the row that names the
-    cut carries the offset that pages to what was dropped. ``total`` and
-    ``offset`` are never touched: a count that survives the clip is the
-    count the question asked about.
+    cut carries the offset that pages to what was dropped. The page's count
+    fields are never touched: a count that survives the clip is the count
+    the question asked about.
     """
     if not isinstance(document, dict):
         return document
     data = document.get("data")
     if not isinstance(data, dict):
         return document
-    rows_key = next(
-        (key for key in ("symbols", "declarations") if isinstance(data.get(key), list)), None
-    )
+    rows_key = next((key for key, _ in _ROW_KEYS if isinstance(data.get(key), list)), None)
     if rows_key is None:
         return document
     rows = data[rows_key]
-    total = data.get("total", len(rows))
+    total_key = next((count for key, count in _ROW_KEYS if key == rows_key), "total")
+    total = data.get(total_key, data.get("total", len(rows)))
     offset = data.get("offset", 0)
     kept: list[Any] = []
     kept_chars = len(json.dumps({k: v for k, v in document.items() if k != "data"}, default=str))

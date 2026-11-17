@@ -183,12 +183,26 @@ def build_server(analyzer: Analyzer) -> MCPServer:
             "says which backend produced it and which file it came from. The source "
             "is Java when JADX produced it and Smali when Apktool did. Returns "
             "found: false with a reason when there is none, which is not the same as "
-            "the class being absent from the APK."
+            "the class being absent from the APK. A very large class can be read in "
+            "windows: pass offset (characters to skip) and limit (characters to "
+            "take) to reach the parts one answer does not carry."
         ),
         annotations=_read_only("Read a class's source"),
     )
-    def get_class_source(project_id: str, class_name: str) -> SourceView:
-        return symbol_tools.class_source(analyzer, project_id, class_name)
+    def get_class_source(
+        project_id: str,
+        class_name: str,
+        offset: Annotated[
+            int, Field(ge=0, description="How many characters of the source to skip.")
+        ] = 0,
+        limit: Annotated[
+            int,
+            Field(ge=1, le=MAX_LIMIT * 100, description="How many characters to return at most."),
+        ] = 200_000,
+    ) -> SourceView:
+        return symbol_tools.class_source(
+            analyzer, project_id, class_name, offset=offset, limit=limit
+        )
 
     @server.tool(
         name="get_method_source",
@@ -216,8 +230,17 @@ def build_server(analyzer: Analyzer) -> MCPServer:
                 )
             ),
         ] = None,
+        offset: Annotated[
+            int, Field(ge=0, description="How many characters of the body to skip.")
+        ] = 0,
+        limit: Annotated[
+            int,
+            Field(ge=1, le=MAX_LIMIT * 100, description="How many characters to return at most."),
+        ] = 200_000,
     ) -> SourceView:
-        return symbol_tools.method_source(analyzer, project_id, class_name, method_name, descriptor)
+        return symbol_tools.method_source(
+            analyzer, project_id, class_name, method_name, descriptor, offset=offset, limit=limit
+        )
 
     @server.tool(
         name="find_callers",
@@ -226,7 +249,8 @@ def build_server(analyzer: Analyzer) -> MCPServer:
             "Find the calls into a method. Returns each call site — the caller, the "
             "callee, the DEX file it was read out of and the instruction offset it "
             "sits at — and counts the call sites and the call edges separately: one "
-            "caller that calls the same target twice is two call sites and one edge."
+            "caller that calls the same target twice is two call sites and one edge. "
+            "Page with offset to walk a wide caller list without repeating a site."
         ),
         annotations=_read_only("Find the calls into a method"),
     )
@@ -240,8 +264,11 @@ def build_server(analyzer: Analyzer) -> MCPServer:
             int,
             Field(ge=1, le=MAX_LIMIT, description="How many results to return at most."),
         ] = DEFAULT_LIMIT,
+        offset: Annotated[int, Field(ge=0, description="How many results to skip.")] = 0,
     ) -> CallerView:
-        return reference_tools.find_callers(analyzer, project_id, method_id, limit=limit)
+        return reference_tools.find_callers(
+            analyzer, project_id, method_id, limit=limit, offset=offset
+        )
 
     @server.tool(
         name="find_callees",
@@ -249,7 +276,8 @@ def build_server(analyzer: Analyzer) -> MCPServer:
         description=(
             "Find the calls out of a method: what it calls, and the two counts — the "
             "call sites, which are the places in the bytecode, and the call edges, "
-            "which are the relationships. Use find_callers for the other direction."
+            "which are the relationships. Use find_callers for the other direction. "
+            "Page with offset to walk a wide callee list without repeating one."
         ),
         annotations=_read_only("Find the calls out of a method"),
     )
@@ -263,8 +291,11 @@ def build_server(analyzer: Analyzer) -> MCPServer:
             int,
             Field(ge=1, le=MAX_LIMIT, description="How many results to return at most."),
         ] = DEFAULT_LIMIT,
+        offset: Annotated[int, Field(ge=0, description="How many results to skip.")] = 0,
     ) -> CalleeView:
-        return reference_tools.find_callees(analyzer, project_id, method_id, limit=limit)
+        return reference_tools.find_callees(
+            analyzer, project_id, method_id, limit=limit, offset=offset
+        )
 
     @server.tool(
         name="get_evidence",

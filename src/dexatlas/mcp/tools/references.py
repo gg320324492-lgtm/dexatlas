@@ -35,19 +35,21 @@ def find_callers(
     method_id: str,
     *,
     limit: int,
+    offset: int = 0,
 ) -> CallerView:
     """Who calls a method, and where in the bytecode the calls are."""
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
 
     sites = analyzer.store.get_method_references(project_id, method_id)
-    page = sites[:limit]
+    page = sites[offset : offset + limit]
 
     return CallerView(
         call_sites=[_view(site) for site in page],
         call_site_count=len(sites),
         call_edge_count=_edge_count(sites),
-        truncated=len(sites) > len(page),
+        truncated=len(sites) > offset + len(page),
+        offset=offset,
     )
 
 
@@ -57,17 +59,21 @@ def find_callees(
     method_id: str,
     *,
     limit: int,
+    offset: int = 0,
 ) -> CalleeView:
     """What a method calls, and where in the bytecode the calls are."""
     if analyzer.store.get_project(project_id) is None:
         raise unknown_project(project_id)
 
     sites = analyzer.store.list_callees(project_id, method_id)
-    page = sites[:limit]
 
+    # The distinct callees are worked out over the *whole* reading, before
+    # the page is cut: a method that calls the same target twice contributes
+    # one row, and paging must not resurrect the second call on the next
+    # page. The counts stay the counts of the reading.
     callees: list[SymbolView] = []
     seen: set[str] = set()
-    for site in page:
+    for site in sites:
         if site.callee in seen:
             continue
         seen.add(site.callee)
@@ -79,12 +85,14 @@ def find_callees(
                 provenance=[entry.locator for entry in site.provenance],
             )
         )
+    page = callees[offset : offset + limit]
 
     return CalleeView(
-        callees=callees,
+        callees=page,
         call_site_count=len(sites),
         call_edge_count=_edge_count(sites),
-        truncated=len(sites) > len(page),
+        truncated=len(callees) > offset + len(page),
+        offset=offset,
     )
 
 

@@ -14,6 +14,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **代码审查遗留修复：裁剪内容可追溯（M-1）与宽页行裁剪补全（L-1）。**
+  只读审查发现两处边界：M-1——transcript 裁剪提示宣称"全文已录为
+  evidence"，但 `_record_source` 的 detail 只存 tool/kind 不存文本，真实
+  APK 大类被裁到 4000 字符后尾部不可达；L-1——`_clip_rows` 只裁
+  `symbols`/`declarations`，`find_callers` 的 `call_sites` 大页（上限
+  200 行）整页绕过裁剪、每轮重发烧预算。修复：① 证据记录承载源码文本
+  （≤65536 字符按 3800 字符分块存 `detail.text_parts`，附
+  `text_total_chars`/`text_parts_truncated`）；② `get_class_source`/
+  `get_method_source` 增加可选 `offset`/`limit` 分页（默认整篇返回，
+  向后兼容），`SourceView` 增 `text_offset`/`text_total_chars`；③
+  `find_callers`/`find_callees` 增加可选 `offset`（`find_callees` 先全量
+  去重再分页，跨页不重复），`CallerView`/`CalleeView` 增 `offset`；
+  ④ `_clip_rows` 行键扩为 `symbols`/`declarations`/`call_sites`/`callees`
+  （计数取各自 total 字段）；⑤ 裁剪提示措辞改为如实指向分页续读（
+  "read the rest with the same tool, offset=N"），不再宣称全文已录为
+  evidence。判分语义与七条红线不变。各带红→绿回归
+  （`tests/test_review_fixes.py`，9 项）。
+
 - **Phase 3 M5 — 对外声明基线校准。** 新增 `docs/reports/phase3-baseline.md`：
   对外声明逐条对照代码与已提交 trace 复核（Windows 启动器、证据三级、计数
   口径等），三份 benchmark（scripted / real / stronger）的八项指标均可由

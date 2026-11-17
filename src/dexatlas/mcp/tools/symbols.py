@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NamedTuple
 
 from dexatlas.core.methods import AmbiguousMethodError
 from dexatlas.core.pipeline import Analyzer
@@ -188,8 +188,22 @@ def search_symbols(
     )
 
 
-def class_source(analyzer: Analyzer, project_id: str, class_name: str) -> SourceView:
-    """One class's source, and where it was read from."""
+def class_source(
+    analyzer: Analyzer,
+    project_id: str,
+    class_name: str,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
+) -> SourceView:
+    """One class's source, and where it was read from.
+
+    The whole source comes back unless the caller asks for a window:
+    ``offset`` skips characters of the source, ``limit`` caps how many this
+    answer carries. A source larger than the caller's transcript can afford
+    is read in windows — the same tool, a further offset — rather than
+    dropped.
+    """
     document = analyzer.class_source_document(project_id, class_name)
     if document is None:
         return SourceView(
@@ -199,10 +213,13 @@ def class_source(analyzer: Analyzer, project_id: str, class_name: str) -> Source
                 "in the APK, or no backend that could produce source was available"
             ),
         )
+    window = _source_window(document.text, offset, limit)
     return SourceView(
         found=True,
         kind=document.kind.value,
-        text=UntrustedText(text=document.text),
+        text=UntrustedText(text=window.text),
+        text_offset=window.offset,
+        text_total_chars=len(document.text),
         provenance=[entry.locator for entry in document.provenance],
     )
 
@@ -213,13 +230,18 @@ def method_source(
     class_name: str,
     method_name: str,
     descriptor: str | None = None,
+    *,
+    offset: int = 0,
+    limit: int | None = None,
 ) -> SourceView:
     """One method's source — the exact one, when the name is ambiguous.
 
     A name that matches several methods is answered with the candidates
     rather than with one of them: the body of the wrong overload reads
     exactly like the body of the right one, and it travels straight into
-    whatever quotes it.
+    whatever quotes it. ``offset``/``limit`` window the body the same way
+    :func:`class_source` does, for a method whose body is larger than one
+    answer should carry.
     """
     try:
         document = analyzer.method_source_document(project_id, class_name, method_name, descriptor)
@@ -239,12 +261,37 @@ def method_source(
             ),
         )
 
+    window = _source_window(document.text, offset, limit)
     return SourceView(
         found=True,
         kind=document.kind.value,
-        text=UntrustedText(text=document.text),
+        text=UntrustedText(text=window.text),
+        text_offset=window.offset,
+        text_total_chars=len(document.text),
         provenance=[entry.locator for entry in document.provenance],
     )
+
+
+def _source_window(text: str, offset: int, limit: int | None) -> SourceWindow:
+    """One window of a source text, at the offset that was asked for.
+
+    An ``offset`` past the end answers with an empty window at that offset —
+    the same convention a paged list answers with — and a ``limit`` of
+    ``None`` takes the rest, so a caller that asks only ``offset=`` keeps
+    reading to the end.
+    """
+    if offset < 0:
+        offset = 0
+    offset = min(offset, len(text))
+    end = len(text) if limit is None else min(offset + max(limit, 0), len(text))
+    return SourceWindow(text=text[offset:end], offset=offset)
+
+
+class SourceWindow(NamedTuple):
+    """A slice of a source text, with the offset it really starts at."""
+
+    text: str
+    offset: int
 
 
 __all__ = ["class_source", "method_source", "search_symbols"]
