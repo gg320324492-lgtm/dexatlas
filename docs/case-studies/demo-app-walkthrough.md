@@ -19,7 +19,7 @@ key-shaped string constant. Its purpose is to be analysed immediately after
 cloning, with nothing to download, and to exercise every part of the pipeline
 without any of them being obscured.
 
-The customer's question this study answers: *given this APK, what can you tell
+The reader's question this study answers: *given this APK, what can you tell
 me about it, and can I check every statement you make without taking your word
 for it?*
 

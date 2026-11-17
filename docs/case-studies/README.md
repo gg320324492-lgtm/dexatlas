@@ -4,10 +4,10 @@ Three complete walkthroughs of DexAtlas analyses, written from real runs.
 Every number below was produced by the commands shown, on the sample named,
 and every conclusion carries the evidence record or locator it came from.
 
-These documents are written to be **reviewed by a customer**: each one states
-the problem it answers, the scope it covers, the reproducible commands it
-ran, the evidence behind every claim, its conclusions, its limits, and what
-to do next. Reading them requires no DexAtlas installation — only the
+These documents are written to be **reviewed by a potential user**: each one
+states the problem it answers, the scope it covers, the reproducible commands
+it ran, the evidence behind every claim, its conclusions, its limits, and
+what to do next. Reading them requires no DexAtlas installation — only the
 willingness to check a locator.
 
 **What these studies are not:** they are not penetration tests, and they do
@@ -26,11 +26,17 @@ DexAtlas to review the evidence, only to reproduce it.
 
 | # | Case study | Sample | What it shows |
 |---|---|---|---|
-| 1 | [From upload to evidence chain](demo-app-walkthrough.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk) | The full tool chain: analyze, manifest, search, source, cross-references, and the eleven evidence records behind them — the complete customer walkthrough |
+| 1 | [From upload to evidence chain](demo-app-walkthrough.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk) | The full tool chain: analyze, manifest, search, source, cross-references, and the eleven evidence records behind them — the complete end-to-end walkthrough |
 | 2 | [Reading an obfuscated app](obfuscated-app.md) | [`examples/obfuscated-app/obfuscated.apk`](../../examples/obfuscated-app/obfuscated.apk), plus a multi-DEX appendix on [`examples/multidex-app/multidex.apk`](../../examples/multidex-app/multidex.apk) | What survives name obfuscation, what the string index still finds, how the index records a class defined in two DEX files at once — and where the capability boundary sits |
 | 3 | [Integrating from Python](api-integration.md) | [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk), via the REST API and the MCP server | The wire contract: upload → analyze → poll → query → report over HTTP, the same analysis over eleven read-only MCP tools, and a minimal Python client |
 
-Both APK samples are **first-party**: built from smali sources committed
+Three walkthroughs cover three first-party APKs — `demo-app`, `obfuscated-app`
+and `multidex-app` (the multi-DEX appendix) — with case studies 1 and 3 both
+analysing the same `demo-app` APK; the three evidence packages cover only two
+analyses, because the demo and api-integration packages come from one run
+(`run_e112e717…`) and their `report.md` and `report.html` are byte-identical.
+
+All three APK samples are **first-party**: built from smali sources committed
 beside them, rebuildable with `scripts/build-test-apks.sh`, and free of
 third-party code. They exist so that a reader can reproduce every step
 without fetching anything.
@@ -47,7 +53,7 @@ jadx 1.5.2, Python 3.12, on Windows 11. Analysis times are reported per run
 and will differ on other machines; the symbol and evidence counts are
 deterministic for a given sample and backend set.
 
-## Reading them as a customer
+## Reading them as a potential user
 
 - **Case 1** answers "what will I get, and can I check it?" — start there.
 - **Case 2** answers "what happens when the names are gone?" — the honest

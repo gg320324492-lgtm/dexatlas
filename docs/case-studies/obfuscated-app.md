@@ -29,7 +29,7 @@ declares dangerous permissions (`ACCESS_FINE_LOCATION`, `READ_PHONE_STATE`,
 shaped URL, and an SMS-shaped string constant — all inert placeholders, all
 committed in source beside the APK.
 
-The customer's question this study answers: **with every meaningful name
+The reader's question this study answers: **with every meaningful name
 destroyed, what does DexAtlas still establish, and how much of it is
 verifiable?**
 
