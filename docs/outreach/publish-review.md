@@ -4,8 +4,12 @@
 > 平台提交、发布、复制或发送任何内容；没有调用任何模型 API；没有改动共享
 > 工作树。四份素材仍然是草稿，状态是「Draft for review — not published」。
 >
+> **内部核对记录——不对外、不作附件、不随提案发送。** 本文件只留在仓库里：
+> 它记着核对基准、分支名、提交号与本机路径，那些是给自己看的；对外发出去的
+> 只有同目录下的四份素材本身。
+>
 > **核对基准：** 分支 `claude/upwork-check`，基于 `origin/claude/m6-level2-verify`
-> @ `8868e30` 的独立 worktree（`E:\worktrees\upwork-check`）。
+> @ `8868e30` 的独立 worktree。
 
 ---
 
@@ -114,25 +118,79 @@
 
 口径：**raw** = Markdown 源码字符数（人从文件里复制的内容）；**plain** = 去掉
 Markdown 语法（`**粗体**`、列表符号、`>` 引用）后的正文字符数（粘进表单框的
-内容）。取两者较大者判定，所以口径是保守的。门限按任务给定：**标题 ≤60、
-简介 ≤5,000**。
+内容）。取两者较大者判定，所以口径是保守的。门限：**标题 ≤60、简介 ≤5,000**
+（Upwork 作品集指南，见素材顶部的链接）；**提案正文 ≤2,500**（本轮按较严的
+常用值取，模板按此留余量）。
+
+**切分规则**：`## ` 标题开一节；一节到下一个 `## ` 标题、或到单独一行的
+`---` 分隔线为止；节正文不含标题行本身，首尾空行不计。**plain 的清洗规则**
+（逐行）：`` `代码` `` → 内容、`**粗体**`/`*斜体*` → 内容、列表符号
+（`- ` / `1. `）→ 4 空格缩进、`> ` 引用符 → 去掉、Markdown 链接
+`[文字](地址)` → 只留文字、`#` 标题符 → 去掉、行尾空白去掉，首尾空行不计。
+
+下面这段脚本就是口径本身，**表里的每个数字都能用它复算**（纯标准库，不写
+任何测量产物）：
+
+```bash
+python - <<'EOF'
+import pathlib, re
+def sections(path):
+    lines = pathlib.Path(path).read_text(encoding="utf-8").splitlines()
+    out, name, cur = [], None, []
+    for l in lines:
+        if l.startswith("## "):
+            if name is not None: out.append((name, cur))
+            name, cur = l[3:].strip(), []
+        elif l.strip() == "---":
+            if name is not None: out.append((name, cur)); name, cur = None, []
+        elif name is not None:
+            cur.append(l)
+    if name is not None: out.append((name, cur))
+    return out
+def strip_md(text):
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    text = re.sub(r"\*\*([^*]*)\*\*", r"\1", text)
+    text = re.sub(r"(?<!\*)\*([^*]+)\*(?!\*)", r"\1", text)
+    text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    out = []
+    for l in text.splitlines():
+        l = re.sub(r"^\s*(-|\d+\.)\s+", "    ", l)
+        l = re.sub(r"^>\s?", "", l)
+        l = re.sub(r"^#+\s*", "", l)
+        out.append(l.rstrip())
+    while out and not out[0].strip(): out.pop(0)
+    while out and not out[-1].strip(): out.pop()
+    return "\n".join(out)
+for path in ["docs/outreach/cover-letter-templates.md", "docs/outreach/project-brief.md",
+             "docs/outreach/scope-ai-mcp.md", "docs/outreach/scope-backend-automation.md"]:
+    raw = len(pathlib.Path(path).read_text(encoding="utf-8").strip("\n"))
+    print(f"### {path} 全文 raw={raw} plain={len(strip_md(pathlib.Path(path).read_text(encoding='utf-8')))}")
+    for name, body in sections(path):
+        text = "\n".join(body).strip("\n")
+        print(f"    {name:<50} raw={len(text):>6} plain={len(strip_md(text)):>6}")
+EOF
+```
 
 | 字段 | 文件 | raw | plain | 门限 | 判定 |
 |---|---|---:|---:|---:|---|
 | **Project title** | `project-brief.md` | **53** | 53 | 60 | ✅ |
 | Role | `project-brief.md` | 438 | 438 | 5,000 | ✅ |
-| **Short description** | `project-brief.md` | 1,410 | 1,397 | 5,000 | ✅ |
+| **Short description** | `project-brief.md` | 1,410 | 1,404 | 5,000 | ✅ |
 | Skills | `project-brief.md` | 311 | 271 | 5,000 | ✅ |
-| Deliverables shown in the repository | `project-brief.md` | 1,455 | 1,405 | 5,000 | ✅ |
-| Third-party components (attribution) | `project-brief.md` | 458 | 439 | 5,000 | ✅ |
-| Honest limitations | `project-brief.md` | 443 | 433 | 5,000 | ✅ |
-| Links | `project-brief.md` | 707 | 478 | 5,000 | ✅ |
-| 全文（附件） | `scope-backend-automation.md` | 4,951 | 4,829 | 5,000 | ✅ |
+| Deliverables shown in the repository | `project-brief.md` | 1,455 | 1,437 | 5,000 | ✅ |
+| Third-party components (attribution) | `project-brief.md` | 458 | 452 | 5,000 | ✅ |
+| Honest limitations | `project-brief.md` | 426 | 428 | 5,000 | ✅ |
+| Links | `project-brief.md` | 601 | 390 | 5,000 | ✅ |
+| 全文（附件） | `scope-backend-automation.md` | 4,950 | 4,941 | 5,000 | ✅ |
 | §What I offer（粘贴段） | `scope-backend-automation.md` | 592 | 588 | 5,000 | ✅ |
-| 全文（附件） | `scope-ai-mcp.md` | **6,562** | **6,408** | 5,000 | ❌ 超 |
+| 全文（附件） | `scope-ai-mcp.md` | **6,561** | **6,530** | 5,000 | ❌ 超（见 §5.2） |
 | §What I offer（粘贴段） | `scope-ai-mcp.md` | 781 | 773 | 5,000 | ✅ |
-| Template 1 正文 | `cover-letter-templates.md` | 2,216 | 2,179 | 5,000 | ✅ |
-| Template 2 正文 | `cover-letter-templates.md` | 3,005 | 2,964 | 5,000 | ✅ |
+| Template 1 正文 | `cover-letter-templates.md` | 2,185 | 2,174 | 2,500 | ✅ |
+| Template 2 正文 | `cover-letter-templates.md` | **2,500** | 2,485 | 2,500 | ⚠ 压线（见 §5.3） |
+
+> 本轮重出整表：`Template 1` / `Template 2` / `scope-backend §What I offer`
+> 三行的旧值（2,216 / 3,005 / 621）在文件上**无法复算**，原因是旧表用的是
+> 另一套清洗口径且值已过期；现在表、口径、脚本三者同源，数字逐字可复算。
 
 ### 5.1 标题：唯一超出平台字段门限的字段，已改正
 
@@ -156,15 +214,20 @@ Markdown 语法（`**粗体**`、列表符号、`>` 引用）后的正文字符�
 
 ### 5.3 另按提案正文常规上限复核（需在真实表单上确认）
 
-Upwork 提案正文的常规上限是 2,500 字符，比任务给定的 5,000 更严：
+Upwork 提案正文的常规上限是 2,500 字符，比作品集简介的 5,000 更严。本轮已按
+这个更严的口径裁过 Template 2：
 
 | | raw | plain | 对 2,500 |
 |---|---:|---:|---|
-| Template 1 正文 | 2,216 | 2,179 | ✅ 未超 |
-| Template 2 正文 | 3,005 | 2,964 | ❌ 超约 460 |
+| Template 1 正文 | 2,185 | 2,174 | ✅ 未超（余 315） |
+| Template 2 正文 | 2,500 | 2,485 | ⚠ 正好压线（余 0） |
 
-两封信都含 `{{...}}` 占位符，实际发送前会删掉不适用的段落，所以真实长度会短于
-上表——但**两封信的模板正文都应按 2,500 再核一次**（§6 第 2 条）。
+Template 2 的正文原为 **3,152** 字符（超 652），本轮裁掉重复表述与三处交付物
+的冗长示例，保留了全部 10 个占位符与实质内容（受控工具、可核查引用、模型
+输出只是线索、成本与上限、范围边界、自建作品示例、三个提问），现为 2,500。
+
+**发送前仍须重算**：占位符替换后通常比示例长，而用法说明要求删去不适用
+的小节——两者方向相反，所以以**实际粘贴的那一版**为准，用 §5 的脚本复算。
 
 ---
 
@@ -221,7 +284,7 @@ Upwork 提案正文的常规上限是 2,500 字符，比任务给定的 5,000 �
 
 ## 8. 门禁结果
 
-在本 worktree（`E:\worktrees\upwork-check`，独立 venv）执行：
+在本轮校对的独立 worktree（独立 venv）执行：
 
 | 门禁 | 结果 |
 |---|---|

@@ -18,7 +18,10 @@
 Usage notes:
 
 - Replace every `{{...}}` placeholder before sending; delete the sections
-  that do not apply to the job post.
+  that do not apply to the job post. A replaced placeholder is usually longer
+  than the example it replaces, so measure the version you actually paste —
+  the counting method and the measured lengths are in
+  [publish-review.md](publish-review.md) §5.
 - Keep the first two paragraphs the same — they state the understanding of
   the job and the concrete plan, which is what a client reads first.
 - Attach the matching scope document and, where the platform allows, point to
@@ -30,7 +33,8 @@ Usage notes:
   [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip).
 - Field lengths are accounted for in
   [publish-review.md](publish-review.md): every letter and every scope
-  section is measured there against the platform's character limits.
+  section is measured there against the platform's character limits. That
+  file is an internal record — it is not part of what is sent to a client.
 
 ---
 
@@ -96,53 +100,45 @@ Hi {{client name}},
 You want an AI assistant to work with your {{data/tools}}, and the key risk
 is usually not the model — it is whether its answers can be trusted and
 audited. My approach is evidence-first: the assistant reads your real data
-through controlled tools, and every answer traces back to the records it
-came from.
+through controlled tools, and every answer traces back to its records.
 
 **What I would deliver:**
 
-- {{Deliverable 1, e.g. "An MCP server exposing your {{systems}} to AI
-  assistants with read-only permissions, bounded responses, and audited tool
-  calls"}}
-- {{Deliverable 2, e.g. "An agent workflow that plans tool use within an
-  agreed budget and reports verified findings, leads, and unknowns
-  separately"}}
-- {{Deliverable 3, e.g. "An evaluation pack: a set of questions with expected
-  evidence and recorded results, so you can re-check behavior after any
-  change"}}
+- {{Deliverable 1, e.g. "A read-only MCP server over your {{systems}}"}}
+- {{Deliverable 2, e.g. "An agent workflow that plans tool use within a
+  budget and reports findings, leads and unknowns separately"}}
+- {{Deliverable 3, e.g. "An evaluation pack: questions, expected evidence,
+  recorded results"}}
 
 **How you verify it:** the tool layer is covered by automated tests that need
 no model; the model-driven behavior is checked against the evaluation set we
-agree on, and both passes and failures are recorded and shown to you. Claims
-in the final output are graded — verified, lead, or insufficient — and model
-text is never recorded as a verified fact.
+agree on, and failures are recorded too. Output claims are graded — verified,
+lead, or insufficient — and model text is never a verified fact.
 
-**Costs and budget:** you own the model account and API keys; model usage is
-billed directly to you with no markup from me. Before any run we agree on the
-model, a per-run and total cost ceiling, and what happens when the ceiling is
-hit. I list every model call made during the engagement in the handover notes
-so you can audit it against your invoice.
+**Costs and budget:** you own the model account and API keys — usage is
+billed directly to you, no markup. Before any run we agree on the model and a
+cost ceiling per run and in total; every model call is listed in the handover
+notes, so you can audit it against your invoice.
 
-**Scope boundaries I hold to:** this is integration and evaluation engineering,
-not autonomous security testing or a promise that the AI "finds all issues".
-The agent works within your question set and your budget, and treats model
-output as a lead that a human confirms — not as a finding.
+**Scope boundaries I hold to:** integration and evaluation engineering, not
+autonomous security testing, and no promise that the AI "finds all issues".
+Model output is a lead a human confirms — not a finding.
 
 **Relevant example (my own open-source work):** DexAtlas — a read-only MCP
-server (eleven tools over stdio) exposing a completed Android APK analysis to AI
-assistants, plus a single-loop agent that answers questions with per-fact
-citations, separates verified evidence from leads, and treats instructions
-found inside analyzed data as data, not orders. The tool layer has no write
-path, no shell execution, and no model dependency.
+server (eleven tools over stdio) exposing a completed Android APK analysis to
+AI assistants, plus a single-loop agent that answers with per-fact citations,
+separates verified evidence from leads, and treats instructions inside
+analyzed data as data, not orders. No write path, no shell, no model
+dependency in the tool layer.
 
-A few questions to make sure the estimate is right:
+Three questions so the estimate is right:
 
-1. {{Question about data access, e.g. "How should the assistant access your
-   data — API, database, or files?"}}
-2. {{Question about the question set, e.g. "What are the 5–10 concrete
-   questions the assistant must answer reliably?"}}
-3. {{Question about model/provider constraints, e.g. "Which provider/model
-   and privacy rules apply? Does any data need to stay on-premise?"}}
+1. {{Question about data access, e.g. "Should the assistant reach your data
+   over API, database, or files?"}}
+2. {{Question about the question set, e.g. "Which 5–10 questions must it answer
+   reliably?"}}
+3. {{Question about model/provider constraints, e.g. "Which provider/model and
+   privacy rules apply? Does any data need to stay on-premise?"}}
 
 I can start with a short scoping pass (fixed fee) that produces the written
 scope, the evaluation set, and a budget plan before implementation begins.
