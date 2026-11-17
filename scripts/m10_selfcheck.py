@@ -15,7 +15,11 @@ installing a backend or running the whole suite:
 * the pack's own tables are complete (40 rows, 19 blocking, no duplicate),
 * the gates the pack names are runnable commands that exist on the path,
 * the contracts the pack points at (exit codes, MCP tools, report fields,
-  routes, the evidence package's ``not_included``) match the code.
+  routes, the evidence package's ``not_included``) match the code,
+* the three gaps a reader dry run found stay closed: the setup step has to
+  fetch the third-party samples, A6's degraded evidence has to be written
+  down at the time because the CLI cannot replay a past run, and the
+  evidence package's entry count is the one the material states.
 
 Every check is a *read* or a *comparison*; the script writes nothing and
 never edits the report or the badges. Its verdict is three-valued, like the
@@ -113,6 +117,23 @@ GATE_COMMANDS: tuple[tuple[str, str, list[str]], ...] = (
 #: The section markers of the verification entry points the pack names.
 CONTRACT_TEST = REPO_ROOT / "tests" / "test_public_contracts.py"
 VERIFY_CONTRACTS = REPO_ROOT / "scripts" / "verify-public-contracts.py"
+
+#: The three documents that tell a reader how to set a machine up. The reader
+#: package is the one-stop entry; the kit and the executive summary repeat
+#: the same facts, so a drift between them is a defect a reader meets while
+#: following one of them.
+READER_KIT_REL = Path("docs/reports/m10-reader-kit.md")
+EXEC_SUMMARY_REL = Path("docs/reports/m10-executive-summary.md")
+
+#: The sources the reader-dry-run checks read the tool's behaviour from.
+FIXTURE_SCRIPT_REL = Path("scripts/fetch-fixtures.sh")
+EVIDENCE_PACKAGE_REL = Path("src/dexatlas/reports/evidence_package.py")
+CLI_REL = Path("src/dexatlas/cli/main.py")
+STORAGE_REL = Path("src/dexatlas/core/storage.py")
+
+#: Where the third-party samples live once they are fetched. They are not
+#: committed, so a fresh clone has none of them.
+FIXTURE_DIR_REL = Path("fixtures") / "apk"
 
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
 BADGE_TESTS = re.compile(r"badge/tests-([\d.]*)%20passing")
@@ -687,13 +708,284 @@ def check_selftest_regressions(report: Report) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Group H — the three gaps the reader dry run found
+# ---------------------------------------------------------------------------
+#
+# ``docs/reports/reader-dry-run.md`` walked the M10 material on a clean
+# machine and found three things the material did not check:
+#
+# 1. the setup step did not have to fetch the third-party samples, so the
+#    integration cases silently skipped and the exit code was still 0;
+# 2. A6 asks the reader to capture a degraded run, but the CLI cannot render
+#    a past run and a new analysis replaces the project's latest one, so the
+#    evidence has to be written down *at the time*;
+# 3. the evidence package holds four entries while the CLI prints "3 files"
+#    (the count of the reports the manifest lists).
+#
+# A check that cannot see these is a check that lets the same gap back in.
+
+#: Chinese numerals the materials use for small counts.
+_SMALL_NUMBERS = {
+    "一": 1,
+    "两": 2,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+
+#: "27 个集成用例会 skip" — the count the material states before the word.
+_SKIP_COUNT_BEFORE = re.compile(r"(\d+)\s*个[^\n]{0,12}?skip")
+#: "skip 27 个" — the count the material states after the word.
+_SKIP_COUNT_AFTER = re.compile(r"skip(?:ped)?[^\d\n]{0,4}?(\d+)\s*个")
+#: "两个第三方集成样本" / "2 个 APK" — how many samples the material claims.
+_SAMPLE_COUNT = re.compile(
+    r"([两三四五六七八九十\d]+)\s*[个份]\s*(?:第三方集成样本|第三方样本|APK)"
+)
+#: A line that runs the fetch script. Mentioning the script is not the same
+#: as telling the reader to run it, and the gap this check exists for is the
+#: step that is not there.
+_FETCH_STEP = re.compile(r"(?m)^[>\s]*(?:bash|sh)\s+scripts/fetch-fixtures\.sh\s*$")
+#: The ways a document says "exit code 0 does not mean everything ran".
+_NEGATIONS = ("不说明", "不代表", "不等于", "不意味", "不能证明", "并非")
+#: The ways a document could promise that a past run can be looked at later.
+_REPLAY_PROMISES = ("事后可以再", "之后可以再查", "随时可以回看", "可以重新渲染", "稍后再看")
+#: Why the evidence has to be captured at the time.
+_ONSITE_REASONS = ("最新一次运行", "换成新的一次", "覆盖", "重跑")
+
+
+def _blocks(text: str) -> list[str]:
+    """The document's paragraphs, with the blockquote markers stripped.
+
+    A material states a fact in a paragraph, so a check that looks for a
+    fact has to look inside the paragraph it belongs to: the caveat about
+    the exit code means something only when it hangs off the step that
+    causes the skips.
+    """
+    blocks: list[str] = []
+    current: list[str] = []
+    for line in text.splitlines():
+        stripped = line.lstrip("> ").strip()
+        if not stripped:
+            if current:
+                blocks.append("\n".join(current))
+                current = []
+            continue
+        current.append(stripped)
+    if current:
+        blocks.append("\n".join(current))
+    return blocks
+
+
+def _as_count(token: str) -> int | None:
+    """A number the materials wrote, in digits or in Chinese numerals."""
+    if token.isdigit():
+        return int(token)
+    if len(token) == 1 and token in _SMALL_NUMBERS:
+        return _SMALL_NUMBERS[token]
+    return None
+
+
+def _stated_numbers(text: str, pattern: re.Pattern[str]) -> set[int]:
+    """Every distinct number ``pattern`` finds in ``text``."""
+    values: set[int] = set()
+    for token in pattern.findall(text):
+        value = _as_count(token)
+        if value is not None:
+            values.add(value)
+    return values
+
+
+def _stated_skip_counts(text: str) -> set[int]:
+    """How many cases the material says will skip without the samples."""
+    before = {int(m) for m in _SKIP_COUNT_BEFORE.findall(text)}
+    after = {int(m) for m in _SKIP_COUNT_AFTER.findall(text)}
+    return before | after
+
+
+def _fixture_names(script_text: str) -> list[str]:
+    """The APKs ``scripts/fetch-fixtures.sh`` fetches."""
+    if "FILES=(" not in script_text:
+        return []
+    block = script_text.split("FILES=(", 1)[-1].split(")", 1)[0]
+    return re.findall(r'"([^"]+\.apk)"', block)
+
+
+def check_fixture_precondition(report: Report, root: Path = REPO_ROOT) -> None:
+    """装环境那一步必须抓第三方样本：不抓的后果写在材料里，且各材料一致。
+
+    The reader dry run installed the tool, never fetched the samples, and
+    the suite skipped 27 integration cases with exit code 0. A step whose
+    failure is silent cannot be left to the reader's judgement, so the
+    material has to say the step exists, how many samples it is, what
+    happens when it is skipped, and that exit code 0 does not mean every
+    case ran.
+    """
+    script_text = (root / FIXTURE_SCRIPT_REL).read_text(encoding="utf-8")
+    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
+    kit_text = (root / READER_KIT_REL).read_text(encoding="utf-8")
+    summary_text = (root / EXEC_SUMMARY_REL).read_text(encoding="utf-8")
+
+    names = _fixture_names(script_text)
+    expected = len(names)
+
+    step_present = bool(_FETCH_STEP.search(reader_text))
+    counts = {
+        "读者包": _stated_numbers(reader_text, _SAMPLE_COUNT),
+        "工具包": _stated_numbers(kit_text, _SAMPLE_COUNT),
+        "摘要": _stated_numbers(summary_text, _SAMPLE_COUNT),
+    }
+    counts_ok = expected > 0 and all(value <= {expected} for value in counts.values())
+    counts_ok = counts_ok and expected in counts["读者包"]
+
+    skips = {
+        "读者包": _stated_skip_counts(reader_text),
+        "工具包": _stated_skip_counts(kit_text),
+        "摘要": _stated_skip_counts(summary_text),
+    }
+    reader_skips = skips["读者包"]
+    skips_ok = bool(reader_skips) and all(value == reader_skips for value in skips.values())
+
+    caveat_ok = any(
+        "退出码 0" in block
+        and any(word in block for word in _NEGATIONS)
+        and _stated_skip_counts(block)
+        for block in _blocks(reader_text)
+    )
+
+    fixture_dir = root / FIXTURE_DIR_REL
+    local = sorted(p.name for p in fixture_dir.glob("*.apk")) if fixture_dir.is_dir() else []
+
+    report.add(
+        outcome_of(
+            "FIXTURE.precondition",
+            "装环境必抓第三方样本：不抓的 skip 后果与「退出码 0」的告诫写在材料里",
+            step_present and counts_ok and skips_ok and caveat_ok,
+            f"本机样本 {len(local)}/{expected}"
+            + ("（未抓取，集成用例会 skip）" if len(local) < expected else "")
+            + f"；脚本声明 {expected} 个（{', '.join(names) or '未读到'}）"
+            + f"；材料所述样本数 {counts}"
+            + f"；所述 skip 数 {skips}"
+            + f"；退出码 0 的告诫={caveat_ok}",
+        )
+    )
+
+
+def check_a6_onsite_record(report: Report, root: Path = REPO_ROOT) -> None:
+    """A6 的降级证据必须当场记下：材料的要求要与工具的实际能力一致。
+
+    The CLI has no command that renders one particular run, and a new
+    analysis replaces the project's published one, so the degraded run's
+    output is gone the moment the reader analyses again. The material has
+    to say so and ask for the evidence to be written down at the time; if
+    the tool ever gains the ability to replay a run, the material's claim
+    that it cannot has to change with it.
+    """
+    cli_text = (root / CLI_REL).read_text(encoding="utf-8")
+    storage_text = (root / STORAGE_REL).read_text(encoding="utf-8")
+    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
+    blocks = _blocks(reader_text)
+
+    cli_can_select_run = "run_id" in cli_text or "run-id" in cli_text
+    publish_replaces = "UPDATE projects SET published_run_id" in storage_text
+
+    claims_no_replay = any("渲染" in block and "没有" in block for block in blocks)
+    onsite = [block for block in blocks if "当场" in block]
+    says_onsite = bool(onsite)
+    reason_ok = any(any(marker in block for marker in _ONSITE_REASONS) for block in onsite)
+    promises_replay = any(marker in reader_text for marker in _REPLAY_PROMISES)
+
+    if cli_can_select_run:
+        ok = not claims_no_replay
+    else:
+        ok = claims_no_replay and says_onsite and reason_ok and not promises_replay
+
+    report.add(
+        outcome_of(
+            "A6.on-the-spot",
+            "A6 降级证据要当场记下：材料的要求与 CLI 能否回看历史运行一致",
+            ok,
+            f"CLI 能按 run 选运行={cli_can_select_run}；新分析替换已发布运行={publish_replaces}"
+            f"；材料说工具不能回看={claims_no_replay}；要求当场记录={says_onsite}"
+            f"；说明了原因={reason_ok}；承诺事后可查={promises_replay}",
+        )
+    )
+
+
+def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
+    """证据包里的条目数：材料说的数目要等于包里实际有的条目。
+
+    The archive holds the reports the manifest lists plus the manifest
+    itself, so the CLI's "N files" is the manifest's count, not the
+    archive's. The material has to say how many entries the archive has
+    and what the CLI's number counts, or the reader opens the zip, counts
+    one more file than the material promised, and files it as a defect.
+    """
+    package_src = (root / EVIDENCE_PACKAGE_REL).read_text(encoding="utf-8")
+    cli_src = (root / CLI_REL).read_text(encoding="utf-8")
+    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
+
+    roles = []
+    if "_REPORT_PATHS = {" in package_src:
+        role_block = package_src.split("_REPORT_PATHS = {", 1)[-1].split("}", 1)[0]
+        roles = re.findall(r'"(\w+)":\s*"([^"]+)"', role_block)
+
+    files_block = ""
+    if "files: dict[str, bytes] = {}" in package_src:
+        files_block = package_src.split("files: dict[str, bytes] = {}", 1)[-1].split(
+            "manifest: dict[str, Any] = {", 1
+        )[0]
+    manifest_written = 'archive.writestr("manifest.json"' in package_src
+    manifest_not_listed = "manifest.json" not in files_block
+    # The printed number has to be the manifest's count itself: a print that
+    # adds the manifest to it would make the material's number wrong.
+    cli_prints_files_count = re.search(r"len\(manifest\['files'\]\)\}\s*files", cli_src) is not None
+
+    entries = _stated_numbers(reader_text, re.compile(r"(\d+)\s*个条目"))
+    reports = _stated_numbers(reader_text, re.compile(r"(\d+)\s*份报告"))
+    cli_files = _stated_numbers(reader_text, re.compile(r"「(\d+)\s*files」"))
+
+    counts_ok = (
+        bool(roles)
+        and len(entries) == 1
+        and len(reports) == 1
+        and len(cli_files) == 1
+        and entries == {next(iter(reports)) + 1}
+        and reports == {len(roles)}
+        and cli_files == reports
+    )
+
+    report.add(
+        outcome_of(
+            "PACKAGE.entry-count",
+            "证据包条目数：材料说的数目 = 报告数 + manifest，CLI 的数字指清单里的报告数",
+            counts_ok and manifest_written and manifest_not_listed and cli_prints_files_count,
+            f"代码：报告角色 {len(roles)} 个，manifest 写入归档={manifest_written}"
+            f"，不进清单={manifest_not_listed}，CLI 打印清单计数={cli_prints_files_count}"
+            f"；材料：条目数 {entries}，报告数 {reports}，CLI 打印 {cli_files}",
+        )
+    )
+
+
+# ---------------------------------------------------------------------------
 # The checks only a reader on a real machine can decide
 # ---------------------------------------------------------------------------
 
 
 MANUAL_CHECKS: tuple[tuple[str, str, str, bool], ...] = (
     ("A1", "取得固定副本并记录 commit", "需要读者 clone 并 checkout 指定 commit", False),
-    ("A2", "依赖安装退出码 0（★）", "需要真实机器安装", True),
+    (
+        "A2",
+        "依赖安装退出码 0（★）",
+        "需要真实机器安装；装环境那一步还要抓第三方样本——不抓则集成用例会 skip，"
+        "而退出码 0 不说明该跑的都跑了，跑完整套件时每一条 skip 都要能说出是哪一类",
+        True,
+    ),
     ("A3", "backends 输出与实际安装一致", "依赖机器上的后端", False),
     ("A4", "首次分析计数（★）", "需要运行分析，脚本只验证入口存在", True),
     ("A5", "三格式报告同源", "需要运行分析", False),
@@ -764,6 +1056,9 @@ CHECKS: tuple[Callable[[Report], None], ...] = (
     check_gate_commands,
     check_scripts_runnable,
     check_selftest_regressions,
+    check_fixture_precondition,
+    check_a6_onsite_record,
+    check_package_entry_count,
     check_manual_items,
 )
 
