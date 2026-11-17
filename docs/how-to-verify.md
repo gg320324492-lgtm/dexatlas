@@ -28,9 +28,9 @@
 
 | # | 说法类别 | 落在哪里 | 怎么核 |
 |---|---|---|---|
-| 1 | **测试数与覆盖率** | [`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 1.2 / 1.3 / 6 节，数字夹在 `<!--fig:…-->` 标记之间 | 跑 `scripts/refresh-report-figures.py` 重测（见 §2.7）；或跑 `tests/test_docs.py`，它拿报告里记录的那次测量的源码指纹和当前树比对 |
-| 2 | **公共契约**（CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema、版本政策） | [`docs/architecture/public-contracts.md`](architecture/public-contracts.md)，验证记录在同文件 §7 | 跑 `scripts/verify-public-contracts.py`（见 §2.5）；契约快照在 `tests/test_public_contracts.py` |
-| 3 | **M6 层级 2 的得分** | [`docs/benchmarks/m6-level2-real.md`](benchmarks/m6-level2-real.md)、[`docs/benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 及窄验证各轮 | 跑对应的 `scripts/m6_level2_*_report.py` 从已提交的 trace 重算（见 §2.6）；缺 trace 时脚本拒绝出报告 |
+| 1 | **测试数与覆盖率** | [`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 1.2 / 1.3 / 6 节，数字夹在 `<!--fig:…-->` 标记之间 | 跑 `scripts/refresh-report-figures.py` 重测（见 §2.8）；或跑 `tests/test_docs.py`，它拿报告里记录的那次测量的源码指纹和当前树比对 |
+| 2 | **公共契约**（CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema、版本政策） | [`docs/architecture/public-contracts.md`](architecture/public-contracts.md)，验证记录在同文件 §7 | 跑 `scripts/verify-public-contracts.py`（见 §2.6）；契约快照在 `tests/test_public_contracts.py` |
+| 3 | **M6 层级 2 的得分** | [`docs/benchmarks/m6-level2-real.md`](benchmarks/m6-level2-real.md)、[`docs/benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 及窄验证各轮 | 跑对应的 `scripts/m6_level2_*_report.py` 从已提交的 trace 重算（见 §2.7）；缺 trace 时脚本不出报告 |
 | 4 | **退出码语义** | [`docs/architecture/public-contracts.md`](architecture/public-contracts.md) §1.2 | 同第 2 条：契约活检脚本会真的触发每一个退出码 |
 | 5 | **证据链与出处模型**（每条结论由哪个工具、哪个版本、从哪个字节位置读出来） | [`docs/analysis-provenance.md`](analysis-provenance.md) | 该文件 §4「读者如何自己验证一条结论」、§7「复现本文档的全部数字」给了逐步命令；§8 是一页速查表 |
 
@@ -165,7 +165,7 @@ facts:
   package version: 1.0.0
   changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.0
-documents read: 109
+documents read: 110
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
@@ -176,8 +176,9 @@ findings: 2 (2 already in 8f9ddcaf)
 Every version claim matches the repository.
 ```
 
-**退出码 0。** 它把仓库里**每一份 Markdown**（109 份）里出现的版本号、发布日期、
-覆盖率和 tag 跟 git 事实（tag 列表、`pyproject.toml` 的版本、CHANGELOG）逐条比对。
+**退出码 0。** 它把仓库里**每一份 Markdown**（`documents read` 那行给出份数；仓库每
+增删一份文档，这个数就变）里出现的版本号、发布日期、覆盖率和 tag 跟 git 事实
+（tag 列表、`pyproject.toml` 的版本、CHANGELOG）逐条比对。
 
 `findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 8f9ddcaf`）：
 两份文档在描述**已发布的历史版本**时引用了当时的覆盖率，而门禁用当前树的覆盖率
@@ -201,14 +202,9 @@ export DEXATLAS_JADX_PATH="<jadx 启动器的路径>"
 export DEXATLAS_APKTOOL_JAR="<apktool.jar 的路径>"
 ```
 
-（这台机器上把两样放在项目内的 `.scratch/backends/` 下，通常这样引：
-
-```bash
-source .scratch/env.sh
-```
-
-——那份脚本会把后端路径和临时目录都指到项目内。`.scratch/` 被 `.gitignore` 忽略，
-不会进仓库。）
+本项目的开发机上把两样装在项目内的 `.scratch/backends/` 下，用一份
+`.scratch/env.sh` 一次引好（它还把临时目录也指到项目内）。**但 `.scratch/` 被
+`.gitignore` 忽略、不随仓库分发**，所以访客要自己写上面那两行 export。
 
 **正常会看到什么：**（下面是三后端齐备时的实测输出，节选；完整 48 行见脚本输出）
 
@@ -321,7 +317,7 @@ uv run --no-sync python scripts/refresh-report-figures.py            # 测量并
 uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较、不写入
 ```
 
-**正常会看到什么：** 脚本跑一遍完整套件（几分钟），把结果写回
+**正常会看到什么：** 脚本跑一遍完整套件，把结果写回
 [`docs/reports/phase1-execution-report.md`](reports/phase1-execution-report.md) 里
 `<!--fig:…-->` 标记之间的数字，以及两份 README 顶部的徽章。
 `--check` 走同一套测量，只比较、不写入，有出入就以非零码退出。
@@ -405,11 +401,11 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 ## 5. 一条最短的复核路径
 
-如果你只有十分钟，按这个顺序：
+如果你只想走一遍最短路径，按这个顺序：
 
 1. 读 [`docs/status.md`](status.md) §1 快照和 §4「还剩什么」——**先看边界，再看成绩**。
-2. 跑 §2.4 的行号引用门禁和 §2.5 的版本声明门禁（各约一分钟，两条只读）。
-3. 跑 §2.6 的契约活检（三后端齐备时约一两分钟），看它是不是 48/48。
+2. 跑 §2.4 的行号引用门禁和 §2.5 的版本声明门禁（两条都是只读的）。
+3. 跑 §2.6 的契约活检（三后端齐备时），看它是不是 48/48。
 4. 跑 §2.7 的 `m6_level2_retest4_report.py`，确认那份报告**逐字节可复现**。
 5. 读 [`docs/architecture/public-contracts.md`](architecture/public-contracts.md) §7
    （验证记录）和 §8（已知限制）——**§8 是这个项目自己承认的破口**。
