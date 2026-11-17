@@ -2,7 +2,7 @@
 
 # DexAtlas
 
-**From APK to Evidence — Powered by AI Agents.**
+**From APK to Evidence — Powered by a bounded AI agent.**
 
 An open-source, evidence-first Android reverse engineering and mobile application analysis platform.
 
@@ -16,7 +16,8 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 
 </div>
 
-DexAtlas turns an APK into a complete, verifiable picture: the manifest and permissions,
+DexAtlas turns an APK into a picture you can verify — as complete as the installed
+backends allow, and the report names what is missing: the manifest and permissions,
 a full class/method/field symbol index, decompiled Java source, call-site and call-graph
 cross-references, and an evidence trail that records — for every fact — which tool read
 it, at which version, from which byte position. One modular, reproducible workflow for
@@ -29,9 +30,17 @@ that fails is reported as a value, not a crash: an APK that defeats the decompil
 still yields a manifest, an index and a report that says which steps did not run.
 
 > [!IMPORTANT]
+> **Milestone numbers.** `M3`–`M10` are this project's milestone numbers, in order.
+> `M5`–`M10` are Phase 3's: they are listed in the
+> [Phase 3 plan](docs/roadmap/phase3-plan.md), and their status is in the
+> [Roadmap status](#roadmap-status) table at the end of this page. `M3` (the
+> benchmark comparison) and `M4` (the web workbench) shipped in `v0.2.0`; their
+> records are the [comparison report](docs/benchmarks/comparison.md) and the
+> [M4 end-to-end run record](docs/reports/m4-e2e-run.md).
+>
 > **Status: early development — v1.0.0 released (tag 2026-11-17); Phase 3's
-> deliverables are released, but its exit criteria are not all met (M6 is not
-> closed and M10 has not started).** The CLI,
+> deliverables are released, but its exit criteria are not all met (M6, M8 and M10
+> are still open).** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in
 > every version since. The MCP server, the evidence-first agent and the web
 > workbench's M4 screens — the project dashboard, upload and analysis progress,
@@ -379,7 +388,9 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 ### Architecture — how it fits together and why
 
 - **[Architecture overview](docs/architecture/README.md)** — the pipeline, the storage
-  model and the design decisions
+  model and the design decisions, and the
+  [glossary](docs/architecture/README.md#glossary) of the terms this project uses
+  (agent service promise, frozen discipline, B1, the seven scoring rules)
 - **[The web workbench](docs/architecture/workbench.md)** — the read-only browser UI:
   the screens that exist, how to start it, and the choices behind them
 - **[The MCP server](docs/architecture/mcp-server.md)** — the read-only tools, and
@@ -402,8 +413,8 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Large-APK benchmark](docs/benchmarks/large-apk.md)** — what the analysis does to a
   200,000-method APK, what it refuses to claim, and what it never measured
 - **[Service regression set](docs/benchmarks/service-regression-set.md)** — the 20
-  frozen questions the agent service promise is measured against, and the judging
-  rules
+  frozen questions the [agent service promise](docs/architecture/README.md#glossary) is
+  measured against, and the judging rules (Chinese; 服务回归集)
 - **[M6 level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md)** — the
   end-to-end question/trace/scoring pass over the frozen set with the scripted
   stand-in provider; not a model-capability baseline
@@ -415,13 +426,14 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   did not run. The configurations differ in budget and visible information, so
   these numbers compare execution conditions, not model quality. What it means:
   the agent's current default configuration does not meet the acceptance line on
-  this set, and the service-promise scope is to be re-decided after failure-mode
-  analysis
+  this set, and the agent service promise's scope is to be re-decided after
+  failure-mode analysis
 - **[M6 level-2 retest after fixes](docs/benchmarks/m6-level2-retest2.md)** — the
   five root-cause fixes re-run against the frozen 20 questions with a real model,
   full denominator: DexAtlas 16/20 (80.0%) meets the ≥80% per-round line once;
   A 7/20, B 7/20; traces 355,623 tokens. One round at the line is not the
-  three-round ≥90% acceptance bar, so the service-promise scope is still open
+  three-round ≥90% acceptance bar, so the agent service promise's scope is still
+  open
 - **[M6 level-2 full three-round retest](docs/benchmarks/m6-level2-retest4.md)** —
   the acceptance measurement after the execution-layer fixes: all three rounds
   complete on the 20-question denominator, DexAtlas 49/60 = 81.7% (rounds
@@ -457,13 +469,17 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Handover](docs/HANDOVER.md)** — where the project stands, how to get it running on a
   new machine, and what to do next
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
-- **[Current status](docs/status.md)** — where the project stands and what is left
-  (Chinese; 当前状态)
+- **[Current status](docs/status.md)** — the project's own status page: where each
+  milestone stands and what is left; §4.0 carries the M6 level-2 verdict, and the
+  milestone stays open (Chinese; 当前状态)
+- **[Service commitments](docs/service-commitments.md)** — what the agent service
+  promise covers and what it explicitly does not (Chinese; 服务承诺范围)
 - **[How to verify every claim](docs/how-to-verify.md)** — the commands to re-check this
   project's own numbers yourself, what you should see, and which claims are not met
   (Chinese; 怎么自己复核这个项目说的每句话)
-- **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
-  which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
+- **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend
+  produced which conclusion, and how to check it yourself; worth reading before
+  trusting a figure a decompiler produced (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
 - **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review,
   against the code that exists
@@ -479,9 +495,13 @@ re-verified against the tree it was found on.
 
 - **[Phase 1 acceptance](docs/releases/phase1-acceptance-2026-10-21.md)** — what was accepted, and what it does not say
 
-- **[Review report](docs/reports/phase1-review-report.md)** — what was found, what was fixed, and what is deferred (Chinese; 评审报告)
-- **[Maturity assessment](docs/reports/phase1-maturity-assessment.md)** — six weighted dimensions, scored from what could be run (Chinese; 成熟度评估)
-- **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings, each with two options and a recommendation (Chinese; Phase 2 任务清单)
+- **[Review report](docs/reports/phase1-review-report.md)** — the Phase 1 source
+  review: what was found, what was fixed, and what is deferred (Chinese; 评审报告)
+- **[Maturity assessment](docs/reports/phase1-maturity-assessment.md)** — six weighted
+  dimensions, scored from what could be run; the score is a pre-fix baseline, and the
+  tree has not been re-scored since (Chinese; 成熟度评估)
+- **[Phase 2 issue list](docs/reports/phase2-issue-list.md)** — the deferred findings,
+  each with two options and a recommendation (Chinese; Phase 2 任务清单)
 
 ## Authorship and third-party engines
 
@@ -548,6 +568,6 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | M10 | independent acceptance, re-scoring, release candidate | **preparation ready; acceptance not run** — the [preparation pack](docs/reports/m10-acceptance-pack.md) exists; independent reproduction and re-scoring have not started |
 
 This plan originally made `v1.0.0` conditional on all its exit criteria passing; `v1.0.0`
-was released on 2026-11-17 under the state-of-record disclosure scope, and the M6 and
-M10 acceptance criteria are still open (see [`docs/status.md`](docs/status.md)) —
+was released on 2026-11-17 under the state-of-record disclosure scope, and the M6, M8
+and M10 acceptance criteria are still open (see [`docs/status.md`](docs/status.md)) —
 phases advance on evidence, not on a calendar.

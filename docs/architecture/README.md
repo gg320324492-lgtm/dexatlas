@@ -187,6 +187,36 @@ locator names the failure rather than a place, which is what a failure is.
 
 See [Evidence invariants](evidence-invariants.md) for the rules in full.
 
+## Glossary
+
+Four phrases this project's own documents use for its rules. Each is defined here in
+English, and each links to the document that owns the full text — three of those are
+written in Chinese, and this is the English pointer to them.
+
+- **The agent service promise.** What DexAtlas commits to answering when an APK is
+  handed to the agent: permissions and components, a named method or overload, callers
+  and cross-references, string constants, resource provenance, multidex counts, and an
+  explicit "no evidence here" answer when the question's subject is absent from the
+  sample. It is a promise about a **bounded** question set, and it excludes runtime
+  analysis, vulnerability discovery, malware verdicts and any general
+  anti-obfuscation claim. Full text (Chinese):
+  [Service commitments](../service-commitments.md).
+- **The frozen discipline.** The rule the acceptance plan runs on. The 20-question
+  service regression set is frozen before any agent tuning, and a missed acceptance
+  line may not be met by deleting the questions that failed: the system is fixed, or
+  the service promise is narrowed and restated. A question is never deleted to move a
+  rate. Full text (Chinese):
+  [Service regression set, §5](../benchmarks/service-regression-set.md).
+- **B1 — the level-2 acceptance line.** The bar the frozen set is measured against:
+  ≥16/20 (≥80%) in every round, and ≥54/60 (≥90%) over the three rounds together. A
+  three-round total below 54/60 does not meet B1 even if two of the three rounds clear
+  the per-round line. Full text (Chinese): [Current status](../status.md).
+- **The seven scoring rules.** The checks the answer scorer applies and will not
+  relax; the project calls them the scoring red lines. They are implemented in
+  `benchmarks/model.py::check`, and the frozen set's fifth rule says the code, not the
+  prose, decides what a correct answer is. Full text (Chinese):
+  [Service regression set, §5](../benchmarks/service-regression-set.md).
+
 ## Security posture
 
 Treated input and untrusted tools, concretely:
