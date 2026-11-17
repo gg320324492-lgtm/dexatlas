@@ -26,18 +26,21 @@ Usage notes:
 - Keep the first two paragraphs the same — they state the understanding of
   the job and the concrete plan, which is what a client reads first.
 - Attach the matching scope document and, where the platform allows, point to
-  the repository's case studies as reproducible work samples. The three
+  the repository's case studies as reproducible work samples. The four
   evidence packages are committed in the repository and can be attached as
   they are:
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
-  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip).
+  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip),
+  [multidex-evidence-package.zip](../case-studies/attachments/multidex-evidence-package.zip).
   **How to read them:** the three walkthroughs cover **three first-party
-  samples** (demo, obfuscated, and a multi-DEX appendix), while the three
-  evidence packages hold **only two analyses** — the demo and api-integration
-  packages are the same analysis run, so their `report.md` and `report.html`
-  are byte-identical and only `report.json` and `manifest.json` differ. Do not
-  present them as three independent analyses or three client cases.
+  samples** (demo, obfuscated, and a multi-DEX appendix), and each evidence
+  package is a **separate analysis** — four packages, four runs, and every
+  manifest records the run id it was made from. Two of them analyse the same
+  `demo-app` APK (the demo package and the api-integration package), so their
+  reports agree on every count and differ only in the run id and the timing.
+  Do not present them as client cases: this is my own open-source work on
+  first-party samples.
 - Field lengths are accounted for in
   [publish-review.md](publish-review.md): every letter and every scope
   section is measured there against the platform's character limits. That

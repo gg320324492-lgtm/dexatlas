@@ -4,7 +4,7 @@
 **APK:** `obfuscated.apk`  
 **SHA-256:** `2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540`  
 **Status:** completed  
-**Run:** `run_8d6735d410174df6` (completed, complete)  
+**Run:** `run_dd897202eba74e28` (completed, complete)  
 **Tool versions:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 
 ---
@@ -26,7 +26,7 @@
 | Evidence records | 8 |
 | DEX files | 1 |
 | Native libraries | 0 |
-| Analysis time | 6.0s |
+| Analysis time | 5.0s |
 
 ## Evidence levels
 

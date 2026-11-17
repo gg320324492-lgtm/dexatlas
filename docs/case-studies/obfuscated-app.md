@@ -4,8 +4,9 @@
 (sha256 `2f8d476fb9e71ac4490059c1d9849f22732254cc7e538a7eebe86aca6c299540`);
 appendix on [`examples/multidex-app/multidex.apk`](../../examples/multidex-app/multidex.apk)
 (sha256 `a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55`)
-**Runs:** 5.1 s and 4.8 s in the sessions quoted below; the attached report is
-a later run of `obfuscated.apk` (`run_8d6735d410174df6`, 6.0 s)
+**Runs:** 5.1 s and 4.8 s in the sessions quoted below; the attached reports
+are later runs of `obfuscated.apk` (`run_dd897202eba74e28`, 5.0 s) and of
+`multidex.apk` (`run_4fde2fa0b5254ccb`, 4.7 s)
 **Backends:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 **Who this is for:** a security researcher or analyst whose targets are
 obfuscated or multi-DEX, who wants to know what an evidence-first index still
@@ -253,17 +254,21 @@ sample): [Markdown report](attachments/obfuscated-report.md),
 [JSON report](attachments/obfuscated-report.json),
 [offline HTML report](attachments/obfuscated-report.html),
 [evidence package](attachments/obfuscated-evidence-package.zip). The report
-is run `run_8d6735d410174df6` — a different run from the session quoted in
-§3, of the same APK, so the counts match and the timings do not. When
-checking hashes: the package's manifest records the `report.json` **inside
-the package** (`d4ad1405…`), which differs from the loose `report.json`
-above (`31124280…`) by two timestamp fields — `generated_at` and
-`project.created_at` — and by nothing else.
+is run `run_dd897202eba74e28` (5.0 s) — a different run from the session
+quoted in §3, of the same APK, so the counts match and the timings do not.
+The loose report files are the package's own `reports/` entries, copied out
+of it: the packaged `report.json` and the loose `report.json` are
+byte-for-byte identical (sha256
+`0d5d2fa00b4ba379c0e0011bf4d1899187453534315b8e5f069ea6c9e06ef0f6`), so the
+hash the manifest records is the hash of the loose file too.
 
-**The multi-DEX appendix below has no attachment.** Its run
-(`apk_a488e43e38c2b8e9`) is quoted in full in the appendix, but there is no
-`multidex-report.*` and no `multidex-evidence-package.zip` here — reproduce
-it with the commands in the appendix if you want to check it.
+**The multi-DEX appendix below has its own attachments**:
+[Markdown report](attachments/multidex-report.md),
+[JSON report](attachments/multidex-report.json),
+[offline HTML report](attachments/multidex-report.html),
+[evidence package](attachments/multidex-evidence-package.zip) — run
+`run_4fde2fa0b5254ccb` (4.7 s), a later run of `multidex.apk` than the one
+the appendix quotes. The counts agree; the run id and the timing do not.
 
 ## Appendix — one class, two DEX files
 
@@ -306,3 +311,13 @@ analyst needs to reason about what a class-loader would actually resolve.
 
 The summary for this run: 4 classes, 11 methods, 13 call sites, 10 call edges,
 evidence records E-0001…E-0009, jadx 7 of 11 methods decompiled, 4.8 s.
+
+**Attachments for this appendix**: [Markdown
+report](attachments/multidex-report.md), [JSON
+report](attachments/multidex-report.json), [offline HTML
+report](attachments/multidex-report.html) and [evidence
+package](attachments/multidex-evidence-package.zip), from run
+`run_4fde2fa0b5254ccb` (4.7 s) — the same sample and the same counts, a later
+run. The package's manifest records that run id and hashes every file it
+carries; the two DEX files it was read from are named in the report's
+`DEX files` row and in every call site's `dex_name`.

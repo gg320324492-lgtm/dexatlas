@@ -241,6 +241,11 @@ customers?`），命中全部落在合法语境：
 终审 §7 第 12 项已点到「两个证据包的 `report.md` 字节相同、APK 相同」，但
 `docs/outreach/publish-review.md` §7 没有承接。
 
+> **这段已被后续改动推翻（2026-11-18）**：附件集换过一轮，仓库里现在是**四个证据包、
+> 四次分析**，`run_id` 两两不同；demo 与 api-integration 仍是**同一份 APK 的两次分析**，
+> 报告只差 `run_id` 与 `Analysis time` 两行，不再是「字节完全相同」。对外文案已同步，
+> 逐条实测见 [case-studies-third-package.md](case-studies-third-package.md)。
+
 ---
 
 ## 5. 旧结论脱节清单

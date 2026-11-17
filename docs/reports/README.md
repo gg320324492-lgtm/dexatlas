@@ -83,7 +83,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [portfolio-readiness-2026-11-18.md](portfolio-readiness-2026-11-18.md) | 同一套评分表的**第二轮复评**（基准为 2026-11-18 的树）：GitHub 85.0%、Upwork 81.9%，两处仍差半档（首次试用、客户交付件），独立使用验证仍缺。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-18 对外材料是什么成色」时看它。 |
 | [next-engagements.md](next-engagements.md) | 下一轮**可接什么活**的纪要（只读调研）：两个服务方向、为什么建议先接 1–2 个便宜试点、以及发布前 12 步清单（第 1 步是发出 M10 邀请函）。**不含任何报价或费率**——仓库里没有价格依据。 | 要决定「下一轮接什么活、什么时候对外发布」时看它。 |
 | [v1.1.0-candidates.md](v1.1.0-candidates.md) | 下一轮（v1.1.0）的**需求候选清单**：12 项候选，每项写明解决的缺口、可交付物、做完判据、依赖与估时（估时按仓库实测口径，不是拍脑袋）。**调研产出，不是已排期的计划。** | 要看「下一轮可以做什么、每项做完算不算完」时看它。 |
-| [case-studies-run-correspondence.md](case-studies-run-correspondence.md) | 案例证据包与「三次分析」的**实测对应关系**（基准 `d43369b`，sha256 逐个实测）：三个案例包实际只覆盖**两次**分析——`demo` 与 `api-integration` 同出 `run_e112e717…`，两者 `report.md`/`report.html` 逐字节相同；`obfuscated` 出自另一次 `run_8d6735d…`。还查出**走查正文引用的会话与附件承载的运行不是同一次**（耗时与 run id 对不上），以及包内 `report.json` 与散装 `report.json` 差两个时间戳字段。含「第三个包补不补」的结论、方案与代价。 | 要对外说清「几个案例、几次分析、几份证据」，或要把第 3 篇换成它自己那次分析的包时看它。 |
+| [case-studies-run-correspondence.md](case-studies-run-correspondence.md) | 案例证据包与「三次分析」的**实测对应关系**（基准 `d43369b`，sha256 逐个实测）：三个案例包实际只覆盖**两次**分析——`demo` 与 `api-integration` 同出 `run_e112e717…`，两者 `report.md`/`report.html` 逐字节相同；`obfuscated` 出自另一次 `run_8d6735d…`。还查出**走查正文引用的会话与附件承载的运行不是同一次**（耗时与 run id 对不上），以及包内 `report.json` 与散装 `report.json` 差两个时间戳字段。含「第三个包补不补」的结论、方案与代价。**这段结论已被后续补包推翻——见 [case-studies-third-package.md](case-studies-third-package.md)。** | 要对外说清「几个案例、几次分析、几份证据」，或要把第 3 篇换成它自己那次分析的包时看它。 |
 
 ## 4. M10 独立验收材料
 
@@ -155,9 +155,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [glossary-pass.md](glossary-pass.md) | 术语对照表这一轮的做法记录：那张表怎么来的、覆盖了哪些文档、补了哪些就地定义、哪些词**故意**不给定义。 | 想知道 [`docs/glossary.md`](../glossary.md) 为什么是现在这个样子、或要往里加词时看它。 |
 | [outreach-first-read.md](outreach-first-read.md) | 对外素材的**首读终审**（只读）：四份给客户看的草稿（**尚未发布**）换过数字之后，一个真客户第一次读会不会理解错。结论：**11 条**（3 高 / 5 中 / 3 低），其中包括素材列了三个**不存在的 CLI 命令**、覆盖率丢了「一方代码」这个限定词。 | 要判断素材能不能直接发给客户时看它。 |
 | [readme-image-consistency.md](readme-image-consistency.md) | README 首屏与 social preview 图的**一致性核对**（只读）：图、两个徽章、首屏文字与它们各自的出处对不对得上，一个新读者十秒内会不会误读。结论：**14 条**（3 严重 / 6 中 / 5 低）。 | 要判断首屏会不会把人带偏时看它。 |
-| [case-studies-third-package.md](case-studies-third-package.md) | 第三个案例证据包的**交接报告**：为第三个案例跑出的**新 run**（`run_fc8e432d4d094350`，走 REST API），四个包的自带校验都过，产物全在 `.scratch/case3/final/`；附**入库清单**与 9 处要跟着改的说法。 | 要把第三个包放进仓库时看它。 |
-
-## 7. 历史记录：不要当现状读
+| [case-studies-third-package.md](case-studies-third-package.md) | 第三个案例证据包的**交接报告**：为第三个案例跑出的**新 run**（`run_fc8e432d4d094350`，走 REST API），四个包的自带校验都过；附**入库清单**与 9 处要跟着改的说法。**2026-11-18 起这些包已全部入库**（四个证据包、四次分析），对外文案已按本清单改完。 | 要把第三个包放进仓库时看它。 |## 7. 历史记录：不要当现状读
 
 下面这些文件**记录的是当时的状态**。直接读它们会得到过期的结论。
 

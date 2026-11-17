@@ -40,8 +40,8 @@
 | 1 | **1,588** 个测试（1,441 快 + 147 集成） | `cover-letter-templates.md:79`；`project-brief.md:50`、`:85`；`scope-backend-automation.md:24` | [phase1-execution-report.md](phase1-execution-report.md) 的 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` / `<!--fig:tests.slow-->`；同值另见 [status.md](../status.md) | `1588（1441 + 147）` ✅ 一致 |
 | 2 | **93.3%** 一方代码覆盖率（7,117 / 7,631 行） | 同上三处 | `phase1-execution-report.md` 的 `<!--fig:coverage.pct-->` / `<!--fig:coverage.covered-->` / `<!--fig:coverage.total-->`；`status.md` | `93.3%（7117/7631）` ✅ 一致 |
 | 3 | **eleven**（11）个 MCP 只读工具 | `cover-letter-templates.md:135`；`scope-ai-mcp.md:28` | [server.py](../../src/dexatlas/mcp/server.py) 里注册的 11 个 `Tool`；[public-contracts.md](../architecture/public-contracts.md) §1.3 的第 1–11 行；[README.md](../../README.md) 写 “eleven tools” | `11` ✅ 一致 |
-| 4 | 三个走查 / 三个一方样本 / **只有两份分析** | `cover-letter-templates.md:35-40`；`project-brief.md:123-126` | [case-studies/README.md](../case-studies/README.md) 表格下方那段说明 | 三篇走查覆盖 `demo-app` / `obfuscated-app` / `multidex-app`，三个证据包只覆盖两份分析 ✅ 一致（详见 §1.3） |
-| 5 | 三个证据包（三个 zip） | `cover-letter-templates.md:32-34`；`project-brief.md:120-122` | [attachments/](../case-studies/attachments/) 下的三个 `.zip`，均已被 git 跟踪 | 三个 zip 都在 ✅ |
+| 4 | 三个走查 / 三个一方样本 / **四个包、四次分析** | `cover-letter-templates.md:36-45`；`project-brief.md:127-135` | [case-studies/README.md](../case-studies/README.md) 表格下方那段说明 | 三篇走查覆盖 `demo-app` / `obfuscated-app` / `multidex-app`，四个证据包对应四次分析（run id 两两不同） ✅ 一致（详见 §1.3） |
+| 5 | 四个证据包（四个 zip） | `cover-letter-templates.md:32-35`；`project-brief.md:123-126` | [attachments/](../case-studies/attachments/) 下的四个 `.zip`，均已被 git 跟踪 | 四个 zip 都在 ✅ |
 | 6 | `v1.0.0`（tagged 2026-11-17） | `project-brief.md:109` | `git for-each-ref refs/tags`；[__init__.py](../../src/dexatlas/__init__.py) 的 `__version__` | tag `v1.0.0`（2026-11-17）、`__version__ = "1.0.0"` ✅ 一致 |
 | 7 | 三个分析引擎 / 两套 Python 版本（3.12 / 3.13） | `cover-letter-templates.md:78`、`:80`；`project-brief.md:51`；`scope-backend-automation.md:23-25` | `src/dexatlas/tools/` 下的三个后端；`.github/workflows/` 的 CI 矩阵 | Apktool / JADX / Androguard 三个引擎，CI 覆盖 3.12 与 3.13 ✅ |
 | 8 | “773 characters as written” | `scope-ai-mcp.md:14` | 按 `publish-review.md` §5 脚本复算 `scope-ai-mcp.md` 的 §What I offer | plain **773** ✅ 一致（raw 781） |
@@ -64,10 +64,12 @@
   怎么查：`git for-each-ref refs/tags/v1.0.0 --format='%(refname:short) %(creatordate:short)'`
   查过是什么样：`v1.0.0 2026-11-17`。**再发一个 tag，这句就过期了**，
   `scripts/check-version-claims.py` 会报出来；届时回 `project-brief.md` 改这一句。
-- [ ] **「三个样本 / 两份分析」的口径没被改回去。**
-  怎么查：`grep -n "only two analyses\|只有两份分析\|three first-party samples" docs/outreach/*.md`
-  查过是什么样：`cover-letter-templates.md:37` 与 `project-brief.md:126` 各有一处「only two analyses / 只有两份分析」，
-  紧跟着说明「demo 与 api-integration 两个包是同一次分析」。
+- [ ] **「三个样本 / 四个包 / 四次分析」的口径没被改回去。**
+  怎么查：`grep -n "only two analyses\|只有两份分析\|three first-party samples\|four separate analyses\|四个证据包" docs/outreach/*.md`
+  查过是什么样：`cover-letter-templates.md:36` 与 `project-brief.md:127` 各有一处说明
+  「四个证据包对应四次分析」，紧跟着说明「demo 与 api-integration 两个包是同一份样本的
+  两次分析」。**旧的「only two analyses / 只有两份分析」一句已经删掉**——附件集换过
+  一轮之后它不再成立；grep 命中的是新口径。
 
 ### 1.2 素材里**没有**写、但发布时可能被临时加上的数字
 
@@ -96,17 +98,19 @@
   查过是什么样：静态 49 = 28 REST + 6 MCP + 15 CLI；实跑依机器而定——
   仅 androguard 时 **47（26 REST + 6 MCP + 15 CLI）**，三后端齐备时 **48（27 REST + 6 MCP + 15 CLI）**。
   ⚠️ 写「49/49 全部通过」是**不成立**的结论，旧稿里的这句已被删。
-- [ ] **三个样本 ≠ 三份分析。**
+- [ ] **三个样本 ≠ 四个包 ≠ 客户案例。**
   怎么查：读 `docs/case-studies/README.md` 表格下方那段话。
   查过是什么样：三篇走查涉及**三个**一方 APK（`demo-app`、`obfuscated-app`、
-  `multidex-app`——后者是第 2 篇的 multi-DEX 附录），但**只有两份分析**支撑三个证据包。
-  别写成「三个独立分析」或「三个客户案例」。
-- [ ] **demo 与 api-integration 两个包是同一次分析，别当成两个案例，也别因为「重复」去删一个。**
+  `multidex-app`——后者是第 2 篇的 multi-DEX 附录），**四个证据包对应四次分析**，
+  每包一次，`run_id` 两两不同。别写成「四个客户案例」。
+- [ ] **demo 与 api-integration 两个包是同一份样本的两次分析，别当成两个样本，也别因为「看起来重复」去删一个。**
   怎么查：解开两个 zip 读 `manifest.json`。
-  查过是什么样：两者的 `project_id` 都是 `apk_80a8fe0e81204c9f`、`run_id` 都是
-  `run_e112e71772d34a0e`；`report.md` 与 `report.html` **字节相同**，
-  只有 `report.json` 与 `manifest.json` 不同（导出时间/包元信息不同）。
-  `obfuscated` 包是另一次 run（`run_8d6735d410174df6`），独立。
+  查过是什么样：两者的 `project_id` 都是 `apk_80a8fe0e81204c9f`（project id 是
+  APK sha256 的前缀，同一份样本必然同一个），但 `run_id` 不同
+  （`run_e8e49384ab5246ab` 与 `run_fc8e432d4d094350`）；`report.md` 与
+  `report.html` **各只有 `run_id` 与 `Analysis time` 两行不同**，其余数字相同。
+  `obfuscated` 包（`run_dd897202eba74e28`）与 `multidex` 包
+  （`run_4fde2fa0b5254ccb`）是另外两次分析，独立。
 
 ---
 
@@ -164,28 +168,30 @@
 
 ## 4. 附件（证据包）
 
-- [ ] **三个 zip 都在，且能被打开。**
+- [ ] **四个 zip 都在，且能被打开。**
   怎么查：`ls -la docs/case-studies/attachments/*.zip`
   查过是什么样：`api-integration-evidence-package.zip`、`demo-evidence-package.zip`、
-  `obfuscated-evidence-package.zip` 三个都在，都已被 git 跟踪。
+  `multidex-evidence-package.zip`、`obfuscated-evidence-package.zip` 四个都在，
+  都已被 git 跟踪。
 - [ ] **每个包的内容完整。**
   怎么查：`python -c "import zipfile;print(zipfile.ZipFile(p).namelist())"`
   查过是什么样：每个包 4 项 —— `reports/report.md`、`reports/report.json`、
   `reports/report.html`、`manifest.json`。
-- [ ] **两个包的 `report.md` / `report.html` 字节相同是正常的，别误删其中一个。**
+- [ ] **两个包的 `report.md` / `report.html` 只差两行是正常的，别误删其中一个。**
   怎么查：解两个 zip 比 `sha256`。
   查过是什么样：`demo` 与 `api-integration` 的 `report.html`（8,549 字节）与
-  `report.md`（5,171 字节）**字节相同**——同一次分析（`run_e112e71772d34a0e`）。
-  只有 `report.json` 与 `manifest.json` 不同。**这不是重复文件错误，不要因为「看起来
-  重复」删掉一个包**，那会把「一份分析、两个视角」变成少一份附件。
+  `report.md`（5,171 字节）**长度相同，但 sha256 不同**——同一样本的两次分析
+  （`run_e8e49384ab5246ab` 与 `run_fc8e432d4d094350`），差别只有 `run_id` 一行与
+  `Analysis time` 一行。**这不是重复文件错误，不要因为「看起来重复」删掉一个包**，
+  那会把「一份样本、两次分析」变成少一份附件。
 - [ ] **别把内部文件打进 zip。**
   怎么查：检查包内清单。
-  查过是什么样：三个包内只有报告与 `manifest.json`，
+  查过是什么样：四个包内只有报告与 `manifest.json`，
   **没有** `publish-review.md`、没有仓库源码、没有本机路径。
-- [ ] **素材里给出的三个 zip 相对路径在客户那一侧能打开。**
+- [ ] **素材里给出的四个 zip 相对路径在客户那一侧能打开。**
   怎么查：`project-brief.md` 与 `cover-letter-templates.md` 里写的是仓库内相对路径；
   单独发 zip 时按附件上传，**不要**把仓库路径当成可点链接交给客户。
-  查过是什么样：`cover-letter-templates.md:32-34`、`project-brief.md:120-122` 各列出三个 zip。
+  查过是什么样：`cover-letter-templates.md:32-35`、`project-brief.md:123-126` 各列出四个 zip。
 
 ---
 
@@ -196,7 +202,7 @@
   查过是什么样：顶部已写明「**内部核对记录——不对外、不作附件、不随提案发送**」✅
   （它记着核对基准、提交号与本机路径，是给自己看的）。
 - [ ] **本清单（`docs/reports/outreach-publish-checklist.md`）同样不外发。**
-  怎么查：发布时只挑 `docs/outreach/` 下四件素材 + 三个 zip。
+  怎么查：发布时只挑 `docs/outreach/` 下四件素材 + 四个 zip。
   查过是什么样：本文件与其它内部记录都在 `docs/reports/` 下。
 - [ ] **工作树是干净的：发布用的素材没有未提交的改动。**
   怎么查：`git status --porcelain`（应为空）；`git log --oneline v1.0.0..HEAD` 看哪些改动还没进任何 tag。
@@ -205,10 +211,10 @@
   所以「素材 = v1.0.0 发版树」这个说法已经不准确了——以工作树实际内容为准，逐条按本清单核。
 - [ ] **没有任何 API key / secret / token 样式的内容被带出去。**
   怎么查：打包前对要发的文件跑一次密钥扫描（如 `grep -rniE "api[_-]?key|secret|token|bearer|password" <要发的文件>`）。
-  查过是什么样：本轮四件素材与三个 zip 内均无此类字符串。
+  查过是什么样：本轮四件素材与四个 zip 内均无此类字符串。
 - [ ] **不把 `.scratch/`、`.env`、本机路径、数据库文件带进附件。**
   怎么查：核对包的清单（见 §4）与素材里出现的路径。
-  查过是什么样：素材里只有仓库内相对路径；三个包内没有本机路径。
+  查过是什么样：素材里只有仓库内相对路径；四个包内没有本机路径。
 
 ---
 
@@ -256,7 +262,7 @@
 - [ ] **发送日期**：`YYYY-MM-DD`（例：2026年11月18日）。
 - [ ] **发出的文案副本**：实际粘贴的标题、简介、两封信的正文、scope 段落，
   以及当时的字符数（用 §2 的脚本量出来的那一版）。
-- [ ] **发出的附件清单**：三个 zip 的文件名与大小。
+- [ ] **发出的附件清单**：四个 zip 的文件名与大小。
 - [ ] **素材版本**：发出时对应的 commit 号（便于日后对照素材与仓库）。
 - [ ] **若发布后又打了新 tag**：回头改 `project-brief.md` 的版本句
   （现在是 `v1.0.0 (tagged 2026-11-17)`），并重跑

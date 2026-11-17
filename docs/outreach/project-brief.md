@@ -117,19 +117,21 @@ captured as values and surfaced in the report instead of aborting the run.
 - Case studies: [docs/case-studies/README.md](../case-studies/README.md) in the
   repository
 - Benchmark reports: `docs/benchmarks/` in the repository
-- Evidence packages, one per case study, each a zip holding the three report
+- Evidence packages, one per analysis, each a zip holding the three report
   formats (Markdown, HTML, JSON) and a manifest that hashes them. The CLI
   prints `4 files: 3 reports + 1 manifest` for each package:
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
-  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip)
+  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip),
+  [multidex-evidence-package.zip](../case-studies/attachments/multidex-evidence-package.zip)
 - How to read the three walkthroughs: they cover **three first-party samples**
   — `examples/demo-app/demo.apk`, `examples/obfuscated-app/obfuscated.apk`, and
-  a multi-DEX appendix on `examples/multidex-app/multidex.apk` — while the three
-  evidence packages hold **only two analyses**: the demo and api-integration
-  packages are the same analysis run (same APK, same run id), so their
-  `report.md` and `report.html` are byte-identical and only `report.json` and
-  `manifest.json` differ. They are not client cases: this is my own
+  a multi-DEX appendix on `examples/multidex-app/multidex.apk` — and the four
+  evidence packages are **four separate analyses**, one package per analysis,
+  each manifest recording the run id it came from. The demo and
+  api-integration packages analyse the same APK in two different runs, so
+  their reports agree on every count and differ only in the run id and the
+  timing. They are not client cases: this is my own
   open-source work on first-party samples.
 
 ---
