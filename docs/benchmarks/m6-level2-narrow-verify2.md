@@ -1,6 +1,6 @@
 # M6 层级 2 —— 修复后窄验证二轮（6 题 × 3 轮）
 
-**状态：本 run 验证首轮窄验证（`m6-level2-narrow-verify.md`）之后的四项修复（协议泄漏纠偏重试、partial 后端缺失措辞对齐、api-key 常量池检索引导、descriptor 连写模板）。代码状态 `claude/m6-level2-verify 9b25835`。本文所有数字由 `scripts/m6_level2_narrow_verify2_report.py` 从 [m6-level2-narrow-verify2-traces.json](m6-level2-narrow-verify2-traces.json) 重算生成，未手改任何数字；trace 缺失或不完整时本脚本拒绝生成报告。**
+**状态：本 run 验证首轮窄验证（`m6-level2-narrow-verify-incomplete.md`）之后的四项修复（协议泄漏纠偏重试、partial 后端缺失措辞对齐、api-key 常量池检索引导、descriptor 连写模板）。代码状态 `claude/m6-level2-verify 9b25835`。本文所有数字由 `scripts/m6_level2_narrow_verify2_report.py` 从 [m6-level2-narrow-verify2-traces.json](m6-level2-narrow-verify2-traces.json) 重算生成，未手改任何数字；trace 缺失或不完整时本脚本拒绝生成报告。**
 
 本文回答验收方案（§2.2）的两个问题：
 

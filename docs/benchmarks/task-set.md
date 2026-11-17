@@ -110,8 +110,11 @@ not cover is worse than one that says so.
 Thirteen tasks have an answer that is an absence. Eleven of them are in the
 `unanswerable` category; the other two are the partial-backend cases where
 the manifest or the resource table is gone with the backend that reads it.
-**That is sixteen per cent of the set**, against the tenth the milestone
-asks for, and the `unanswerable` category on its own is fourteen per cent.
+(The two `partial` tasks whose expected answer is a *recorded* backend
+failure — the analysis did come back and said so — are answerable questions,
+not absences, and are not counted here.) **That is fourteen per cent of the
+set** (13 of 92), against the tenth the milestone asks for, and the
+`unanswerable` category on its own is twelve per cent (11 of 92).
 
 **They are scored, not merely present.** The right answer to "which method
 calls `Crypto.digestOf`?" is that nothing does, and a system that answers it
@@ -477,7 +480,7 @@ Adding a task needs no change anywhere else. The runner finds it through
    source retrieval would need questions about *where* the answer was found,
    not only what it was.
    **Done** — the `where-source` category carries eleven of them, written
-   against the same five samples. What is not done is the comparison itself:
-   the 81 tasks measured in `comparison-traces.json` are now a subset of the
-   set, and that measurement needs to be re-run before any of the metrics are
-   quoted against the full 92.
+   against the same five samples. The comparison has been re-run against the
+   full set: `comparison-traces.json` holds 276 traces (92 tasks × 3
+   configurations, 92 distinct task ids), and the metrics in
+   [the comparison report](comparison.md) are quoted against the full 92.

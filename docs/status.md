@@ -264,13 +264,13 @@ where-source 任务），三配置 harness、八项指标和脚本生成的报�
 × 3 配置，结果在[真模型报告](benchmarks/comparison-real.md)，证据是
 `comparison-real-traces.json`；scripted 的那组在
 [对比报告](benchmarks/comparison.md)，两份**分开陈述、不并表**。
-本次正确率 A 27.2% / B 22.8% / DexAtlas agent 17.4%，无支撑断言率
-100% / 100% / 2.8%，工具调用成功率 100% / 100% / 99.0%。
+本次正确率 A 30.4% / B 22.8% / DexAtlas agent 19.6%，无支撑断言率
+100% / 100% / 4.4%，工具调用成功率 100% / 100% / 98.9%。
 
 **这些数字里有一半是模型行为，不是工具能力**：agent 正确率低的主因是模型
-反复请求工具直到预算耗尽（14 题），以及回答写成散文而非 JSON
+反复请求工具直到预算耗尽（15 题），以及回答写成散文而非 JSON
 （`parse_answer` 已能提取内嵌文档，见下）。unanswerable 那一类反而是 agent
-最好（12/13，A 9/13、B 8/13）。报告的「Why the failed tasks failed」表把这些
+最好（11/13，A 10/13、B 8/13）。报告的「Why the failed tasks failed」表把这些
 成因逐条列出——率不带成因就是没有解释。
 
 **§5 退出标准逐条核对**（2026-11-14，逐条证据见
@@ -295,11 +295,11 @@ where-source 任务），三配置 harness、八项指标和脚本生成的报�
 [架构文档](architecture/agent.md)与 `benchmarks/comparison/systems.py`）。
 结果在[强预算报告](benchmarks/comparison-stronger.md)，证据是
 `comparison-stronger-traces.json`，与上一轮**分开陈述、不并表**。
-agent 正确率 19.6% → 22.8%（+3.2 个百分点，21/92），A 30.4% → 28.3%，
+agent 正确率 19.6% → 22.8%（+3.3 个百分点，21/92），A 30.4% → 28.3%，
 B 22.8% → 16.3%；agent 无支撑断言率 4.4% → 9.2%。结论：**agent 与 A 的
 差距主要是任务的步数预算与回答格式咬合的问题，不是换模型能消的**
-——同一模型下，光把预算放开、把敏感门拿掉，agent 也只追回 3 个百分点，
-且 72 题仍撞在 24 轮的循环上限上（模型一轮只请求一个工具、又倾向反复取证）。
+——同一模型下，光把预算放开、把敏感门拿掉，agent 也只追回 3.3 个百分点，
+且 61 题仍撞在 24 轮的循环上限上（模型一轮只请求一个工具、又倾向反复取证）。
 A/B 在长上下文下反而更不稳定（B 退步 6.5 个百分点）。两轮的差值表在报告的
 「Comparison with the previous run」段；报告不把任何差值说成改进。
 

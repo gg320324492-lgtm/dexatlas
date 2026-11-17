@@ -129,8 +129,8 @@ activity 与 service；后端缺失是值不是异常（`ToolOutcome` 携带 `To
 计划列出的五类是最低覆盖；此题保证 multidex 样本进入冻结集，使五个 first-party
 样本全部有代表。其判定客观（计数），不引入后端顺序歧义。
 
-**样本覆盖核对**：demo-app（多数题）、strings-app（2）、obfuscated-app（3）、
-wide-app（1）、multidex-app（1）——五个样本全覆盖。
+**样本覆盖核对**：demo-app（14）、strings-app（1）、obfuscated-app（3）、
+wide-app（1）、multidex-app（1）——五个样本全覆盖，合计 20 题。
 
 ## 4. 落选说明（代表性理由）
 
