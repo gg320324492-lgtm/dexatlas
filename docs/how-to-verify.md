@@ -21,7 +21,8 @@
 2. **命令是按 Unix shell / Git Bash 写的。** Windows 上 PowerShell 的写法不同，
    但每条命令本身在两种 shell 里都能跑（`source` 是 bash 的）。
 3. **skip 不等于通过。** 外部分析后端（JADX / Apktool）找不到时，相关测试会
-   **skip** 而不是 fail；两个第三方集成样本没拉时同理。skip 的数量写在 pytest 的
+   **skip** 而不是 fail；两个第三方集成样本没拉时同理（**取样本的那一步在 §2.0**，
+   不取就开跑，汇总行里那一栏不会是 0）。skip 的数量写在 pytest 的
    汇总行里——**请读那一行，不要只看退出码**（这条规则同样写在
    [项目自己的开发约定](../CLAUDE.md)里）。§2.3 给了两种环境下这一栏各是多少。
 
@@ -54,6 +55,34 @@ cd dexatlas
 **每个 worktree / 每份检出都要自己的虚拟环境。** `uv sync` 建出来的 `.venv` 是一个
 editable 安装，指向**建它的那份目录**；复用别人的 venv 会安静地测错代码。
 
+#### 再取两个第三方集成样本（跑测试前做）
+
+集成测试要读两个 APK。它们**不在仓库里**：随仓库分发二进制，读者就无法从树里
+核对它们的来源与许可，所以 `scripts/fetch-fixtures.sh` 把每一个是从哪儿来、什么
+许可都写在了脚本里。
+
+```bash
+bash scripts/fetch-fixtures.sh
+```
+
+**这一步的前置条件：** 一台能上网的机器，加一个**已登录的 GitHub CLI**——脚本用
+`gh api` 取文件，`gh auth status` 能看到已登录即可。没有 `gh` 就跑不动这一步。
+
+**它抓的是什么：** 两个来自 `androguard/androguard`（Apache-2.0）的自建测试 APK，
+落到 `fixtures/apk/`：
+
+| 文件 | 来源 | 许可 |
+|---|---|---|
+| `TestActivity.apk` | `androguard/androguard` @ `tests/data/APK` | Apache-2.0 |
+| `multidex.apk` | `androguard/androguard` @ `tests/data/APK` | Apache-2.0 |
+
+同样的来源与许可也写在仓库里已提交的
+[`fixtures/apk/SOURCES.md`](../fixtures/apk/SOURCES.md)——脚本跑完会把它重写一遍。
+`multidex.apk` 带两个 dex，正是它让 Smali 回退那条路径上的测试成为真的。
+
+**抓不到会怎样：** 套件**不会失败**，用到样本的测试会 **skip**。那就是 §2.3
+汇总行里那一栏的来源——**先抓，再跑**，那一栏才可能是 0。
+
 ### 2.1 装依赖
 
 ```bash
@@ -79,7 +108,8 @@ bash scripts/install-backends.sh    # 需要 java 在 PATH 上
 ```
 
 脚本会把 **JADX 1.5.2** 和 **Apktool 2.11.1** 装到 `INSTALL_ROOT`（默认
-`/tmp/dexatlas-backends`），并打印装了什么、装在哪。
+`${RUNNER_TEMP:-/tmp}/dexatlas-backends`——在 GitHub runner 上就是
+`$RUNNER_TEMP/dexatlas-backends`），并打印装了什么、装在哪。
 
 想确认后端可用：
 
@@ -88,17 +118,17 @@ uv run dexatlas backends
 ```
 
 **正常会看到什么：** 三行，`jadx` / `apktool` / `androguard` 的状态都是
-`available`：
+`available`（下面是实跑原文）：
 
 ```text
-              Analysis backends
-┌────────────┬───────────┬──────────────────┐
-│ Backend    │    Status │ Version          │
-├────────────┼───────────┼──────────────────┤
-│ jadx       │ available │ 1.5.2            │
-│ apktool    │ available │ 2.11.1           │
-│ androguard │ available │ 4.1.4            │
-└────────────┴───────────┴──────────────────┘
+         Analysis backends
+┌────────────┬───────────┬─────────┐
+│ Backend    │    Status │ Version │
+├────────────┼───────────┼─────────┤
+│ jadx       │ available │ 1.5.2   │
+│ apktool    │ available │ 2.11.1  │
+│ androguard │ available │ 4.1.4   │
+└────────────┴───────────┴─────────┘
 ```
 
 若某一行不是 `available`，**去掉的测试会变成 skip，而不是 fail**（见 §0 第 3 条）。
@@ -123,21 +153,17 @@ uv run --no-sync pytest -q
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
-* **skipped 的数量** —— **这一栏要能说清每一个 skip 的原因。skip 不是通过。**
+* **skipped 的数量** —— **skip 只允许来自未抓取的第三方 fixture，且每一条都要能说出是哪一类。skip 不是通过。**
+  别的来源的 skip（后端不在 PATH 上、缺可选依赖）都说明**环境没配好**，不是通过。
 
 **skip 从哪来。** 两个第三方集成样本（Apache-2.0 许可，随仓库分发二进制会让读者
-无法核对来源）不在 clone 里，要自己拉：
-
-```bash
-bash scripts/fetch-fixtures.sh
-```
-
-不拉也能跑——套件会跳过用到样本的测试。**这两种跑法的差别就是这一栏：**
+无法核对来源）不在 clone 里——**取它们的那一步在 §2.0**。没取就开跑，套件会
+跳过用到样本的测试。**这两种跑法的差别就是这一栏：**
 
 | 环境 | 汇总行 |
 |---|---|
-| 三后端齐备，**没**拉第三方样本 | `1561 passed, 27 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
-| 三后端齐备，**拉了**第三方样本 | `1588 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+| 三后端齐备，**没**取第三方样本 | `1561 passed, 27 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
+| 三后端齐备，**取了**第三方样本 | `1588 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
 
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
@@ -186,13 +212,15 @@ facts:
   package version: 1.0.0
   changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.0
-documents read: 110
+documents read: 115
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
 findings: 2 (2 already in 8f9ddcaf)
   docs/releases/v0.2.0.md:326  release-coverage  it says the coverage is 91.0%, the measured coverage is 91.6%
+      First-party coverage is **91.0%** (5945/6536 lines). `mypy` strict and `ruff`
   CHANGELOG.md:1033  release-coverage  it says the coverage is 93.9%, the measured coverage is 91.6%
+      - **The v0.1.3 release notes quoted a hand-copied coverage figure.** They said 93.9%,
 
 Every version claim matches the repository.
 ```
@@ -200,6 +228,9 @@ Every version claim matches the repository.
 **退出码 0。** 它把仓库里**每一份 Markdown**（`documents read` 那行给出份数；仓库每
 增删一份文档，这个数就变）里出现的版本号、发布日期、覆盖率和 tag 跟 git 事实
 （tag 列表、`pyproject.toml` 的版本、CHANGELOG）逐条比对。
+
+**`documents read` 那行是活的。** 它数的是**当前这棵树里 Markdown 的份数**——本文件
+也是被数的之一，所以改完任何一份文档都要重跑一遍门禁，确认这个数还对得上。
 
 `findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 8f9ddcaf`）：
 两份文档在描述**已发布的历史版本**时引用了当时的覆盖率，而门禁用当前树的覆盖率
@@ -301,8 +332,8 @@ M6 层级 2 的每一个数字都由脚本从**已提交的 trace 文件**重算
 uv run --no-sync python scripts/m6_level2_retest4_report.py
 ```
 
-**正常会看到什么：** 脚本重新生成那份 Markdown，**逐字节应当和仓库里的一样**；
-文件没有变化。
+**正常会看到什么：** 脚本重新生成那份 Markdown，**内容逐字节应当和仓库里的一样**
+（行尾 CRLF/LF 有差）；文件没有变化。
 
 **缺 trace 时脚本不出报告。** 这是这套材料的底线：**一次没跑完的测量不许变成一份
 看起来完整的报告。** 把 trace 拿掉再跑，你会看到（下面是实测输出）：
@@ -372,7 +403,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 | 说法 | 现在的状态 | 依据 |
 |---|---|---|
-| **M6 层级 2 的得分达标** | **未达。** 修复后三轮完整重测 DexAtlas **49/60 = 81.7%**（逐轮 15/16/18），**低于三轮合计 ≥90%（≥54/60）的验收线**；r1 未达每轮 ≥80%（≥16/20）。结论：**未达标** | [`benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 第 83、85 行；验收线（每轮 ≥80%、三轮合计 ≥90%）见 [`benchmarks/service-regression-set.md`](benchmarks/service-regression-set.md) §5「冻结纪律」第 2 条与 [`roadmap/phase3-plan.md`](roadmap/phase3-plan.md) §5 M6 |
+| **M6 层级 2 的得分达标** | **未达。** 修复后三轮完整重测 DexAtlas **49/60 = 81.7%**（逐轮 15/16/18），**低于三轮合计 ≥90%（≥54/60）的验收线**；r1 未达每轮 ≥80%（≥16/20）。结论：**未达标** | [`benchmarks/m6-level2-retest4.md`](benchmarks/m6-level2-retest4.md) 第 82、83、85 行；验收线（每轮 ≥80%、三轮合计 ≥90%）见 [`benchmarks/service-regression-set.md`](benchmarks/service-regression-set.md) §5「冻结纪律」第 2 条与 [`roadmap/phase3-plan.md`](roadmap/phase3-plan.md) §5 M6 |
 | **窄验证（六个已知失败面）达标** | **未达。** 窄验证二轮 DexAtlas 转通过 **2/6**、确定性修复题 **2/5**；三轮（预算效率修复后）转通过 **3/6**、确定性修复题 **3/5**——门槛都是 ≥4/6、≥3/5，**两轮都未达** | [`benchmarks/m6-level2-narrow-verify2.md`](benchmarks/m6-level2-narrow-verify2.md) 第 61 行；[`benchmarks/m6-level2-narrow-verify3.md`](benchmarks/m6-level2-narrow-verify3.md) 第 61 行 |
 | **M10 独立验收已完成** | **尚未开始。** 准备包就绪（40 项验收检查表 + 读者一站式入口 + 作者侧自查 40/40 通过），但**独立复现、准备度重评与 release candidate 仍未开始**，需要一位真实的独立读者来跑 | [`docs/status.md`](status.md) §4.0 的 M10 行；[`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) 的 M10 行 |
 | **Phase 3 的退出标准已全部达成** | **未全部达成。** M6 层级 2 未达标、M10 验收未开始 | [`docs/status.md`](status.md) §4.0 开头；[`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) 开头段 |
@@ -427,7 +458,8 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 1. 读 [`docs/status.md`](status.md) §1 快照和 §4「还剩什么」——**先看边界，再看成绩**。
 2. 跑 §2.4 的行号引用门禁和 §2.5 的版本声明门禁（两条都是只读的）。
 3. 跑 §2.6 的契约活检（三后端齐备时），看它是不是 48/48。
-4. 跑 §2.7 的 `m6_level2_retest4_report.py`，确认那份报告**逐字节可复现**。
+4. 跑 §2.7 的 `m6_level2_retest4_report.py`，确认那份报告**内容逐字节可复现**
+   （行尾 CRLF/LF 有差）。
 5. 读 [`docs/architecture/public-contracts.md`](architecture/public-contracts.md) §7
    （验证记录）和 §8（已知限制）——**§8 是这个项目自己承认的破口**。
 

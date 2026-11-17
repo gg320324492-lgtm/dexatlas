@@ -367,6 +367,7 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[交接说明](docs/HANDOVER.md)** —— 项目现状、如何在另一台机器跑起来、接下来做什么
 - **[安装指南](docs/install.md)** —— 每条命令都在全新克隆上验证过
 - **[当前状态](docs/status.md)** —— 项目现在在哪，还剩什么
+- **[怎么自己复核这个项目说的每句话](docs/how-to-verify.md)** —— 自己复核本项目每个数字的命令、应该看到什么、以及哪些说法尚未达成（[§3](docs/how-to-verify.md#3-哪些说法目前是未达成--未验证请据此打折) 列出了未达成的那些）；需要 JDK、三个分析后端与第三方测试样本
 - **[分析覆盖度与证据来源](docs/analysis-provenance.md)** —— 每条结论由哪个后端支撑，以及怎么自己核对
 - **[路线图](docs/roadmap/ROADMAP.md)** —— 三个阶段与当前位置
 - **[Phase 2 计划](docs/roadmap/phase2-plan.md)** —— 源码评审之后、对着真实代码写的
