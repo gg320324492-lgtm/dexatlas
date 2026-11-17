@@ -170,12 +170,19 @@ cd dexatlas
 uv sync --extra analysis
 
 uv run dexatlas backends              # what is installed, at what version
-uv run dexatlas analyze app.apk -o report.md --json report.json --html report.html
+uv run dexatlas analyze examples/demo-app/demo.apk -o report.md --json report.json --html report.html
 uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;"
 uv run dexatlas export <project-id> -o evidence-package.zip
 ```
+
+The `analyze` example points at `examples/demo-app/demo.apk` — a real APK
+**bundled in the repository**, so the first command works the moment the
+clone is in place: nothing to download, no Android SDK needed. It is built
+from the smali sources next to it and rebuildable with
+`scripts/build-demo-apk.sh` (needs Apktool + a JDK); once you have your own
+APK, point `analyze` at that instead.
 
 Every command takes the same `--workspace`/`-w` option: `analyze` creates the
 workspace, the read-only commands require it to exist.
