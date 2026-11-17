@@ -23,7 +23,7 @@
 | 测试 | <!--fig:tests.total-->1632<!--/fig--> 个（<!--fig:tests.fast-->1485<!--/fig--> 快 + <!--fig:tests.slow-->147<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
-| CI | 6 个 workflow job 全绿：Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / Lint（`test` 是 3.12/3.13 矩阵，故实际并行运行数为 7） |
+| CI | **9 个 workflow job、10 次并行运行**（`test` 是 3.12/3.13 矩阵）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检 / M10 自查 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
 > M6 层级 2 的执行层修复（判分链路、预算分类、重试、检索兜底）已在本分支
@@ -47,8 +47,8 @@
 > （现状披露）为最终定稿路径**，不再追加修复轮或模型调用。本页其余测量数字
 > 仍对应修复前代码（`main` `fbca3d5` 及更早）。
 
-**CI 的六个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
-矩阵，展开后是七个并行运行）：
+**CI 的九个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
+矩阵，展开后是十次并行运行）：
 
 | Job | 覆盖什么 |
 |---|---|
@@ -59,6 +59,9 @@
 | Docker image builds | 镜像里三个后端真的能跑 |
 | Dependency audit | 锁文件的已知漏洞 |
 | Lint and format | ruff、mypy、**actionlint**（workflow 文件本身）、**版本状态陈述检查** |
+| Public contracts (live) | 公共契约活检实跑：三个后端齐备时跑 `scripts/verify-public-contracts.py`，退出码要判 |
+| M10 acceptance self-check | 跑 `scripts/m10_selfcheck.py`（只读、零成本），M10 验收材料的自动化判据 |
+| The report's figures describe the tagged tree | **只在推 tag 时跑**：用 `refresh-report-figures.py --check` 重测一遍并比对，报告里的数字必须描述被 tag 的那棵树 |
 
 第三个 job 存在的原因值得记一句：它曾经**从未在 CI 上跑过**，
 于是两个假定 JADX 已安装的测试一直是绿的，而 Smali 回退——那个「JADX 不可用时
