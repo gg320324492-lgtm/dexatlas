@@ -59,11 +59,14 @@ the wrong code.
 
 ### The gates
 
-CI runs six jobs (seven parallel runs): lint/format/mypy, tests on Python 3.12 (every backend),
-tests on Python 3.13 (no external backends), tests with Apktool only, the Docker
-image, and the dependency audit. The same configurations are worth running by
-hand before a push — the three backend configurations are separate
-configurations, not one.
+CI runs ten jobs (eleven parallel runs on a tag — the test job is a 3.12/3.13
+matrix): lint/format/mypy, tests on Python 3.12 (every backend), tests on
+Python 3.13 (no external backends), tests with Apktool only, the M3
+comparison re-run, the Docker image, the dependency audit, the live
+public-contract check, the M10 acceptance self-check, the social-preview
+figure check, and the job that re-measures the report against the tagged tree.
+The same configurations are worth running by hand before a push — the three
+backend configurations are separate configurations, not one.
 
 ### Measuring the project
 

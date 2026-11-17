@@ -37,7 +37,7 @@
 |---|---|---|---|---|
 | 源指纹 / 源码指纹 | source fingerprint | 对 `src/`、`tests/`、`pyproject.toml` 和测量脚本求的哈希；它回答「还是不是同一份代码」，不回答「这份代码还绿吗」。 | `reports/release-process-dry-run.md:62`、`reports/v1.1.0-candidates.md:106`、`reports/portfolio-readiness-2026-11-18.md:442`、`reports/v1.0.0-release-checklist.md:529`、`reports/ci-gate-coverage.md:14`、`reports/phase1-execution-report.md:985` | dry-run:62 是（已补）· candidates:106 是（已补）· portfolio:442 否 · checklist:529 否 · ci-gate-coverage:14 否（§2.1 从 :91 起解释边界）· phase1-execution-report:985 是 |
 | 完整测量 / 重测量 | full measurement | 跑一遍完整测试套件并测覆盖率，把结果写回报告与 README 徽章；数字由此而来。 | `reports/release-process-dry-run.md:66`、`reports/v1.0.0-release-checklist.md:381`、`reports/ci-gate-coverage.md:12` | dry-run:66 否 · checklist:381 是（§8.1 L1 行给出命令）· ci-gate-coverage:12 否 |
-| 独占测量 | exclusive measurement | 同一个 checkout 同一时刻只允许一个测量进程在跑；两个进程会互相污染覆盖率数据。 | `reports/release-process-dry-run.md:167`、`reports/v1.0.0-release-checklist.md:353`、`reports/coverage-guard-audit.md:86` | dry-run:167 是（已补）· checklist:353 是（§7 N1 整节讲机制）· coverage-guard-audit:86 是 |
+| 独占测量 | exclusive measurement | 同一个 checkout 同一时刻只允许一个测量进程在跑；两个进程会互相污染覆盖率数据。 | `reports/release-process-dry-run.md:194`、`reports/v1.0.0-release-checklist.md:353`、`reports/coverage-guard-audit.md:86` | dry-run:167 是（已补）· checklist:353 是（§7 N1 整节讲机制）· coverage-guard-audit:86 是 |
 | 基线 / 基准 | baseline | 一条判断所依据的那棵树或那个提交。同一个数字在不同基线上读出来可能不同。 | `reports/README.md:14`、`reports/release-process-dry-run.md:11`、`reports/portfolio-readiness-2026-11-18.md:7`、`reports/v1.1.0-candidates.md:3`、`reports/v1.0.0-release-checklist.md:3` | README:14 是 · dry-run:11 是（就地写明基线是什么）· portfolio:7 否 · candidates:3 是（已补）· checklist:3 否（已补于 :8） |
 | 口径 | measurement basis | 这个数是在哪个分母、哪套题、哪条判分规则下算出来的。 | `roadmap/phase3-plan.md:58`、`reports/v1.1.0-candidates.md:91` | phase3-plan:58 否 · candidates:91 否 |
 | 分母 / 分子 | denominator / numerator | 比值的上数与下数：测试总数，或代码总行数。⚠ 本仓库里"分母"有两义——**测试数** 与 **代码总行数**，换个口径就换个意思。 | `reports/release-process-dry-run.md:68`、`reports/v1.1.0-candidates.md:166`、`reports/ci-gate-coverage.md:178`、`reports/coverage-guard-audit.md:75` | dry-run:68 否 · candidates:166 是（并说明"两个分母不是一回事"） |
@@ -54,10 +54,10 @@
 | 契约活检 | contract live-check | 真的把公共契约面跑一遍、失败就非零退出的脚本；它验证行为，不是比对文档。 | `how-to-verify.md:38`、`reports/release-process-dry-run.md:181`、`reports/portfolio-readiness-2026-11-18.md:56`、`reports/v1.0.0-release-checklist.md:508`、`reports/ci-gate-coverage.md:12` | how-to-verify:38 是（§2.6「门禁三」）· dry-run:181 是（已补）· portfolio:56 是（已补）· checklist:508 是（§8.1 L2 行）· ci-gate-coverage:12 否 |
 | M10 自查 | M10 self-check | `scripts/m10_selfcheck.py`：把 M10 准备包里的检查跑成自动化判定。 | `reports/ci-gate-coverage.md:12`、`reports/v1.0.0-release-checklist.md:509` | ci-gate-coverage:12 否 · checklist:509 是（§8.1 L3 行） |
 | 红 / 绿 / 全绿 | red / green | 一次 CI run 的结论：每个 job 都是 success 才叫绿；有一个不是，就不叫绿。 | `reports/release-process-dry-run.md:11`、`reports/v1.0.0-release-checklist.md:51`、`reports/portfolio-readiness-2026-11-18.md:18` | dry-run:11 否（已补于 :26）· checklist:51 否（已补）· portfolio:18 否（已补于 :19） |
-| 判定 | judgement | 一行检查核对完之后留下的结论，取值有限；本仓库里另有一义：**题目的机器判分**（`must_contain` / `expect_count` / `expect_empty` / `expect_backend_failure`）。 | `reports/release-process-dry-run.md:20`、`reports/v1.0.0-release-checklist.md:83`、`benchmarks/service-regression-set.md:8` | dry-run:20 否（已补）· checklist:83 否 · service-regression-set:8 否 |
+| 判定 | judgement | 一行检查核对完之后留下的结论，取值有限；本仓库里另有一义：**题目的机器判分**（`must_contain` / `expect_count` / `expect_empty` / `expect_backend_failure`）。 | `reports/release-process-dry-run.md:15`、`reports/v1.0.0-release-checklist.md:83`、`benchmarks/service-regression-set.md:8` | dry-run:20 否（已补）· checklist:83 否 · service-regression-set:8 否 |
 | 只读演练 / 只读复核 | read-only dry run | 照着清单或材料真走一遍，但除了这份报告什么都没改；它的结论只对走它的那棵树成立。 | `reports/release-process-dry-run.md:1`、`reports/v1.0.0-release-checklist.md:9`、`reports/reader-dry-run.md:1` | dry-run:1 是（标题写明"只读"，§0 写明没改任何东西）· checklist:9 是（括注"照本清单实走一遍的只读演练"）· reader-dry-run:1 是 |
 | 两棵树（发布树 / 当前树） | the two trees | 发布树 = tag 指向的那棵不可变的树；当前树 = 现在工作区这棵。数字属于前者，代码可能已经是后者。 | `reports/release-process-dry-run.md:257`、`reports/v1.0.0-release-checklist.md:102`、`reports/ci-gate-coverage.md:225` | dry-run:257 否（已补）· checklist:102 否 · ci-gate-coverage:225 否（§4.11 从 :225 起讨论） |
-| 重打 tag | re-tagging | 把已存在的 annotated tag 强行移到另一个提交上，标签本身不变。 | `reports/release-process-dry-run.md:39`、`reports/v1.0.0-release-checklist.md:10`、`reports/m10-invitation-sender-checklist.md:123` | dry-run:39 是（已补）· checklist:10 否（已补于 :11）· invitation-sender:123 是（给出 `git push --force`） |
+| 重打 tag | re-tagging | 把已存在的 annotated tag 强行移到另一个提交上，标签本身不变。 | `reports/release-process-dry-run.md:56`、`reports/v1.0.0-release-checklist.md:10`、`reports/m10-invitation-sender-checklist.md:123` | dry-run:39 是（已补）· checklist:10 否（已补于 :11）· invitation-sender:123 是（给出 `git push --force`） |
 
 ### 三、引用完整性（这个项目的承诺就落在这几个词上）
 
@@ -95,10 +95,10 @@
 | 可核查 | verifiable | 读者能自己把一条结论核到它的出处：指出是哪个工具、哪个版本、从哪个字节位置读出来的。本仓库统一写「可核查」，不写「可核验」——两个词说的是一件事，读者以为是两件。 | `../README.zh-CN.md:5`、`../README.zh-CN.md:25`、`reports/m10-acceptance-pack.md:443`、`benchmarks/service-regression-set.md:17` | 否（README.zh-CN.md:5 的 tagline 是定位语，不解释词义） |
 | 证据链 / 出处模型 | evidence chain / provenance model | 记录每条结论由哪个工具、哪个版本、从哪个字节位置读出来的那条链。 | `how-to-verify.md:40`、`analysis-provenance.md:880` | how-to-verify:40 是（括注一句）· analysis-provenance:880 是（§4 逐步给命令） |
 | 公共契约 | public contract | 对外承诺并版本化的行为表面：CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema。 | `architecture/public-contracts.md:1`、`roadmap/phase3-plan.md:7` | public-contracts:1 是（整份文件就是它）· phase3-plan:7 否 |
-| 证据包 | evidence package | `dexatlas export` 导出的 zip：报告本身 + 一份记录所引文件哈希的 `manifest.json`。 | `reports/release-process-dry-run.md:84`、`reports/v1.1.0-candidates.md:28`、`reports/v1.0.0-release-checklist.md:37`、`reports/portfolio-readiness-2026-11-18.md:207`、`architecture/public-contracts.md:32` | dry-run:84 是（已补）· candidates:28 是（已补）· checklist:37 是（已补）· portfolio:207 否 · public-contracts:32 是（§5.3 给出 manifest 字段） |
-| 报告三件套 | the report trio | 同一份分析的 Markdown / JSON / 离线 HTML 三个文件。 | `outreach/publish-review.md:130`、`benchmarks/m6-verify3-plan.md:125` | publish-review:130 是（列出三个文件名）· m6-verify3-plan:125 是（但那里的"三件套"指后端检查三件套，是另一回事） |
+| 证据包 | evidence package | `dexatlas export` 导出的 zip：报告本身 + 一份记录所引文件哈希的 `manifest.json`。 | `reports/release-process-dry-run.md:111`、`reports/v1.1.0-candidates.md:28`、`reports/v1.0.0-release-checklist.md:37`、`reports/portfolio-readiness-2026-11-18.md:207`、`architecture/public-contracts.md:32` | dry-run:84 是（已补）· candidates:28 是（已补）· checklist:37 是（已补）· portfolio:207 否 · public-contracts:32 是（§5.3 给出 manifest 字段） |
+| 报告三件套 | the report trio | 同一份分析的 Markdown / JSON / 离线 HTML 三个文件。 | `outreach/publish-review.md:122`、`benchmarks/m6-verify3-plan.md:125` | publish-review:130 是（列出三个文件名）· m6-verify3-plan:125 是（但那里的"三件套"指后端检查三件套，是另一回事） |
 | 交付包 | delivery package | 客户可以直接审阅的成品：报告 + 最小证据包 + 案例说明。 | `roadmap/phase3-plan.md:66` | 否（实义在 :141、:149） |
-| 工作区 | workspace | 存项目、报告与证据的磁盘目录，`--workspace` 指的就是它；与 git 的"工作树"是两回事。 | `architecture/public-contracts.md:24`、`roadmap/phase3-plan.md:56` | public-contracts:24 是（`--workspace` 出现在命令行表里）· phase3-plan:56 否 |
+| 工作区 | workspace | 存项目、报告与证据的磁盘目录，`--workspace` 指的就是它；与 git 的"工作树"是两回事。 | `architecture/public-contracts.md:51`、`roadmap/phase3-plan.md:56` | public-contracts:24 是（`--workspace` 出现在命令行表里）· phase3-plan:56 否 |
 | 交叉引用 | cross-reference (xref) | 一个符号引用另一个符号的位置；CLI 子命令是 `xrefs`。 | `how-to-verify.md:98` | 否 |
 | 脱敏 | redaction | 从导出包里删掉敏感字符串，并记录删了什么。 | `roadmap/phase3-plan.md:152` | 否 |
 | 阻断项 | blocking item | 验收前必须关闭的问题，不能被高分或重要项抵消。 | `roadmap/phase3-plan.md:219` | 否（:101 那行写的是「阻断/重要/可选」三类） |
@@ -141,14 +141,14 @@
 | 截断 | truncation | 某一步被上限截断（退出码 5）；与"残缺"是两种不同的缺口。 | `proposals/exit-code-partial-read.md:21` | 否 |
 | 外延 | denotation | 一个退出码所覆盖的运行集合；"收窄外延"= 某些运行不再返回它。 | `proposals/exit-code-partial-read.md:98` | 否 |
 | 破坏面 | blast radius | 一次改动会打破的既有消费方与文档表述的范围。 | `proposals/exit-code-partial-read.md:160` | 否 |
-| 契约快照 | contract snapshot | 契约表在仓库里的定稿副本，契约测试拿它比对。 | `architecture/public-contracts.md:353` | 是（"快照测试把同样的清单固化为回归门禁"） |
+| 契约快照 | contract snapshot | 契约表在仓库里的定稿副本，契约测试拿它比对。 | `architecture/public-contracts.md:5` | 是（"快照测试把同样的清单固化为回归门禁"） |
 
 ### 八、M10 验收
 
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
 | 准备包 / M10 准备包 | M10 acceptance pack | 交给外部读者执行的 M10 验收材料包（清单、记录模板、读者包）。 | `reports/m10-acceptance-pack.md:1`、`reports/portfolio-readiness-2026-11-18.md:4`、`reports/v1.0.0-release-checklist.md:5`、`reports/v1.1.0-candidates.md:130` | acceptance-pack:1 是（标题即定义）· portfolio:4 否（已补于 :5）· checklist:5 是（已补）· candidates:130 否 |
-| 独立验收 | independent acceptance | 由一个没参与实现的人执行准备包里的 40 项检查并给出结论。 | `reports/portfolio-readiness-2026-11-18.md:4`、`reports/v1.0.0-release-checklist.md:41`、`reports/v1.1.0-candidates.md:27` | portfolio:4 否（已补于 :5）· checklist:41 是（§1.2 标题括注）· candidates:27 是（已补） |
+| 独立验收 | independent acceptance | 由一个没参与实现的人执行准备包里的 40 项检查并给出结论。 | `reports/portfolio-readiness-2026-11-18.md:8`、`reports/v1.0.0-release-checklist.md:41`、`reports/v1.1.0-candidates.md:27` | portfolio:4 否（已补于 :5）· checklist:41 是（§1.2 标题括注）· candidates:27 是（已补） |
 | 留人工 | left for a human reader | 脚本判不了、要由人读材料下结论的那几项检查。 | `reports/m10-selfcheck.md:25`、`reports/portfolio-readiness-2026-11-18.md:296`、`reports/v1.1.0-candidates.md:166` | m10-selfcheck:25 是（§2.2「明确留人工的 40 项」，从 :62 起）· portfolio:296 是（已补）· candidates:166 是（已补） |
 | 三态 | three-state verdict | 一个验收项的三种结论：通过 / 不通过 / 未验证。 | `reports/m10-acceptance-pack.md:27` | 否（三个取值在 :81 才列出） |
 | 卡点 | blocker (a logged defect) | 读者记下的一处文档缺陷：文档写的与实际行为不符。 | `reports/m10-acceptance-pack.md:47` | 否（§3.7 给了记法，没给这个词的定义） |
@@ -174,9 +174,17 @@
 | 走查 | walkthrough | 按读者视角从头走一遍流程；与只做文本比对的复核不同。 | `reports/m10-reader-walkthrough-3rd.md:1`、`reports/final-outward-consistency.md:212` | 否（只有标题） |
 | 演练 | rehearsal / dry run | 照着清单真做一遍；见第二节「只读演练」。 | `reports/release-process-dry-run.md:1` | 是 |
 | 审计 | audit | 一处或一组缺陷的根因追查，结论通常是"要改哪里的机制"。 | `reports/coverage-guard-audit.md:1` | 否（只有标题） |
-| 首读 | cold read | 没读过该文档的外部读者从零冷读一遍并给结论。 | `reports/next-engagements.md:343` | 否 |
+| 首读 | cold read | 没读过该文档的外部读者从零冷读一遍并给结论。 | `reports/next-engagements.md:356` | 否 |
 
 ---
+
+### 这一轮新引入的两个说法
+
+| 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
+|---|---|---|---|---|
+| **判定格** | verdict cell | 一张判定表里**一格判定**；一行可以同时判两格（「不一致 + 无法验证」），所以「判定格数」比「行数」多。 | `docs/reports/release-process-dry-run.md` §0 | 是 |
+| **静态条数 / 实跑条数** | static count / live count | 契约的**静态条数**是脚本里 `check()` 调用点的数目（49）；**实跑条数**是那次真跑出来的条数（48 或 47，依可用后端而定）。两者不是一回事。 | `docs/architecture/public-contracts.md` §7 | 是 |
+
 
 ## 故意不收的词
 

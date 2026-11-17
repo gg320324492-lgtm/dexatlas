@@ -191,8 +191,8 @@ def test_the_check_fails_when_a_badge_drifts(tmp_path: Path) -> None:
     root = _copy_tree(tmp_path)
     readme = root / "README.md"
     text = readme.read_text(encoding="utf-8")
-    total = _script().collect_facts(REPO_ROOT).figures["tests.total"]
-    before = f"badge/tests-{total}%20passing"
+    passed = _script().collect_facts(REPO_ROOT).figures["suite.passed"]
+    before = f"badge/tests-{passed}%20passing"
     assert before in text
     readme.write_text(text.replace(before, "badge/tests-1600%20passing"), encoding="utf-8")
 

@@ -15,7 +15,7 @@
 > 外加对外展示页 `docs/portfolio.md` 与对外边界文档
 > `docs/service-commitments.md`。
 >
-> **基准树**：本 worktree `HEAD` = `48a56b5`（`v1.0.0` tag 指向 `b71bf30`，
+> **基准树**：本 worktree `HEAD` = `48a56b5`（`v1.0.0` tag **写这份报告时**指向 `b71bf30`（指向会变，现查 `git rev-parse v1.0.0^{commit}`），
 > 二者相差 1 个提交）。测量数字一律取自
 > `docs/reports/phase1-execution-report.md` 的 `<!--fig:...-->` 标记，
 > 报告里的 `<!--report-figures:{...}-->` 记录块同理；本报告不手抄任何数字，
@@ -298,7 +298,7 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 | 说法 | 实况 |
 |---|---|
 | 「四份素材与本文件的最后一次改动都在 `0104ccb`」 | 三份素材与本文件的最后一次改动是 `00309bb`（2026-11-18 02:15:33 +0800）；`scope-ai-mcp.md` 是 `08cb34f` |
-| 「tag `v1.0.0`」 | tag 当前指向 `b71bf30`，`0104ccb` 只是它的祖先 |
+| 「tag `v1.0.0`」 | tag 的指向会变（发版后重打过；现查 `git rev-parse v1.0.0^{commit}`），`0104ccb` 只是它的祖先 |
 | 「tag `v1.0.0`，2026-11-17」 | tag 对象 taggerdate = `2026-11-18 02:16:25 +0800`（= UTC `2026-11-17 18:16:25`） |
 
 `git log -1 -- docs/outreach/publish-review.md` → `00309bb`。
@@ -312,7 +312,7 @@ F-8 的成因。
 **建议改法：**
 
 > > **核对基准：** 素材最后一次改动是 `00309bb`（2026-11-18 02:15:33 +0800）；
-> > `v1.0.0` tag 当前指向 `b71bf30`。本文件的核对结论仍锚在 `0104ccb`，
+> > `v1.0.0` tag 的指向会变（发版后重打过；现查 `git rev-parse v1.0.0^{commit}`）。本文件的核对结论仍锚在 `0104ccb`，
 > > 数字列已按最新一次完整测量同步。
 
 ---
@@ -327,7 +327,7 @@ F-8 的成因。
 >   covers the documented CLI/API/MCP surfaces.
 
 `docs/outreach/publish-review.md:11`、`:28`、`:71`、`:78`、`:81`、`:314`；以及
-`docs/status.md:129`（`v1.0.0`（tag 2026-11-17）已发布）。
+`docs/status.md:3`（`v1.0.0`（tag 2026-11-17）已发布）。
 
 **仓库实况：** tag 是附注 tag，taggerdate = **`2026-11-18 02:16:25 +0800`**，
 换算成 UTC 是 `2026-11-17 18:16:25`。也就是说「2026-11-17」只在 UTC 成立，
@@ -587,3 +587,21 @@ python scripts/check-version-claims.py --base auto
    `suite.*` / 源指纹**都可能再变一次**，四份素材里的数字要跟着再同步一遍。
    建议等测量彻底落盘、连跑两次数字不再变之后，再一次性改完本报告里的全部
    建议句。
+
+## 处置状态（2026-11-18，主会话）
+
+**本文的 11 条发现已全部落地**（其中 F-3「落盘记录里有 1 条 failed」随着最终重测量落定
+自动消解）。本节写下来，是为了让后来的读者知道：下面那些「现在还错着」的描述**描述的是
+本文写就时的树**，不是现状。
+
+| 发现 | 处置 |
+|---|---|
+| F-1 两个不存在的 CLI 命令 | 已改：`xref` → `xrefs`，`evidence`/`report` 换成 `export` 与 `analyze` 的真实职责 |
+| F-2 覆盖率少了「一方代码」限定词 | 已改：三处都写成「93.3% coverage of the project's own code」 |
+| F-3 落盘记录里有 1 条 failed | 已消解：最终重测量落盘后是「1632 passed / 0 failed / 0 skipped」（数字随最后一次测量走） |
+| F-4 `portfolio.md` 的 CI job 数 | 已改：十个 job（tag 上十一次并行运行），并把漏掉的三项列上 |
+| F-5 服务承诺页的 M6 数字 | 已改：写成三轮 49/60 = 81.7%、未达三轮合计 ≥90%、方案 3 是最终定稿路径 |
+| F-6–F-10 `publish-review.md` 的覆盖行数 / 基准 / tag 日期 / 门禁记录 / 证据包条目数 | 已改 |
+| F-11 README 的 alt 文本旧数 | 已改 |
+| F-12 `portfolio.md` 缺千分位 | 已改 |
+| F-13 覆盖率与测试数的相对关系没被否定 | 已改：三处首次出现处补了「the denominator is lines of code, not tests」 |

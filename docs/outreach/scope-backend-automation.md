@@ -21,7 +21,7 @@ typing and documentation as part of the deliverable, not an afterthought.
 
 Demonstrated by: **DexAtlas** (open source) — an Android APK analysis platform
 with a FastAPI REST API, a CLI, a SQLite evidence store, three integrated
-third-party engines, 1,632 tests at 93.3% coverage of the project's own code
+third-party engines, 1,643 tests at 93.3% coverage of the project's own code
 (the denominator is lines of code, not tests), strict mypy typing, and
 CI across Python 3.12/3.13 and multiple engine configurations.
 
@@ -97,8 +97,8 @@ decoding → three-engine symbol indexing (Androguard, JADX, Apktool) →
 evidence-grade storage in SQLite → Markdown/JSON reports with per-fact
 provenance. Exposed through a CLI and a FastAPI REST API. Every engine
 failure is captured as a value and reported, so a partially analyzable input
-still produces a complete, honest report. This is the engineering style I
-would bring to your backend or automation task.
+still produces an honest report. This is the style I would bring to your
+backend work.
 
 ---
 
