@@ -1,17 +1,23 @@
 # GitHub / Upwork 作品集准备度复评（第二轮，作者自评）
 
-日期：2026-11-18。评估基准：`75976e0`（= `git rev-parse v1.0.0^{commit}`，与 `origin/main` 同指）。
+日期：2026-11-18。评估基准：**`75976e0` 那棵树**（= **评估当时** `v1.0.0` tag 指向的提交，
+本文把它称为「基线树」；**该 tag 后来被重打，现在指向 `b71bf30`**——本文评的仍是 `75976e0`）。
+**本文的全部结论只对基线树 `75976e0` 成立。** 工作副本此后继续前进（截至 `d43369b` 已领先基线树
+**19 个提交**，此数随工作副本前进而增长）；读者若按当前 checkout 复核，会看到不同的行号、
+不同的「仓库现状」、不同的 CI 运行结果。要复核本文，请先 `git checkout 75976e0`。
 **本文是作者自评（self-assessment），不是 [M10 准备包](m10-acceptance-pack.md)所要求的独立验收。
 （「准备包」= 交给外部读者的 M10 验收材料包；「独立验收」= 由一个没参与实现的人执行该准备包里的
 40 项检查并给出结论。）**
 维度、两平台权重与 0–4 等级定义全部沿用 [2026-11-15 基线评估](portfolio-readiness-2026-11-15.md)；
 「上一轮得分」取 [2026-11-15 复评](portfolio-readiness-2026-11-15-recheck.md) §6.5 的最终值
-（GitHub 81.25% / Upwork 76.9%）。分值是作者按同一评分表对当前树的保守判断，
-供 M10 独立验收对照，**不是验收结论，不是生产成熟度认证，也不是「客户会买」的预测**。
+（GitHub 81.25% / Upwork 76.9%）。分值是作者按同一评分表对**基线树 `75976e0`**
+的保守判断，供 M10 独立验收对照，**不是验收结论，不是生产成熟度认证，也不是「客户会买」的预测**。
 
 > **一句话结论**：这一轮补上的证据几乎全部落在**「可复现」与「说法为真」**两件事上，
-> 没有一件落在**「被外部验证」**上。因此两个平台的分数都涨了（GitHub +3.75、
-> Upwork +5.0 个百分点），而最高权重、最能决定「能不能对外说『已验收』」的
+> 没有一件落在**「被外部验证」**上。因此两个平台的分数都涨了（GitHub +3.75 个百分点、
+> Upwork +5.0 个百分点——**相对上一轮** [2026-11-15 复评](portfolio-readiness-2026-11-15-recheck.md)
+> §6.5 的 81.25% / 76.9%；分母是同一张评分表下的两平台各自百分比分，见 §1、§2 的算式），
+> 而最高权重、最能决定「能不能对外说『已验收』」的
 > **独立使用验证** 一分未动，仍是 1 / 4。
 
 > **更正（2026-11-18，主会话）**：本报告 §8 第 8 条原写「作者记录下的 CI 10 次并行
@@ -32,15 +38,18 @@
   自测快照，逐项给出证据出处与扣分原因。
 - **不是**：独立验收。没有未参与实现的读者执行过
   [准备包](m10-acceptance-pack.md)；本文不给任何验收项判「通过」。
-- **不是**：M6 的最终 Agent 评分。层级 2 真实模型三轮完整重测的结果是
-  **49 / 60 = 81.7%**，未达验收线（每轮 ≥80%、三轮合计 ≥90%），
+- **不是**：M6 的最终 Agent 评分。层级 2 真实模型**三轮、每轮 20 题**（合计 60 题）的完整重测
+  结果是 **49 / 60 = 81.7%**，未达验收线（每轮 ≥80%、三轮合计 ≥90%），
   见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85。
 - **不是**：对仓库全部质量的重测。本轮未重新执行完整测试矩阵与覆盖率测量，
-  采用仓库里已落盘的最终测量：**1,620 项测试（1,473 快 + 147 集成；「快 / 集成」=
-  fast / slow 两套——fast 是 pytest 没标 `slow` 的用例，slow 是标了 `@pytest.mark.slow`、
-  要真调外部后端的集成用例）、
-  一方代码覆盖率 93.3%（7,117/7,631 行）**，
-  见 [phase1-execution-report.md](phase1-execution-report.md):76-77、:1097。
+  采用仓库里已落盘的最终测量：**套件数与一方代码覆盖率见
+  [phase1-execution-report.md](phase1-execution-report.md):76-77 的落盘标记**
+  （`<!--fig:tests.total-->` / `tests.fast` / `tests.slow` / `coverage.pct` /
+  `coverage.covered` / `coverage.total`；源指纹见同文 :1097 的 `source_fingerprint`）。
+  **本文不抄这些数字**：它们由 `scripts/refresh-report-figures.py` 写盘，重测量会整体替换；
+  本文引用标记，读者按标记去该文对。
+  （标记里的「快 / 集成」= fast / slow 两套——fast 是 pytest 没标 `slow` 的用例，
+  slow 是标了 `@pytest.mark.slow`、要真调外部后端的集成用例。）
 - **不是**：接单计划、报价单或市场调研。
 
 ---
@@ -55,12 +64,16 @@
 |---|---:|:---:|:---:|---|
 | 核心工程与证据链 | 30% | 4 | 4 | 已到等级上限；证据变厚但未跨档：CI 新增 tag 触发与只在 tag 上跑的测量 job（[ci.yml](../../.github/workflows/ci.yml):18、:493-525），契约活检进 CI（`ci.yml:442`；契约活检 = 真的把公共契约面跑一遍、失败就非零退出的脚本），M10 自查进 CI（`ci.yml:471`）；两处门禁盲区收口（[check-doc-citations.py](../../scripts/check-doc-citations.py):107、[refresh-report-figures.py](../../scripts/refresh-report-figures.py):1012） |
 | 首次试用与复现 | 20% | 3 | **3.5** | 升级：新增[读者实走演练](reader-dry-run.md)——真 clone 46 秒、`uv sync` 218 秒、后端 359 秒，九步路径与材料逐字相符，七道门禁退出码全 0（:39-45、:196-199）；并查出 **11 处材料与现实不符**（:108-118），已逐条改正。扣分见 §4.2 |
-| Agent 可用性与评测可信度 | 10% | 3.5 | 3.5 | 未变：M6 层级 2 三轮合计 **49/60 = 81.7%**，仍未达 ≥90%（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83）；层级 0/1 证据延续有效 |
+| Agent 可用性与评测可信度 | 10% | 3.5 | 3.5 | 未变：M6 层级 2 **三轮、每轮 20 题（合计 60 题）**，通过 **49/60 = 81.7%**，仍未达三轮合计 ≥90%（[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83）；层级 0/1 证据延续有效 |
 | 客户交付件与服务边界 | 10% | 3 | **3.5** | 升级：契约活检真跑通（[public-contracts.md](../architecture/public-contracts.md):348-362，三后端齐备 = Apktool、JADX、androguard 三个后端都在，48/48、仅 androguard 47/47、退出码 0）；交付路径被演练全程走通。扣分见 §4.4 |
 | 对外展示与个人贡献说明 | 25% | 3 | 3 | 未变：v1.0.0 已发布、LICENSE 已换成官方全文（[LICENSE](../../LICENSE):1、:176、:178）、两轮走查与两轮审计已落盘；但 Upwork 素材仍是草稿未发布（[project-brief.md](../outreach/project-brief.md):3），独立首读复核结论未回填 |
 | 独立使用验证 | 5% | 1 | 1 | 未变：可见记录仍全部是作者自测；[M10 独立验收](m10-acceptance-pack.md)尚未发起（[status.md](../status.md):3、:138） |
 
 **GitHub 加权：4×30 + 3.5×20 + 3.5×10 + 3.5×10 + 3×25 + 1×5 = 120 + 70 + 35 + 35 + 75 + 5 = 340 → 85.0%**
+
+> **分母**：每一维的等级满分 **4 分**，权重是百分数且**各平台权重和 = 100%**，
+> 所以一个平台的**满分是 4 × 100 = 400 分**；平台得分 = 400 × 百分比。
+> GitHub 340 / 400 = **85.0%**。算法见 §3。
 
 ## 2. 评分表：Upwork 服务页
 
@@ -68,16 +81,23 @@
 |---|---:|:---:|:---:|---|
 | 核心工程与证据链 | 20% | 4 | 4 | 同 §1；契约活检与测量进 CI 对 Upwork 侧的意义更直接：对外承诺的每一条现在都有机器可复核的出处 |
 | 首次试用与复现 | 15% | 3 | **3.5** | 同 §1：演练把「客户从零装一遍」这条路走通并留了实测耗时，可直接用于服务页的工时口径 |
-| Agent 可用性与评测可信度 | 15% | 3.5 | 3.5 | 未变：49/60 = 81.7% 未达线，AI/MCP 方向的承诺只能按已实测口径写，不能按模型能力写 |
+| Agent 可用性与评测可信度 | 15% | 3.5 | 3.5 | 未变：49/60 = 81.7%（三轮、每轮 20 题）未达线，AI/MCP 方向的承诺只能按已实测口径写，不能按模型能力写 |
 | 客户交付件与服务边界 | 25% | 3 | **3.5** | 升级：契约活检两套配置实测、已知限制节、发布前点检十项（[publish-review.md](../outreach/publish-review.md):307-340）；扣分见 §4.4 |
 | 对外展示与个人贡献说明 | 15% | 3 | 3 | 未变：服务页与素材仍为草稿未发布（[project-brief.md](../outreach/project-brief.md):3）——这是 Upwork 侧唯一能开门的动作，没做就不能给分 |
 | 独立使用验证 | 10% | 1 | 1 | 未变：没有外部读者执行过准备包 |
 
 **Upwork 加权：4×20 + 3.5×15 + 3.5×15 + 3.5×25 + 3×15 + 1×10 = 80 + 52.5 + 52.5 + 87.5 + 45 + 10 = 327.5 → 81.9%**
 
+> **分母**：同上（每维满分 4 分、权重和 = 100%、平台满分 400 分）。
+> Upwork 327.5 / 400 = **81.875%**，本文四舍五入报 **81.9%**
+> （读者若用 81.9 反推会得到 327.6，与 327.5 差 0.1 —— 那是四舍五入，不是算错）。
+> GitHub 340 / 400 = 85.0% 恰好整除，无此偏差。
+
 ## 3. 加权计算与对照
 
 计算方式与前两轮相同：每项贡献＝分值 ÷ 4 × 该平台权重，两平台分别求和。
+**分母**：每维等级满分 **4 分**、权重为百分数、**各平台权重和 = 100%**，
+故平台满分 = 4 × 100 = **400 分**，百分比 = 加权和 ÷ 400。
 
 | 平台 | 2026-11-15 基线 | 上一轮复评（§6.5） | 这一轮 | 距 90% |
 |---|---:|---:|---:|---:|
@@ -85,8 +105,12 @@
 | Upwork | 约 65% | 76.9% | **81.9%** | 差 **8.1 个百分点** |
 | 两平台平均 | 约 70% | 79.1% | **83.4%** | 差 6.6 个百分点 |
 
-与上一轮同表相比：GitHub **+3.75**、Upwork **+5.0** 个百分点。增量全部来自两个
-半档（首次试用、客户交付件），而 Upwork 权重最高（25%）的客户交付件也是本轮涨得最多的
+与上一轮同表相比：GitHub **+3.75**、Upwork **+5.0** 个百分点。
+**这两个增量的分母是「上一轮复评 §6.5 的百分比分」**——
+81.25% → 85.0%（+3.75）、76.9% → 81.9%（+5.0）；两边用的是同一张评分表、
+同一个满分 400 的分母，所以可以直接相减。**不是**相对 2026-11-15 基线评估
+（那一列是「约 75% / 约 65%」的粗值）。
+增量全部来自两个半档（首次试用、客户交付件），而 Upwork 权重最高（25%）的客户交付件也是本轮涨得最多的
 一维——但它仍差 0.5 分到 4，挡住它的不是证据，是**服务页没发布**。
 
 > **口径校正（上一轮的算式）**：[上一轮复评](portfolio-readiness-2026-11-15-recheck.md):127-130
@@ -183,8 +207,9 @@ Windows 要指向 `bin\jadx.bat`；`export` 提示改为按 manifest 实际文�
 默认预算上调与重复调用检测等有依据的收敛。
 
 **扣分**：**层级 2 真实模型三轮完整重测 49/60 = 81.7%，未达验收线**
-（逐轮 15/20 = 75.0%、16/20 = 80.0%、18/20 = 90.0%；r1 未达每轮 ≥16/20，
-三轮合计未达 ≥54/60，见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85）。
+（**分母：三轮、每轮 20 题，合计 60 题**；逐轮 15/20 = 75.0%、16/20 = 80.0%、18/20 = 90.0%；
+r1 未达每轮 ≥16/20，三轮合计未达 ≥54/60，
+见 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md):38、:83、:85）。
 按冻结纪律，只能修正系统或缩小并重述服务承诺后重测，不得删题换通过率
 （同文件 :85）。因此维持 3.5，不给 4。
 
@@ -240,9 +265,11 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 1. **Upwork 服务页与素材仍是草稿、未发布**（[project-brief.md](../outreach/project-brief.md):3）。
    这一条是 Upwork 侧唯一的门槛动作，没做就不能给 4。
 2. **README 的独立首读复核结论仍未回填**（上一轮列为待办 #5，至今没有落盘的结论）。
-3. **本轮自查发现的新不一致还没改**：README 徽章写 1620，README 正文与
-   social preview 的说明文字仍写 1612（见 §8 第 1–3 条）——展示维度上的
-   「说法为真」还没做到全库一致。
+3. **本轮自查发现的新不一致还没改**：README 徽章（**由脚本写入**，
+   值见 [phase1-execution-report.md](phase1-execution-report.md):76 的 `<!--fig:tests.total-->`
+   落盘值）与 README 正文、social preview 的说明文字（**手写**）当前不一致
+   （见 §8 第 1–3 条）——展示维度上的「说法为真」还没做到全库一致。
+   **这三个位置的数字由 `scripts/refresh-report-figures.py` 负责同步，本文不抄。**
 
 **要提升它要做什么**：发布服务页、回填独立首读复核结论、把 §8 的前三条改掉。
 
@@ -324,7 +351,8 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
    影响：对外展示（3/3，不变）、核心工程（4/4）。
 
 8. **有一个可引用的发布版本了。**
-   证据：tag `v1.0.0` = `75976e0`，与 `origin/main` 同指；
+   证据：**写就时** tag `v1.0.0` = `75976e0`，与 `origin/main` 同指
+   （**该 tag 后来被重打，现在指向 `b71bf30`**；本文评的仍是 `75976e0`）；
    [发版说明](../releases/v1.0.0.md) 与 [GitHub Release 正文成稿](v1.0.0-github-release-body.md) 都在仓库里；
    **但该 tag 的 CI run 不是绿的**：run `44126968629` 以 `failure` 结束（耗时 14 分 32 秒），
    **4 个 job 红**——`Tests (Python 3.12)`、`Tests (Python 3.13)`、
@@ -334,7 +362,9 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
    tag 推送时的 CI 规模是 **9 个 job 定义、10 次并行运行**（`test` 是 3.12/3.13 矩阵）。
    **这一条结果是 2026-11-18 主会话用 `gh run view` 核出来的**（本报告写就时未联网）；
    仓库里也确实没有落盘记录（见 §7 第 7 条、§8 第 17 条）。
-   改变的判断：上一轮评的是「一个工作分支上的树」；这一轮评的是「一个发布出去的版本」——
+   改变的判断：上一轮评的是「一个工作分支上的树」；这一轮评的是「一个发布出去的版本」
+   ——**指的是 tag `v1.0.0` 所指的那一棵树（`75976e0`），不是读者今天拿到的代码**
+   （工作副本已领先它 19 个提交，见文首）。
    **但「发布出去」不等于「CI 验过」**，这一点本报告原版写反了。
    影响：核心工程（4/4，**依据是 `ci.yml` 里的机制，不是那次运行的结果**）、对外展示（3/3）。
 
@@ -413,8 +443,13 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 **这一轮新增的还有两条口径限定**（上一轮没有）：
 
-- 上一轮 §2 引用的测量是 1,542 测试 / 93.1%；当前树是 **1,620（1,473 快 + 147 集成）/ 93.3%**
-  （[phase1-execution-report.md](phase1-execution-report.md):76-77、:1097）。本文用新数。
+- 上一轮 §2 引用的测量是 **1,542 测试 / 93.1%**（那是上一轮自己抄进正文的字面值）；
+  本文不抄基线树的值，改引用落盘标记：
+  **[phase1-execution-report.md](phase1-execution-report.md):76-77** 的
+  `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` / `coverage.pct` /
+  `coverage.covered` / `coverage.total`（源指纹见同文 :1097 的 `source_fingerprint`）。
+  这些数字由 `scripts/refresh-report-figures.py` 写盘，**重测量会整体替换**；
+  本文的口径差异结论（「这一轮的测量比上一轮新」）不依赖具体数值。
 - 上一轮的复评结论（§6.5，GitHub 81.25% / Upwork 76.9%）本身**没有被重新计算**，
   它是「上一轮的快照」；本文是「这一轮的快照」。两者不可相加。
 
@@ -426,20 +461,20 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 | # | 文件:行 | 现状 | 建议改法 |
 |---|---|---|---|
-| 1 | [README.md](../../README.md):15 | 徽章写 `tests-1620`（:12），正文却写「完整环境下的一次测量（**1612** 个测试、0 跳过）」 | 改成 1620，与 [phase1-execution-report.md](phase1-execution-report.md):76 同源 |
-| 2 | [README.md](../../README.md):21 | social preview 的 alt 文本写「…93.3% first-party code coverage, **1612** tests…」 | 改成 1620，与徽章一致 |
-| 3 | [social-preview-howto.md](social-preview-howto.md):53-54 | 「图上的文字」映射表写 `1612` 与 `1465 快 + 147 集成`，而执行报告 :76 已是 1620 / 1473 快 | 按新值改这张表，否则照它重画会把旧数画回图上 |
-| 4 | [status.md](../status.md):26 | 「CI｜**6 个** workflow job 全绿…故实际并行运行数为 **7**」 | 改为 9 个 job 定义、tag 推送时 **10** 次并行运行（[ci.yml](../../.github/workflows/ci.yml):38、:119、:198、:270、:406、:416、:442、:471、:493） |
-| 5 | [status.md](../status.md):50-51 | 「CI 的**六个** workflow job 各自覆盖一种配置…展开后是**七个**并行运行」 | 同上 |
+| 1 | [README.md](../../README.md):15 | 徽章由脚本写入（其值 = [phase1-execution-report.md](phase1-execution-report.md):76 的 `<!--fig:tests.total-->` 落盘值），正文却手写着「完整环境下的一次测量（**1612** 个测试、0 跳过）」——手写的那一处没跟上落盘值 | 改成指向 `<!--fig:tests.total-->` 的落盘值（**不要抄数字**）；这一步由 `scripts/refresh-report-figures.py` 同步 |
+| 2 | [README.md](../../README.md):21 | social preview 的 alt 文本手写着「…93.3% first-party code coverage, **1612** tests…」 | 同上：alt 文本与徽章同源（脚本写），或由脚本一并同步 |
+| 3 | [social-preview-howto.md](social-preview-howto.md):53-54 | 「图上的文字」映射表手写着 `1612` 与 `1465 快 + 147 集成`，而执行报告 :76 的落盘值已是别的数 | 按新值改这张表，否则照它重画会把旧数画回图上；新值取 `<!--fig:tests.total-->` / `tests.fast` 的落盘值，不手抄 |
+| 4 | [status.md](../status.md):26 | 「CI｜**6 个** workflow job 全绿…故实际并行运行数为 **7**」 | 改为 **9 个 job 定义、tag 推送时展开成 10 次并行运行**（`test` 是 3.12/3.13 两格矩阵，所以 9 个 job → 10 次运行；分母是 `ci.yml` 的 job 定义数，不是「运行数」）（[ci.yml](../../.github/workflows/ci.yml):38、:119、:198、:270、:406、:416、:442、:471、:493） |
+| 5 | [status.md](../status.md):50-51 | 「CI 的**六个** workflow job 各自覆盖一种配置…展开后是**七个**并行运行」 | 同上（9 job 定义 / 10 次运行） |
 | 6 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md):40 | 「最终 commit 上 CI **七个**并行运行全绿」 | 改为 10 次（tag 推送时） |
 | 7 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md):112、:423-427 | 「CI 只在 push 到 `main` 或 PR 到 `main` 时触发…**推 tag 也不产生** run」「21 项门禁里 CI 实际跑 14 项，6 道只存在于本地」 | 已被 [ci.yml](../../.github/workflows/ci.yml):18 与三个新 job 推翻；按新状态重写或加注记 |
 | 8 | [ci-gate-coverage.md](ci-gate-coverage.md):13、:35、:49 | 摘要与 §1/§3 说 tag 推送不触发 workflow、CI 是「6 个 job、7 次并行运行」 | 同上：改为 tag 会触发、9 个 job / 10 次运行。§7.1（:340-386）只记了另两个盲区，这条没记 |
 | 9 | [ci-gate-coverage.md](ci-gate-coverage.md):139-140、:414、:446 | 「`v1.0.0^{commit}` = `8f9ddca`」「tag 不可变，本轮没有动它」 | 现在是 `75976e0`；tag 已被重打**五次**（6 个 tag 状态：success → success → success → failure → cancelled → in_progress，见 [release-process-dry-run.md](release-process-dry-run.md) §4.3），按当前指向改 |
 | 10 | [next-engagements.md](next-engagements.md):3 | 「调研基准：本 worktree 的 `0104ccb`（= tag `v1.0.0` 指向的 commit）」 | tag 现指向 `75976e0`；改基准句或注明「本文写于 tag 重打之前」 |
-| 11 | [m10-invitation-final.md](m10-invitation-final.md):60 | commit 占位符「【待填：v1.0.0 发版 commit 的完整 hash】」仍是空的 | 填 `75976e0c884a8f9d6f6771abbaea730eb6490d0b`，或按该文件自述的写法让读者用 `git rev-parse v1.0.0^{commit}` 自取比对 |
+| 11 | [m10-invitation-final.md](m10-invitation-final.md):60 | commit 占位符「【待填：v1.0.0 发版 commit 的完整 hash】」仍是空的 | 按该文件自述的写法让读者用 `git rev-parse v1.0.0^{commit}` 自取比对（**别写死一个 hash**：tag 被重打是这条路径的常态，写死的 hash 第二天就会过期） |
 | 12 | [docs/reports/README.md](README.md) | 索引漏收两份报告：**reader-dry-run.md**（该文件 §7 自己承认「本文件尚未被收录」）与 **next-engagements.md** | 补进索引表；另 :87 那条把要填的 hash 写成 `0104ccb…`，而 tag 现指向 `75976e0` |
 | 13 | [m10-reader-walkthrough-2nd.md](m10-reader-walkthrough-2nd.md)（N1）与 [索引](README.md):127 | 记「N1（重打 `v1.0.0` tag、把远端推进到最终 commit）**未处理**」 | 已处理（tag 已重打并推到 `75976e0`）；回填结论，否则读者会以为发版仍卡着 |
-| 14 | [m10-number-traceability.md](m10-number-traceability.md)（索引 [README.md](README.md):120 亦引） | 记录的权威值是「1,588 个测试、一方代码覆盖率 93.3%（7,117/7,631 行）、源指纹 `sha256:975afa8e…`」 | 套件数已更新为 1,620（1,473 快 + 147 集成）；覆盖率与指纹不变。回填并注明「发版后重测已刷新」 |
+| 14 | [m10-number-traceability.md](m10-number-traceability.md)（索引 [README.md](README.md):120 亦引） | 记录的权威值是「1,588 个测试、一方代码覆盖率 93.3%（7,117/7,631 行）、源指纹 `sha256:975afa8e…`」 | **三项都要按落盘值回填**（**不抄数字**）：套件数与覆盖率取 [phase1-execution-report.md](phase1-execution-report.md):76-77 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` / `coverage.pct` / `coverage.covered` / `coverage.total`；源指纹取同文 :1097 的 `source_fingerprint`。**覆盖率的那两行行数会随套件一起变**（分子分母同时动），所以「百分比没变」不等于「行数没变」。回填并注明「发版后重测已刷新」 |
 | 15 | [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md):127-130 | §4 收敛清单的 GitHub 增量列（+10.0 / +2.5）与其自述口径算不平（按权重应为 +7.5 / +11.25） | 加一行注记说明该列的口径，或按权重改算；本文 §6 已改用可直接复算的算式 |
 | 16 | [status.md](../status.md):71-77 | 「已发布版本」表只列到 `v0.2.0`（`v1.0.0` 只出现在 §1 快照） | 表里补 `v1.0.0` 一行 |
 | 17 | 仓库内无落盘记录 | CI 的运行结果只有机制（[ci.yml](../../.github/workflows/ci.yml)）没有结果——tag `v1.0.0` 那次 run 实际以 `failure` 结束、4 个 job 红 | 落盘一份运行记录（run 链接、时间、覆盖的 job、对应的 commit、结论），放进 [docs/reports/](README.md) 并进索引 —— 否则读者无从判断「这个发布版本的 CI 结论是什么」 |
@@ -451,7 +486,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 **本轮做了这些（全部只读）**：
 
-- 读了当前树（`75976e0`）上的评分基线两篇、准备包、契约表、状态页、案例与附件、
+- 读了**基线树**（`75976e0`）上的评分基线两篇、准备包、契约表、状态页、案例与附件、
   五份对外素材、三份读者走查报告、五份审计报告、演练报告与本轮新增的两份报告，
   逐条核到 `file:line`。
 - `git` 只读查询：`rev-parse`、`rev-list --count`、`log`、`diff --stat`、`merge-base --is-ancestor`、
@@ -463,10 +498,11 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 - 未运行 `pytest --cov`、任何 `coverage` 命令、`uv sync`、
   `scripts/refresh-report-figures.py`；未重新测量覆盖率与套件数，
   采用仓库里已落盘的最终测量（[phase1-execution-report.md](phase1-execution-report.md):76-77、:1097）。
-- 未联网。因此**「GitHub Release 在线」「CI 10 次并行运行全绿」「GitHub 已把仓库
-  识别为 Apache-2.0」这三条本轮无法复核**，本文只引用仓库里可查的部分
-  （tag 指向、CI 工作流定义、LICENSE 全文），其余按作者在平台上的观察陈述，
-  并在 §8 第 17 条列为待落盘项。
+- 未联网。因此**「GitHub Release 在线」「GitHub 已把仓库识别为 Apache-2.0」这两条本轮无法复核**，
+  本文只引用仓库里可查的部分（tag 指向、CI 工作流定义、LICENSE 全文），其余按作者在平台上的
+  观察陈述，并在 §8 第 17 条列为待落盘项。
+  **第三条「CI 10 次并行运行全绿」已从本清单删去**：它不再只是「本轮无法复核」，
+  而是**已被证伪**——tag `v1.0.0` 那次 run 以 `failure` 结束、**4 个 job 红**（见文首更正与 §4.1）。
 - 未邀请任何独立读者，未发起 M10 独立验收，未发布任何内容。
 - 未修改仓库任何文件（除新增本报告），未写入共享树 `E:\Dexatlas`。
 
