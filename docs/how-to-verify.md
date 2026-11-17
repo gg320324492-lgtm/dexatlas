@@ -18,9 +18,10 @@
    本页跟随它主要指向的那几份中文文档。README 的对应入口行上也注明了这一点。
 2. **命令是按 Unix shell / Git Bash 写的。** Windows 上 PowerShell 的写法不同，
    但每条命令本身在两种 shell 里都能跑（`source` 是 bash 的）。
-3. **缺后端不等于通过。** 外部分析后端（JADX / Apktool）找不到时，相关测试会
-   **skip** 而不是 fail。skip 的数量写在 pytest 的汇总行里——**请读那一行，不要只看
-   退出码**（这条规则同样写在[项目自己的开发约定](../CLAUDE.md)里）。
+3. **skip 不等于通过。** 外部分析后端（JADX / Apktool）找不到时，相关测试会
+   **skip** 而不是 fail；两个第三方集成样本没拉时同理。skip 的数量写在 pytest 的
+   汇总行里——**请读那一行，不要只看退出码**（这条规则同样写在
+   [项目自己的开发约定](../CLAUDE.md)里）。§2.3 给了两种环境下这一栏各是多少。
 
 ---
 
@@ -119,9 +120,27 @@ uv run --no-sync pytest -q
   uv run --no-sync pytest --collect-only -q -m "slow"         # → 147/1588 tests collected (1441 deselected)
   ```
 
-* **passed 的数量** —— 应当等于收集数，即**没有 failed、没有 error**。
-* **skipped 的数量** —— **这一栏必须是 0**（或你能说清每一个 skip 的原因）。
-  skip 不是通过。
+* **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
+* **skipped 的数量** —— **这一栏要能说清每一个 skip 的原因。skip 不是通过。**
+
+**skip 从哪来。** 两个第三方集成样本（Apache-2.0 许可，随仓库分发二进制会让读者
+无法核对来源）不在 clone 里，要自己拉：
+
+```bash
+bash scripts/fetch-fixtures.sh
+```
+
+不拉也能跑——套件会跳过用到样本的测试。**这两种跑法的差别就是这一栏：**
+
+| 环境 | 汇总行 |
+|---|---|
+| 三后端齐备，**没**拉第三方样本 | `1561 passed, 27 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
+| 三后端齐备，**拉了**第三方样本 | `1588 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+
+**看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
+不说明「该跑的都跑了」。
+
+（本机实测：整套约 7.5 分钟。后端版本、机器和后端是否在场都会影响它。）
 
 `--no-sync` 是有意加的：它让 uv 不会顺手重新同步环境、把你刚装好的 `.venv` 换掉。
 
