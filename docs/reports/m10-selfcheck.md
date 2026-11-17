@@ -8,7 +8,8 @@
 > 明显缺口，降低外部读者的执行负担。独立验收仍以读者亲手执行[验收记录模板](m10-review-record-template.md)
 > 的结果为准。
 >
-> 执行日期：2026年11月16日 · commit：`bb50635`（main）
+> 执行日期：2026年11月17日 · 运行树：v1.0.0 发版 commit（含本轮 M10 读者材料修正；
+> 读者在自己的验收 commit 上复跑时以自己的实际输出为准）
 
 ## 1. 脚本用法
 
@@ -41,7 +42,7 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 | `FIG.suite-adds-up` | 报告数字纪律 | `tests.total = tests.fast + tests.slow` |
 | `FIG.badge-tests` / `FIG.badge-coverage` | M9 纪律 | README 徽章数字 = 报告 `suite.passed`/`coverage.pct` |
 | `F5.entry` / `F6.entry` | F5/F6 | 契约测试文件与契约实测脚本存在 |
-| `F1.exit-codes` | F1 | 退出码 0–5：契约表 = CLI 常量（含隐式成功 0） |
+| `F1.exit-codes` | F1 | 退出码 0–6：契约表 = CLI 常量（含隐式成功 0）= 契约测试 `EXPECTED_EXIT_CODES` |
 | `F3.mcp-tools` | F3 | MCP 工具清单：契约表 = 测试断言（11 个） |
 | `F4.report-fields` / `F4.schema-version` | F4 | JSON 报告顶层 10 字段与 `schema_version=3`：契约表 = 测试断言 |
 | `F2.route-test` | F2 | 契约快照测试覆盖 REST/CLI/MCP 三表 |
@@ -76,26 +77,38 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 
 ## 3. 本次自查运行结果快照
 
-> 以下为 2026年11月16日在 `bb50635` 上的人工运行记录（非机器生成数字；
-> 可随时用 §1 的命令复现核对）。
+> 以下为 2026年11月17日、在这棵含 M10 读者材料修正的树上的运行记录（非机器生成
+> 数字；可随时用 §1 的命令复现核对）。
 
 - 运行命令：`uv run --no-sync python scripts/m10_selfcheck.py`
-- 退出码：`0`
-- 汇总：**通过 40，失败 0，需人工 40；已判定项通过率 100.0%**
+- 退出码：`1`
+- 汇总：**通过 38，失败 2，需人工 40；已判定项通过率 95.0%**
 - 脚本输出末行原文：
-  `自动化判定：通过 40，失败 0，需人工 40；已判定项通过率 100.0%`
+  `自动化判定：通过 38，失败 2，需人工 40；已判定项通过率 95.0%`
+
+两项失败都不是材料缺陷，如实记下并说明成因：
+
+| 失败项 | 成因 | 归谁 |
+|---|---|---|
+| `DOC.changelog-unreleased` | 判据要求 CHANGELOG 顶部保留一节给下一次发版用；发布后那一节已被清空（Keep a Changelog 的正常形态），所以判红 | 判据过时，要更新脚本；不是 CHANGELOG 的缺陷 |
+| `G.vulture` | 本次运行环境里 `PATH` 与 `.venv` 都没有 vulture（该工作树未装 dev extras） | 环境缺件；装齐 dev extras 的环境应通过 |
+
+第一项的时间线：v1.0.0 于 2026-11-17 发布，CHANGELOG 顶部那一节随即被清空，
+而判据仍要求它保留 Added/Changed，于是把一棵正确的树判红。这两项会随后续编辑
+与环境变化而变。读者在自己树上跑出的输出可能与此不同，**以你的实际输出为准**，
+差异按[读者验收包 §7](m10-reader-package.md)的同一原则处理。
 
 要点：
 
 1. 验收包结构（40 项、19 阻断项、读者包链接）完整。
 2. 三份核心文档的相对链接全部可解析；CHANGELOG 版本与代码版本一致。
-3. README 徽章（tests 1478 / coverage 91.9%）与执行报告 `<!--fig:-->` 数字一致；
-   `tests.total = 1332 + 146` 加和成立。
-4. F1/F3/F4/D3/D1/D5/E1/E5 的静态契约核对全部一致（退出码 0–5、MCP 11 工具、
+3. README 徽章（tests 1588 / coverage 93.3%）与执行报告 `<!--fig:-->` 数字一致；
+   `tests.total = 1441 + 147` 加和成立。
+4. F1/F3/F4/D3/D1/D5/E1/E5 的静态契约核对全部一致（退出码 **0–6**、MCP 11 工具、
    报告 10 顶层字段 + `schema_version=3`、`not_included` 三键、HTML 无外部资源、
    冻结 20 题、两套报告入口）。
-5. §6.3 门禁的 7 个命令在本机均存在（PATH 或 `.venv`），5 个被点名脚本均有
-   `__main__` 入口；本脚本不代跑全量门禁。
+5. §6.3 门禁的 7 个命令中 6 个在本机可执行（`vulture` 因本环境未装 dev extras
+   不可执行，见上表）；5 个被点名脚本均有 `__main__` 入口；本脚本不代跑全量门禁。
 
 ## 4. 边界与诚实声明
 

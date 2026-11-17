@@ -7,9 +7,13 @@
 > 按本包执行、并把结果填入[验收记录模板](m10-review-record-template.md)后，才产生可引用的
 > 验收证据。
 >
-> 编写日期：2026-11-15 · 编写基准：`ff5c4cc`（本文件在独立分支提交）·
-> 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
-> （GitHub 约 75% / Upwork 约 65%，人工基线，不是接单概率）
+> 编写日期：2026-11-15 · 初稿基准：`ff5c4cc`（本文件在独立分支提交）·
+> **当前版本对应 v1.0.0 发版 commit**——即读者 `git checkout v1.0.0` 得到的那个
+> 提交，也就是[邀请函成稿 §2](m10-invitation-final.md)钉定的验收 commit
+> · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
+> （GitHub 约 75% / Upwork 约 65%，人工基线，不是接单概率；
+> [复评](portfolio-readiness-2026-11-15-recheck.md)的 77.5% / 68.75% 是同一组
+> 维度上的作者自评更新，权重不变，不是新基线）
 >
 > **读者验收包已就绪：** 外部读者请从 [m10-reader-package.md](m10-reader-package.md)
 > 开始——那里有一站式分步执行路径（clone → 环境 → 首次分析 → 案例 → 打分）、
@@ -35,9 +39,12 @@
   DexAtlas 49/60 = 81.7%），但仍未达验收线（每轮 ≥80%、三轮合计 ≥90%）；
   scripted 结果不能替代模型能力，81.7% 也不是通过。
 - **不是安全审计或渗透测试。** 不覆盖 native / 动态分析、恶意软件定性、加固还原。
-- **不替代原始证据。** 与[公共契约表](../architecture/public-contracts.md)、
+- **不替代原始证据。** 本包、[读者验收包](m10-reader-package.md)与
+  [读者工具包](m10-reader-kit.md)三份材料之间冲突时，以**本包的判定标准**为准；
+  本包与被验收对象（[公共契约表](../architecture/public-contracts.md)、
   [服务回归集](../benchmarks/service-regression-set.md)、
-  [M8 安装演练](m8-install-rehearsal.md)等冲突时，以原始证据和代码为准。
+  [M8 安装演练](m8-install-rehearsal.md)、源码、README）冲突时，
+  **以原始证据和代码为准**，并把差异按 §3.7 记成卡点。
 
 **硬规则**
 
@@ -90,7 +97,7 @@
 ### 2.2 B — 完整案例（6 项）
 
 案例入口：[demo-app-walkthrough](../case-studies/demo-app-walkthrough.md)。
-判定时只使用该文档公开的命令；需要作者补充步骤即记 B1 不通过。
+判定时只使用该文档公开的命令；需要作者补充步骤即记**验收项 B1**不通过。
 
 | ID | 验收项与判定标准 | 阻断 | 状态 | 证据记录 |
 |---|---|:---:|---|---|
@@ -154,7 +161,7 @@
 |---|---|:---:|---|---|
 | G1 | 坏输入：非 ZIP 文件当 APK 分析，退出码 2，错误信息可理解，workspace 不留下半成品项目。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；workspace： |
 | G2 | 后端缺失：清空后端环境变量后分析继续，错误记录 `not_installed`，报告照常产出；不得把失败当异常抛出。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；errors： |
-| G3 | 超时：设置极短超时后三后端记录 `timeout`，报告仍产出；同时核对 M8-4 的退出码缺口（全部后端失败仍为 0），记录是否接受及其边界。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；M8-4 结论： |
+| G3 | 超时：设置极短超时后三后端记录 `timeout`，报告仍产出；同时核对 M8-4 的退出码语义——三个后端全部失败时退出码应为 **6**（`EXIT_NO_INDEX`，v1.0.0 新增），不是 0；记录实际退出码。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；M8-4 结论： |
 | G4 | 幂等：同一 APK 连续分析两次，project id 相同，`projects` 只有一条，计数一致。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 两次 id：；项目数： |
 | G5 | 数据隔离：证据包不含 APK、全量源码、未引用字符串；记录 SHA-256 绑定但没有把 APK 打进包。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 包内容：；not_included： |
 
@@ -183,17 +190,18 @@
 | Docker | 可选 | 不想装 Python/JDK 时走 Docker 路线；镜像自带 JADX 与 Apktool |
 | 网络 | 首次需要 | clone、uv 依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写到系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11）；见 [M8 演练](m8-install-rehearsal.md) |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 1.5–2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11）；见 [M8 演练](m8-install-rehearsal.md) |
 
-**固定版本。** 验收针对验收发起人钉定的 commit（待项目里程碑定稿后确定并告知
-hash）。不要用移动的 `main` 分支做验收；所有记录都写清 commit hash。
+**固定版本。** 验收针对验收发起人钉定的 commit（本轮为 v1.0.0 发版 commit，
+完整 hash 随[邀请函成稿 §2](m10-invitation-final.md)给出）。
+不要用移动的 `main` 分支做验收；所有记录都写清 commit hash。
 
 ### 3.2 路线 A：uv（推荐，可完成 CLI、案例、测试和契约检查）
 
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人钉定的 commit>
+git checkout v1.0.0
 uv sync --extra dev --extra analysis --extra mcp --extra demo
 uv run dexatlas backends
 ```
@@ -202,9 +210,12 @@ uv run dexatlas backends
 `not installed`。`analysis` 提供 Androguard（进程内 DEX 解析）；JDK 21 加
 JADX / Apktool 才提供 Java 源码和 Smali 回退。
 
-> **已知文档不一致（M8-3）：** [install.md](../install.md) 的安装节写的是
-> `uv venv` + `uv pip install -e ".[analysis]"`，这是最小安装，不含 `mcp` 和
-> `demo` extras。验收推荐上面的四 extras `uv sync`；无论用哪条，记录实际命令。
+> **M8-3（历史问题，已修复并合入）：** [install.md](../install.md) 的安装节过去
+> 把最小安装（`uv venv` + `uv pip install -e ".[analysis]"`，不含 `mcp` 与
+> `demo` extras）写在前面，容易被读成推荐路线；现在 install.md **先**给四
+> extras 的 `uv sync`，最小路线明确标注为「只用 CLI 与 REST API 时够用」。
+> 验收推荐上面的四 extras `uv sync`；无论用哪条，记录实际命令。
+> 若 install.md 现在的写法仍影响你的操作，记录为卡点。
 
 如果后端不在 `PATH`，按 [install.md](../install.md) 设置：
 
@@ -486,7 +497,10 @@ uv run --no-sync python -c \
 
 - 每项贡献 = 分值 ÷ 4 × 该平台权重；六项求和即该平台总分。
 - 两个平台**分别**达到至少 90% 才算达到 M10 的评分目标；两平台平均分不能替代。
-- 基线是 GitHub 约 75%、Upwork 约 65%；目标 90% 是门槛，不是预测。
+- 基线是 GitHub 约 75%、Upwork 约 65%（[准备度评估](portfolio-readiness-2026-11-15.md)，
+  人工基线）；[复评](portfolio-readiness-2026-11-15-recheck.md)的 77.5% / 68.75%
+  是同一组维度与权重下的作者自评更新，不是新的权重基准——重评请与 75% / 65%
+  这一档对齐，并在记录里写明依据；目标 90% 是门槛，不是预测。
 - 只保留一位小数；不四舍五入到 90% 以上来「达标」。
 - **分数通过不能抵消阻断缺陷。** 以下任一项存在，即使总分 ≥90%，也判 M10 不通过：
   1. 证据链断裂（结论无法追到字节，或引用不可解析）；
@@ -541,9 +555,14 @@ uv run --no-sync python benchmarks/comparison/run.py \
   DexAtlas 5/92；trace 与报告一致。
 - 层级 2 真实模型批次已执行：执行层修复后的三轮完整重测见
   [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md)，DexAtlas 49/60 = 81.7%
-  （逐轮 15/16/18），仍未达 B1 验收线；首测 24/60（40.0%）与中间复测的过渡数字见
+  （逐轮 15/16/18），仍未达 **B1 验收线**；首测 24/60（40.0%）与中间复测的过渡数字见
   [m6-level2-real.md](../benchmarks/m6-level2-real.md) 及各 retest 文档，引用时以
   retest4 为当前事实。评审结论不得写成「真实模型已达标」；scripted 结果不得写成模型能力。
+  > **术语（就地定义）：** 「**B1 验收线**」= v1.0.0 发版阻断项 B1「M6 层级 2
+  > 未达验收线」（每轮 ≥80%、三轮合计 ≥90%），定义见
+  > [v1.0.0 发版演练](v1.0.0-dry-run.md)。它与 §2 判定表里的**验收项 B1**
+  > （B 组「完整案例」，★ 阻断项）是两回事：本节讲前者，那一项讲「案例能否从头
+  > 走到尾」。
 - 判分口径以 `benchmarks/model.py` 的 `check()` 为准；文档与代码冲突时以代码为准。
 
 **M7 — 案例、HTML、证据包**
@@ -564,7 +583,11 @@ uv run --no-sync python benchmarks/comparison/run.py \
   截断 5、重复分析幂等、证据隔离。
 - M8-1（`verify_citations` 裸树 locator）已修复：核对回归测试在旧实现上会红；
   只看到「测试通过」不算。
-- M8-2 / M8-3 / M8-4 仍未关闭，按 §7 决定「阻断」还是「有边界接受」。
+- M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合）
+  **已修复并合入**（`d90baff`，见 [status.md](../status.md)）；M8-4（三后端全部
+  失败仍退 0）**已由退出码 6（`EXIT_NO_INDEX`）关闭**，见 §7 与
+  [公共契约表 §8.1](../architecture/public-contracts.md)。§7 剩下的 macOS 未验证
+  按「有边界接受」处理。
 - 契约核对：`pytest -q tests/test_public_contracts.py` 全过；
   `python scripts/verify-public-contracts.py` 退出码 0；逐项 PASS。
 
@@ -599,7 +622,7 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
   部分运行保留旧覆盖率和旧套件数，等于描述一棵不存在的树。
 - 三种后端配置（全后端 / 无外部后端 / 仅 Apktool）都要有结果或明确记录未跑。
 
-**编写本包时的门禁现状（2026-11-15，基准 `ff5c4cc`）**
+**编写本包时的门禁现状（2026-11-15，基准 `ff5c4cc`）——历史账，不是验收 commit 的现状**
 
 - `ruff check .` 与 `ruff format --check .`：通过。
 - `scripts/check-doc-citations.py`：通过（226 条引用，0 漂移）。
@@ -612,6 +635,12 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 - 这些失败是既有文档数字未随源码树更新，不是本包引入。按项目规则不得手改数字；
   最终 commit 上必须完整重测量后复跑至全绿。详见 §7。
 
+> **读者怎么用这张表：** 上面的数字描述的是 2026-11-15 写本包时的那棵树，**不是**
+> 验收 commit 的现状。v1.0.0 发版的完整重测量已在其后执行（见
+> [发版说明](../releases/v1.0.0.md)）。**以你在验收 commit 上复跑的结果为准**：
+> 上面 7 条命令应当全部以退出码 0 结束；任何一条非 0，按 §3.7 记卡点，并把
+> 实际输出原文贴进记录——不要拿本表的历史数字去判通过或不通过。
+
 
 
 ### 6.4 最终 commit 与发布候选
@@ -622,7 +651,9 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
   native / dynamic 能力；`v1.0.0` 的稳定承诺只覆盖契约表明确列入的范围。
 - 实验性 Agent 行为另行标注；不得把默认预算下的有限能力写成通用自主分析。
 - 完成源码评审和验收后才准备 tag；提交、推送和发布状态按实际记录书写。
-- **本包编写时没有 tag、没有发布候选、没有验收结论。**
+  **实际状态：v1.0.0 的 tag 于 2026-11-17 打好，而独立验收尚未执行——
+  这次发版不含任何验收结论；M10 仍是「未完成」，本包 40 项仍全部「未验证」。**
+- **本包编写时（2026-11-15）没有 tag、没有发布候选、没有验收结论。**
 
 ## 7. 已知遗留问题（进入验收前必须处理或明确接受）
 
@@ -632,11 +663,11 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 | ID | 问题 | 影响 | 验收处理 | 状态 |
 |---|---|---|---|---|
 | M8-1 | `verify_citations` 把覆盖率观察的裸树 locator 判为未解析 | M7 的「包搬走后引用仍可解析」对真实分析不成立 | 已修复并带红→绿回归测试；复验 C6 | 已修复，待复验 |
-| M8-2 | 容器内查询命令缺 `--workspace`，只能靠 `DEXATLAS_WORKSPACE` | 首次 Docker 用户必踩；两条路径不一致 | 修 CLI 或在 install.md 明示；验收记录是否阻断 | 未关闭 |
-| M8-3 | install.md 的安装命令与推荐四 extras 不一致 | 按 install.md 装会缺 MCP/demo 依赖 | 增补推荐组合与各 extra 用途；验收记录实际路线 | 未关闭 |
-| M8-4 | 三后端全部超时后 run 仍 completed、退出码 0 | 只看退出码会把空索引运行误判为成功；涉及公共契约 | 明确接受边界，或修退出码并版本化契约；G3 记录 | 未关闭（重要） |
+| M8-2 | 容器内查询命令缺 `--workspace`，只能靠 `DEXATLAS_WORKSPACE` | 首次 Docker 用户必踩；两条路径不一致 | 已修 CLI（所有命令都有 `--workspace`/`-w`）并合入（`d90baff`）；复验 A6/G2 时确认 | 已修复并合入 |
+| M8-3 | install.md 的安装命令与推荐四 extras 不一致 | 按 install.md 装会缺 MCP/demo 依赖 | 已把四 extras 路线写进 install.md 安装节并合入（`d90baff`）；最小路线标注为「只用 CLI 与 REST API 时够用」；复验时确认 | 已修复并合入 |
+| M8-4 | 三后端全部超时后 run 仍 completed、退出码 0 | 只看退出码会把空索引运行误判为成功；涉及公共契约 | 已修：新增退出码 6（`EXIT_NO_INDEX`）并版本化（[公共契约表 §8.1](../architecture/public-contracts.md)、[提案](../proposals/exit-code-partial-read.md)）；G3 复验时核对实际退出码 | 已关闭（v1.0.0 退出码 6） |
 | — | macOS 未验证 | 平台矩阵不完整 | 如读者使用 macOS，单独记录；不得外推 | 未验证 |
-| — | M6 层级 2 已执行但未达验收线（retest4 三轮 49/60 = 81.7%，逐轮 15/16/18） | 不能声称真实模型在冻结集上达标；首测/中间轮的 24/60、40.0% 等是过渡数字 | 以 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为当前事实；B1 验收线未达，scripted 不得替代 | 未达标（B1 未关闭） |
+| — | M6 层级 2 已执行但未达验收线（retest4 三轮 49/60 = 81.7%，逐轮 15/16/18） | 不能声称真实模型在冻结集上达标；首测/中间轮的 24/60、40.0% 等是过渡数字 | 以 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为当前事实；**B1 验收线**未达，scripted 不得替代 | 未达标（B1 验收线未关闭） |
 | — | 独立验收尚未执行 | M10 未完成 | 本包就是为此准备；执行后回填 §8 | 未执行 |
 | — | `install.md` 写「No APK is committed」，但 `examples/` 有一方 APK | 首次读者可能误以为必须 fetch fixtures | 记录为文档措辞问题；完整案例直接用 `examples/`；不阻断 | 文档缺陷（低） |
 | — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 最终 commit 上完整重测量后复跑；不得手改数字，不得用部分测量刷新 | 未关闭（阻断文档门禁） |
@@ -650,11 +681,11 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 | 客户视角审阅交付样例：输入/结论、引用、事实/线索 | §4 | 未验证 |
 | 源码评审具备审查对应代码的能力 | §1、§6 | 未验证 |
 | M5–M9 每项均有证据与评审结论 | §6 | 未验证 |
-| 所有阻断项关闭；重要遗留项有边界与接受理由 | §2.8、§7 | 未关闭（M8-2/3/4 等） |
-| 最终 commit 源码审查与完整质量检查；数字属于同一棵树 | §6.3、§6.4 | 未验证 |
+| 所有阻断项关闭；重要遗留项有边界与接受理由 | §2.8、§7 | 未关闭：19 个 ★ 阻断项尚无读者判定；§7 遗留项中 M8-2/M8-3 已修复并合入、M8-4 已由退出码 6 关闭，macOS 未验证仍待明确接受 |
+| 最终 commit 源码审查与完整质量检查；数字属于同一棵树 | §6.3、§6.4 | 未验证（v1.0.0 发版前已在发版 commit 上完整重测量，读者仍需自行复跑确认） |
 | 按原权重重评 GitHub / Upwork，各至少 90% | §5 | 未执行：无分数 |
 | 列出交付文件、使用说明、兼容/破坏性变更、已知限制 | §6.4、§7 | 材料存在，未评审 |
-| 完成源码评审和验收后才推进阶段/准备 tag | §6.4 | 未推进：无 tag |
+| 完成源码评审和验收后才推进阶段/准备 tag | §6.4 | 已发布：v1.0.0（tag 2026-11-17）——但独立验收在其后仍未执行，本次发版不含验收结论 |
 
 **结论：本文件是准备材料；独立验收尚未执行，M10 未完成。**
 在至少一位独立读者完成 §3、一位审阅者完成 §4、一位有代码能力的评审者完成 §6，

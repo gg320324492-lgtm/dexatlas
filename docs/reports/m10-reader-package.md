@@ -6,14 +6,18 @@
 > **未参与实现**的读者的完整执行包：从这里出发，不需要再向作者要任何步骤。
 > 验收记录填写[验收记录模板](m10-review-record-template.md)。
 >
-> 编写日期：2026-11-16（2026-11-17 定稿）· 验收 commit：**由验收发起人钉定并
-> 告知**（待项目里程碑定稿后确定；不要使用移动的 `main` 分支）
+> 编写日期：2026-11-16（2026-11-17 定稿）· 验收 commit：**随邀请函给出**
+> ——即 v1.0.0 发版 commit，完整 hash 写在[邀请函成稿 §2](m10-invitation-final.md)
+> 的占位符里（由发起人填好）；不要使用移动的 `main` 分支
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
-> （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）
+> （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）。
+> 两套数字用的是**同一组维度与权重**，复评是同一维度上的自评更新；
+> 你的重评请与 **75% / 65%** 这一档对齐，并在记录里写明依据。
 >
 > **第一次来？** 先看一页版[读者执行摘要](m10-executive-summary.md)；
-> 邀请与独立性要求见[验收邀请函](m10-invitation-template.md)。
+> 邀请与独立性要求见[邀请函成稿](m10-invitation-final.md)（发给您的就是这一份；
+> [邀请函模板](m10-invitation-template.md)只供发起人填空用）。
 
 ## 0. 这份包是什么、不是什么
 
@@ -43,8 +47,10 @@
    改环境或远程操作。凡是靠作者口头补充才走通的步骤，相关验收项判不通过。
 5. **阻断项一票否决。** 19 个标 ★ 的验收项（清单见[准备包 §2.8](m10-acceptance-pack.md)）
    任何一个不通过，M10 即不通过，高分不能抵消。
-6. **固定 commit。** 验收 commit 由验收发起人钉定后告知 hash，全程只验这一个
-   commit，所有记录写明 hash。不要用移动的 `main` 分支做验收。
+6. **固定 commit。** 验收 commit 由验收发起人钉定，**随邀请函给出**（本轮是
+   v1.0.0 发版 commit，完整 hash 在[邀请函成稿 §2](m10-invitation-final.md)）——
+   不需要你另行索取，全程只验这一个 commit，所有记录写明 hash。不要用移动的
+   `main` 分支做验收。
 7. ** secrets 与第三方样本不入记录。** 记录中的个人路径、密钥、日志用 `<redacted>` 脱敏；
    不要把第三方 APK 或 `so` 文件传给任何人。
 
@@ -60,7 +66,7 @@
 | `gh` CLI | 仅 fixtures 需要 | `scripts/fetch-fixtures.sh` 经 GitHub API 拉取 androguard 测试数据 |
 | 网络 | 首次需要 | clone、依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒纯分析） |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 1.5–2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒纯分析） |
 
 ## 3. 分步执行路径
 
@@ -71,11 +77,12 @@
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人钉定的 commit>
+git checkout v1.0.0
 git status
 ```
 
-预期：`git status` 干净；记录 commit hash、clone 来源 URL、日期。
+预期：`git status` 干净；记录 commit hash（`git rev-parse HEAD` 的输出，
+应与[邀请函成稿 §2](m10-invitation-final.md)钉定的那一串相同）、clone 来源 URL、日期。
 
 ### 3.2 第 2 步：环境准备（验收项 A2、A3）
 
@@ -89,10 +96,12 @@ uv run dexatlas backends
 预期：`uv sync` 退出码 0；`backends` 打印一张表，每个后端是 `available` 或
 `not installed`。四个 extras 的分工见 [install.md](../install.md)。
 
-> **已知文档不一致（M8-3）：** [install.md](../install.md) 安装节写的
-> `uv venv` + `uv pip install -e ".[analysis]"` 是最小安装，不含 `mcp` 与
-> `demo` extras。验收推荐上面的四 extras 路线；无论用哪条，记录实际命令。
-> 若两处说明冲突影响你的操作，记录为卡点。
+> **M8-3（历史问题，已修复并合入）：** [install.md](../install.md) 的安装节过去
+> 把最小安装（`uv venv` + `uv pip install -e ".[analysis]"`，不含 `mcp` 与
+> `demo` extras）写在前面，容易被读成推荐路线；现在 install.md **先**给四
+> extras 的 `uv sync`，最小路线明确标注为「只用 CLI 与 REST API 时够用」。
+> 验收推荐上面的四 extras 路线；无论用哪条，记录实际命令。
+> 若 install.md 现在的写法仍影响你的操作，记录为卡点。
 
 后端不在 `PATH` 时按 [install.md](../install.md) 设置：
 
@@ -122,8 +131,8 @@ docker run --rm dexatlas dexatlas backends
 
 预期：构建约 2 分钟（[M8 演练](m8-install-rehearsal.md)实测 2 分 16 秒）；
 镜像内 JADX / Apktool 可用。容器内多个命令共享 workspace 时，用
-`DEXATLAS_WORKSPACE=/workspace/ws` 统一（已知限制 M8-2：查询类命令缺
-`--workspace` 选项；遇到即记录，不要改用作者未公开的步骤）。
+`DEXATLAS_WORKSPACE=/workspace/ws` 统一（M8-2 已修复并合入：所有命令都带
+`--workspace`/`-w`，这一项不再是已知限制；容器里仍建议用环境变量统一）。
 
 ### 3.3 第 3 步：首次分析 demo.apk（验收项 A4）
 
@@ -143,7 +152,7 @@ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 r
 情况下重复分析，预期仍以退出码 0 完成并产出报告，错误记录写明哪个后端
 `not_installed`；不得崩溃或静默省略。
 
-### 3.4 第 4 步：检索、证据与 locator 解析（验收项 A3–A5、B3–B4、C1–C3）
+### 3.4 第 4 步：检索、证据与 locator 解析（验收项 B3–B4、C1–C3）
 
 以下命令全部来自 [demo-app 案例](../case-studies/demo-app-walkthrough.md)：
 
@@ -265,7 +274,13 @@ uv run --no-sync python -c \
 45% / 40% / 35%，trace 合计 853,103 tokens 超出当次 800,000 授权）与中间复测
 （[retest](../benchmarks/m6-level2-retest.md)、[retest2](../benchmarks/m6-level2-retest2.md)、
 [retest3](../benchmarks/m6-level2-retest3.md)）是过渡数字，引用时不得替代 retest4。
-无论引用哪一轮，验收结论都是「未通过、B1 未关闭」。
+无论引用哪一轮，验收结论都是「未通过、**B1 验收线**未关闭」。
+
+> **术语（就地定义）：** 本文的「**B1 验收线**」= v1.0.0 发版阻断项 B1
+> 「M6 层级 2 未达验收线」（每轮 ≥80%、三轮合计 ≥90%），定义见
+> [v1.0.0 发版演练](v1.0.0-dry-run.md)。它与[验收准备包](m10-acceptance-pack.md)
+> §2 判定表里的**验收项 B1**（B 组「完整案例」，★ 阻断项）是两回事：
+> 本节讲的是前者，判定表里那一项讲的是「案例能否从头走到尾」。
 
 **核查方法**：确认 retest4 的数字由 committed trace 重算得出（可用
 `scripts/m6_level2_retest4_report.py` 复现）；确认文档没有把 81.7% 说成达标，
@@ -292,7 +307,7 @@ uv run --no-sync python -c \
 **核查方法**：抽查报告是否保留了免责声明；确认没有把 scripted 数字当作
 通过率引用；确认预算差异已被披露而不是隐去。
 
-### 4.4 已知限制与未合入修复（对应 G2、G3、A2，★）
+### 4.4 已知限制与历史遗留（对应 G2、G3、A2，★）
 
 - **M8-4（已在 v1.0.0 关闭）**：三个后端全部超时（或全部失败）时，分析状态曾为
   `completed`、退出码曾为 0。v1.0.0 用新退出码 **6（`EXIT_NO_INDEX`）**关闭了它
@@ -302,9 +317,11 @@ uv run --no-sync python -c \
   [exit-code-partial-read.md](../proposals/exit-code-partial-read.md)。复现与
   理由见 [M8 演练 §6](m8-install-rehearsal.md)。请核对：读到 6 时你是否仍会把它
   误读为「分析成功」。
-- **M8-2**：Docker 容器内查询类命令缺 `--workspace` 选项，需用
-  `DEXATLAS_WORKSPACE` 统一。
-- **M8-3**：[install.md](../install.md) 的安装 extras 组合与验收推荐路线不一致
+- **M8-2（已修复并合入）**：容器内查询类命令缺 `--workspace` 选项的历史问题已修
+  ——现在所有命令都带 `--workspace`/`-w`；容器里仍建议用 `DEXATLAS_WORKSPACE`
+  统一工作区。
+- **M8-3（已修复并合入）**：[install.md](../install.md) 的安装节现在**先**给验收
+  推荐的四 extras 路线，最小安装被明确标为「只用 CLI 与 REST API 时够用」
   （见[本包 §3.2](#32-第-2-步环境准备验收项-a2a3)）。
 - **macOS 未验证**：环境表只对 Windows 11 与 Linux 有实测记录。
 
@@ -317,8 +334,8 @@ uv run --no-sync python -c \
   无害占位符。工具不做恶意软件定性、不判断可利用性——案例里若出现越界结论，
   直接判不通过。
 - `lead 0` 表示「分析没有在这一级落结论」，**不表示样本安全**。
-- 测试与覆盖率数字来自 M8 窗口的重测量；你验收的 commit 若不同，以你本机
-  `uv run --no-sync pytest -q` 的实际结果为准。
+- 测试与覆盖率数字来自 v1.0.0 发版的完整重测量；你验收的 commit 若与它不同，
+  以你本机 `uv run --no-sync pytest -q` 的实际结果为准。
 
 ## 5. 评分表填写说明与提交格式
 
@@ -327,6 +344,9 @@ uv run --no-sync python -c \
 - 六个维度、两套权重（GitHub / Upwork）与 0–4 分定义沿用
   [基线评估](portfolio-readiness-2026-11-15.md)；空白表在
   [准备包 §5.2–5.3](m10-acceptance-pack.md)。
+- 基线是 GitHub 约 75%、Upwork 约 65%；[复评](portfolio-readiness-2026-11-15-recheck.md)
+  的 77.5% / 68.75% 是同一组维度与权重下的作者自评更新，不是新的权重基准——
+  你的重评请与 75% / 65% 这一档对齐，并在记录里写明依据。
 - 等级含义：0＝未见证据；1＝初步证据；2＝局部可用、仍有实质缺口；
   3＝在声明环境内有完整演示或复现记录；4＝在限定范围内经过评审并有边界验证。
   4 不表示软件无缺陷。
@@ -376,7 +396,9 @@ uv run --no-sync python -c \
 
 ### 5.4 时间参考
 
-- 到第一份报告：首次 10–20 分钟（含下载），暖缓存约 30 秒。
+- 到第一份报告：首次 10–20 分钟（含下载），暖缓存约 1.5–2 分钟。
+  （[M8 演练](m8-install-rehearsal.md)在已就绪的会话工作树上实测约 30 秒，
+  同一环境差异下两者都成立；以你自己的实测为准，明显超出预期按 §5.2 记卡点。）
 - Docker 镜像构建：约 2 分钟。
 - 完整案例（analyze 到 xrefs）：约 1–2 分钟。
 - 40 项逐项判定 + 两平台打分：视抽查深度，建议预留半天。
@@ -405,6 +427,10 @@ PATH 没配）才修复后重试，并把两次输出都留下。
 检查写成脚本（`scripts/m10_selfcheck.py`）并留有自查记录。它可以帮你在
 正式验收前发现文档、徽章、契约清单层面的明显缺口，但**不替代**你的任何
 一项判定——需人工的项仍要你亲手执行并记录。
+**注意自查记录描述的是哪棵树：** 该记录自带执行日期与它自己写明的 commit，
+是**那一次自查的快照**，不是验收 commit 的现状；它里面的数字与你在验收
+commit 上跑出来的不同，**以你的实测为准**，不要据此判「作者的数字造假」——
+按 §5.2 记成卡点即可。
 
 ## 8. 配套工具：读者工具包
 
