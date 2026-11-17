@@ -188,7 +188,7 @@ GitHub 上的元数据会随作者操作变化；本报告描述的是 2026-11-1
 | # | 缺口 | 卡在哪 | 补什么 |
 |---|---|---|---|
 | 1 | **许可证自相矛盾** | 右侧栏写 `Other`；README 徽章与 `pyproject.toml` 写 Apache-2.0 | 恢复规范 LICENSE 文本 + 新增 `NOTICE`（§8 第 8 项）。这不是"锦上添花"：项目的第一条纪律就是"结论必须能指回来源"，而"自己的许可证都说不清"是这条纪律的第一个反例 |
-| 2 | **"已发布"在 Releases 页对不上** | README 与 `docs/status.md` 说 v1.0.0 已发布；Releases 页最新是 v0.2.0 | 发布 `v1.0.0` 的 Release（§8 第 4 项）。正文已经写好了（`docs/releases/v1.0.0.md`），只差一次 `gh release create` |
+| 2 | **"已发布"在 Releases 页对不上** | README 与 `docs/status.md` 说 v1.0.0 已发布；而「Releases 页最新是 v0.2.0」 | 发布 `v1.0.0` 的 Release（§8 第 4 项）。正文已经写好了（`docs/releases/v1.0.0.md`），只差一次 `gh release create` |
 | 3 | **「怎么复核」在首屏断了** | 中文 README 0 入口；英文入口在第 83% 行 | 两份 README 首屏各补一条（§8 第 9、10 项）。项目的主张是"可回溯"，而验证路径没有指路 = 主张无法兑现给访客 |
 | 4 | **报告索引不可达** | 两份 README 都没有 `docs/reports/README.md` 入口；43 份报告只能靠搜 | 补一条索引入口（§8 第 11 项；与 `docs/reports/readme-map-audit.md` §7 重复） |
 | 5 | **徽章链接落点不对** | Coverage 徽章指向 `pyproject.toml`（93.3% 的出处其实是 `docs/reports/phase1-execution-report.md`） | 改链接目标（§8 第 12 项） |
