@@ -475,8 +475,10 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Service commitments](docs/service-commitments.md)** — what the agent service
   promise covers and what it explicitly does not (Chinese; 服务承诺范围)
 - **[How to verify every claim](docs/how-to-verify.md)** — the commands to re-check this
-  project's own numbers yourself, what you should see, and which claims are not met
-  (Chinese; 怎么自己复核这个项目说的每句话)
+  project's own numbers yourself, what you should see, and
+  [§3](docs/how-to-verify.md#3-哪些说法目前是未达成--未验证请据此打折) lists which claims
+  are not met; needs a JDK, the three analysis backends and the third-party test
+  fixtures (Chinese; 怎么自己复核这个项目说的每句话)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend
   produced which conclusion, and how to check it yourself; worth reading before
   trusting a figure a decompiler produced (Chinese; 分析覆盖度与证据来源)
