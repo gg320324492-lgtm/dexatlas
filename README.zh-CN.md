@@ -148,12 +148,17 @@ cd dexatlas
 uv sync --extra analysis
 
 uv run dexatlas backends              # 哪些后端可用、版本号是多少
-uv run dexatlas analyze app.apk -o report.md --json report.json --html report.html
+uv run dexatlas analyze examples/demo-app/demo.apk -o report.md --json report.json --html report.html
 uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
 uv run dexatlas export <project-id> -o evidence-package.zip
 ```
+
+`analyze` 示例指向 `examples/demo-app/demo.apk` —— 这是**仓库自带的**真实
+APK，克隆下来就能直接分析：无需下载，也不需要 Android SDK。它由旁边的
+smali 源码构建而成，可用 `scripts/build-demo-apk.sh` 重新构建（需要
+Apktool + JDK）；拿到自己的 APK 后，把 `analyze` 指向它即可。
 
 所有命令都接受同一组 `--workspace`/`-w` 选项：`analyze` 可以创建工作区，
 其余只读命令要求工作区已存在。
