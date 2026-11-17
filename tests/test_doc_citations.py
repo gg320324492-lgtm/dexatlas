@@ -639,12 +639,18 @@ def test_a_document_that_quotes_another_tree_s_fingerprint_is_a_finding(
     A document that names a tree it does not quote the fingerprint of is a
     document whose line numbers cannot be tied to anything, and the registry
     entry that says so is a claim nobody has checked.
+
+    The fingerprint is quoted the way the documents quote it: abbreviated.
+    One release body abbreviates it to eight hex characters and another to
+    six, so a checker that only recognises the longer form calls a document
+    that *does* name a fingerprint a document that quotes none -- a finding
+    that is about the checker's own vocabulary rather than about the
+    document.
     """
     repository = _repository_with_two_trees(tmp_path)
     document = repository / "doc.md"
     document.write_text(
-        "The logic lives in `file.py:8`.\n\nThis document describes the tree "
-        "`sha256:" + "cd" * 32 + "`.\n",
+        "The logic lives in `file.py:8`.\n\nThis document describes the tree `sha256:cdcdcd…`.\n",
         encoding="utf-8",
     )
 
