@@ -32,12 +32,12 @@ Usage notes:
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
   [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip).
-  **How to read them:** the three walkthroughs are **three viewpoints on two
-  samples**, not three separate projects — case studies 1 and 3 analyze the
-  same first-party sample, and the demo and api-integration packages carry
-  **the same analysis report** (their `report.md` and `report.html` are
-  byte-identical; only `report.json` and `manifest.json` differ). Do not
-  present them as three independent pieces of work or three client cases.
+  **How to read them:** the three walkthroughs cover **three first-party
+  samples** (demo, obfuscated, and a multi-DEX appendix), while the three
+  evidence packages hold **only two analyses** — the demo and api-integration
+  packages are the same analysis run, so their `report.md` and `report.html`
+  are byte-identical and only `report.json` and `manifest.json` differ. Do not
+  present them as three independent analyses or three client cases.
 - Field lengths are accounted for in
   [publish-review.md](publish-review.md): every letter and every scope
   section is measured there against the platform's character limits. That

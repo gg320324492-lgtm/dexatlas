@@ -133,12 +133,18 @@ tag（`git for-each-ref refs/tags/v1.0.0`），`src/dexatlas/__init__.py` 的
 **一处必须说明的事实：demo 与 api-integration 两个证据包里的报告是同一份。** 把两个
 zip 解开逐文件比对，`reports/report.md` 与 `reports/report.html` **字节完全相同**
 （sha256 前 16 位同为 `1594a0c19aa6c165` / `82bcb84c37db4f64`），只有
-`reports/report.json` 与 `manifest.json` 不同。原因是 case study 1 与 case study 3
-分析的是**同一个**一方样本 `examples/demo-app/demo.apk`（sha256 `80a8fe0e…`）——
-case study 3 走的是 REST API / MCP 入口，不是另一个样本；case study 2 才是混淆样本。
-所以这三篇走查是**三个视角、两个样本**，对外不要读成三个独立样本或三个客户案例。
-素材侧已各加了一句澄清（`project-brief.md` §Links、`cover-letter-templates.md`
-用法说明）。
+`reports/report.json` 与 `manifest.json` 不同。两边的 `manifest.json` 也写明是同一次
+分析：APK sha256 同为 `80a8fe0e…`，`run_id` 同为 `run_e112e717…`。原因是 case
+study 1 与 case study 3 分析的是**同一个**一方样本 `examples/demo-app/demo.apk`
+——case study 3 走的是 REST API / MCP 入口，不是另一个样本。
+
+**样本数与分析数不是一回事。** 三篇走查涉及**三个**一方样本：`demo.apk`
+（case study 1 与 3）、`obfuscated.apk`（case study 2）、`multidex.apk`（case study 2
+的 multi-DEX 附录）。但**三个证据包只覆盖两份分析**——demo 包与 api-integration 包是
+同一次分析（所以报告字节相同），obfuscated 包是另一次分析（`run_id`
+`run_8d6735d4…`）；`multidex.apk` 没有单独的证据包。对外不要读成三份独立分析，
+更不要读成三个客户案例。素材侧已各加了一句澄清（`project-brief.md` §Links、
+`cover-letter-templates.md` 用法说明）。
 
 ### 4.3 素材里没有指错的东西
 
@@ -215,7 +221,7 @@ EOF
 | Deliverables shown in the repository | `project-brief.md` | 1,455 | 1,437 | 5,000 | ✅ |
 | Third-party components (attribution) | `project-brief.md` | 458 | 452 | 5,000 | ✅ |
 | Honest limitations | `project-brief.md` | 426 | 428 | 5,000 | ✅ |
-| Links | `project-brief.md` | 1,048 | 823 | 5,000 | ✅ |
+| Links | `project-brief.md` | 1,178 | 947 | 5,000 | ✅ |
 | 全文（附件） | `scope-backend-automation.md` | 4,950 | 4,941 | 5,000 | ✅ |
 | §What I offer（粘贴段） | `scope-backend-automation.md` | 592 | 588 | 5,000 | ✅ |
 | 全文（附件） | `scope-ai-mcp.md` | **6,561** | **6,530** | 5,000 | ❌ 超（见 §5.2） |
