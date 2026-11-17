@@ -36,7 +36,7 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 | `PACK.reader-links` | §1 | 读者包链接验收包与记录模板 |
 | `DOC.pack-links` / `DOC.reader-links` / `DOC.contracts-links` | 文档完整性 | 三份文档的相对链接全部可解析 |
 | `DOC.case-study` / `DOC.service-set` | B 组/E 组入口 | 案例文档与回归集文档存在 |
-| `DOC.changelog-unreleased` | 变更记录纪律 | `[Unreleased]` 含 Added/Changed |
+| `DOC.changelog-newest-section` | 变更记录纪律 | 最新一节含 Added/Changed |
 | `DOC.changelog-version` | 版本一致性 | `__init__.py` 版本 = CHANGELOG 最新发布版 |
 | `FIG.consistent` | 报告数字纪律 | `<!--fig:-->` 同键不出现两个值 |
 | `FIG.suite-adds-up` | 报告数字纪律 | `tests.total = tests.fast + tests.slow` |
@@ -81,22 +81,21 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 > 数字；可随时用 §1 的命令复现核对）。
 
 - 运行命令：`uv run --no-sync python scripts/m10_selfcheck.py`
-- 退出码：`1`
-- 汇总：**通过 38，失败 2，需人工 40；已判定项通过率 95.0%**
+- 退出码：`0`
+- 汇总：**通过 40，失败 0，需人工 40；已判定项通过率 100.0%**
 - 脚本输出末行原文：
-  `自动化判定：通过 38，失败 2，需人工 40；已判定项通过率 95.0%`
+  `自动化判定：通过 40，失败 0，需人工 40；已判定项通过率 100.0%`
 
-两项失败都不是材料缺陷，如实记下并说明成因：
+上一版本文件记的是「通过 38，失败 2」：两项失败都不是材料缺陷，而是两处环境与
+判据的问题，现已分别消解——
 
-| 失败项 | 成因 | 归谁 |
+| 原失败项 | 成因 | 现在 |
 |---|---|---|
-| `DOC.changelog-unreleased` | 判据要求 CHANGELOG 顶部保留一节给下一次发版用；发布后那一节已被清空（Keep a Changelog 的正常形态），所以判红 | 判据过时，要更新脚本；不是 CHANGELOG 的缺陷 |
-| `G.vulture` | 本次运行环境里 `PATH` 与 `.venv` 都没有 vulture（该工作树未装 dev extras） | 环境缺件；装齐 dev extras 的环境应通过 |
+| `DOC.changelog-unreleased` | 判据写死了「CHANGELOG 顶部要有 `[Unreleased]` 一节」；v1.0.0 于 2026-11-17 发布后那一节被清空（Keep a Changelog 的正常形态），于是一棵正确的树被判红 | **判据已改为版本无关**：`scripts/m10_selfcheck.py` 现在检查 CHANGELOG 的**最新一节**（发版前是 `[Unreleased]`，发版后是刚打 tag 的那一节）是否含 Added/Changed，条目 id 随之改为 `DOC.changelog-newest-section` |
+| `G.vulture` | 本次运行环境里 `PATH` 与 `.venv` 都没有 vulture（该工作树未装 dev extras） | 装齐 dev extras 的环境里通过 ✓ |
 
-第一项的时间线：v1.0.0 于 2026-11-17 发布，CHANGELOG 顶部那一节随即被清空，
-而判据仍要求它保留 Added/Changed，于是把一棵正确的树判红。这两项会随后续编辑
-与环境变化而变。读者在自己树上跑出的输出可能与此不同，**以你的实际输出为准**，
-差异按[读者验收包 §7](m10-reader-package.md)的同一原则处理。
+差异按[读者验收包 §7](m10-reader-package.md)的同一原则处理：读者在自己树上跑出的
+输出可能与此不同，**以你的实际输出为准**。
 
 要点：
 

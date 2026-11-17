@@ -277,19 +277,24 @@ def check_document_links(report: Report) -> None:
 
 
 def check_changelog(report: Report) -> None:
-    """The changelog carries an [Unreleased] section with Added/Changed headings."""
+    """The changelog's newest section carries Added/Changed headings.
+
+    Before a release that section is ``[Unreleased]``; after it, it is the
+    version just tagged. The check follows the newest section rather than a
+    fixed name, so it does not expire the day the section is renamed.
+    """
     text = CHANGELOG_PATH.read_text(encoding="utf-8")
-    has_unreleased = "## [Unreleased]" in text
-    unreleased = text.split("## [Unreleased]", 1)[1] if has_unreleased else ""
-    section = unreleased.split("\n## ", 1)[0]
+    match = re.search(r"^## \[([^\]]+)\]", text, re.MULTILINE)
+    heading = match.group(1) if match else ""
+    section = text[match.end() :].split("\n## ", 1)[0] if match else ""
     has_added = "### Added" in section
     has_changed = "### Changed" in section
     report.add(
         outcome_of(
-            "DOC.changelog-unreleased",
-            "CHANGELOG 含 [Unreleased]（Added/Changed）",
-            has_unreleased and has_added and has_changed,
-            f"Unreleased={has_unreleased}，Added={has_added}，Changed={has_changed}",
+            "DOC.changelog-newest-section",
+            "CHANGELOG 最新一节含 Added/Changed",
+            bool(heading) and has_added and has_changed,
+            f"最新节=[{heading}]，Added={has_added}，Changed={has_changed}",
         )
     )
 
