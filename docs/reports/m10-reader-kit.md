@@ -6,8 +6,9 @@
 > **回填说明**、**常见问答**。它不含任何验收结论，也不预填任何分数——本文里
 > 每一个空格都还是空的，等读者亲手填。
 >
-> 编写日期：2026-11-17 · 验收 commit：**277d0fa**（由验收发起人钉定，见
-> [邀请函成稿](m10-invitation-final.md)）· 判定依据：[验收准备包](m10-acceptance-pack.md)
+> 编写日期：2026-11-17 · 验收 commit：**v1.0.0 发版 commit**——完整 hash 写在
+> [邀请函成稿 §2](m10-invitation-final.md)的占位符里，由验收发起人填好后随函给你；
+> 本文件与该 commit 同一棵树 · 判定依据：[验收准备包](m10-acceptance-pack.md)
 > · 评分基线：[准备度评估](portfolio-readiness-2026-11-15.md)
 
 ## 0. 先读这三条
@@ -22,7 +23,7 @@
    窄验证转通过 3/6，未达 ≥4 的判据（`docs/benchmarks/m6-level2-narrow-verify3.md:61`）。
    项目已按既定方案停止追加修复轮，把 Agent 服务定稿为**现状披露**——
    「有界、证据可核查的 agent 演练」，不宣称达到验收线。这是读者应当重点核对的
-   高风险声明之一（`docs/reports/m10-reader-package.md:255`）。
+   高风险声明之一（`docs/reports/m10-reader-package.md:261`）。
 
 ## 1. 你的路径
 
@@ -38,7 +39,7 @@
 
 > **维度与权重逐字沿用[准备包 §5](m10-acceptance-pack.md)，一字未改。**
 > 不因本轮完成了什么而改权重——改了权重，分数就与 75% / 65% 的基线不可比
-> （`docs/reports/m10-acceptance-pack.md:442`）。基线权重出处：
+> （`docs/reports/m10-acceptance-pack.md:453`）。基线权重出处：
 > `docs/reports/portfolio-readiness-2026-11-15.md:34`。
 
 ### 2.1 评分等级（0–4）
@@ -86,7 +87,10 @@
 
 - 每项贡献 = 分值 ÷ 4 × 该平台权重；六项求和即该平台总分。
 - 两个平台**分别**达到至少 90% 才算达到 M10 的评分目标；两平台平均分不能替代。
-- 基线是 GitHub 约 75%、Upwork 约 65%；目标 90% 是门槛，不是预测。
+- 基线是 GitHub 约 75%、Upwork 约 65%（[准备度评估](portfolio-readiness-2026-11-15.md)，
+  人工基线）；[复评](portfolio-readiness-2026-11-15-recheck.md)的 77.5% / 68.75%
+  是同一组维度与权重下的作者自评更新，不是新的权重基准——重评请与 75% / 65%
+  这一档对齐，并在记录里写明依据；目标 90% 是门槛，不是预测。
 - 只保留一位小数；不四舍五入到 90% 以上来「达标」。
 - **分数通过不能抵消阻断缺陷。** 以下任一项存在，即使总分 ≥90%，也判 M10 不通过：
   1. 证据链断裂（结论无法追到字节，或引用不可解析）；
@@ -115,13 +119,13 @@
 | 独立使用验证 | 5% / 10% | **就是您这一份记录**：有没有未参与实现的读者复现并留痕 | 可见记录主要是项目自身演练与评审，未见独立读者复现及客户式验收记录；不推断项目没有外部用户 |
 
 > 权重一列按准备包原表抄写：GitHub 30/20/10/10/25/5
-> （`docs/reports/m10-acceptance-pack.md:457`）、Upwork 20/15/15/25/15/10
-> （`docs/reports/m10-acceptance-pack.md:471`）。
+> （`docs/reports/m10-acceptance-pack.md:468`）、Upwork 20/15/15/25/15/10
+> （`docs/reports/m10-acceptance-pack.md:482`）。
 
 ### 2.6 总评与一句话结论
 
 打分只依据**您自己的验收记录**。引用作者报告的数字时，注明「作者自述，未独立复现」，
-或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:331`）。
+或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:358`）。
 
 ```text
 GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
@@ -129,7 +133,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 总评（对照 40 项判定的整体结论）：
 
 阻断项结论：____ 项通过 / ____ 项不通过 / ____ 项未验证
-  （19 个 ★ 阻断项清单见 docs/reports/m10-acceptance-pack.md:166；
+  （19 个 ★ 阻断项清单见 docs/reports/m10-acceptance-pack.md:173；
     任一 ★ 不通过，M10 即不通过，分数不能抵消）
 
 一句话结论（读者的一句话判断）：
@@ -145,7 +149,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 
 | 模板段落 | 你填什么 | 材料来源 |
 |---|---|---|
-| §1 记录元数据（`docs/reports/m10-review-record-template.md:8`） | 角色、是否参与实现、日期、**commit hash（填 277d0fa）**、副本来源、OS 与 Python/uv/JDK/Docker 版本、三个后端各自 available / not installed、是否用了作者补充步骤 | 你的机器；后端可用性来自 `uv run dexatlas backends` |
+| §1 记录元数据（`docs/reports/m10-review-record-template.md:8`） | 角色、是否参与实现、日期、**commit hash（填邀请函成稿 §2 钉定的那一串完整 hash）**、副本来源、OS 与 Python/uv/JDK/Docker 版本、三个后端各自 available / not installed、是否用了作者补充步骤 | 你的机器；后端可用性来自 `uv run dexatlas backends` |
 | §2 首次读者会话记录（`docs/reports/m10-review-record-template.md:24`） | A1–A7、B1–B6、D1–D5 每步一行：命令、退出码、关键输出摘要、耗时、卡点编号 | [读者验收包 §3](m10-reader-package.md) 的命令原文 |
 | §3 卡点记录（`docs/reports/m10-review-record-template.md:60`） | 每个卡点一条：完整命令、退出码、原始输出（脱敏）、你期望的依据（文档哪一节）、是否阻断后续 | 你自己的日志 |
 | §4 客户视角审阅备忘（`docs/reports/m10-review-record-template.md:77`） | 三问结论（输入与结论是否清楚 / 引用能否核查 / 事实与线索能否区分）+ 抽查的 3 条引用 + 红旗清单命中项 | 案例、HTML 报告、证据包 |
@@ -158,14 +162,15 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 - **提交物**：一份填写完成的[验收记录模板](m10-review-record-template.md)（Markdown 文件），
   含元数据、会话记录、卡点、客户视角备忘、（如承担）源码评审记录与两张评分表。
 - **回传方式**：按邀请函第六节指定的渠道交给验收发起人（邀请函发出时填写的
-  收件渠道，`docs/reports/m10-invitation-final.md:131`）。**不要自行 push 到仓库**；
+  收件渠道，`docs/reports/m10-invitation-final.md:146`）。**不要自行 push 到仓库**；
   如发起人要求归档，按其指定渠道提交。
-- **附 commit**：记录里必须写明所验的 commit hash（`277d0fa`，模板 §1「commit hash」栏），
+- **附 commit**：记录里必须写明所验的 commit hash（邀请函成稿 §2 钉定的那一串
+  完整 hash，模板 §1「commit hash」栏），
   以及每条命令是在哪个 commit 上跑的。全程只验这一个 commit，不要切换分支、不要
   拉取新提交。
 - **原始材料留本机**：日志、截图、证据包、`.dexatlas/` 工作区都留在你自己的机器上；
   仓库只接收脱敏后的记录——个人路径、密钥、账号一律写 `<redacted>`
-  （`docs/reports/m10-invitation-final.md:136`）。
+  （`docs/reports/m10-invitation-final.md:153`）。
 - **别带进来**：第三方 APK、DEX、`so`、含个人路径的日志、任何密钥。
 
 ### 3.3 耗时预期
@@ -173,11 +178,11 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 | 事项 | 预期 | 说明 |
 |---|---|---|
 | 首次复现（冷缓存：clone + 依赖 + 后端下载） | **10–20 分钟** | 首次需要网络；装好后分析本身可离线 |
-| 暖缓存到第一份报告 | 约 2 分钟 | M8 演练另测 6.8 秒纯分析 |
+| 暖缓存到第一份报告 | 约 1.5–2 分钟 | M8 演练另测 6.8 秒纯分析；同一环境下 30 秒的那次实测见 [M8 演练](m8-install-rehearsal.md) |
 | 一个完整案例 | 1–2 分钟 | Docker 路线另加约 2 分钟 |
-| 完整验收（含 40 项判定与评分） | 建议预留半天 | 时间口径见 `docs/reports/m10-reader-package.md:63` |
+| 完整验收（含 40 项判定与评分） | 建议预留半天 | 时间口径见 `docs/reports/m10-reader-package.md:69` |
 
-慢不一定是卡点：后端下载、JDK 首次安装、`npm install` 都是一次性开销。把**每一步**
+慢不一定是卡点：后端下载、JDK 首次安装、首次依赖安装都是一次性开销。把**每一步**
 的耗时记下来，读者包要求的是分步耗时，不只是总耗时（验收项 A7）。
 
 ### 3.4 遇到问题找谁
@@ -188,19 +193,19 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 | 命令报错了、文档缺步骤 | 验收发起人 | 附完整命令、退出码、原始输出、你期望的依据 → 走 §3 卡点 |
 | 判定有争议 | 验收发起人 | 把两种判法和各自依据都写进记录，不要口头结论了事 |
 | 确认是产品缺陷 | 验收发起人 → 作者 | 缺陷由作者修复；**修复后取新 commit 并复验受影响项** |
-| 只在 macOS 上、或环境实在装不上 | 验收发起人 | macOS 未验证，如实记录即可（`docs/reports/m10-reader-package.md:55`） |
+| 只在 macOS 上、或环境实在装不上 | 验收发起人 | macOS 未验证，如实记录即可（`docs/reports/m10-reader-package.md:61`） |
 
 **边界**：发起人可以解释名词和意图，不能替您补一条文档里没有的命令、改您的环境或
 远程操作您的机器。凡是靠口头补充才走通的步骤，相关验收项判不通过
-（`docs/reports/m10-acceptance-pack.md:61`）。
+（`docs/reports/m10-acceptance-pack.md:68`）。
 
 ### 3.5 交回前自查
 
 - [ ] 每一条命令都有退出码和关键输出；没执行的项记「未验证」，不是「通过」。
-- [ ] 19 个 ★ 阻断项都有明确的三态判定（`docs/reports/m10-acceptance-pack.md:166`）。
+- [ ] 19 个 ★ 阻断项都有明确的三态判定（`docs/reports/m10-acceptance-pack.md:173`）。
 - [ ] 两张评分表都填完，每一分都有证据；没有证据的分值记 0。
 - [ ] 总分保留一位小数，没有为了「达标」四舍五入。
-- [ ] 记录里的 commit hash 是 `277d0fa`。
+- [ ] 记录里的 commit hash 与邀请函成稿 §2 钉定的那一串完整 hash 相同。
 - [ ] 个人路径、密钥已脱敏；没有第三方样本、日志附件。
 - [ ] §7 已签署；致谢意愿已表明。
 
@@ -210,17 +215,17 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 
 不要停，把缺失本身当证据记下来。缺后端是**降级**而不是失败：分析仍以 0 退出、
 报告写明该后端 `not_installed`，这正是验收项 A6 / G2 要核实的
-（`docs/reports/m10-acceptance-pack.md:87`）。没有 Java 也能用 Androguard 完成基础分析
-（`docs/reports/m10-reader-package.md:58`）。真装不上时在 §1 元数据里写明
+（`docs/reports/m10-acceptance-pack.md:94`）。没有 Java 也能用 Androguard 完成基础分析
+（`docs/reports/m10-reader-package.md:64`）。真装不上时在 §1 元数据里写明
 jadx / apktool / androguard 各自「not installed」及原因，并把缺失造成的计数差异
 （如 classes 5→4）记进证据栏。缺后端导致的测试 **skip 不是 pass**，跳过数要写进 §5.3。
 
 **Q2：某题判不过算不算失败？**
 
 分两种。**非阻断项**不通过：要写清影响范围、是否有替代证据、是否接受遗留
-（`docs/reports/m10-acceptance-pack.md:168`），不影响 M10 的判定，但必须在扣分原因里
+（`docs/reports/m10-acceptance-pack.md:175`），不影响 M10 的判定，但必须在扣分原因里
 留下。**阻断项（★，共 19 项）**不通过：M10 直接判不通过，其他项再高的分也抵消不了
-（`docs/reports/m10-acceptance-pack.md:166`）。**未验证**不算失败，但也不能算通过——
+（`docs/reports/m10-acceptance-pack.md:173`）。**未验证**不算失败，但也不能算通过——
 没有执行的项一律记「未验证」，不得留空当默认通过。
 
 **Q3：复现结果与文档不一致怎么处理？**
@@ -228,21 +233,23 @@ jadx / apktool / androguard 各自「not installed」及原因，并把缺失造
 以**实际输出**为准，把差异写成卡点（模板 §3）：完整命令、退出码、原始输出、
 你期望的依据（文档哪一节哪一句）、是否可以重试、是否阻断后续。确认是自己的环境问题
 才修复后重试，**两次输出都留下**。文档缺步骤本身就是缺陷，不要替项目圆场
-（`docs/reports/m10-reader-package.md:41`）。特别提醒：M6 的数字以仓库落盘报告为准——
+（`docs/reports/m10-reader-package.md:44`）。特别提醒：M6 的数字以仓库落盘报告为准——
 修复后三轮完整重测逐轮 15/20、16/20、18/20、合计 49/60 = 81.7%
 （`docs/benchmarks/m6-level2-retest4.md:82`），另有一次更早的重测逐轮为 17/15/17
 （`docs/benchmarks/m6-level2-retest3.md:85`）；两者合计都是 49/60。看到不同文档里的
 逐轮数字不一致时，以[重测报告](../benchmarks/m6-level2-retest4.md)为准，并把差异记成卡点。
 
-**Q4：验收 commit 钉定 277d0fa 是什么含义？**
+**Q4：验收 commit 钉定 v1.0.0 发版 commit 是什么含义？**
 
-含义是：**本次验收只认这一个 commit**。clone 后执行 `git checkout 277d0fa`，
-此后不要切换分支、不要拉取新提交，所有记录写明该 hash；不要用会移动的 `main` 分支做验收
-（`docs/reports/m10-invitation-final.md:51`）。这个 hash 由验收发起人钉定，邀请函里引用的
+含义是：**本次验收只认这一个 commit**。clone 后执行 `git checkout v1.0.0`，
+用 `git rev-parse HEAD` 核出的 hash 应与邀请函成稿 §2 填的那一串逐字相同；此后
+不要切换分支、不要拉取新提交，所有记录写明该 hash；不要用会移动的 `main` 分支做验收
+（`docs/reports/m10-invitation-final.md:54`）。这个 commit 由验收发起人钉定，邀请函里引用的
 M6 数字对应的是该 commit 所在树上的落盘报告（`docs/benchmarks/m6-level2-retest4.md`）；
-若 clone 后找不到该 hash，先联系发起人，不要自行换用其他提交。规则上的原因：验收针对一个
+若 clone 后找不到该 hash 或 `git checkout v1.0.0` 取不到，先联系发起人，不要自行换用
+其他提交。规则上的原因：验收针对一个
 固定 commit，作者修复阻断项后必须取新 commit 并复验受影响项
-（`docs/reports/m10-acceptance-pack.md:47`）。
+（`docs/reports/m10-acceptance-pack.md:54`）。
 
 **Q5：证据包怎么验证（verify_package）？**
 
@@ -256,7 +263,7 @@ uv run --no-sync python -c \
 
 预期：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定），
 `citations_resolved` 为 `True`、`citations_unresolved` 为空
-（`docs/reports/m10-reader-package.md:199`）。再把包复制到另一个目录或另一台机器复验一次
+（`docs/reports/m10-reader-package.md:209`）。再把包复制到另一个目录或另一台机器复验一次
 （验收项 C6），并解压对照 `manifest.json` 的 `not_included` 声明，确认包里没有 APK、
 全量源码和未被证据引用的字符串（验收项 D3、G5）。
 
@@ -269,21 +276,24 @@ uv run --no-sync python -c \
 - 层级 1 scripted 成绩——那是替身模型，只证明管线端到端可用，不是模型能力基线
   （`docs/benchmarks/m6-level1-scripted.md`）；
 - 测试与覆盖率数字——以你本机 `uv run --no-sync pytest -q` 的实际结果为准
-  （`docs/reports/m10-reader-package.md:314`）；
-- 已知限制 M8-2、M8-3、macOS 未验证；M8-4（三个后端全部失败时退出码仍为 0）
-  已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
-  （`docs/reports/m10-reader-package.md:293`）；
-- 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，是重评的基线，不是成绩
-  （`docs/reports/m10-reader-package.md:13`）。
+  （`docs/reports/m10-reader-package.md:337`）；
+- 已知限制只剩 macOS 未验证（M8-2、M8-3 已修复并合入）；M8-4（三个后端全部失败时
+  退出码仍为 0）已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
+  （`docs/reports/m10-reader-package.md:312`）；
+- 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，不是成绩。
+  两组数字用的是同一组维度与权重：75%/65% 是[准备度评估](portfolio-readiness-2026-11-15.md)
+  的基线，77.5%/68.75% 是同一基线上的自评更新。**你的重评请与 75%/65% 这一档
+  对齐**，并在记录里写明依据
+  （`docs/reports/m10-reader-package.md:12`）。
 
 作者可以解释名词与意图，不能替你补命令、改环境或远程操作；靠口头补充才走通的步骤，
-相关验收项判不通过（`docs/reports/m10-acceptance-pack.md:61`）。
+相关验收项判不通过（`docs/reports/m10-acceptance-pack.md:68`）。
 
 **Q7：我可以用自己的 APK 代替 demo.apk 吗？**
 
 可以，但验收项 A4 的计数（5 classes / 8 methods / 23 call sites / 21 call edges /
 1 resource string）与 project id `apk_80a8fe0e81204c9f`是 demo-app 的预期值
-（`docs/reports/m10-acceptance-pack.md:85`）。用你自己的样本时，这一条的判定标准要改为
+（`docs/reports/m10-acceptance-pack.md:92`）。用你自己的样本时，这一条的判定标准要改为
 「与你自己对样本的预期是否一致」，并在证据栏写清样本来源；demo.apk 那一组请照原样跑一遍。
 
 **Q8：我发现了一个 bug，可以直接改吗？**
@@ -295,21 +305,24 @@ uv run --no-sync python -c \
 
 不能。[作者自查记录](m10-selfcheck.md) 覆盖的是文档、徽章、契约清单这类自动化项，
 **不替代你的任何一项判定**，需人工的项仍要你亲手执行并记录
-（`docs/reports/m10-reader-package.md:396`）。
+（`docs/reports/m10-reader-package.md:418`）。
+注意：那份自查记录是**它自己那一次执行时的快照**（记录里写明了当时的日期与
+commit），不是验收 commit 的现状；数字对不上时以你的实测为准，按 §3 记卡点。
 
 ## 5. 本工具包引用的数字与出处
 
-所有数字均抄自仓库落盘文件，未手改；行号指向引用时所在的 commit `277d0fa`。
+所有数字均抄自仓库落盘文件，未手改；行号指向引用时所在的 commit——即本轮
+v1.0.0 发版 commit（见[邀请函成稿 §2](m10-invitation-final.md)）。
 
 | 数字 | 出处 | 说明 |
 |---|---|---|
-| 40 个验收项、7 组 | `docs/reports/m10-acceptance-pack.md:23` | A–G 七组 |
-| 19 个 ★ 阻断项 | `docs/reports/m10-acceptance-pack.md:166` | 清单同处 |
-| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:446` | §5.1 原文表 |
-| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:457` | §5.2 原文表 |
-| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:471` | §5.3 原文表 |
+| 40 个验收项、7 组 | `docs/reports/m10-acceptance-pack.md:27` | A–G 七组 |
+| 19 个 ★ 阻断项 | `docs/reports/m10-acceptance-pack.md:173` | 清单同处 |
+| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:457` | §5.1 原文表 |
+| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:468` | §5.2 原文表 |
+| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:482` | §5.3 原文表 |
 | 基线 GitHub 约 75% / Upwork 约 65% | `docs/reports/portfolio-readiness-2026-11-15.md:28` | 人工基线，不是接单概率 |
-| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:488` | 门槛，不是预测 |
+| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:499` | 门槛，不是预测 |
 | M6 三轮合计 49/60 = 81.7% | `docs/benchmarks/m6-level2-retest4.md:38` | 脚本重算生成 |
 | M6 逐轮 15/20、16/20、18/20 | `docs/benchmarks/m6-level2-retest4.md:82` | 未达每轮 ≥16/20 的轮次存在 |
 | 验收线 每轮 ≥16/20、合计 ≥54/60 | `docs/benchmarks/m6-level2-retest4.md:83` | 未达 |
@@ -317,14 +330,15 @@ uv run --no-sync python -c \
 | 窄验证转通过 3/6（门槛 ≥4） | `docs/benchmarks/m6-level2-narrow-verify3.md:59` | 未达判据 |
 | 窄验证确定性修复相关题 3/5 | `docs/benchmarks/m6-level2-narrow-verify3.md:60` | — |
 | M10 独立验收尚未开始 | `docs/status.md:128`、`docs/reports/m10-acceptance-pack.md:3` | 如实状态 |
-| 冷缓存首次 10–20 分钟 | `docs/reports/m10-reader-package.md:63` | 时间口径 |
-| 验收 commit `277d0fa` | `docs/reports/m10-invitation-final.md:57` | 由验收发起人钉定 |
+| 冷缓存首次 10–20 分钟 | `docs/reports/m10-reader-package.md:69` | 时间口径 |
+| 验收 commit（v1.0.0 发版 commit） | `docs/reports/m10-invitation-final.md:60` | 由验收发起人钉定；完整 hash 填在邀请函成稿 §2 的占位符里 |
 
 ## 6. 这份工具包不是什么
 
 - 不是验收结论，不是分数，也不代表任何一项验收项已通过。
 - 不是 M10 的完成证明——M10 的关闭依据是读者填写并回传的记录
-  （`docs/reports/m10-invitation-final.md:145`）。
-- 不替代[准备包](m10-acceptance-pack.md)的 40 项判定标准；两者冲突时以准备包为准。
+  （`docs/reports/m10-invitation-final.md:160`）。
+- 不替代[准备包](m10-acceptance-pack.md)的 40 项判定标准；本包与准备包、读者包之间
+  冲突时以准备包的判定标准为准。
 - 不是安全审计或渗透测试：DexAtlas 是静态分析工具，不做动态分析、不定性恶意软件、
-  不判断可利用性（`docs/reports/m10-acceptance-pack.md:37`）。
+  不判断可利用性（`docs/reports/m10-acceptance-pack.md:41`）。
