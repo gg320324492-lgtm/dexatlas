@@ -318,7 +318,7 @@ trace 数不是 3、少了某个任务——同样拒绝，各有各的指名信
 
 | 脚本 | 缺 trace 时 |
 |---|---|
-| `m6_level2_narrow_verify2_report.py`、`m6_level2_narrow_verify3_report.py`、`m6_level2_narrow_verify_audit.py`、`m6_level2_narrow_verify2_audit.py`、`m6_level2_verify_report.py`、`m6_level2_retest3_report.py`、`m6_level2_retest4_report.py` | **指名拒绝**：`SystemExit` + 一句说清哪个文件缺、为什么拒绝。退出码 1 |
+| `m6_level2_narrow_verify_report.py`、`m6_level2_narrow_verify2_report.py`、`m6_level2_narrow_verify3_report.py`、`m6_level2_narrow_verify_audit.py`、`m6_level2_narrow_verify2_audit.py`、`m6_level2_verify_report.py`、`m6_level2_retest3_report.py`、`m6_level2_retest4_report.py` | **指名拒绝**：`SystemExit` + 一句说清哪个文件缺、为什么拒绝。退出码 1 |
 | `m6_level2_report.py`、`m6_level2_retest_report.py`、`m6_level2_retest2_report.py` | **未捕获异常**：直接抛 `FileNotFoundError` 回溯。退出码 1，仍然不写文件 |
 
 两种都**没有写出报告**，区别只在错误信息好不好读。前一种更符合脚本 docstring 里
