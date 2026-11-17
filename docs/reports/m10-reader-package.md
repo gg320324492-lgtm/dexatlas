@@ -152,7 +152,7 @@ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 r
 情况下重复分析，预期仍以退出码 0 完成并产出报告，错误记录写明哪个后端
 `not_installed`；不得崩溃或静默省略。
 
-### 3.4 第 4 步：检索、证据与 locator 解析（验收项 B3–B4、C1–C3）
+### 3.4 第 4 步：检索、证据与 locator 解析（验收项 B2–B5、C1–C3）
 
 以下命令全部来自 [demo-app 案例](../case-studies/demo-app-walkthrough.md)：
 

@@ -6,9 +6,9 @@
 > **回填说明**、**常见问答**。它不含任何验收结论，也不预填任何分数——本文里
 > 每一个空格都还是空的，等读者亲手填。
 >
-> 编写日期：2026-11-17 · 验收 commit：**v1.0.0 发版 commit**——完整 hash 写在
+> 编写日期：2026-11-17 · 验收对象：**`v1.0.0` 这个 tag 所指的提交**——完整 hash 写在
 > [邀请函成稿 §2](m10-invitation-final.md)的占位符里，由验收发起人填好后随函给你；
-> 本文件与该 commit 同一棵树 · 判定依据：[验收准备包](m10-acceptance-pack.md)
+> 你 `git checkout v1.0.0` 拿到的就是含本轮全部修正的那棵树 · 判定依据：[验收准备包](m10-acceptance-pack.md)
 > · 评分基线：[准备度评估](portfolio-readiness-2026-11-15.md)
 
 ## 0. 先读这三条
@@ -39,7 +39,7 @@
 
 > **维度与权重逐字沿用[准备包 §5](m10-acceptance-pack.md)，一字未改。**
 > 不因本轮完成了什么而改权重——改了权重，分数就与 75% / 65% 的基线不可比
-> （`docs/reports/m10-acceptance-pack.md:453`）。基线权重出处：
+> （`docs/reports/m10-acceptance-pack.md:455`）。基线权重出处：
 > `docs/reports/portfolio-readiness-2026-11-15.md:34`。
 
 ### 2.1 评分等级（0–4）
@@ -119,13 +119,13 @@
 | 独立使用验证 | 5% / 10% | **就是您这一份记录**：有没有未参与实现的读者复现并留痕 | 可见记录主要是项目自身演练与评审，未见独立读者复现及客户式验收记录；不推断项目没有外部用户 |
 
 > 权重一列按准备包原表抄写：GitHub 30/20/10/10/25/5
-> （`docs/reports/m10-acceptance-pack.md:468`）、Upwork 20/15/15/25/15/10
-> （`docs/reports/m10-acceptance-pack.md:482`）。
+> （`docs/reports/m10-acceptance-pack.md:476`–`:481`）、Upwork 20/15/15/25/15/10
+> （`docs/reports/m10-acceptance-pack.md:490`–`:495`）。
 
 ### 2.6 总评与一句话结论
 
 打分只依据**您自己的验收记录**。引用作者报告的数字时，注明「作者自述，未独立复现」，
-或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:358`）。
+或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:73`、`:348`）。
 
 ```text
 GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
@@ -178,7 +178,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 | 事项 | 预期 | 说明 |
 |---|---|---|
 | 首次复现（冷缓存：clone + 依赖 + 后端下载） | **10–20 分钟** | 首次需要网络；装好后分析本身可离线 |
-| 暖缓存到第一份报告 | 约 1.5–2 分钟 | M8 演练另测 6.8 秒纯分析；同一环境下 30 秒的那次实测见 [M8 演练](m8-install-rehearsal.md) |
+| 暖缓存到第一份报告 | 约 1.5–2 分钟 | M8 演练另测 6.8 秒纯分析；另一次在**已就绪的会话工作树**上实测约 30 秒，见 [M8 演练](m8-install-rehearsal.md) |
 | 一个完整案例 | 1–2 分钟 | Docker 路线另加约 2 分钟 |
 | 完整验收（含 40 项判定与评分） | 建议预留半天 | 时间口径见 `docs/reports/m10-reader-package.md:69` |
 
@@ -279,7 +279,7 @@ uv run --no-sync python -c \
   （`docs/reports/m10-reader-package.md:337`）；
 - 已知限制只剩 macOS 未验证（M8-2、M8-3 已修复并合入）；M8-4（三个后端全部失败时
   退出码仍为 0）已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
-  （`docs/reports/m10-reader-package.md:312`）；
+  （`docs/reports/m10-reader-package.md:318`）；
 - 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，不是成绩。
   两组数字用的是同一组维度与权重：75%/65% 是[准备度评估](portfolio-readiness-2026-11-15.md)
   的基线，77.5%/68.75% 是同一基线上的自评更新。**你的重评请与 75%/65% 这一档
@@ -305,24 +305,29 @@ uv run --no-sync python -c \
 
 不能。[作者自查记录](m10-selfcheck.md) 覆盖的是文档、徽章、契约清单这类自动化项，
 **不替代你的任何一项判定**，需人工的项仍要你亲手执行并记录
-（`docs/reports/m10-reader-package.md:418`）。
+（`docs/reports/m10-reader-package.md:434`–`:435`）。
 注意：那份自查记录是**它自己那一次执行时的快照**（记录里写明了当时的日期与
 commit），不是验收 commit 的现状；数字对不上时以你的实测为准，按 §3 记卡点。
 
 ## 5. 本工具包引用的数字与出处
 
-所有数字均抄自仓库落盘文件，未手改；行号指向引用时所在的 commit——即本轮
-v1.0.0 发版 commit（见[邀请函成稿 §2](m10-invitation-final.md)）。
+> **术语（就地定义）：** `verified` = 由工具确定性确立、且带一条能在分析里解析到位的
+> 出处的结论；`lead` = 风险指示，**不是**已验证发现；`insufficient` = 证据不足以
+> 两边下判断。模型生成的文字只能落在 `lead` 或 `insufficient`，永远不能落成
+> `verified`。判定口径以验收准备包与 `benchmarks/model.py` 的 `check()` 为准。
+
+所有数字均抄自仓库落盘文件，未手改；行号指向引用时所在的那棵树——即
+`v1.0.0` 这个 tag 所指的提交（见[邀请函成稿 §2](m10-invitation-final.md)）。
 
 | 数字 | 出处 | 说明 |
 |---|---|---|
 | 40 个验收项、7 组 | `docs/reports/m10-acceptance-pack.md:27` | A–G 七组 |
 | 19 个 ★ 阻断项 | `docs/reports/m10-acceptance-pack.md:173` | 清单同处 |
 | 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:457` | §5.1 原文表 |
-| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:468` | §5.2 原文表 |
-| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:482` | §5.3 原文表 |
+| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:476`–`:481` | §5.2 原文表 |
+| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:490`–`:495` | §5.3 原文表 |
 | 基线 GitHub 约 75% / Upwork 约 65% | `docs/reports/portfolio-readiness-2026-11-15.md:28` | 人工基线，不是接单概率 |
-| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:499` | 门槛，不是预测 |
+| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:501` | 门槛，不是预测 |
 | M6 三轮合计 49/60 = 81.7% | `docs/benchmarks/m6-level2-retest4.md:38` | 脚本重算生成 |
 | M6 逐轮 15/20、16/20、18/20 | `docs/benchmarks/m6-level2-retest4.md:82` | 未达每轮 ≥16/20 的轮次存在 |
 | 验收线 每轮 ≥16/20、合计 ≥54/60 | `docs/benchmarks/m6-level2-retest4.md:83` | 未达 |

@@ -24,8 +24,10 @@ SQLite 工作区，渲染出 Markdown / JSON 报告与证据包——报告里�
 
 1. **锁定验收对象**：验收对象是 `v1.0.0` 这个 tag 所指的提交——你执行
    `git checkout v1.0.0` 就能拿到它，**不必再向发起人索取 commit hash**；
-   想核对时用 `git rev-parse v1.0.0` 核出 hash，与
-   [邀请函成稿 §2](m10-invitation-final.md) 占位符里填的那串逐字比对。
+   想核对时用 `git rev-parse v1.0.0^{commit}` 核出 hash，与
+   [邀请函成稿 §2](m10-invitation-final.md) 占位符里填的那串逐字比对
+   （`v1.0.0` 是附注 tag，`git rev-parse v1.0.0` 给出的是**tag 对象**的 hash，
+   加上 `^{commit}` 才是它指向的提交 ✓）。
    全程只验这一个提交，**不要用移动的 `main` 分支**。
 2. **clone 并装环境**：`git clone` → `git checkout v1.0.0` →
    `uv sync --extra dev --extra analysis --extra mcp --extra demo`

@@ -250,9 +250,9 @@ docker run --rm \
 预期：构建约 2 分钟（M8 实测 2 分 16 秒）；镜像内 JADX / Apktool 可用；
 分析加导出约 10 秒；`out/` 下出现四份文件。
 
-> **已知限制（M8-2）：** 容器内多个命令共享 workspace 时，查询类命令没有
-> `--workspace` 选项；用 `DEXATLAS_WORKSPACE=/workspace/ws` 统一。遇到此问题
-> 记录为卡点，不要改用作者未公开的步骤。
+> **M8-2 已修复：** 容器内的查询类命令现在同样有 `--workspace`/`-w`，
+> 与其它路径一致；`DEXATLAS_WORKSPACE=/workspace/ws` 也仍可作为统一入口。
+> 若你在容器里遇到工作区相关的问题，按 §5.2 记录卡点，不要改用作者未公开的步骤。
 
 Docker 路线下校验证据包：
 
@@ -630,12 +630,11 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 - `scripts/check-doc-citations.py`：通过（226 条引用，0 漂移）。
 - `tests/test_docs.py::test_all_relative_links_resolve` 与
   `tests/test_doc_citations.py`：通过（16 项）。
-- `scripts/check-version-claims.py --base auto`：**失败**，3 项既有声明与仓库
-  事实不符（README 徽章、v0.2.0 发布说明覆盖率、CHANGELOG 引用）。
-- `tests/test_docs.py` 全量：**5 项失败**，全部是 `phase1-execution-report.md`
-  的测试数/文件表/指纹与当前树不一致；不涉及本包新增文件。
-- 这些失败是既有文档数字未随源码树更新，不是本包引入。按项目规则不得手改数字；
-  最终 commit 上必须完整重测量后复跑至全绿。详见 §7。
+- `scripts/check-version-claims.py --base auto`：通过（0 新增；2 条历史遗留已在案）。
+- `tests/test_docs.py` 全量：**60 项全通过**，报告的测试数/文件表/指纹与当前树一致。
+- 这些门禁在编写本包时是红的（`check-version-claims.py` 3 项、`tests/test_docs.py`
+  5 项失败），原因是既有文档数字未随源码树更新，不是本包引入。按项目规则不得手改
+  数字；最终 commit 上必须完整重测量后复跑至全绿。详见 §7。
 
 > **读者怎么用这张表：** 上面的数字描述的是 2026-11-15 写本包时的那棵树，**不是**
 > 验收 commit 的现状。v1.0.0 发版的完整重测量已在其后执行（见
