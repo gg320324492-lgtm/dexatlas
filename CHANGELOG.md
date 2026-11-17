@@ -9,6 +9,27 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **M6 层级 2 预算效率四项修复与行裁剪机制（窄验证三轮前置）。** 四项修复
+  各带红→绿回归：① `resources` intent 加入 `KEY_TOOLS`，资源题首次成功读取
+  即收口；② agent transcript 对重复 data notice 折叠（首条保留全文，其余
+  短标记，MCP 对外响应不变）；②b `search_symbols` 字符串命中 excerpt 截断
+  到 1 行/128 字节，工具描述与提示词增「先 limit=20 再翻页」引导；③ 同工具
+  连续无新行读取 N=3 次发软提示（不硬拦，带新行的合法翻页即清除）。另带
+  transcript 三层行裁剪（单字段 4000 字符、行页 12000 字符，保 total/offset
+  语义）。全量 suite 1575 项通过，覆盖率 93.2%。
+
+- **M6 层级 2 窄验证三轮报告（预算效率修复验证，仍未达窄验证判据）。** 新增
+  `docs/benchmarks/m6-level2-narrow-verify3.md` 与
+  `docs/benchmarks/m6-level2-narrow-verify3-traces.json`（6 题 × 3 轮 × 3
+  配置 = 54 条 trace），全部数字由新脚本
+  `scripts/m6_level2_narrow_verify3_report.py` 从 trace 重算生成，trace
+  缺失或不完整即拒绝生成报告。代码 `9f0dae3`：DexAtlas 转通过 **3/6**
+  （`manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo`
+  3/3、`multidex.dex-file-count` 2/3），确定性修复题 **3/5**——仍低于
+  窄验证判据（≥4/6 且 ≥3/5）。实测 380,881 tokens，在 450,000 授权内，
+  无熔断中止；三轮密钥扫描零命中。按 `m6-verify3-plan.md` §7 停止：不进入
+  完整重测，不再追加修复轮或模型调用，M6 以现状披露方案（方案 3）定稿。
+
 - **M6 层级 2 服务回归集单轮验证复测报告（A+C2 修复验证）。** 新增
   `docs/benchmarks/m6-level2-verify.md` 与 trace 文件
   `m6-level2-verify-traces.json`（20 题 × 3 配置 = 60 条），全部数字由新脚本
