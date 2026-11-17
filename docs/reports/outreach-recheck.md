@@ -1,5 +1,10 @@
 # Upwork 素材二次核对（outreach recheck）
 
+> **基线之后的变动（2026-11-17）：** 复核当时 `v1.0.0` 的 tag 尚未落地、版本号仍是
+> `0.2.0`，故复核项 1 判「不通过（tag 落地后自动成立）」——**tag 现已落地，改为通过** ✓。
+> 发版完整测量也已落盘，权威值为 **1,588 个测试（1,441 快 + 147 集成）、一方代码覆盖率
+> 93.3%（7,117/7,631 行）**。下文表格里的旧值属基线记录，留作对照。
+
 > **本窗口未发布任何内容，也未向任何外部服务发送数据。** 未调用 Upwork 或任何其它
 > 平台的 API，未登录账号，未复制到剪贴板，未发送邮件或消息，未把任何内容推送到外部
 > 服务，未提交任何投稿草稿，未打 tag，未发布。本窗口只做**只读**核对；唯一被写入的
@@ -57,7 +62,7 @@
 
 | # | 位置 | 复核项 | 结论 | 依据 |
 |---|---|---|---|---|
-| 1 | `docs/outreach/project-brief.md:109` | 版本句 `v1.0.0 (tagged 2026-11-17)` 是否与仓库事实一致 | **不通过**（tag 落地后自动成立） | `git tag` 无 `v1.0.0`；`src/dexatlas/__init__.py:11` 在 HEAD 仍是 `0.2.0`；`docs/status.md:3` 在 HEAD 写「`v1.0.0` 未发布」；`scripts/check-version-claims.py` 报 `docs/outreach/project-brief.md:109 latest it says the newest release is v1.0.0, but the newest is v0.2.0` |
+| 1 | `docs/outreach/project-brief.md:109` | 版本句 `v1.0.0 (tagged 2026-11-17)` 是否与仓库事实一致 | **通过**（复核当时判不通过，tag 落地后自动成立） | 复核当时：`git tag` 无 `v1.0.0`、`src/dexatlas/__init__.py:11` 在 HEAD 仍是 `0.2.0`、`docs/status.md:3` 在 HEAD 写「`v1.0.0` 未发布」，`scripts/check-version-claims.py` 当时报「docs/outreach/project-brief.md:109 latest it says the newest release is v1.0.0, but the newest is v0.2.0」；tag 已于 2026-11-17 落地、版本号已是 1.0.0、`docs/status.md` 已改为已发布口径，版本句成立 |
 | 2 | `docs/outreach/cover-letter-templates.md` Template 2 | 正文长度是否 ≤2,500；用法说明是否要求复算 | **通过** | §5 脚本实测 Template 2 正文 raw=2,500 / plain=2,485；Template 1 raw=2,185 / plain=2,174；用法说明 `docs/outreach/cover-letter-templates.md:20-24`「A replaced placeholder is usually longer … so measure the version you actually paste」在位 |
 | 3 | `docs/outreach/publish-review.md:175-190` | §5 字符表 14 行逐行复算 | **通过（14/14 一致）** | 用该表自己给出的脚本（§5 内嵌 heredoc，逐字抽取执行）复算，14 行 raw/plain 全部逐字相同，见 §2 |
 | 4 | `docs/outreach/publish-review.md:7-9` 等 | 内部记录标注是否在位；正文是否残留本机路径；指向它的地方是否注明 | **通过**（附 2 点提示） | 顶部有「**内部核对记录——不对外、不作附件、不随提案发送。**」；四件对外素材对 `E:\` / `worktree` / `claude/` / `.git/` / 分支名 / commit 的扫描 **0 命中**；`docs/outreach/cover-letter-templates.md:34-37` 写明「That file is an internal record — it is not part of what is sent to a client.」 |
@@ -76,7 +81,7 @@
 - `src/dexatlas/__init__.py:11`：`__version__ = "0.2.0"`
 - `docs/status.md:3`：「… M10 独立验收尚未开始，`v1.0.0` 未发布」
 - `docs/releases/v1.0.0.md` **存在**且是完整发版说明 ✅ —— 但「有发版说明文件」不等于
-  「tag 已打」，这句话里的 `(tagged 2026-11-17)` 目前无物可指
+  「tag 已打」，这句话里的 `(tagged 2026-11-17)` 当时无物可指（tag 已于 2026-11-17 落地）
 
 仓库自带的版本门禁直接报出这一条：
 
