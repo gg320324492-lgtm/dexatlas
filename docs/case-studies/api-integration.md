@@ -13,12 +13,12 @@ code — a pipeline, a dashboard, an agent — rather than from the command line
 
 ## 1. Background and the question
 
-The first two studies drive the CLI by hand. A customer integrating DexAtlas
+The first two studies drive the CLI by hand. A developer integrating DexAtlas
 into their own tooling needs something different: a stable way to upload an
 APK, start an analysis, poll it, ask questions of the result, and export a
 report — without shelling out to a subprocess and parsing its stdout.
 
-The customer's question this study answers: *what does the wire contract
+The integrator's question this study answers: *what does the wire contract
 actually look like, endpoint by endpoint, and does the output an integrator
 receives match what the CLI shows a human?*
 
