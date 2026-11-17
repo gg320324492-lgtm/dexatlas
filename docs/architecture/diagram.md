@@ -1,7 +1,7 @@
 # Architecture diagram
 
 One diagram of how DexAtlas is put together, drawn from the tree as it
-stands (`v0.2.0`, plus the workbench screens that shipped with it). The prose
+stands (`v1.0.0`, plus the workbench screens that shipped with it). The prose
 behind each box is in [README.md](README.md) (the pipeline and the failure
 rule), [mcp-server.md](mcp-server.md), [agent.md](agent.md) and
 [workbench.md](workbench.md); this page is the map, not the explanation.
@@ -23,7 +23,7 @@ rule), [mcp-server.md](mcp-server.md), [agent.md](agent.md) and
                                         ┌─────────────────────────┐
                                         │   MCP tool functions    │
                                         │   src/dexatlas/mcp/     │
-                                        │   10 read-only tools    │
+                                        │   11 read-only tools    │
                                         └────────────┬────────────┘
                                                      │
                         ┌────────────────────────────┼──────────────────┐

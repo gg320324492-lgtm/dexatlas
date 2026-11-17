@@ -254,10 +254,10 @@ DexAtlas can serve its analysis to an agent over the Model Context Protocol.
 
 It is a **read-only tool server over a workspace**. It exposes what the workspace
 already holds — the projects, their symbols, the call sites between their methods, the
-evidence records, and the places those records were read from — and nothing else. Ten
-tools: `list_projects`, `get_project_status`, `get_manifest`, `search_symbols`,
-`get_class_source`, `get_method_source`, `find_callers`, `find_callees`, `get_evidence`
-and `resolve_locator`.
+evidence records, and the places those records were read from — and nothing else.
+Eleven tools: `list_projects`, `get_project_status`, `get_manifest`, `search_symbols`,
+`get_class_source`, `get_method_source`, `find_callers`, `find_callees`, `get_evidence`,
+`resolve_locator` and `find_resource_declarations`.
 
 It **needs no model**. It has no model, no planner and no opinions, and it makes no
 decision about what the caller should look at next. A tool server that needed a model
@@ -397,10 +397,12 @@ src/dexatlas/
 ├── cli/          Typer commands, plus the console-encoding layer
 ├── api/          FastAPI transport
 ├── mcp/          the read-only MCP server
+├── workbench/    the browser workbench: a FastAPI app over the same read-only
+│                 tools, with the React SPA under workbench/web/
 └── agent/        the evidence-first agent
 ```
 
-`mcp/` and `agent/` have landed. `web/` has not. The agent consumes this core through
+`mcp/`, `agent/` and `workbench/` have landed. The agent consumes this core through
 the MCP tools — it calls them, it inherits their read-only nature, and it checks that
 every conclusion it reached has something behind it before it reports it. It does not
 duplicate any of it.

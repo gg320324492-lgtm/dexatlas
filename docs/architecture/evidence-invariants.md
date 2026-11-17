@@ -171,8 +171,8 @@ Honesty about the edges:
   nothing. The dex file's *name* is still checked against the APK.
 - **The resolution rule is checked when the builder knows the workspace.** The
   builder takes it as an argument (`EvidenceBuilder(workspace=...)`), and the
-  analysis has to pass it — see below. A cross-reference is the one record
-  whose citation goes unchecked in the meantime.
+  analysis has to pass it — see below. The pipeline does pass it (§6), so a
+  cross-reference's citation is resolved like any other record's.
 - **A record that is read back from the database is not re-checked.** The
   database holds what was written, and a record that was written by an older
   build is still a record. The rules are about what can be *written*.
@@ -193,10 +193,11 @@ EvidenceBuilder(
 )
 ```
 
-Until the analysis passes them, the resolution half of the rule is off in the
-real pipeline: a cross-reference's citation goes unchecked, while a located
-finding is refused rather than believed. The change is one call site, in
-`core/pipeline.py`, where the workspace is already in hand.
+The analysis passes them, at one call site in `core/pipeline.py`, where the
+workspace is already in hand (`src/dexatlas/core/pipeline.py:206-217`). With
+that, the resolution half of the rule is on in the real pipeline: a
+cross-reference's citation is resolved like a located finding's, instead of
+going unchecked.
 
 The four backend configurations were run with the change applied — all three
 backends, JADX alone, Apktool alone, and Androguard alone — and the analysis
@@ -209,25 +210,21 @@ versioned run directory without anything here changing.
 
 ---
 
-## 7. What the report should say
+## 7. What the report says
 
 The report's level table says of `verified`:
-
-> Determininistically established by an analysis tool.
-
-That sentence is now stronger than it was, and it should say so. The wording
-this change asks for:
 
 > Determininistically established by an analysis tool, with a citation that
 > resolves inside this analysis.
 
-and the closing sentence of the report, which today reads
+and the closing sentence of the report reads
 
 > This report describes only what was deterministically established by the
-> analysis tools listed above.
+> analysis tools listed above, and a verified record's citation resolves inside
+> the analysis this report describes.
 
-…should keep saying that, and add that a verified record's citation resolves
-inside the analysis the report describes.
-
-The renderer is not changed here: it belongs to whoever merges this, so that
-the report is changed in one voice.
+Both renderers carry the wording — the level table at
+`src/dexatlas/reports/markdown.py:28-29` and
+`src/dexatlas/reports/html_report.py:45-46`, the closing sentence at
+`src/dexatlas/reports/markdown.py:195-197` and
+`src/dexatlas/reports/html_report.py:298-300`.

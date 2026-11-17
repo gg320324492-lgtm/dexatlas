@@ -324,9 +324,9 @@ not_included: {apk, full_sources, unrelated_strings}
 ## 6. 版本政策
 
 - 版本号唯一来源是 `src/dexatlas/__init__.py:11` 的 `__version__`
-（当前 `0.2.0`）；打包经 hatch 从该文件读取（`pyproject.toml:145-146`）。
+（当前 `1.0.0`）；打包经 hatch 从该文件读取（`pyproject.toml:145-146`）。
 - 遵循 Semantic Versioning（`CHANGELOG.md:5-6`）；变更记录在 CHANGELOG 的
-  `[Unreleased]` 节，分类 Added/Changed/Fixed。
+  `[Unreleased]` 节，分类 Added/Changed/Fixed（发版时该节并入该版本的段）。
 - 公共契约（本文所列）的变更规则：
   - **加字段、加端点、加工具、加退出码**是兼容变更：在 CHANGELOG 里说明即可。
     JSON 报告从 v1→v2→v3 都是纯增量，读旧文档的调用方忽略未知键不受影响
@@ -341,32 +341,48 @@ not_included: {apk, full_sources, unrelated_strings}
 
 ## 7. 验证记录
 
-实测环境：本 worktree（branch `claude/agitated-diffie-f2a45f`），Python 3.12.10。
-结果见 §7.1–§7.3；快照测试 `tests/test_public_contracts.py` 把同样的清单固化为
-回归门禁。
+实测环境：Python 3.12.10。2026年11月15日的首次实测在 branch
+`claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑一次。
+快照测试 `tests/test_public_contracts.py` 把同样的清单固化为回归门禁。
+
+**检查项清单共 49 项：28 REST + 6 MCP + 15 CLI**——即
+`scripts/verify-public-contracts.py` 里 `check()` 调用的条数（`_rest_requests()`
+28 项、`mcp_checks()` 6 项、`cli_checks()` 15 项）。下面三张表每行对应脚本里的一次
+`check()`，行数与分项数相等。
+
+REST 有两项是条件检查：服务起不来时才记 `server comes up`，源码端点返回 200 时
+才记 `X-DexAtlas-Source-* headers`。所以实跑条数依机器而定——缺 JADX 时源码端点
+返回 404，那一项不触发，2026年11月17日实测为 47/47 通过；三个后端齐备时是 49/49。
 
 ### 7.1 REST 实测
 
 以 `uvicorn dexatlas.api.app:app` 起服务，上传 `examples/demo-app/demo.apk` 后逐
-端点核对（脚本 `scripts/verify-public-contracts.py`，2026年11月15日，26/26 通过）：
+端点核对（脚本 `scripts/verify-public-contracts.py` 的 `_rest_requests()`，28 项
+检查）：
 
 | 检查 | 结果 |
 |---|---|
+| 服务起来（起不来则记 `server comes up` 并中止本节） | ✅ |
 | `GET /health` → `{status,version,backends}`，`status=="ok"` | ✅ |
 | `GET /backends` → `{available,missing,versions}`，两集合不相交 | ✅ |
-| `POST /analyze` → 202 `{project_id,status,detail}`，id = `apk_<sha256[:16]>` | ✅ |
-| `GET /projects/{pid}` → §2.3 全部 14 字段，`call_site_count == reference_count` | ✅ |
+| `POST /analyze` → 202 `{project_id,status,detail}` | ✅ |
+| `POST /analyze` 的 `project_id` = `apk_<sha256[:16]>` | ✅ |
+| 分析跑到 `completed` | ✅ |
+| `GET /projects/{pid}` → §2.3 全部 14 字段 | ✅ |
+| `GET /projects/{pid}` 的 `call_site_count == reference_count` | ✅ |
 | `GET /projects` → `ProjectResponse[]` | ✅ |
 | `GET /projects/{pid}/runs` → `{project_id,total,published_run_id,runs[]}`，RunResponse 11 字段 | ✅ |
 | `GET /projects/{pid}/runs/{rid}` → `published==True` | ✅ |
 | `GET /projects/{pid}/manifest` → 200（本机 Apktool 缺失时 404 带 reason） | ✅ |
-| `GET /projects/{pid}/classes?limit=5` → `{project_id,total,classes}`，`total ≥ len(classes)` | ✅ |
-| `GET /projects/{pid}/methods?limit=5` → `{project_id,total,methods}` | ✅ |
-| `GET /projects/{pid}/resources` / `resource-references` → 三键形状 | ✅ |
+| `GET /projects/{pid}/classes?limit=5` → `{project_id,total,classes}`，`len(classes) ≤ 5`，`total ≥ len(classes)` | ✅ |
+| `GET /projects/{pid}/methods?limit=5` → `{project_id,total,methods}`，`total ≥ 1` | ✅ |
+| `GET /projects/{pid}/resources` → `{project_id,total,resources}` | ✅ |
+| `GET /projects/{pid}/resource-references` → `{project_id,total,references}` | ✅ |
 | `GET /projects/{pid}/xrefs/{mid}` → `total_unit=="call_sites"`，`total==call_sites`，`call_edges ≤ call_sites` | ✅ |
-| `GET /projects/{pid}/search?q=demo` → `{project_id,query,results}` | ✅ |
+| `GET /projects/{pid}/search?q=demo` → `{project_id,query,results}`，`query=="demo"` | ✅ |
 | `GET /projects/{pid}/evidence` → `{project_id,total,evidence}`，`level ∈ {verified,lead,insufficient}` | ✅ |
-| `GET /projects/{pid}/classes/{cls}/source` → 200/404，200 时四个 `X-DexAtlas-Source-*` 头齐全 | ✅ |
+| `GET /projects/{pid}/classes/{cls}/source` → 200 或 404 | ✅ |
+| 上一行返回 200 时，四个 `X-DexAtlas-Source-*` 头齐全 | ⚪ 条件项 |
 | `GET /projects/{pid}/report?format=json` → `schema_version==3`，10 个顶层键 | ✅ |
 | `GET /projects/{pid}/report?format=markdown` → `text/markdown` | ✅ |
 | `GET /projects/{pid}/report?format=bogus` → 422 | ✅ |
@@ -375,24 +391,31 @@ not_included: {apk, full_sources, unrelated_strings}
 | `DELETE /uploads/{sha}` → 204 | ✅ |
 | `DELETE /projects/{pid}` → 204 | ✅ |
 
+⚪ = 条件项：本机没有源码后端（JADX），端点返回 404，该项未触发；后端齐备时它是
+一项常规检查。
+
 ### 7.2 MCP 实测
 
 以 in-process `Client(build_server(analyzer))` 走 MCP 协议调用（同
-`tests/test_mcp_tools.py` 的方式，2026年11月15日，6/6 通过）：
+`tests/test_mcp_tools.py` 的方式，脚本 `mcp_checks()`，6 项检查）：
 
 | 检查 | 结果 |
 |---|---|
-| `list_tools()` 恰为 §3.1 的十一个名字，全部 `read_only_hint=True` | ✅ |
+| `list_tools()` 恰为 §3.1 的十一个名字 | ✅ |
+| 每个工具都带 `read_only_hint=True` | ✅ |
 | `list_projects` → `{projects,total,offset,limit}` | ✅ |
 | `get_project_status` → `{project,completeness,published_run,runs}`，completeness 四键齐全 | ✅ |
 | `search_symbols` → `{symbols,total,offset,limit}` | ✅ |
 | `get_class_source` → `found/reason/kind/text/provenance/candidates` 六键 | ✅ |
-| 有界响应：`limit` 请求被上限收敛 | ✅ |
+
+响应都是有界的：`limit` 请求被上限收敛，摘录按行数和字节数截断（快照测试
+`tests/test_mcp_tools.py` 的 `test_an_excerpt_is_bounded` 与
+`test_list_projects_pages` 固化了这条）。
 
 ### 7.3 CLI 退出码实测
 
-`CliRunner` 逐个触发（同 `scripts/verify-public-contracts.py`，2026年11月15日，
-14/14 通过）：
+`CliRunner` 逐个触发（脚本 `scripts/verify-public-contracts.py` 的 `cli_checks()`，
+15 项检查）：
 
 | 场景 | 期望 | 实测 |
 |---|---|---|
@@ -406,21 +429,25 @@ not_included: {apk, full_sources, unrelated_strings}
 | `classes <pid> --limit 0`（Typer `min=1`） | 2 | ✅ |
 | `analyze 缺失文件` | 2 | ✅ |
 | `analyze 非APK文件` | 2 | ✅ |
-| `source` 歧义方法名（合成双重载项目） | 4，候选被列出 | ✅ |
+| `source` 歧义方法名（合成双重载项目） | 4 | ✅ |
+| 上一行的候选被列出（两个重载都在输出里） | 候选被列出 | ✅ |
 | `analyze` 桩抛 `AnalysisFailed` | 3 | ✅ |
-| `analyze` 项目带 `output_truncated` 错误 | 5 | ✅ |
-| 截断场景的 stderr 提到 exit code 5 | ✅ | ✅ |
+| `analyze` 项目带 `output_truncated` 错误 | 5，stderr 提到 exit code 5 | ✅ |
+| `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ |
 
 ## 8. 已知限制
 
-本节记录当前版本**已知但未修复**的契约缺口。它不是对承诺的描述，而是对"承诺与
-实现之间还差什么"的说明。修复任何一条都属于公共契约变更，按 §6 的规则显式版本化，
-不得悄悄改。
+本节记录契约的已知缺口与它的结局：一条缺口在修复前是什么、修复后是什么、调用方
+怎么印证。它不是对承诺的描述，而是对"承诺与实现之间曾经差什么、现在差多少"的说明。
+修复任何一条都属于公共契约变更，按 §6 的规则显式版本化，不得悄悄改。
+
+本节当前没有未修复的条目：§8.1 唯一的一条已按提案修复，下面记的是那次变更的完整
+记录。
 
 ### 8.1 三后端全部失败时 run 仍可能记 `completed`、CLI 退出码为 0
 
 **状态：已按提案修复（新增退出码 6，方案 A），本条由「已知缺口」转为「已修复的
-契约变更记录」。** 修复以兼容变更显式版本化（§6、CHANGELOG `[Unreleased]`）：
+契约变更记录」。** 修复以兼容变更显式版本化（§6、CHANGELOG `[1.0.0]`）：
 0–5 语义不变，0 的外延收窄。
 
 - **原现象**：`DEXATLAS_TOOL_TIMEOUT_SECONDS` 过小等情况下，JADX、Apktool、

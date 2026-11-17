@@ -136,10 +136,16 @@ raised: the project is gone from the database either way.
 
 ## The schema
 
-Schema version 4 adds:
+The workspace schema is at version 7 (`SCHEMA_VERSION`,
+`src/dexatlas/core/storage.py:44`). The two things this page is about are the
+ones version 4 added:
 
 - **`analysis_runs`** — one row per attempt, as described above.
 - **`projects.published_run_id`** — the run whose snapshot is published.
+
+Versions 5 to 7 only added the `call_sites` table, the `resource_references`
+table and a `projects.apk_metadata` column; none of them changes what this
+page describes.
 
 The migration is additive. A workspace written before runs existed opens,
 keeps its symbols and its evidence, and has no published run to point at —
