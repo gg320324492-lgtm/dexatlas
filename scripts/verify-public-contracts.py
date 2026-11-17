@@ -83,6 +83,25 @@ def rest_checks() -> None:
         server.wait(timeout=15)
 
 
+def wait_for_analysis(client, pid, attempts: int = 240, pause: float = 0.5) -> str:
+    """The status of a project, once it has stopped changing.
+
+    The REST API answers ``202`` and creates the project a moment later.
+    Until that row exists, the answer carries no ``status`` field at all --
+    and reading that absence as "the analysis is over" turned a slow start
+    into a failed contract check: the loop broke on the first empty answer
+    and reported ``status=`` instead of waiting for the work to finish.
+    """
+    status = ""
+    for _ in range(attempts):
+        project = client.get(f"/projects/{pid}").json()
+        status = project.get("status", "")
+        if status in {"completed", "failed"}:
+            break
+        time.sleep(pause)
+    return status
+
+
 def _rest_requests() -> None:
     apk_bytes = DEMO_APK.read_bytes()
     sha256 = hashlib.sha256(apk_bytes).hexdigest()
@@ -125,13 +144,7 @@ def _rest_requests() -> None:
         )
         check("project id is apk_<sha256[:16]>", response.json()["project_id"] == pid)
 
-        status = ""
-        for _ in range(240):
-            project = client.get(f"/projects/{pid}").json()
-            status = project.get("status", "")
-            if status not in {"pending", "running"}:
-                break
-            time.sleep(0.5)
+        status = wait_for_analysis(client, pid)
         check("analysis completes", status == "completed", f"status={status}")
 
         project_keys = {

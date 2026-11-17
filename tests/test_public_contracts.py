@@ -931,3 +931,36 @@ def test_the_release_materials_repeat_the_check_count() -> None:
         text = document.read_text(encoding="utf-8")
         assert split in text, f"{name} does not state the split {split}"
         assert str(CONTRACT_CHECK_TOTAL) in text, f"{name} does not state {CONTRACT_CHECK_TOTAL}"
+
+
+def test_the_contract_check_waits_for_the_project_row_to_appear() -> None:
+    """A project that is not visible yet is not a finished analysis.
+
+    The REST API answers ``202`` and creates the project a moment later;
+    until that row exists the answer carries no ``status`` field at all. The
+    old loop broke on the first such answer and reported ``status=``, so a
+    slow start turned into a failed contract check -- which is what happened
+    on the ``v1.0.0`` tag run, on a tree whose same job passed on ``main``.
+    """
+    from importlib.util import module_from_spec, spec_from_file_location
+
+    path = Path(__file__).parent.parent / "scripts" / "verify-public-contracts.py"
+    spec = spec_from_file_location("dexatlas_verify_public_contracts", path)
+    assert spec is not None and spec.loader is not None
+    script = module_from_spec(spec)
+    spec.loader.exec_module(script)
+
+    answers: list[dict[str, str]] = [{}, {"status": "pending"}, {"status": "completed"}]
+
+    class _Response:
+        def __init__(self, payload: dict[str, str]) -> None:
+            self._payload = payload
+
+        def json(self) -> dict[str, str]:
+            return self._payload
+
+    class _Client:
+        def get(self, path: str) -> _Response:
+            return _Response(answers.pop(0) if answers else {"status": "completed"})
+
+    assert script.wait_for_analysis(_Client(), "apk_x", attempts=5, pause=0) == "completed"
