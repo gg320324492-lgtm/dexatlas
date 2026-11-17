@@ -208,12 +208,12 @@ server instructions（`src/dexatlas/mcp/server.py:47-68`）向调用方声明三
 | 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[]}` | `src/dexatlas/mcp/server.py:126-139` |
 | 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:141-152` |
 | 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:154-174` |
-| 5 | `get_class_source` | `project_id`、`class_name` | `SourceView` | `src/dexatlas/mcp/server.py:176-189` |
-| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?` | `SourceView` | `src/dexatlas/mcp/server.py:191-218` |
+| 5 | `get_class_source` | `project_id`、`class_name` | `SourceView` | `src/dexatlas/mcp/server.py:177-191` |
+| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?` | `SourceView` | `src/dexatlas/mcp/server.py:207-220` |
 | 7 | `find_callers` | `project_id`、`method_id`、`limit` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:220-242` |
 | 8 | `find_callees` | `project_id`、`method_id`、`limit` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated}` | `src/dexatlas/mcp/server.py:244-265` |
-| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:267-278` |
-| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:280-293` |
+| 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:269-280` |
+| 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:283-295` |
 | 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:295-330` |
 
 ### 3.2 响应形状与"有界、说清"语义

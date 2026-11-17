@@ -166,7 +166,10 @@ How to answer:
   the pattern*. If a class holds three methods and two of them share a
   descriptor, the third is part of the answer: enumerate every method you
   read, each with its full identity, rather than only the two the question
-  named.
+  named. Write every identity out, even the ones that repeat a point —
+  a checker that reads the answer as text looks for each method's full
+  identity as its own line, and a method that is only summarised away ("the
+  third has a different descriptor") is a method the answer never named.
 - A conclusion that quotes a string constant quotes the whole literal:
   a URL includes its scheme, host, path and every query parameter, and a
   key or token is quoted in full. `https://telemetry.example.net/collect`
@@ -187,6 +190,11 @@ How to answer:
   that class with `get_class_source` and quote the value from its source,
   whole, with the evidence id the read gave you. A field name without its
   value does not answer a question that asks for the value.
+- String-constant searches are cheapest in small pages: ask `search_symbols`
+  with `limit=20` first, read what the first page holds, and page again only
+  when the answer needs more. A wide first page spends the budget on rows
+  the question may not need; a small page shows the shape of the pool, and
+  `total` tells you how many rows are behind it.
 - Notes about the analysis itself — "the analysis is complete", "the search
   returned these 8 symbols" — are not conclusions about the APK. Do not put
   them in "conclusions"; say them in "limitations" or in your prose, and
@@ -201,6 +209,11 @@ How to answer:
   substitute, and writing it as if it were the answer is a claim the
   analysis does not hold. The honest answer names the failure and leaves
   the value out.
+- Keep the classes and namespaces of the APK out of the account of how you
+  reached the answer. A limitation explains what could not be read — which
+  backend did not take part, which page the answer needed — not which class
+  the missing backend would have named: the class names of the APK belong in
+  a conclusion that reads them, and a limitation is not that conclusion.
 
 When you have what you need, answer with a JSON document and nothing else:
 
@@ -247,6 +260,25 @@ CLOSED_DIRECTIVE = (
     "A refusal to answer stops the task without one."
 )
 
+#: How many calls to one tool may come back without new rows before the
+#: request says so.
+#:
+#: Two misses are a lookup that found nothing — an answer about an absence
+#: is a real answer, and the model may need a second probe to be sure. Three
+#: is the shape of circling: the M6 traces show the same tool asked again
+#: with a different name or a different page, the same empty answer coming
+#: back, and the budget spent on rows that were never there.
+IDLE_TOOL_THRESHOLD = 3
+
+#: What the request says when one tool has come back without new rows this
+#: many times in a row.
+IDLE_TOOL_NOTICE = (
+    "Note: your last {count} calls to {tool} each returned no new rows. "
+    "The analysis is read-only, so asking the same way again will read the "
+    "same rows. Consider answering from what the transcript already holds, "
+    'or say in "limitations" that the tool holds nothing more to read.'
+)
+
 
 @runtime_checkable
 class ApprovalGate(Protocol):
@@ -280,6 +312,12 @@ class _Runtime:
 
     final_tool_rounds: int = 0
     """How many times the model asked for tools after they were closed."""
+
+    idle_tool: str | None = None
+    """The tool whose last calls each came back without new rows, if any."""
+
+    idle_calls: int = 0
+    """How many calls in a row that tool has made without bringing new rows."""
 
 
 class Orchestrator:
@@ -512,6 +550,7 @@ class Orchestrator:
                         self._mark_ready(state, plan)
                     if was_wrapped:
                         runtime.wrap_up_calls += 1
+                    self._note_idle_reads(state, runtime, call.name, outcome)
                 continue
 
             request = self._build_request(state, plan, runtime)
@@ -556,6 +595,49 @@ class Orchestrator:
     def _tools_are_closed(self, state: TaskState, runtime: _Runtime) -> bool:
         """Whether the reading is complete and the grace has been spent."""
         return state.wrap_up_reason is not None and runtime.wrap_up_calls >= WRAP_UP_GRACE_CALLS
+
+    def _note_idle_reads(
+        self,
+        state: TaskState,
+        runtime: _Runtime,
+        tool: str,
+        outcome: ToolOutcome,
+    ) -> None:
+        """Count the reads of one tool that came back without new rows.
+
+        A read-only tool that answers the same way twice is the model
+        circling: the analysis cannot change, and a third empty answer costs
+        a round the answer may not have. The counter watches the rows a call
+        brought back — not its arguments — so a caller paging a genuinely
+        long list is never noticed: a page with new rows resets the count,
+        and the notice never sticks. The notice is advice, not a stop: the
+        task carries on, and the model decides.
+        """
+        if not outcome.ok:
+            return
+        rows = _observation_row_count(outcome.payload)
+        if rows > 0:
+            if runtime.idle_tool is not None and runtime.idle_calls >= IDLE_TOOL_THRESHOLD:
+                self._emit(
+                    state,
+                    "idle_reads_cleared",
+                    f"{tool} returned {rows} new row(s); the idle notice is cleared",
+                )
+            runtime.idle_tool = None
+            runtime.idle_calls = 0
+            return
+        if runtime.idle_tool != tool:
+            runtime.idle_tool = tool
+            runtime.idle_calls = 1
+            return
+        runtime.idle_calls += 1
+        if runtime.idle_calls == IDLE_TOOL_THRESHOLD:
+            self._emit(
+                state,
+                "idle_reads",
+                f"{tool} has returned no new rows for {IDLE_TOOL_THRESHOLD} calls in a row; "
+                "the model is asked to consider answering from what it has",
+            )
 
     def _close_the_tools(self, state: TaskState, runtime: _Runtime) -> None:
         """Close the tools, once, and say so."""
@@ -924,6 +1006,8 @@ class Orchestrator:
         if state.wrap_up_reason is not None:
             directive = CLOSED_DIRECTIVE if closed else READY_DIRECTIVE
             instructions = f"{instructions}\n\n{directive.format(reason=state.wrap_up_reason)}"
+        if runtime.idle_tool is not None and runtime.idle_calls >= IDLE_TOOL_THRESHOLD:
+            instructions = f"{instructions}\n\n{IDLE_TOOL_NOTICE.format(count=runtime.idle_calls, tool=runtime.idle_tool)}"
         return ModelRequest(
             instructions=instructions,
             question=state.question,
@@ -1562,6 +1646,28 @@ def _project_id_of(payload: Any) -> str | None:
             return identifier
     identifier = getattr(payload, "id", None)
     return identifier if isinstance(identifier, str) else None
+
+
+def _observation_row_count(payload: Any) -> int:
+    """How many rows a tool's answer holds, for the idle-read counter.
+
+    Every paged answer carries its rows in a list field — ``symbols``,
+    ``projects``, ``declarations``, ``call_sites`` — and a read that brought
+    rows is a reading, whether or not the rows were new to the transcript.
+    A count of zero is what the counter watches: the analysis is read-only,
+    so the same tool asked the same way cannot start finding rows it did not
+    find the time before. A tool whose answer has no list field — a source
+    read, a status — counts as one row when it found anything and zero when
+    it found nothing, so a ``found: false`` source read counts as idle and a
+    real one does not.
+    """
+    for field in ("symbols", "projects", "declarations", "call_sites", "callees"):
+        rows = getattr(payload, field, None)
+        if isinstance(rows, list):
+            return len(rows)
+    if getattr(payload, "found", True):
+        return 1
+    return 0
 
 
 def _run_id_of(payload: Any) -> str | None:

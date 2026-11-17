@@ -17,6 +17,21 @@ from dexatlas.mcp.security import bounded_text
 #: comes back unbounded, and the cut is stated in the response.
 _SYMBOL_TEXT_LIMITS = {"max_lines": 8, "max_bytes": 4096}
 
+#: How much of a *string constant's* excerpt comes back.
+#:
+#: A string constant is one line and usually one token: the excerpt around a
+#: string hit is the string itself, and eight lines of it is eight copies of
+#: a value the name already shows. The M6 budget analysis measured a page of
+#: twenty string hits carrying their values twice over — once as the name,
+#: once as the excerpt — and the transcript re-sent on every turn billing
+#: the same bytes again. A constant's excerpt is cut to one line and a
+#: hundred and twenty-eight bytes: enough to see the value and where it
+#: sits, small enough that a page of constants costs a page of facts, not a
+#: page of copies. Class, method and field hits keep the wider limits: an
+#: excerpt around a code hit is the code the match sits in, and that is the
+#: fact a reader came for.
+_STRING_EXCERPT_LIMITS = {"max_lines": 1, "max_bytes": 128}
+
 #: The smallest query the pool-union rule answers. A query whose word
 #: search hits string constants is a question about the pool's contents —
 #: one word included, because the M6 single-turn verification had the agent
@@ -27,16 +42,26 @@ _MIN_WORD_COUNT = 1
 
 
 def _page_symbols(entries: list[dict[str, Any]]) -> list[SymbolView]:
-    """Turn store rows into the response's symbol views."""
-    return [
-        SymbolView(
-            kind=str(entry.get("kind", "")),
-            name=bounded_text(str(entry.get("name", "")), **_SYMBOL_TEXT_LIMITS),
-            detail=bounded_text(str(entry.get("excerpt", "")), **_SYMBOL_TEXT_LIMITS),
-            provenance=[],
+    """Turn store rows into the response's symbol views.
+
+    A string constant's excerpt is cut harder than a code hit's: the excerpt
+    around a string hit is the string itself, which the name already shows,
+    and a page of constants is where a search's bytes go. The cut is stated
+    in the response — ``truncated`` says so — like every other cut.
+    """
+    views: list[SymbolView] = []
+    for entry in entries:
+        kind = str(entry.get("kind", ""))
+        limits = _STRING_EXCERPT_LIMITS if kind == "string" else _SYMBOL_TEXT_LIMITS
+        views.append(
+            SymbolView(
+                kind=kind,
+                name=bounded_text(str(entry.get("name", "")), **_SYMBOL_TEXT_LIMITS),
+                detail=bounded_text(str(entry.get("excerpt", "")), **limits),
+                provenance=[],
+            )
         )
-        for entry in entries
-    ]
+    return views
 
 
 def _dedupe_by_identity(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:

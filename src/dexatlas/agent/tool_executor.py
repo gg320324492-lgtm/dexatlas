@@ -171,7 +171,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     ),
     "search_symbols": (
         "Search the index of an analysed APK for a phrase, across its classes, "
-        "methods, fields and strings. It searches the index, not the source."
+        "methods, fields and strings. It searches the index, not the source. "
+        "For a string constant, read the first page with limit=20 before paging "
+        "further: string hits share the constant pool, so the first small page "
+        "shows the shape of the answer before a wider read spends the budget."
     ),
     "get_class_source": (
         "Read one class's source — Java when the decompiler produced it, Smali "
@@ -666,9 +669,71 @@ def _type_name(annotation: Any) -> str:
     return getattr(annotation, "__name__", str(annotation))
 
 
+#: What a repeated data notice becomes in the agent's transcript.
+#:
+#: The first notice in a tool answer keeps its full words; the rest are this
+#: marker, which says the notice was already given. The MCP-facing response
+#: is untouched: this shapes only what this agent reads, and the loop
+#: re-sends it on every turn, so the fold is what keeps a page of wrapped
+#: texts from billing its boilerplate again on every round.
+FOLDED_NOTICE = "(data notice as above)"
+
+
 def _success_content(tool: str, payload: Any) -> str:
-    """The answer as text the model can read."""
-    return _content(tool, {"ok": True, "data": _as_jsonable(payload)})
+    """The answer as text the model can read.
+
+    The notices the answer's wrapped texts carry are folded here: the first
+    one keeps its full words, and every later one becomes a short marker.
+    The MCP response the caller gets is untouched — this shapes only what
+    this agent reads, and the loop re-sends it on every turn, so the fold is
+    what keeps a page of wrapped texts from billing its boilerplate again
+    on every round.
+    """
+    return clip_tool_content(
+        _content(tool, {"ok": True, "data": _fold_repeated_notices(_as_jsonable(payload))})
+    )
+
+
+def _fold_repeated_notices(node: Any) -> Any:
+    """Fold repeated ``notice`` fields to one full text and short markers.
+
+    Every piece of text read out of an APK travels with a notice that says
+    what it is. The notice is worth reading once; on a page of symbols it is
+    repeated for every hit, twice over, and the repeats are the largest
+    single part of a big answer. The first notice in the document is kept in
+    full — a reader cannot miss what the text is — and every later
+    occurrence of the same notice becomes a marker that points back at it.
+    A notice that says something different is kept in full: the fold is for
+    repetition, not for notice-wearing in general.
+
+    The fold follows the document's own order — lists in list order, fields
+    in field order — so the kept notice is the first wrapped text the model
+    would have read.
+    """
+    state: dict[str, set[str]] = {"seen": set()}
+    return _fold_node(node, state)
+
+
+def _fold_node(node: Any, state: dict[str, set[str]]) -> Any:
+    if isinstance(node, dict):
+        folded: dict[str, Any] = {}
+        # The document is serialized with sorted keys, so the fold walks the
+        # keys in the same order: the notice the model reads first is the
+        # one kept in full.
+        for key in sorted(node):
+            value = node[key]
+            if key == "notice" and isinstance(value, str):
+                if value in state["seen"]:
+                    folded[key] = FOLDED_NOTICE
+                else:
+                    state["seen"].add(value)
+                    folded[key] = value
+            else:
+                folded[key] = _fold_node(value, state)
+        return folded
+    if isinstance(node, list):
+        return [_fold_node(item, state) for item in node]
+    return node
 
 
 def _error_content(tool: str, kind: str, message: str) -> str:
@@ -689,6 +754,139 @@ def _as_jsonable(payload: Any) -> Any:
     return payload
 
 
+#: The most transcript an answer's *repeated row scaffolding* may cost.
+#:
+#: A page of symbols is the answer that repeats itself: every row carries
+#: the keys, the ``truncated`` and ``bytes`` bookkeeping and the folded
+#: notice that says the text is data, and twenty of those rows spend more
+#: than three thousand characters saying the same shape. The transcript
+#: budget gives each answer a page allowance on top of the per-field text
+#: limit, and the row count is cut to fit inside it — with the cut stated,
+#: as every cut here is, and ``total`` and ``offset`` kept so a reader can
+#: page to what was dropped.
+MAX_CONTENT_CHARS = 12_000
+
+
+#: The longest text a single string field may put in the transcript.
+#:
+#: A whole-class source read is the biggest thing a tool hands back, and the
+#: narrow M6 verification showed what it costs: three tasks spent their whole
+#: 24,000-token task budget on the prompt alone — the history re-sent on every
+#: iteration carried the same whole-class text again and again — and died
+#: before the model could answer. The evidence a conclusion is checked
+#: against is recorded from the *payload*, before this clip, so the clip
+#: costs the transcript nothing it cannot re-read and the evidence chain
+#: nothing at all.
+MAX_FIELD_TEXT = 4_000
+
+#: The announcement that replaces the dropped middle of a clipped text.
+_CLIP_NOTICE = (
+    "\n… [clipped {dropped} characters to keep the transcript readable; "
+    "the full text is recorded as evidence]"
+)
+
+#: The announcement that replaces the rows a page dropped.
+_ROW_NOTICE = (
+    "… [{dropped} of {total} rows clipped to keep the transcript readable; "
+    "the full page is recorded as evidence — page again with offset={kept}]"
+)
+
+
+def clip_tool_content(content: str, *, max_field_text: int = MAX_FIELD_TEXT) -> str:
+    """Clip a tool answer to what a transcript can afford to re-send.
+
+    The transcript is re-sent on every iteration, so a tool answer that
+    carries a whole class's source — or a page of rows whose scaffolding
+    outweighs its facts — costs its own size again on every turn after it.
+    Two cuts, both announced where they happen and both taken after the
+    evidence was recorded from the untouched payload:
+
+    * any string field longer than :data:`MAX_FIELD_TEXT` keeps its head —
+      where a class's declarations and constants live — and says what was
+      dropped;
+    * a list of rows longer than :data:`MAX_CONTENT_CHARS` allows keeps the
+      first rows and says how many were dropped, with the offset that pages
+      to them. ``total`` and ``offset`` stay, so the count is not lost.
+
+    A document that fits is returned unchanged: the clip is for the answers
+    that are too big, not for the answers that are already right.
+    """
+    if len(content) <= max_field_text:
+        return content
+    try:
+        document = json.loads(content)
+    except (TypeError, ValueError):
+        return content
+    clipped = _clip_value(document, max_field_text)
+    clipped = _clip_rows(clipped)
+    if clipped is document:
+        return content
+    return json.dumps(clipped, sort_keys=True, default=str)
+
+
+def _clip_value(value: Any, limit: int) -> Any:
+    """Clip one JSON value; return the original object when nothing changed."""
+    if isinstance(value, str):
+        if len(value) <= limit:
+            return value
+        head = value[:limit]
+        return head + _CLIP_NOTICE.format(dropped=len(value) - limit)
+    if isinstance(value, list):
+        clipped_items = [_clip_value(item, limit) for item in value]
+        if any(new is not old for new, old in zip(clipped_items, value, strict=False)):
+            return clipped_items
+        return value
+    if isinstance(value, dict):
+        clipped_fields = {key: _clip_value(item, limit) for key, item in value.items()}
+        if clipped_fields != value:
+            return clipped_fields
+        return value
+    return value
+
+
+def _clip_rows(document: Any, *, max_chars: int = MAX_CONTENT_CHARS) -> Any:
+    """Cut a page of rows to the transcript allowance, saying what was dropped.
+
+    A page that fits is returned unchanged. One that does not keeps its
+    first rows — the ones a reader reads first — and the row that names the
+    cut carries the offset that pages to what was dropped. ``total`` and
+    ``offset`` are never touched: a count that survives the clip is the
+    count the question asked about.
+    """
+    if not isinstance(document, dict):
+        return document
+    data = document.get("data")
+    if not isinstance(data, dict):
+        return document
+    rows_key = next(
+        (key for key in ("symbols", "declarations") if isinstance(data.get(key), list)), None
+    )
+    if rows_key is None:
+        return document
+    rows = data[rows_key]
+    total = data.get("total", len(rows))
+    offset = data.get("offset", 0)
+    kept: list[Any] = []
+    kept_chars = len(json.dumps({k: v for k, v in document.items() if k != "data"}, default=str))
+    changed = False
+    for index, row in enumerate(rows):
+        row_chars = len(json.dumps(row, default=str))
+        if kept and kept_chars + row_chars > max_chars:
+            notice = _ROW_NOTICE.format(dropped=len(rows) - index, total=total, kept=offset + index)
+            kept.append({"row_clip": notice})
+            changed = True
+            break
+        kept.append(row)
+        kept_chars += row_chars
+    if not changed:
+        return document
+    clipped = dict(document)
+    clipped_data = dict(data)
+    clipped_data[rows_key] = kept
+    clipped["data"] = clipped_data
+    return clipped
+
+
 __all__ = [
     "ERROR_CIRCUIT_OPEN",
     "ERROR_INVALID_ARGUMENTS",
@@ -697,6 +895,8 @@ __all__ = [
     "ERROR_TIMEOUT",
     "ERROR_TOOL",
     "ERROR_UNKNOWN_TOOL",
+    "MAX_CONTENT_CHARS",
+    "MAX_FIELD_TEXT",
     "SENSITIVE_TOOLS",
     "TOOL_DESCRIPTIONS",
     "TRANSIENT_ERRORS",
@@ -706,4 +906,5 @@ __all__ = [
     "ToolClient",
     "ToolExecutor",
     "ToolOutcome",
+    "clip_tool_content",
 ]

@@ -157,7 +157,10 @@ def build_server(analyzer: Analyzer) -> MCPServer:
             "Search the index of an analysed APK for a phrase, across its classes, "
             "methods, fields and strings, and return the excerpt the index has around "
             "each match. Searches the index only — not the decompiled source. For "
-            "source, use get_class_source or get_method_source."
+            "source, use get_class_source or get_method_source. For a string "
+            "constant, read the first page with limit=20 before paging further: "
+            "string hits share the constant pool, so the first small page shows "
+            "the shape of the answer before a wider read spends the budget."
         ),
         annotations=_read_only("Search the index"),
     )

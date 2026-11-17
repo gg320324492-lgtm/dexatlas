@@ -34,6 +34,7 @@ KEY_TOOLS: dict[str, frozenset[str]] = {
     "source": frozenset({"get_class_source", "get_method_source"}),
     "calls": frozenset({"find_callers", "find_callees"}),
     "evidence": frozenset({"get_evidence", "resolve_locator"}),
+    "resources": frozenset({"find_resource_declarations"}),
 }
 
 #: Every tool that can be the key reading of some question.
