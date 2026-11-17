@@ -9,16 +9,20 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1632%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
-
-> 徽章是**完整环境下**的一次测量（1632 个测试、0 跳过）。在没抓第三方样本的机器上，
-> `pytest` 会显示 27 个 skip —— 那是缺 `scripts/fetch-fixtures.sh` 抓的两个样本，
-> 不是失败。
+[![Tests](https://img.shields.io/badge/tests-1632%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
-  <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1632 tests, 49 public contract checks" width="900">
+> The badges are one measurement of the whole tree. On a machine without the
+> third-party samples, `pytest` reports skips — that is
+> `scripts/fetch-fixtures.sh` not having been run, not a failure. What was
+> measured, and how to reproduce it, is in the
+> [execution report](docs/reports/phase1-execution-report.md).
+
+  <sub>[Every figure on the card below, and the file it was read from](docs/reports/social-preview-howto.md)</sub>
+
+  <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence" width="900">
 </div>
 
 DexAtlas turns an APK into a picture you can verify — as complete as the installed

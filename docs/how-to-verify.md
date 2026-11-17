@@ -144,14 +144,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里三样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1632**（**1485** 快 + **147** 集成）。
+* **收集到的测试数** —— 当前这棵树上应当是 **1643**（**1496** 快 + **147** 集成）。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1485/1632 tests collected (147 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 147/1632 tests collected (1485 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1496/1643 tests collected (147 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 147/1643 tests collected (1496 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -164,8 +164,8 @@ uv run --no-sync pytest -q
 
 | 环境 | 汇总行 |
 |---|---|
-| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `1605 passed, 27 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
-| 三后端齐备，**取了**第三方样本 | `1632 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `1616 passed, 27 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
+| 三后端齐备，**取了**第三方样本 | `1643 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -430,7 +430,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:tests.total-->1632<!--/fig-->
+<!--fig:tests.total-->1643<!--/fig-->
 ```
 
 **改了会怎样？**

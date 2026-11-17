@@ -2,22 +2,27 @@
 
 # DexAtlas
 
-**From APK to Evidence — Powered by AI Agents.**
+**从 APK 到可核查的证据 —— 由一个有边界的 AI agent 驱动。**
 
 开源、证据优先的 Android 逆向工程与移动应用分析平台。
 
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1632%20passing-brightgreen.svg)](tests)
-[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-1632%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 
-> 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录；英文版的徽章由
-> `scripts/refresh-report-figures.py` 生成，中文版此处需人工同步。
+> 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录，同样由
+> `scripts/refresh-report-figures.py` 写回——**不要手改**。测的是什么、怎么复现，
+> 见[执行报告](docs/reports/phase1-execution-report.md)。
+
+  <sub>[下面这张卡片上每一个数，以及它是从哪个文件读出来的](docs/reports/social-preview-howto.md)</sub>
+
+  <img src=".github/social-preview.zh-CN.png" alt="DexAtlas — 从 APK 到可核查的证据" width="900">
 
 </div>
 
-DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权限清单、完整的
+DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权限清单、完整的
 类/方法/字段符号索引、反编译的 Java 源码、调用点与调用关系交叉引用，以及一条证据链——
 每个事实都记录着是哪个工具、在哪个版本、从哪个字节位置读出来的。一套模块化、可复现的
 工作流，面向开发者、安全研究员，以及对自己拥有或已获授权的应用进行分析的工程师。

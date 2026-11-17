@@ -89,6 +89,11 @@ DOCS = [
     REPO / "docs" / "architecture" / "public-contracts.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
     REPO / "docs" / "benchmarks" / "large-apk.md",
+    # The howto for the social preview card states, for every figure on the
+    # card, the file and the line it was read from. Two of those citations
+    # were wrong for a long time, because the document was not on this list:
+    # a citation nobody checks is a citation nobody has to keep true.
+    REPO / "docs" / "reports" / "social-preview-howto.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
