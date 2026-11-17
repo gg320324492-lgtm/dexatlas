@@ -1,7 +1,7 @@
 # M10 独立验收 · 读者执行摘要
 
 > 一页看懂：你被邀请做什么、怎么做、要多久、交回什么。
-> 细节见[读者验收包](m10-reader-package.md)与[验收邀请函](m10-invitation-template.md)。
+> 细节见[读者验收包](m10-reader-package.md)与[验收邀请函成稿](m10-invitation-final.md)。
 
 ## 这个项目是什么
 
@@ -22,9 +22,12 @@ SQLite 工作区，渲染出 Markdown / JSON 报告与证据包——报告里�
 
 ## 你要做的 5 步
 
-1. **领 commit**：向发起人索取固定 commit hash；全程只验这一个提交，
-   不用移动的 `main` 分支。
-2. **clone 并装环境**：`git clone` → `git checkout <commit>` →
+1. **锁定验收对象**：验收对象是 `v1.0.0` 这个 tag 所指的提交——你执行
+   `git checkout v1.0.0` 就能拿到它，**不必再向发起人索取 commit hash**；
+   想核对时用 `git rev-parse v1.0.0` 核出 hash，与
+   [邀请函成稿 §2](m10-invitation-final.md) 占位符里填的那串逐字比对。
+   全程只验这一个提交，**不要用移动的 `main` 分支**。
+2. **clone 并装环境**：`git clone` → `git checkout v1.0.0` →
    `uv sync --extra dev --extra analysis --extra mcp --extra demo`
    （或走 Docker 路线）。命令见[读者验收包 §3.1–3.2](m10-reader-package.md)。
 3. **跑一个完整案例**：对 `demo.apk` 做分析，做检索与引用核对，
@@ -38,7 +41,9 @@ SQLite 工作区，渲染出 Markdown / JSON 报告与证据包——报告里�
 
 ## 预计耗时
 
-- 到第一份报告：首次约 **10–20 分钟**（含下载），暖缓存约 30 秒。
+- 到第一份报告：首次约 **10–20 分钟**（含下载），暖缓存约 **1.5–2 分钟**
+  （同一环境差异下 [M8 演练](m8-install-rehearsal.md)另测过约 30 秒，
+  以你自己的实测为准；口径说明见[读者验收包 §5.4](m10-reader-package.md)）。
 - 完整案例（analyze 到 xrefs）：约 1–2 分钟。
 - 40 项判定 + 两平台打分：视抽查深度，**整体建议预留半天**。
 

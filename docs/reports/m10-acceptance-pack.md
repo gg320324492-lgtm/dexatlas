@@ -232,7 +232,7 @@ Windows 下 `DEXATLAS_JADX_PATH` 指向 `bin\jadx.bat`。没有后端时不要�
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人钉定的 commit>
+git checkout v1.0.0
 docker build -t dexatlas .
 docker run --rm dexatlas dexatlas backends
 ```
@@ -418,7 +418,9 @@ uv run --no-sync python -c \
 
 1. 结论没有 evidence 记录或 locator，或 locator 指向包外/不存在的位置。
 2. 把 `lead` 写成 finding，或把「没有发现」写成「不存在/安全」。
-3. 数字没有生成脚本或 trace 来源；Markdown / JSON / HTML 三处不一致。
+3. 数字没有生成脚本或 trace 来源（trace = 一次模型运行落盘的可复查记录，
+   定义见[读者验收包 §4.1](m10-reader-package.md)的术语块）；Markdown / JSON /
+   HTML 三处不一致。
 4. 只报成功子集，不报完整 92 题；失败和预算耗尽被隐去。
 5. 把 scripted 结果写成模型能力或模型通过率。
 6. 安装/案例步骤依赖作者口头补充，文档本身走不通。
@@ -669,8 +671,8 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 | — | macOS 未验证 | 平台矩阵不完整 | 如读者使用 macOS，单独记录；不得外推 | 未验证 |
 | — | M6 层级 2 已执行但未达验收线（retest4 三轮 49/60 = 81.7%，逐轮 15/16/18） | 不能声称真实模型在冻结集上达标；首测/中间轮的 24/60、40.0% 等是过渡数字 | 以 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为当前事实；**B1 验收线**未达，scripted 不得替代 | 未达标（B1 验收线未关闭） |
 | — | 独立验收尚未执行 | M10 未完成 | 本包就是为此准备；执行后回填 §8 | 未执行 |
-| — | `install.md` 写「No APK is committed」，但 `examples/` 有一方 APK | 首次读者可能误以为必须 fetch fixtures | 记录为文档措辞问题；完整案例直接用 `examples/`；不阻断 | 文档缺陷（低） |
-| — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 最终 commit 上完整重测量后复跑；不得手改数字，不得用部分测量刷新 | 未关闭（阻断文档门禁） |
+| — | `install.md` 过去写「No APK is committed」，与 `examples/` 已提交的一方 APK 矛盾 | 首次读者可能误以为必须 fetch fixtures | 已修正：install.md 现写明五个一方样例 APK 已提交于 `examples/`（各带 Smali 源码），完整案例直接用 `examples/`；第三方夹具仍走 `scripts/fetch-fixtures.sh`；见[发版检查清单 D2](v1.0.0-release-checklist.md) | 已修复并合入 |
+| — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 已在当前树复跑三项只读门禁：`check-doc-citations.py` 0 漂移、`check-version-claims.py --base auto` 0 新增 finding（2 条历史遗留已在基线内）、`pytest tests/test_docs.py` 60 passed；读者仍需在最终 commit 上自行复跑；不得手改数字，不得用部分测量刷新 | 已关闭（当前树三项全绿；复跑结果由读者记录） |
 
 ## 8. M10 退出门槛对照（当前全部未验证）
 
@@ -689,8 +691,9 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 
 **结论：本文件是准备材料；独立验收尚未执行，M10 未完成。**
 在至少一位独立读者完成 §3、一位审阅者完成 §4、一位有代码能力的评审者完成 §6，
-并把结果填入记录模板之前，不得把本包中的任何条目当作「通过」，也不得据此发布
-v1.0.0 或对外宣称已达 90%。
+并把结果填入记录模板之前，不得把本包中的任何条目当作「通过」，也不得把本包
+当作**发布依据**——v1.0.0 已于 2026-11-17 打 tag（见 §6.4 与 §8），本次验收
+既不构成重发或改发 v1.0.0 的理由，也不构成对外宣称已达 90% 的依据。
 
 ## 附录 A：验收项统计与追溯
 
