@@ -36,8 +36,10 @@ still yields a manifest, an index and a report that says which steps did not run
 > every version since. The MCP server, the evidence-first agent and the web
 > workbench's M4 screens — the project dashboard, upload and analysis progress,
 > search and evidence, the cross-reference view, the agent workspace, report
-> export, and the M3 benchmark view — are built and shipped in `v0.2.0`. M4 passed
-> its source review on 2026-11-14. Phase 3 is under way against the
+> export, and the M3 benchmark view — shipped in `v0.2.0`; all of them are
+> built in full except the search, source and evidence group, which is partly
+> built. M4 passed its source review on 2026-11-14. Phase 3 is under way
+> against the
 > [portfolio plan](docs/roadmap/phase3-plan.md): M5 (claims baseline) and M7
 > (client-ready deliverables) are done; M6 (bounded agent tasks) has its level-0
 > and level-1 drills complete, its level-2 real-model batch run — which did
@@ -251,7 +253,10 @@ In an MCP host, add it as a stdio server:
 DexAtlas can show a workspace in a browser. The workbench sits on the same
 eleven tools the MCP server exposes, called in-process — the JSON the browser
 receives is the shape the MCP server would have returned. It is the Phase 2
-plan's M4 screen set; all eight screens are built and shipped in `v0.2.0`:
+plan's M4 screen set — eight screens, shipped in `v0.2.0`. Five of them are
+built in full; the explorer, the source viewer and the evidence viewer are
+partly built — they cover search, source reading and evidence records, and do
+not claim the rest of those screens:
 
 - the **project dashboard**: the projects a workspace holds, each with the
   backends that took part and the counts the analysis produced;

@@ -94,8 +94,8 @@ uv run dexatlas backends
 ┌────────────┬───────────┬──────────────────┐
 │ Backend    │    Status │ Version          │
 ├────────────┼───────────┼──────────────────┤
-│ jadx       │ available │ 1.5.6            │
-│ apktool    │ available │ 3.0.3            │
+│ jadx       │ available │ 1.5.2            │
+│ apktool    │ available │ 2.11.1          │
 │ androguard │ available │ androguard 4.1.4 │
 └────────────┴───────────┴──────────────────┘
 ```
@@ -151,7 +151,9 @@ analysis backends and are not yet read by any code path.
 `demo-app/demo.apk`, `multidex-app/multidex.apk`, `obfuscated-app/obfuscated.apk`,
 `strings-app/strings.apk` and `wide-app/wide.apk` — each with the Smali sources it
 was built from beside it. You can analyse them as they are, and the three
-[case studies](case-studies/README.md) run on two of them:
+[case studies](case-studies/README.md) run on three of them — `demo-app`,
+`obfuscated-app` and `multidex-app`, the last one as the multi-DEX appendix
+of the obfuscated-sample study:
 
 ```bash
 uv run dexatlas analyze examples/demo-app/demo.apk \
@@ -311,24 +313,31 @@ no network at all:
 uv run dexatlas analyze app.apk --output report.md
 ```
 
-| Method   | Path                                        | Purpose                       |
-| -------- | ------------------------------------------- | ----------------------------- |
-| `GET`    | `/health`                                   | Liveness and backend versions |
-| `GET`    | `/backends`                                 | Installed vs missing         |
-| `POST`   | `/analyze`                                  | Upload an APK                |
-| `GET`    | `/projects`                                 | List projects                |
-| `GET`    | `/projects/{id}`                            | One project's metadata       |
-| `GET`    | `/projects/{id}/manifest`                   | Parsed AndroidManifest.xml    |
-| `GET`    | `/projects/{id}/classes`                    | Indexed classes               |
-| `GET`    | `/projects/{id}/methods`                    | Indexed methods               |
-| `GET`    | `/projects/{id}/resources`                 | Indexed resource strings      |
-| `GET`    | `/projects/{id}/classes/{name}/source`      | Class source                 |
-| `GET`    | `/projects/{id}/methods/{class}/{method}`   | Method source                |
-| `GET`    | `/projects/{id}/xrefs/{method_id}`          | Callers of a method          |
-| `GET`    | `/projects/{id}/search?q=`                  | Full-text search             |
-| `GET`    | `/projects/{id}/evidence`                   | Evidence records             |
-| `GET`    | `/projects/{id}/report?format=json\|markdown` | Report export              |
-| `DELETE` | `/projects/{id}`                            | Remove a project             |
+| Method   | Path                                           | Purpose                       |
+| -------- | ---------------------------------------------- | ----------------------------- |
+| `GET`    | `/health`                                      | Liveness and backend versions |
+| `GET`    | `/backends`                                    | Installed vs missing          |
+| `POST`   | `/analyze`                                     | Upload an APK                 |
+| `GET`    | `/projects`                                    | List projects                 |
+| `GET`    | `/projects/{id}`                               | One project's metadata        |
+| `GET`    | `/projects/{id}/runs`                          | Runs of one project           |
+| `GET`    | `/projects/{id}/runs/{run_id}`                 | One run's status              |
+| `POST`   | `/projects/{id}/cancel`                        | Stop a running analysis       |
+| `GET`    | `/projects/{id}/manifest`                      | Parsed AndroidManifest.xml    |
+| `GET`    | `/projects/{id}/classes`                       | Indexed classes               |
+| `GET`    | `/projects/{id}/methods`                       | Indexed methods               |
+| `GET`    | `/projects/{id}/resources`                     | Indexed resource strings      |
+| `GET`    | `/projects/{id}/resource-references`           | Resource-to-file references   |
+| `GET`    | `/projects/{id}/classes/{name}/source`         | Class source                  |
+| `GET`    | `/projects/{id}/methods/{class}/{method}`      | Method source                 |
+| `GET`    | `/projects/{id}/xrefs/{method_id}`             | Callers of a method           |
+| `GET`    | `/projects/{id}/search?q=`                     | Full-text search              |
+| `GET`    | `/projects/{id}/evidence`                      | Evidence records              |
+| `GET`    | `/projects/{id}/report?format=json\|markdown`  | Report export                 |
+| `GET`    | `/uploads`                                     | Stored uploads and retention  |
+| `DELETE` | `/uploads/{sha256}`                            | Remove a stored upload        |
+| `POST`   | `/uploads/cleanup`                             | Delete uploads past retention |
+| `DELETE` | `/projects/{id}`                               | Remove a project              |
 
 ```bash
 curl -X POST -F "file=@app.apk" http://localhost:8000/analyze
