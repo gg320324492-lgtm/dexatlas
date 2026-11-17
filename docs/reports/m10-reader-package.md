@@ -223,7 +223,9 @@ uv run --no-sync python -c \
 ### 3.8 第 8 步：契约与回归集抽查（验收项 E、F 组，可选但建议）
 
 - **CLI 退出码（F1）**：0 成功、1 空答案、2 请求错误、3 分析失败、4 重载歧义、
-  5 截断；至少实测 0/1/2 各一次。语义见[公共契约表](../architecture/public-contracts.md)。
+  5 截断、6 跑完但没有可用的代码索引（`EXIT_NO_INDEX`，v1.0.0 新增；自动化脚本
+  请用 `exit_code in (0, 6)` 或 `summary.index_complete` 区分）；至少实测
+  0/1/2 各一次。语义见[公共契约表](../architecture/public-contracts.md)。
 - **契约实测（F5–F6）**：
 
   ```bash
@@ -292,9 +294,13 @@ uv run --no-sync python -c \
 
 ### 4.4 已知限制与未合入修复（对应 G2、G3、A2，★）
 
-- **M8-4**：三个后端全部超时（或全部失败）时，分析状态仍为 `completed`、
-  退出码仍为 0。项目已**决策为已知限制**，不改退出码契约；复现与理由见
-  [M8 演练 §6](m8-install-rehearsal.md)。请核对你会不会把「全部后端失败」
+- **M8-4（已在 v1.0.0 关闭）**：三个后端全部超时（或全部失败）时，分析状态曾为
+  `completed`、退出码曾为 0。v1.0.0 用新退出码 **6（`EXIT_NO_INDEX`）**关闭了它
+  ——这类运行现在返回 6，并在 `errors[]`、`summary.index_complete == false` 与
+  `run.completeness = "partial"` 里同时说明；契约见
+  [公共契约表 §8.1](../architecture/public-contracts.md)，引入它的提案见
+  [exit-code-partial-read.md](../proposals/exit-code-partial-read.md)。复现与
+  理由见 [M8 演练 §6](m8-install-rehearsal.md)。请核对：读到 6 时你是否仍会把它
   误读为「分析成功」。
 - **M8-2**：Docker 容器内查询类命令缺 `--workspace` 选项，需用
   `DEXATLAS_WORKSPACE` 统一。

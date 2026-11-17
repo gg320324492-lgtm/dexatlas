@@ -270,7 +270,8 @@ uv run --no-sync python -c \
   （`docs/benchmarks/m6-level1-scripted.md`）；
 - 测试与覆盖率数字——以你本机 `uv run --no-sync pytest -q` 的实际结果为准
   （`docs/reports/m10-reader-package.md:314`）；
-- 已知限制 M8-4（三个后端全部失败时退出码仍为 0）、M8-2、M8-3、macOS 未验证
+- 已知限制 M8-2、M8-3、macOS 未验证；M8-4（三个后端全部失败时退出码仍为 0）
+  已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
   （`docs/reports/m10-reader-package.md:293`）；
 - 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，是重评的基线，不是成绩
   （`docs/reports/m10-reader-package.md:13`）。

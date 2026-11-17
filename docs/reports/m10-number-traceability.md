@@ -93,7 +93,7 @@
 - **对外表述应当用 retest4 的逐轮数 15/20、16/20、18/20**，理由：
   - 它是更晚一次测量、且是验收测量；
   - 它对应**发版树**所处的代码状态，而 retest3 的树已在发版树之外；
-  - 仓库内所有「以当前事实为准」的文档已经统一指向 retest4（`docs/reports/m10-reader-kit.md:312`–`:315`、`docs/reports/m10-invitation-final.md:45`–`:47`、`docs/releases/v1.0.0.md:27`–`:31`、`README.md:44`–`:46`、`README.zh-CN.md:342`–`:343`、`docs/reports/m10-acceptance-pack.md:134`、`:543`–`:544`、`:639`）。
+  - 仓库内所有「以当前事实为准」的文档已经统一指向 retest4（`docs/reports/m10-reader-kit.md:313`–`:315`、`docs/reports/m10-invitation-final.md:45`–`:47`、`docs/releases/v1.0.0.md:27`–`:31`、`README.md:44`–`:46`、`README.zh-CN.md:342`–`:343`、`docs/reports/m10-acceptance-pack.md:134`、`:543`–`:544`、`:639`）。
 - **两次合计数相同是巧合，不是同一批数据。** 合计都是 49/60 = 81.7%，但 token 合计不同（1,080,116 vs 1,182,356，逐轮也不同：367581/356309/356226 vs 395740/395542/391074），A/B 合计也不同（20/60、22/60 vs 21/60、21/60）。两者是两次独立运行。
 
 ### 1.3 一个必须提醒的检索陷阱（推断，依据见下）
@@ -115,11 +115,11 @@
 
 | 数字 | 出现在哪个文档:行 | 出处（基准报告:行） | 结论 |
 |---|---|---|---|
-| 首测 DexAtlas 24/60 = 40.0% | `docs/status.md:133`；`docs/releases/v1.0.0.md:23`；`docs/reports/v1.0.0-github-release-body.md:289`；`README.md:42`；`README.zh-CN.md:29`；`CHANGELOG.md:52`；`docs/reports/m10-reader-package.md:262`；`docs/reports/m10-acceptance-pack.md:134`、`:544` | `docs/benchmarks/m6-level2-real.md:29` | 一致 |
-| 首测逐轮 45% / 40% / 35% | `docs/status.md:133`；`docs/releases/v1.0.0.md:24`；`docs/reports/m10-reader-package.md:262`–`:263`；`CHANGELOG.md:52` | `m6-level2-real.md:42`、`:55`、`:68`（逐轮八指标） | 一致 |
+| 首测 DexAtlas 24/60 = 40.0% | `docs/status.md:133`；`docs/releases/v1.0.0.md:23`；`docs/reports/v1.0.0-github-release-body.md:289`；`README.md:42`；`README.zh-CN.md:29`；`CHANGELOG.md:52`；`docs/reports/m10-reader-package.md:264`；`docs/reports/m10-acceptance-pack.md:134`、`:544` | `docs/benchmarks/m6-level2-real.md:29` | 一致 |
+| 首测逐轮 45% / 40% / 35% | `docs/status.md:133`；`docs/releases/v1.0.0.md:24`；`docs/reports/m10-reader-package.md:264`–`:263`；`CHANGELOG.md:52` | `m6-level2-real.md:42`、`:55`、`:68`（逐轮八指标） | 一致 |
 | 首测 A 24/60、B 18/60 | `docs/status.md:133`；`CHANGELOG.md:52`–`:53` | `m6-level2-real.md:27`–`:28` | 一致 |
-| 首测 token 853,103（超 800,000 授权 53,103） | `docs/status.md:133`；`docs/releases/v1.0.0.md`（同段）；`docs/reports/m10-reader-package.md:262`–`:263`；`CHANGELOG.md:54`–`:55` | `m6-level2-real.md:31`、`:112` | 一致 |
-| **最终完整重测** DexAtlas 49/60 = 81.7%，逐轮 **15/20、16/20、18/20** | `docs/reports/m10-invitation-final.md:45`–`:46`；`docs/reports/m10-reader-kit.md:20`、`:232`；`docs/reports/m10-reader-package.md:237`、`:258`；`docs/reports/m10-acceptance-pack.md:35`、`:133`、`:543`–`:544`、`:639`；`docs/releases/v1.0.0.md:27`–`:28`；`docs/reports/v1.0.0-github-release-body.md:112`–`:113`、`:229`；`CHANGELOG.md:443`–`:444`；`docs/status.md:133`；`README.md:44`；`README.zh-CN.md:342` | `m6-level2-retest4.md:28`–`:30`、`:38`、`:82` | 一致 |
+| 首测 token 853,103（超 800,000 授权 53,103） | `docs/status.md:133`；`docs/releases/v1.0.0.md`（同段）；`docs/reports/m10-reader-package.md:264`–`:263`；`CHANGELOG.md:54`–`:55` | `m6-level2-real.md:31`、`:112` | 一致 |
+| **最终完整重测** DexAtlas 49/60 = 81.7%，逐轮 **15/20、16/20、18/20** | `docs/reports/m10-invitation-final.md:45`–`:46`；`docs/reports/m10-reader-kit.md:20`、`:232`；`docs/reports/m10-reader-package.md:239`、`:258`；`docs/reports/m10-acceptance-pack.md:35`、`:133`、`:543`–`:544`、`:639`；`docs/releases/v1.0.0.md:27`–`:28`；`docs/reports/v1.0.0-github-release-body.md:112`–`:113`、`:229`；`CHANGELOG.md:443`–`:444`；`docs/status.md:133`；`README.md:44`；`README.zh-CN.md:342` | `m6-level2-retest4.md:28`–`:30`、`:38`、`:82` | 一致 |
 | 更早一次重测逐轮 **17/15/17**，合计同为 49/60 | `docs/reports/m10-invitation-final.md:47`；`docs/reports/m10-reader-kit.md:233`、`:315` | `m6-level2-retest3.md:29`–`:31`、`:39`、`:85` | 一致（已正确标注为「更早一次重测」；邀请函那一处**共享树已改好，待随发版提交**，不计入 §3） |
 | retest4 token 合计 1,182,356 | `docs/releases/v1.0.0.md:30`；`docs/reports/v1.0.0-github-release-body.md:282`；`CHANGELOG.md:448`；`docs/status.md:133`；`README.zh-CN.md:343` | `m6-level2-retest4.md:40` | 一致 |
 | retest3 token 合计 1,080,116 | `CHANGELOG.md:122`；`docs/status.md:133` | `m6-level2-retest3.md:41` | 一致（CHANGELOG 该条已标为「B1 关闭测量」，未冒用 retest4 名义） |
@@ -150,10 +150,10 @@
 
 | 数字 | 出现在哪个文档:行 | 出处（基准报告:行） | 结论 |
 |---|---|---|---|
-| 层级 0 = 20/20（确定性判分，无模型） | `docs/reports/m10-reader-package.md:236`；`docs/reports/m10-acceptance-pack.md:133`、`:538`；`docs/releases/v1.0.0.md:21`；`docs/reports/v1.0.0-github-release-body.md:84`、`:290` | `m6-level1-scripted.md:106`、`:112`；`docs/benchmarks/service-regression-set.md:173` | 一致 |
-| 层级 1：20 题 A 4/20、B 4/20、DexAtlas 1/20 | `docs/reports/m10-reader-package.md:285`；`docs/reports/m10-acceptance-pack.md:134`、`:540`；`CHANGELOG.md:46` | `m6-level1-scripted.md:113`、`:51`–`:53` | 一致 |
+| 层级 0 = 20/20（确定性判分，无模型） | `docs/reports/m10-reader-package.md:238`；`docs/reports/m10-acceptance-pack.md:133`、`:538`；`docs/releases/v1.0.0.md:21`；`docs/reports/v1.0.0-github-release-body.md:84`、`:290` | `m6-level1-scripted.md:106`、`:112`；`docs/benchmarks/service-regression-set.md:173` | 一致 |
+| 层级 1：20 题 A 4/20、B 4/20、DexAtlas 1/20 | `docs/reports/m10-reader-package.md:287`；`docs/reports/m10-acceptance-pack.md:134`、`:540`；`CHANGELOG.md:46` | `m6-level1-scripted.md:113`、`:51`–`:53` | 一致 |
 | 层级 1：92 题 A 15/92、B 15/92、DexAtlas 5/92 | `docs/reports/m10-acceptance-pack.md:540`–`:541`；`CHANGELOG.md:46`–`:47` | `m6-level1-scripted.md:54`–`:56` | 一致 |
-| 层级 1 的口径是「替身模型，只证明管线端到端可用，不是模型能力基线」 | `docs/reports/m10-reader-kit.md:269`；`docs/reports/m10-reader-package.md:285`；`docs/reports/m10-acceptance-pack.md:134` | `m6-level1-scripted.md:4`、`:110`–`:113` | 一致 —— 全部带免责声明，未把 4/20、1/20 当模型通过率 |
+| 层级 1 的口径是「替身模型，只证明管线端到端可用，不是模型能力基线」 | `docs/reports/m10-reader-kit.md:269`；`docs/reports/m10-reader-package.md:287`；`docs/reports/m10-acceptance-pack.md:134` | `m6-level1-scripted.md:4`、`:110`–`:113` | 一致 —— 全部带免责声明，未把 4/20、1/20 当模型通过率 |
 
 ### 2.5 公共契约与退出码
 
@@ -236,7 +236,7 @@
 | 7 | `docs/reports/m10-acceptance-pack.md` | 144 | `\| F1 \| CLI 退出码：0 成功、1 空答案、2 请求错误、3 分析失败、4 重载歧义、5 截断；至少实测 0/1/2 各一次，并核对文档语义。 \| ★ \| …` | 同上，补 6 | 同上 |
 | 8 | `docs/reports/m10-acceptance-pack.md` | 146 | `\| F3 \| MCP：工具清单为契约表的 10 个，全部只读注解；抽查 2 个工具的返回形状。 \| …` | `契约表的 11 个` | `public-contracts.md:203`–`:217`（11 行）；`docs/releases/v1.0.0.md:119` |
 | 9 | `docs/reports/m10-reader-package.md` | 295–298 | `- **M8-4**：三个后端全部超时（或全部失败）时，分析状态仍为 `completed`、`<br>`  退出码仍为 0。项目已**决策为已知限制**，不改退出码契约；复现与理由见`<br>`  [M8 演练 §6](m8-install-rehearsal.md)。请核对你会不会把「全部后端失败」`<br>`  误读为「分析成功」。` | 改为已解决：M8-4 的「退出码仍是 0」缺口已由 v1.0.0 的 `EXIT_NO_INDEX = 6` 补上——全部读取 DEX 的后端失败且索引为空时落 6；原 M8 演练记录（`m8-install-rehearsal.md:138`–`:145`）是当时的实况，需加一句「已在 1.0.0 解决」或改指新契约 | `public-contracts.md:54`（6 的语义）、`:64`–`:66`（「原先错误地落在 0 的运行改落 6，0–5 语义不变」）；`docs/status.md:135`；`src/dexatlas/cli/main.py:135` |
-| 10 | `docs/reports/m10-reader-kit.md` | 273 | `- 已知限制 M8-4（三个后端全部失败时退出码仍为 0）、M8-2、M8-3、macOS 未验证`<br>`  （`docs/reports/m10-reader-package.md:293`）；` | 从「已知限制」清单里移除 M8-4，或改为「M8-4 已在 v1.0.0 由退出码 6 解决」；同时 `:274` 的引用行号要随 §4.4 的改动重算 | 同上；且 `docs/status.md:135` 已经把退出码 6 记为 v1.0.0 的公共契约变更，与「不改退出码契约」直接矛盾 |
+| 10 | `docs/reports/m10-reader-kit.md` | 273 | `- 已知限制 M8-4（三个后端全部失败时退出码仍为 0）、M8-2、M8-3、macOS 未验证`<br>`  （`docs/reports/m10-reader-package.md:295`）；` | 从「已知限制」清单里移除 M8-4，或改为「M8-4 已在 v1.0.0 由退出码 6 解决」；同时 `:274` 的引用行号要随 §4.4 的改动重算 | 同上；且 `docs/status.md:135` 已经把退出码 6 记为 v1.0.0 的公共契约变更，与「不改退出码契约」直接矛盾 |
 
 **这一组为什么最严重（推断，依据已列）**：这五处落在**三份发给外部读者的验收材料**里（`m10-reader-package.md`、`m10-acceptance-pack.md`、`m10-reader-kit.md`）。读者按 F1 实测退出码时，照着「0–5」枚举根本不会去构造退出码 6 的场景；照着 M8-4 又会得出「全部后端失败仍是 0」的错误结论。这与本项目「退出码即契约、只看退出码也要能分辨残缺运行」的设计（`public-contracts.md:62`）正面冲突，且方向是**低估**自己已交付的能力。
 
@@ -254,7 +254,7 @@
 | 项 | 位置 | 为什么无法核实 | 怎么复核 |
 |---|---|---|---|
 | 「226 条引用，0 漂移」 | `docs/reports/m10-acceptance-pack.md:605` | 仓库里没有落盘这次 `check-doc-citations.py` 的运行结果；本窗口受约束未运行任何 Python 测量命令 | 在发版树上跑 `uv run --no-sync python scripts/check-doc-citations.py`，读它打印的「校验了多少处、漂移了几处」，把实际数字填进去（`docs/status.md:431`–`:432` 明确要求这个数不要手抄） |
-| 读者材料的 `file:line` 引用是否仍命中 | `docs/reports/m10-reader-package.md`、`m10-reader-kit.md`、`m10-acceptance-pack.md` 内多处 | 本次只核了**数字**；这些文档里的行号引用是否仍指向它说的东西，需由 `check-doc-citations.py` 判定 | 同上；注意 §3 第 10 条要求改动 `m10-reader-package.md:293` 附近后，相关引用行号会漂，须重跑 remapper + checker |
+| 读者材料的 `file:line` 引用是否仍命中 | `docs/reports/m10-reader-package.md`、`m10-reader-kit.md`、`m10-acceptance-pack.md` 内多处 | 本次只核了**数字**；这些文档里的行号引用是否仍指向它说的东西，需由 `check-doc-citations.py` 判定 | 同上；注意 §3 第 10 条要求改动 `m10-reader-package.md:295` 附近后，相关引用行号会漂，须重跑 remapper + checker |
 | `docs/releases/v1.0.0.md:56`–`:58`、`:108`–`:115` 的引用 | 发版说明 | 已逐条核对：`v1.0.0-github-release-body.md:299`、`:301` 引用的这几行**命中**，且 `docs/reports/v1.0.0-release-runbook.md:98` 也命中「46/46 活检（26 REST + 6 MCP + 14 CLI）」 | — （此项无需再核） |
 
 ---
