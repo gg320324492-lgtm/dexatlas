@@ -6,7 +6,8 @@
 > **未参与实现**的读者的完整执行包：从这里出发，不需要再向作者要任何步骤。
 > 验收记录填写[验收记录模板](m10-review-record-template.md)。
 >
-> 编写日期：2026-11-16 · 配套验收包基准：`bfa2f56`（main）
+> 编写日期：2026-11-16（2026-11-17 定稿）· 验收 commit：**由验收发起人钉定并
+> 告知**（待项目里程碑定稿后确定；不要使用移动的 `main` 分支）
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
 > （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）
@@ -42,8 +43,8 @@
    改环境或远程操作。凡是靠作者口头补充才走通的步骤，相关验收项判不通过。
 5. **阻断项一票否决。** 19 个标 ★ 的验收项（清单见[准备包 §2.8](m10-acceptance-pack.md)）
    任何一个不通过，M10 即不通过，高分不能抵消。
-6. **固定 commit。** 向验收发起人索取要验收的 commit hash，全程只验这一个 commit，
-   所有记录写明 hash。不要用移动的 `main` 分支做验收。
+6. **固定 commit。** 验收 commit 由验收发起人钉定后告知 hash，全程只验这一个
+   commit，所有记录写明 hash。不要用移动的 `main` 分支做验收。
 7. ** secrets 与第三方样本不入记录。** 记录中的个人路径、密钥、日志用 `<redacted>` 脱敏；
    不要把第三方 APK 或 `so` 文件传给任何人。
 
@@ -70,7 +71,7 @@
 ```bash
 git clone https://github.com/gg320324492-lgtm/dexatlas.git
 cd dexatlas
-git checkout <验收发起人指定的 commit>
+git checkout <验收发起人钉定的 commit>
 git status
 ```
 
@@ -102,6 +103,15 @@ export DEXATLAS_APKTOOL_JAR=/path/to/apktool.jar
 
 Windows 下 `DEXATLAS_JADX_PATH` 指向 `bin\jadx.bat`。**没有后端不要停**：
 继续往下走，这正好是验收项 A6 / G2 要核实的降级行为。
+
+> **工作区位置（路线 A）**：连续执行 `analyze` / `manifest` / `search` 等命令时，
+> 工作区是**当前目录下的 `.dexatlas/`**。请在克隆目录根目录内执行全部命令；
+> 若换目录执行查询命令，需设置 `DEXATLAS_WORKSPACE` 指回原工作区，否则会得到
+> 「No such project」（退出码 2）。
+
+> **缺后端时的计数差异（A6 预告）**：在 jadx 或 apktool 不可用时重复分析，
+> `classes` 与 `resource strings` 计数会低于 A4 的 5 classes / 1 resource string
+> 基线（例如缺 jadx 时 5→4、1→0）——这是降级不是回归，记录实际值即可。
 
 **路线 B（Docker，隔离环境，自带后端）：**
 

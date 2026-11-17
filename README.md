@@ -43,7 +43,14 @@ still yields a manifest, an index and a report that says which steps did not run
 > ≥80%; see the [M6 level-2 record](docs/benchmarks/m6-level2-real.md)) — and a
 > post-fix full three-round retest that scored 49/60 = 81.7% (15/16/18 per
 > round) — still below the three-round ≥90% bar (see the
-> [retest record](docs/benchmarks/m6-level2-retest4.md)); M8 (clean
+> [retest record](docs/benchmarks/m6-level2-retest4.md)) — and a post-fix
+> narrow verification round over the six known failure surfaces (6 questions ×
+> 3 rounds × 3 configurations) that converted **2/6** questions (deterministic
+> fixes 1/5) and missed the narrow-verification gate (≥4/6 and ≥3/5), so per
+> the acceptance plan investment stopped and M6 moved to the
+> state-of-record disclosure plan (see the
+> [narrow-verification round-2 record](docs/benchmarks/m6-level2-narrow-verify2.md));
+> M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
 > the GitHub side with the Upwork materials still unpublished; M10 (independent
@@ -114,7 +121,7 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.2` | Acceptance Checklist      | Five self-built test APKs, a demo video, and the exit checklist in the plan's own words                      |
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.2.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
-| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
+| **3** | `v1.0.0` (planned) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar, post-fix narrow verification converted 2/6 — below the ≥4/6 gate, moved to state-of-record disclosure), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (pack ready, not run) |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 
@@ -402,6 +409,17 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   15/16/18; r2 and r3 met the per-round line, r1 did not), A 21/60, B 21/60;
   traces 1,182,356 tokens. Still below the three-round ≥90% bar, so the
   milestone stays open
+- **[M6 level-2 narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md)** —
+  the four fixes aimed at the known failure surfaces re-run over 6 questions ×
+  3 rounds × 3 configurations (54 traces, all captured; figures recomputed by
+  script): protocol-leak correction retry worked (0 protocol failures; the
+  `multidex.dex-file-count` round that failed all three retest rounds went
+  through in r3), but DexAtlas converted **2/6** questions
+  (`manifest.permission.count-obfuscated` 3/3, `resources.app-name.demo` 2/3)
+  and the deterministic-fix questions **1/5** — below the narrow-verification
+  gate (≥4/6 and ≥3/5). The run spent 420,826 tokens against the authorized
+  410,000 cap (overrun recorded, not re-run). Per the acceptance plan:
+  investment stopped, M6 moves to the state-of-record disclosure plan
 
 ### Project records
 
@@ -489,7 +507,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line); after failure-mode analysis and five root-cause fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round line, r1 did not, and 81.7% is below the three-round ≥90% bar, so the milestone stays open |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas 24/60 = 40.0% over three rounds against the ≥80% acceptance line); after failure-mode analysis and five root-cause fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round line, r1 did not, and 81.7% is below the three-round ≥90% bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 1/5), below the narrow-verification gate (≥4/6 and ≥3/5), so per the acceptance plan investment stopped and M6 moved to the state-of-record disclosure plan — the milestone stays open |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit-code question is decided and recorded as a known limitation |
 | M9 | GitHub showcase (this page) and Upwork materials | **showcase done; materials unpublished** — this page and the [project brief](docs/outreach/project-brief.md) draft are in place; the Upwork materials are not published |
