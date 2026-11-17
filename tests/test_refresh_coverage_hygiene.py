@@ -10,6 +10,7 @@ numbers describes a tree that no longer exists.
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,91 @@ def test_the_refresh_starts_from_a_clean_file_even_after_a_crash(tmp_path: Path)
     finally:
         if stale.exists():
             stale.unlink()
+
+
+def test_the_measurement_tells_its_processes_which_data_file_to_write(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The measurement's numbers must land in a file of its own.
+
+    ``.coverage`` belongs to the whole checkout: a ``pytest --cov`` that does
+    not ask to append replaces it wholesale. A measurement that reads that
+    file can therefore read another run's numbers -- the doc tests' coverage
+    instead of the suite's -- and publish them as the project's own. The
+    measurement names its own file, and every process it starts is told to
+    write there.
+    """
+    script = _figure_script()
+    captured: dict[str, Any] = {}
+
+    def fake_measure_tests(args: list[str], env: dict[str, str] | None = None, **_: Any) -> Any:
+        captured["env"] = env
+        return script.Outcome(
+            counts={"passed": 1, "failed": 0, "skipped": 0, "xfailed": 0, "deselected": 0},
+            failures=(),
+        )
+
+    monkeypatch.setattr(script, "measure_tests", fake_measure_tests)
+    monkeypatch.setattr(script, "run", lambda *args, **kwargs: None)
+
+    script.measure_code_tests()
+
+    env = captured["env"]
+    assert env is not None, "the measurement ran its suite without an environment"
+    assert "COVERAGE_FILE" in env, "the measurement did not say where to write its coverage"
+    assert Path(env["COVERAGE_FILE"]) != REPO_ROOT / ".coverage", (
+        "the measurement wrote to the file every process in the checkout shares"
+    )
+    assert Path(env["COVERAGE_FILE"]).exists() or Path(env["COVERAGE_FILE"]).parent.exists()
+
+
+def test_a_concurrent_coverage_run_cannot_replace_the_measurement_data() -> None:
+    """The shared file is not the measurement's file.
+
+    What a concurrent ``pytest --cov`` does to ``.coverage`` is replace it.
+    The measurement's data file lives elsewhere, so that replacement cannot
+    reach the numbers the report is about to publish.
+    """
+    script = _figure_script()
+    data_file = script.measurement_data_file("a-concurrent-run")
+    try:
+        data_file.write_bytes(b"the suite's coverage")
+
+        shared = REPO_ROOT / ".coverage"
+        shared.write_bytes(b"the doc tests' coverage")
+        try:
+            assert data_file.read_bytes() == b"the suite's coverage", (
+                "a concurrent coverage run replaced the measurement's data"
+            )
+        finally:
+            shared.unlink(missing_ok=True)
+    finally:
+        shutil.rmtree(data_file.parent, ignore_errors=True)
+
+
+def test_a_second_measurement_in_the_same_checkout_is_refused(tmp_path: Path) -> None:
+    """Two measurements would fight over the report.
+
+    Whichever finished last would write the numbers the other one measured.
+    The slot is an operating-system lock, so it is released when the process
+    holding it ends, and a measurement that finds it taken must say so
+    rather than race.
+    """
+    script = _figure_script()
+    lock = tmp_path / "measure.lock"
+
+    first = script.try_measurement_slot(lock)
+    assert first is not None, "the first measurement could not take the slot"
+    try:
+        assert script.try_measurement_slot(lock) is None, (
+            "a second measurement was allowed to take a slot that was already taken"
+        )
+    finally:
+        first.close()
+
+    again = script.try_measurement_slot(lock)
+    assert again is not None, "the slot was not released when its holder ended"
+    again.close()
 
 
 def _minimal_report() -> str:

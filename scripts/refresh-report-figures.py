@@ -66,6 +66,7 @@ running the script again changes nothing.
 from __future__ import annotations
 
 import argparse
+import atexit
 import hashlib
 import io
 import json
@@ -81,7 +82,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
@@ -127,6 +128,21 @@ COVERAGE_RC = """[run]
 parallel = true
 source = dexatlas
 """
+
+#: Where a measurement keeps the coverage data it collects.
+#:
+#: The coverage data file is shared by default: every process in a checkout
+#: writes to ``.coverage``, and a ``pytest --cov`` that does not ask to
+#: append replaces it wholesale. A measurement that reads the shared file can
+#: therefore read another run's numbers -- the doc tests' coverage instead of
+#: the suite's -- and publish them as the project's own. A measurement's data
+#: file belongs to that measurement alone.
+MEASUREMENT_DATA_DIR = REPO_ROOT / ".scratch" / "coverage"
+
+#: The file that keeps two measurements out of the same checkout. It is
+#: locked by the operating system, so it is released when the process that
+#: holds it ends, however it ends.
+MEASUREMENT_LOCK = REPO_ROOT / ".scratch" / "measure.lock"
 
 #: A first-party module below this coverage is a weak spot the report must disclose.
 WEAK_MODULE_PERCENT = 90.0
@@ -311,9 +327,87 @@ def discard_stale_coverage() -> None:
     print(f"  discarded stale coverage data: {', '.join(path.name for path in stale)}")
 
 
+def measurement_data_file(run_id: str | None = None) -> Path:
+    """The coverage data file one measurement run uses.
+
+    The default data file, ``.coverage``, belongs to everybody in the
+    checkout: a ``pytest --cov`` started anywhere in it replaces that file
+    wholesale, and a measurement that reads the shared file can end up
+    publishing another run's numbers as the project's own. This file belongs
+    to the run that names it, and the environment points at it, so a
+    concurrent process cannot reach it.
+    """
+    identifier = run_id if run_id is not None else str(os.getpid())
+    directory = MEASUREMENT_DATA_DIR / identifier
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory / ".coverage"
+
+
+def measurement_env(base: dict[str, str] | None = None) -> dict[str, str]:
+    """The environment a measurement runs in.
+
+    ``COVERAGE_FILE`` names the data file this run owns, so every process
+    the measurement starts -- the suite, the coverage tool, the workers the
+    tests spawn -- writes into it and nowhere else.
+    """
+    env = dict(os.environ if base is None else base)
+    env["COVERAGE_FILE"] = str(measurement_data_file())
+    return env
+
+
+def discard_stale_measurement_data() -> None:
+    """Delete the data files an earlier run left in this run's directory.
+
+    The directory is named after the process, and processes are reused, so
+    it can hold the numbers of an earlier run that ended where this one
+    starts. A measurement starts from nothing.
+    """
+    stale = sorted(measurement_data_file().parent.glob(".coverage*"))
+    for path in stale:
+        path.unlink()
+    if stale:
+        print(f"  discarded stale measurement data: {', '.join(p.name for p in stale)}")
+
+
+def try_measurement_slot(path: Path | None = None) -> IO[bytes] | None:
+    """Take this checkout's measurement slot, or return ``None`` if it is taken.
+
+    Two measurements in one checkout would fight over the report: whichever
+    finished last would write the numbers the other one measured. The slot
+    is a file the operating system locks, so it is released when the process
+    holding it ends -- however it ends -- and a measurement that finds the
+    slot taken says so instead of racing.
+    """
+    lock_path = MEASUREMENT_LOCK if path is None else path
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    # The lock lives as long as the handle, so the handle has to outlive this
+    # call: the caller holds the slot for the whole measurement and closes it
+    # when it is done.
+    handle = open(lock_path, "a+b")  # noqa: SIM115
+    handle.seek(0)
+    handle.write(b"0")
+    handle.flush()
+    handle.seek(0)
+    try:
+        if os.name == "nt":
+            import msvcrt
+
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
 def read_coverage() -> Coverage:
     """Read the coverage the runs produced."""
-    data = json.loads(run(sys.executable, "-m", "coverage", "json", "-o", "-").stdout)
+    data = json.loads(
+        run(sys.executable, "-m", "coverage", "json", "-o", "-", env=measurement_env()).stdout
+    )
 
     files: dict[str, list[int]] = {}
     for name, entry in data["files"].items():
@@ -404,14 +498,16 @@ def measure_code_tests() -> Outcome:
     # ``COVERAGE_PROCESS_START`` names it — the androguard workers, the
     # launcher grandchildren — reads it from its own ``site`` hook, and a file
     # that disappears under them is a ``ConfigError`` printed onto some
-    # backend's stderr instead of coverage data. The name is fixed and the
-    # content is rewritten at the start of every measurement, so a stale copy
-    # never survives to describe an older tree; the scratch area keeps it out
-    # of the repository and out of ``discard_stale_coverage``'s way.
-    rc_path = REPO_ROOT / ".scratch" / "coveragerc-measure.ini"
+    # backend's stderr instead of coverage data. The name carries the pid,
+    # so a measurement never rewrites the configuration another one is
+    # reading; the content is rewritten at the start of every measurement, so
+    # a stale copy never survives to describe an older tree; the scratch area
+    # keeps it out of the repository and out of ``discard_stale_coverage``'s
+    # way.
+    rc_path = REPO_ROOT / ".scratch" / f"coveragerc-measure-{os.getpid()}.ini"
     rc_path.parent.mkdir(exist_ok=True)
     rc_path.write_text(COVERAGE_RC, encoding="utf-8")
-    env = dict(os.environ)
+    env = measurement_env()
     env["COVERAGE_PROCESS_START"] = str(rc_path)
     outcome = measure_tests(
         [
@@ -428,7 +524,7 @@ def measure_code_tests() -> Outcome:
         env=env,
         full_command=True,
     )
-    run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}")
+    run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}", env=measurement_env())
     return outcome
 
 
@@ -443,7 +539,7 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / report_path.name
         path.write_text(candidate, encoding="utf-8")
-        env = dict(os.environ)
+        env = measurement_env()
         env[REPORT_PATH_ENV] = str(path)
         return measure_tests(
             ["--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
@@ -465,7 +561,7 @@ def measure_status_checks(
         status_copy = Path(directory) / status_path.name
         report_copy.write_text(report_candidate, encoding="utf-8")
         status_copy.write_text(status_candidate, encoding="utf-8")
-        env = dict(os.environ)
+        env = measurement_env()
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
         return measure_tests(
@@ -1104,7 +1200,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {tag}: {entry['tests'] if entry else 'not measured'} tests")
 
     print("Running the suite with coverage (this takes a couple of minutes)...")
+    slot = try_measurement_slot()
+    if slot is None:
+        print(
+            "Another measurement is already running in this checkout. Two of them would "
+            "fight over the report, so this one did not start."
+        )
+        return 1
+    atexit.register(slot.close)
     discard_stale_coverage()
+    discard_stale_measurement_data()
     code = measure_code_tests()
     coverage = read_coverage()
     print(f"  {code.describe()} (the report's own self-checks are measured separately)")
