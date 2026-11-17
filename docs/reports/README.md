@@ -71,7 +71,9 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | 报告 | 回答什么 | 什么时候看它 |
 |---|---|---|
 | [portfolio-readiness-2026-11-15.md](portfolio-readiness-2026-11-15.md) | GitHub / Upwork 作品集准备度评估（基准 `752d10a`）。**已被同日的复评取代，见 §7。** | 想看这套评分维度与等级定义是怎么定的时看它。 |
-| [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md) | 同一套评分表对当前树（基准 `da69f5d`）的复评。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-15 对外材料是什么成色」时看它。 |
+| [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md) | 同一套评分表对当前树（基准 `da69f5d`）的复评。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-15 对外材料是什么成色」时看它。**已被 2026-11-18 的第二轮复评取代，见下一行。** |
+| [portfolio-readiness-2026-11-18.md](portfolio-readiness-2026-11-18.md) | 同一套评分表的**第二轮复评**（基准为 2026-11-18 的树）：GitHub 85.0%、Upwork 81.9%，两处仍差半档（首次试用、客户交付件），独立使用验证仍缺。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-18 对外材料是什么成色」时看它。 |
+| [v1.1.0-candidates.md](v1.1.0-candidates.md) | 下一轮（v1.1.0）的**需求候选清单**：12 项候选，每项写明解决的缺口、可交付物、做完判据、依赖与估时（估时按仓库实测口径，不是拍脑袋）。**调研产出，不是已排期的计划。** | 要看「下一轮可以做什么、每项做完算不算完」时看它。 |
 
 ## 4. M10 独立验收材料
 
@@ -84,7 +86,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [m10-reader-package.md](m10-reader-package.md) | 上面那份准备包整理成的**一站式执行包**：从它出发，读者不需要再向作者要任何步骤。 | 读者拿到验收任务、问「我该从哪开始」时看它。 |
 | [m10-reader-kit.md](m10-reader-kit.md) | 配套工具包：评分表、回填说明、常见问答。**不含任何结论，也不预填分数。** | 读者开始填表时看它。 |
 | [m10-executive-summary.md](m10-executive-summary.md) | 一页版执行摘要：项目是什么、验收要回答什么问题、读者要做哪几步、要多久、交回什么。 | 读者问「这事大概要花我多久」时看它。 |
-| [m10-invitation-final.md](m10-invitation-final.md) | 邀请函**成稿**：验收 commit 已钉定到 v1.0.0 发版 commit，只差发起人把完整 hash 填进占位符。**发之前只剩一件事**：把成稿第二节的完整 hash 填进去（`git rev-parse v1.0.0^{commit}` → `0104ccb…`）。原先那条「tag 仍停在旧 commit、成稿还不能发」的限制**已经解除**——`v1.0.0` tag 已重打并推上远端，`origin/main` 在其上继续推进（发版后的文档修正 ✓）（原发现记在 [`m10-reader-walkthrough-2nd.md`](m10-reader-walkthrough-2nd.md) 的 N1 ✓）。 | 要把验收正式发出去时看它；**发之前先确认 tag 与远端都已经推进。** |
+| [m10-invitation-final.md](m10-invitation-final.md) | 邀请函**成稿**：验收 commit 已钉定到 v1.0.0 发版 commit，只差发起人把完整 hash 填进占位符。**发之前只剩一件事**：把成稿第二节的完整 hash 填进去（`git rev-parse v1.0.0^{commit}` → 当前指向的 commit；**tag 会被重打，所以填之前现查，不要抄本索引里的旧值**）。原先那条「tag 仍停在旧 commit、成稿还不能发」的限制**已经解除**——`v1.0.0` tag 已重打并推上远端，`origin/main` 在其上继续推进（发版后的文档修正 ✓）（原发现记在 [`m10-reader-walkthrough-2nd.md`](m10-reader-walkthrough-2nd.md) 的 N1 ✓）。 | 要把验收正式发出去时看它；**发之前先确认 tag 与远端都已经推进。** |
 | [m10-invitation-template.md](m10-invitation-template.md) | 邀请函**模板**：正文仍以「发起人钉定的固定 commit」表述，保持模板对后续轮次的通用性——但**验收 commit 已钉定为 v1.0.0 发版 commit**，**只有完整 hash 未填**，那串 hash 写在成稿第二节的占位符里（模板本身不预设具体 hash）。**成稿见上一行，模板见 §7。** | 需要改写信封语气、或另邀一位评审者时看它。 |
 | [m10-review-record-template.md](m10-review-record-template.md) | 验收记录模板（空白）：记录元数据、首次读者会话记录、评分回填。**填完不等于 M10 完成。** | 评审者要记录验收过程时看它。 |
 | [m10-selfcheck.md](m10-selfcheck.md) | 作者侧自动化预检（`scripts/m10_selfcheck.py`）的自测记录。**不产生任何「通过/不通过」判定。** | 提交验收材料前，作者想先抓文档层面的错时看它。 |
@@ -99,6 +101,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [v1.0.0-release-runbook.md](v1.0.0-release-runbook.md) | 发版**流程**预研（runbook 草案）：顺序、门禁、前提。**不发布、不打 tag、不改版本号。** | 要照着走一遍发版流程时看它。**是预研稿，已被执行，见 §7。** |
 | [v1.0.0-release-commit-draft.md](v1.0.0-release-commit-draft.md) | 发版 commit 的完整变更清单与 commit message 草案。**不执行发版。** | 要照着起草发版 commit 时看它。**是草案，已被执行，见 §7。** |
 | [v1.0.0-dry-run.md](v1.0.0-dry-run.md) | 发版流程的**本地预演**（2026-11-16）：只核对流程与证据，不创建 tag、不发布、不改版本号。 | **预演记录，不是发版执行记录**，见 §7。 |
+| [release-process-dry-run.md](release-process-dry-run.md) | 发版**清单本身**的实走演练（2026-11-18）：照 `v1.0.0-release-checklist.md` 走一遍，73 项判定里 16 项与仓库现状不符、2 项缺失、17 处前提过期。**只读演练：没有打 tag、没有推送、没有建 Release。** | 要知道「发版清单哪里对不上现实」时看它；清单已按它的发现修过一轮。 |
 
 发版本身的结果，以 [`docs/releases/v1.0.0.md`](../releases/v1.0.0.md) 与 git tag 为准，
 不在本目录。
