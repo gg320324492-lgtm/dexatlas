@@ -69,7 +69,7 @@
 | `README.md:32` 与 `README.zh-CN.md:22`（均为共享树未提交版） | 「英文 README 说自己还是『早期开发、v0.2.0 已发布』，中文 README 说自己已经是 v1.0.0 —— 到底哪个是真的？」 | 2 数字矛盾 | 被验收对象之一的两份 README 在**同一次发版改动里**状态相反：英文 `:32`「Status: early development (v0.2.0 released; Phase 3 in progress)…」；中文 `:22`「当前状态：v1.0.0（tag 2026-11-17，见发版说明）」。钉定提交上两者是一致的（「早期开发 / early development」，`README.md:32` 与 `README.zh-CN.md:22`），是这轮未提交的发版改动把中文版单独推到了 v1.0.0。 | `git status --short`（共享树）→ `M README.md`、`M README.zh-CN.md`；`sed -n '32p' README.md` → `> **Status: early development (v0.2.0 released; Phase 3 in progress).**`；`sed -n '22p' README.zh-CN.md` → `> **当前状态：v1.0.0（tag 2026-11-17，见发版说明）。**` |
 | `docs/reports/m10-invitation-final.md:25` 与 `docs/reports/m10-acceptance-pack.md:625`、`:657`、`:659` | 「按准备包自己的退出门槛表，M10 现在一定不通过（『未关闭（M8-2/3/4 等）』『未推进：无 tag』）—— 那这轮验收请我来做什么？」 | 6 过度承诺/含糊 + 7 该有而没有 | 准备包 §8 退出门槛对照表自己写着未达成：`:653`「所有阻断项关闭；重要遗留项有边界与接受理由 → 未关闭（M8-2/3/4 等）」、`:657`「完成源码评审和验收后才推进阶段/准备 tag → 未推进：无 tag」、`:659`「独立验收尚未执行，M10 未完成」。而邀请函 `:25`（共享树版）说的是「已发布的 v1.0.0 … 做独立验收」、`:40` 把 40 项检查表当作待办清单。材料没有一句话解释「这轮验收就是用来关闭这些遗留的」还是「这些遗留已经被接受」。 | `sed -n '653p;657p;659p' docs/reports/m10-acceptance-pack.md`；`sed -n '25p' docs/reports/m10-invitation-final.md`（共享树）；`sed -n '40p;44-49p' docs/reports/m10-invitation-final.md`。 |
 | `docs/reports/m10-reader-kit.md:328` 对 `docs/reports/m10-acceptance-pack.md:38-40` | 「两份材料打架的时候到底听谁的？规则自己就有两条，而且指向不同答案。」 | 7 该有而没有 | 工具包 §5 末：「两者冲突时以准备包为准」（指工具包 vs 准备包）；准备包 §0「不是什么」：「与[公共契约表]、[服务回归集]、[M8 安装演练]等冲突时，**以原始证据和代码为准**」。当**准备包本身**与代码冲突时（退出码 6、MCP 工具数、M8-4），这两条规则给出相反答案，而材料没有第三条规定。 | `sed -n '328p' docs/reports/m10-reader-kit.md`；`sed -n '38,40p' docs/reports/m10-acceptance-pack.md`。 |
-| `docs/reports/m10-acceptance-pack.md:544`、`:639`；`docs/reports/m10-reader-package.md:268` | 「『B1 验收线未达』『B1 未关闭』—— B1 是什么？它跟表里那个 B1 验收项是一回事吗？」 | 3 术语未定义 | 「B1」在验收材料里有**两个互不相干的含义**：(a) 验收项编号 B1 = 「按案例从 analyze 走到 xrefs 全程完成」（★ 阻断项，`acceptance-pack.md:97`、`:166`）；(b) M6 的「B1 验收线 / B1 未关闭」，指真实模型批次的验收线。而材料把被验收对象指向的 `docs/roadmap/phase3-plan.md` 里**没有** B1 这个标签，M6 的判据实际写在 `service-regression-set.md §5` 与 `phase3-plan.md §5 M6`（每轮 ≥16/20、三轮合计 ≥54/60）。 | `grep -n "B1\|B2\|B3" docs/roadmap/phase3-plan.md` → 无匹配；`grep -rn "B1 验收" docs/` → 只有 `acceptance-pack.md:544`、`:639` 与 `docs/benchmarks/m6-level2-retest4.md:3`（「B1 验收测量」）；`docs/benchmarks/m6-level2-retest4.md:3` 自己写「验收线来自 [service-regression-set.md] §5 与 [phase3-plan.md] §5 M6（每轮 ≥16/20，三轮合计 ≥54/60）」——与「B1」这个标签无关。 |
+| `docs/reports/m10-acceptance-pack.md:544`、`:639`；`docs/reports/m10-reader-package.md:268` | 「『B1 验收线未达』『B1 未关闭』—— B1 是什么？它跟表里那个 B1 验收项是一回事吗？」 | 3 术语未定义 | 「B1」在仓库里至少有**三个互不相干的含义**，而读者材料用的那一个**从未被定义**：(a) 验收项编号 B1 = 「按案例从 analyze 走到 xrefs 全程完成」（★ 阻断项，`acceptance-pack.md:97`、`:166`）；(b) **发版阻断项** B1–B5，B1 = 「M6 层级 2 未达验收线」，B2 = 「M10 独立验收未执行」，B3 = 「准备度自评未达 90%」，定义在 `docs/reports/v1.0.0-dry-run.md:112`–`:163` 与 `docs/reports/v1.0.0-release-checklist.md`；(c) `docs/reports/phase1-findings-ledger.md:18` 的 B1 = 一个 Phase 1 缺陷（上传文件名竞态）。四份读者材料**从不指向** (b) 的定义文件。 | `grep -n "^### B[1-5]" docs/reports/v1.0.0-dry-run.md` → `:112` B1、`:126` B2、`:136` B3、`:154` B4、`:163` B5；`grep -rn "v1.0.0-dry-run\|v1.0.0-release-checklist" docs/reports/m10-{invitation-final,reader-package,acceptance-pack,reader-kit}.md` → **零命中**；`grep -n "B1" docs/reports/phase1-findings-ledger.md` → `:18` 是另一个 B1。**推断（依据：`docs/roadmap/phase3-plan.md` 与 `docs/roadmap/phase2-plan.md` 里都没有 B1/B2/B3；`docs/status.md:38`「仍未达 B1 验收线，B1 保持未关闭」、`:128`「B3 准备度与 B2 独立验收仍在推进」是同一套发版阻断项）**：评审者被指向的定义文件是作者侧的发版演练报告，不在读者路径上。 |
 | `docs/reports/m10-invitation-final.md:1`、`:29`、`:36`、`:102`；`docs/reports/m10-acceptance-pack.md:527-529`；`docs/reports/m10-reader-package.md:290`、`:293` | 「邀请函要我核对 evidence 的 `level` 字段是不是三级语义，可这三个词整份邀请函里一次都没出现过。」 | 4 顺序缺失 + 3 术语未定义 | 邀请函从头到尾没有 `verified`/`lead`/`insufficient` 这三个词（`grep` 无匹配），但它要求评审者判断「事实与线索能否区分」（`:36`）、并「任选 3 条 evidence 记录核对工具、版本、locator、level 四字段」（`:102`），而 C3 是 ★ 阻断项（`acceptance-pack.md:110`）。另外三个术语同样没有就地解释：`trace`（准备包 `:527-529`「指标能否从 trace 重算」，而 §4 明说客户视角审阅者「不需要读 Python」）、`预算`（读者包 `:293`「确认预算差异已被披露而不是隐去」，指 token 预算/题预算）、「确定性判分」（读者包 `:290`、准备包 `:128`「层级 0 确定性判分 20/20」）。 | `grep -n "verified\|lead\|insufficient" docs/reports/m10-invitation-final.md` → 无匹配；`grep -n "verified\|lead\|insufficient" docs/reports/m10-reader-kit.md` → **无匹配**（工具包是「评分/回填/FAQ」三件套，但一个 `verified` 都没有）；定义实际在 `docs/reports/m10-reader-package.md:170-172`、`docs/reports/m10-acceptance-pack.md:384-388`、`docs/architecture/public-contracts.md:259`。 |
 
 ## B 档：会让评审者卡住或无法复现（8 条）
@@ -113,8 +113,9 @@
    **共同的形状是「同一件事在已提交版与未提交版不一样」**：`277d0fa` 的材料与 `277d0fa`
    的代码也对不上（退出码 6、MCP 11 个）。评审者拿到哪一份，取决于他 clone 的是哪个分支。
 3. **术语未定义（3 条）** —— 「B1 验收线」是撞得最狠的一个：它在准备包和读者包里被当成
-   一个已知的判据反复引用，而被指向的 `phase3-plan.md` 里根本没有 B1；同一个文档里 B1
-   又是一条 ★ 验收项。`trace`/`预算`/`确定性判分`/`层级 0-1-2`/`M10` 都没有就地解释。
+   一个已知的判据反复引用，而它的定义在 `docs/reports/v1.0.0-dry-run.md:112`（发版阻断项
+   B1–B5）——**四份读者材料从不指向那个文件**，而同一个代号在仓库里还指验收项 B1 和一个
+   Phase 1 缺陷。`trace`/`预算`/`确定性判分`/`层级 0-1-2`/`M10` 都没有就地解释。
 4. **顺序缺失（3 条）** —— 执行摘要第 1 步就要向作者要 commit（与「不需要再向作者要任何
    步骤」直接冲突）；邀请函要人判三级语义却一次都没写过这三个词；工具包（专门解释
    术语的 FAQ）里 `verified`/`lead`/`insufficient` 出现 0 次。
@@ -144,7 +145,9 @@
 `scripts/check-doc-citations.py`、`scripts/check-version-claims.py`；
 `tests/test_public_contracts.py`、`tests/test_docs.py`、`tests/test_html_report.py`、
 `tests/test_evidence_package.py`；`docs/reports/m10-selfcheck.md`、
-`m10-review-record-template.md`、`portfolio-readiness-2026-11-15.md` 与其 `-recheck.md`。
+`m10-review-record-template.md`、`portfolio-readiness-2026-11-15.md` 与其 `-recheck.md`；
+`docs/reports/v1.0.0-dry-run.md` 与 `docs/reports/v1.0.0-release-checklist.md`
+（**发版阻断项 B1–B5 的定义处**，但读者材料从不指向它们）。
 
 **在钉定提交里不存在：** `docs/reports/m10-reader-kit.md`（A 档第 5 条）；
 `docs/benchmarks/m6-level2-narrow-verify.md`（**任何分支都没有**，C 档最后一条）。
