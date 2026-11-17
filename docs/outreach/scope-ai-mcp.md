@@ -9,6 +9,10 @@
 > **Identity note.** I am an individual freelancer. The examples below come
 > from my own open-source project (DexAtlas); no client engagement, client
 > result, or revenue/time-saving figure is claimed or implied.
+>
+> **Where this goes.** This sheet is an attachment. If the platform's
+> project-description field is the target, paste *What I offer* (773
+> characters as written); the rest of the sheet is the attachment.
 
 ---
 
@@ -21,7 +25,7 @@ read-only or least-privilege tools, and every answer it produces is
 traceable to the records it came from. Model output is treated as a lead, not
 a finding; your system stays the source of truth.
 
-Demonstrated by: **DexAtlas** (open source) — a read-only MCP server (ten
+Demonstrated by: **DexAtlas** (open source) — a read-only MCP server (eleven
 tools over stdio) exposing an existing analysis to AI assistants, plus a
 single-loop, budget-bounded agent that answers questions with cited evidence
 and separates verified facts from leads and unknowns. No write path, no shell

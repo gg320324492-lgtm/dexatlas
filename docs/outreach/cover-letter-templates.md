@@ -22,7 +22,15 @@ Usage notes:
 - Keep the first two paragraphs the same — they state the understanding of
   the job and the concrete plan, which is what a client reads first.
 - Attach the matching scope document and, where the platform allows, point to
-  the repository's case studies as reproducible work samples.
+  the repository's case studies as reproducible work samples. The three
+  evidence packages are committed in the repository and can be attached as
+  they are:
+  [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
+  [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
+  [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip).
+- Field lengths are accounted for in
+  [publish-review.md](publish-review.md): every letter and every scope
+  section is measured there against the platform's character limits.
 
 ---
 
@@ -57,7 +65,7 @@ environment you designate; secrets never go into code or repositories.
 **Relevant example (my own open-source work):** DexAtlas, an Android APK
 analysis platform I built end to end — a FastAPI REST API and CLI over a
 SQLite evidence store, three integrated analysis engines with per-engine
-failure reporting, ~1,540 automated tests at 93.1% coverage, and CI across
+failure reporting, 1,584 automated tests at 93.2% coverage, and CI across
 Python 3.12/3.13. It is the same engineering style I would bring to your
 task: {{one sentence tying it to the job, e.g. "ingest messy binary input,
 normalize it, and produce structured, auditable output"}}.
