@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import zipfile
 from pathlib import Path
@@ -34,6 +35,7 @@ from dexatlas.core.storage import Store
 from dexatlas.reports.evidence_package import (
     PACKAGE_SCHEMA_VERSION,
     EvidencePackageError,
+    package_file_summary,
     verify_citations,
     verify_package,
 )
@@ -218,6 +220,52 @@ def test_build_writes_a_zip_with_manifest_and_reports(project_id: str, tmp_path:
         assert hashlib.sha256(package.read(path)).hexdigest() == sha
     for name in names - {"manifest.json"}:
         assert name in files, f"{name} is packaged but not listed"
+
+
+def test_the_cli_counts_the_files_the_reader_finds_in_the_zip(
+    project_id: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The number the CLI prints is the number of files in the archive.
+
+    The manifest lists every file in the package except itself, so a count
+    taken from the manifest is one short of what a reader counts when they
+    open the zip — and a reader opens the zip and counts files. The
+    message has to name the archive's own count, and say what that count
+    is made of, so the reader counts once and lands on the same number.
+    """
+    # Rich wraps a line at the terminal width, and the width is the
+    # terminal's to choose.
+    monkeypatch.setenv("COLUMNS", "200")
+    target = tmp_path / "pkg" / "evidence.zip"
+
+    result = runner.invoke(app, ["export", project_id, "--output", str(target)])
+    assert result.exit_code == 0, result.output
+
+    with zipfile.ZipFile(target) as package:
+        packaged = package.namelist()
+
+    printed = re.search(r"\((\d+) files?\b", result.output)
+    assert printed is not None, f"the message names no file count: {result.output!r}"
+    assert int(printed.group(1)) == len(packaged), (
+        f"the CLI says {printed.group(1)} files, the archive holds {len(packaged)}: "
+        f"{sorted(packaged)}"
+    )
+    # And the count says what it is made of: the three reports, the source
+    # fragment the evidence cites, and the manifest the count includes.
+    assert "3 reports" in result.output
+    assert "1 source fragment" in result.output
+    assert "1 manifest" in result.output
+
+
+def test_the_summary_counts_the_manifest_the_manifest_cannot_list() -> None:
+    """The manifest does not list itself, but the archive holds it."""
+    manifest = {
+        "files": [
+            {"path": "reports/report.json", "role": "report"},
+            {"path": "sources/com/example/demo/Crypto.java", "role": "evidence_source"},
+        ]
+    }
+    assert package_file_summary(manifest) == "3 files: 1 report + 1 source fragment + 1 manifest"
 
 
 def test_no_local_paths_inside_the_package(project_id: str, tmp_path: Path) -> None:

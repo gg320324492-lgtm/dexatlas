@@ -272,17 +272,43 @@ def test_the_package_criterion_fails_when_the_material_miscounts(tmp_path: Path)
     assert outcome.state == "fail", f"the miscount went unnoticed: {outcome.detail}"
 
 
-def test_the_package_criterion_fails_when_the_cli_stops_printing_the_manifest_count(
+def test_the_package_criterion_fails_when_the_cli_prints_the_manifest_count(
     tmp_path: Path,
 ) -> None:
-    """The printed number has to be the manifest's, or the material lies."""
+    """The printed number has to be the archive's, not the manifest's.
+
+    The manifest lists every file in the package except itself, so its
+    count is one short of what a reader counts in the zip. A CLI that
+    prints the manifest's count is one file out, and the criterion has to
+    notice.
+    """
     script = _selfcheck_script()
     root = _dry_run_tree(tmp_path)
     _edit(
         root,
         "src/dexatlas/cli/main.py",
+        "package_file_summary(manifest)",
         "len(manifest['files'])",
+    )
+    outcome = _outcome(script, "check_package_entry_count", root)
+    assert outcome.state == "fail", f"the misleading count went unnoticed: {outcome.detail}"
+
+
+def test_the_package_criterion_passes_when_the_cli_prints_the_archive_count(
+    tmp_path: Path,
+) -> None:
+    """The archive's own count is the number the reader counts.
+
+    The count has to be the archive's — the manifest's count plus the
+    manifest itself — and it may be written any way that says so.
+    """
+    script = _selfcheck_script()
+    root = _dry_run_tree(tmp_path)
+    _edit(
+        root,
+        "src/dexatlas/cli/main.py",
+        "package_file_summary(manifest)",
         "len(manifest['files']) + 1",
     )
     outcome = _outcome(script, "check_package_entry_count", root)
-    assert outcome.state == "fail", f"the changed print went unnoticed: {outcome.detail}"
+    assert outcome.state == "pass", f"the archive's count was rejected: {outcome.detail}"

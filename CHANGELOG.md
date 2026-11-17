@@ -26,6 +26,24 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/status.md`、`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md`。
   验收包本身的 40 个验收项未变。
 
+### Fixed
+
+- **`dexatlas export` 打印的文件数是清单里的报告数，比归档里的条目少一个。**
+  CLI 那行 `(N files, apk …)` 取自 `manifest['files']`——那是清单列出的文件
+  数，不含清单自己（`manifest.json` 不进清单：文件无法给自己做哈希）。读者
+  打开 zip 数到的文件因此比 CLI 说的多一个：包里 4 个条目（3 份报告 +
+  `manifest.json`），CLI 说 `3 files`。现在打印的是**归档自己的文件数**，
+  并说清它由什么组成：`3 reports + 1 manifest`（被证据引用的源码片段另计
+  `N source fragments`）。读者按这句话数一次就能对上包里有多少文件。
+  证据包的清单形状与 `schema_version = 1` 不变（`files` 仍只列归档里除清单
+  以外的文件），变的是 CLI 消息里那个数字指什么——公开契约表 §5.3 已补上
+  这条语义；它不是版本化的数据契约，故不改版本号，按 Fixed 记在此处。
+  回归测试：`tests/test_evidence_package.py::test_the_cli_counts_the_files_the_reader_finds_in_the_zip`
+  （打开 zip 数文件，与 CLI 打印的数目比对；旧实现下 4 vs 5，判红）、
+  `tests/test_evidence_package.py::test_the_summary_counts_the_manifest_the_manifest_cannot_list`。
+  `scripts/m10_selfcheck.py` 的 `PACKAGE.entry-count` 判据随之改为核对「CLI
+  打印归档计数」而非「CLI 打印清单计数」，回归测试同步反转为两条。
+
 ## [1.0.0] — 2026-11-17
 
 ### Added

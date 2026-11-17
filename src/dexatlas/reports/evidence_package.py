@@ -22,6 +22,7 @@ import hashlib
 import json
 import re
 import zipfile
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -46,6 +47,12 @@ _REPORT_PATHS = {
 #: The tree the package's own source fragments live under. Not the
 #: decompiler's tree name: the package's tree is the package's own.
 _SOURCES_PREFIX = "sources/"
+
+#: The manifest's own name inside the archive. It is written into the zip
+#: but never listed in the manifest's own ``files`` array: a file cannot
+#: hash itself, and a manifest that claimed to hash itself would be a claim
+#: it could not keep.
+MANIFEST_NAME = "manifest.json"
 
 #: Locators that name one of the decompiler's whole output trees rather than
 #: a file inside it. The coverage observation cites ``jadx:sources`` — there
@@ -122,8 +129,41 @@ def build_evidence_package(analyzer: Analyzer, project_id: str, target: Path) ->
     with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
         for path, content in sorted(files.items()):
             archive.writestr(path, content)
-        archive.writestr("manifest.json", manifest_bytes)
+        archive.writestr(MANIFEST_NAME, manifest_bytes)
     return manifest
+
+
+def package_file_summary(manifest: Mapping[str, Any]) -> str:
+    """What the archive holds, in one phrase a reader can count against.
+
+    The archive holds every file the manifest lists *plus* the manifest
+    itself, so a count taken from the manifest alone is one short of what
+    a reader finds when they open the zip — and a reader who opens the zip
+    counts files, not manifest entries. The phrase therefore names the
+    archive's own count and what that count is made of, so the reader
+    counts once and lands on the number the CLI printed.
+    """
+    files = list(manifest.get("files", []))
+    reports = sum(1 for entry in files if entry.get("role") == "report")
+    sources = sum(1 for entry in files if entry.get("role") == "evidence_source")
+    others = len(files) - reports - sources
+
+    parts: list[str] = []
+    if reports:
+        parts.append(_plural(reports, "report"))
+    if sources:
+        parts.append(_plural(sources, "source fragment"))
+    if others:
+        parts.append(_plural(others, "evidence file"))
+    parts.append(_plural(1, "manifest"))
+
+    total = len(files) + 1
+    return f"{_plural(total, 'file')}: " + " + ".join(parts)
+
+
+def _plural(count: int, noun: str) -> str:
+    """``3 reports``, ``1 report`` — the count with its noun."""
+    return f"{count} {noun}" if count == 1 else f"{count} {noun}s"
 
 
 def _role_of(path: str) -> str:

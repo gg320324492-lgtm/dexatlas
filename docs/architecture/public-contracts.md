@@ -300,10 +300,10 @@ Markdown、JSON、HTML 由同一组指标渲染：`reports/summary.py` 的
 
 ### 5.3 证据包 manifest
 
-`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:71-120`），
+`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:84-133`），
 `schema_version = 1`（`PACKAGE_SCHEMA_VERSION`，
-`src/dexatlas/reports/evidence_package.py:37`）。字段（
-`src/dexatlas/reports/evidence_package.py:95-112`）：
+`src/dexatlas/reports/evidence_package.py:38`）。字段（
+`src/dexatlas/reports/evidence_package.py:108-125`）：
 
 ```text
 schema_version: 1
@@ -317,9 +317,16 @@ not_included: {apk, full_sources, unrelated_strings}
 ```
 
 包内路径固定：`reports/report.{json,md,html}`、`sources/<相对路径>`、
-`manifest.json`（`src/dexatlas/reports/evidence_package.py:40-48`）。定位符一律是
+`manifest.json`（`src/dexatlas/reports/evidence_package.py:41-55`）。定位符一律是
 `<tool>:<包内相对位置>`，绝无机器绝对路径
 （`src/dexatlas/reports/evidence_package.py:14-16`）。
+
+`dexatlas export` 的成功消息打印的是**归档里的文件数**，不是清单列出的
+数：清单列的是归档里除清单以外的文件，加上清单自己才是归档的全部条目。
+消息同时说清这个数由什么组成（`3 reports + 1 manifest`；被证据引用的源码
+片段另计 `N source fragments`），读者打开 zip 数一次就能对上包里有多少
+文件。清单的形状与 `schema_version = 1` 不变——变的是消息里那个数字指的
+是什么。
 
 ## 6. 版本政策
 

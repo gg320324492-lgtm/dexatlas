@@ -19,7 +19,8 @@ installing a backend or running the whole suite:
 * the three gaps a reader dry run found stay closed: the setup step has to
   fetch the third-party samples, A6's degraded evidence has to be written
   down at the time because the CLI cannot replay a past run, and the
-  evidence package's entry count is the one the material states.
+  evidence package's entry count is the one the CLI prints and the
+  material states.
 
 Every check is a *read* or a *comparison*; the script writes nothing and
 never edits the report or the badges. Its verdict is three-valued, like the
@@ -920,11 +921,13 @@ def check_a6_onsite_record(report: Report, root: Path = REPO_ROOT) -> None:
 def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
     """证据包里的条目数：材料说的数目要等于包里实际有的条目。
 
-    The archive holds the reports the manifest lists plus the manifest
-    itself, so the CLI's "N files" is the manifest's count, not the
-    archive's. The material has to say how many entries the archive has
-    and what the CLI's number counts, or the reader opens the zip, counts
-    one more file than the material promised, and files it as a defect.
+    The archive holds every file the manifest lists *plus* the manifest
+    itself, so the number a reader counts in the zip is one more than the
+    manifest's count. The CLI has to print the archive's count — a print
+    built from the manifest's count wears the archive's name and is one
+    short of what the reader finds — and the material has to state the
+    archive's entry count and how it is made up, or the reader counts a
+    different number than the material promised and files it as a defect.
     """
     package_src = (root / EVIDENCE_PACKAGE_REL).read_text(encoding="utf-8")
     cli_src = (root / CLI_REL).read_text(encoding="utf-8")
@@ -940,11 +943,23 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
         files_block = package_src.split("files: dict[str, bytes] = {}", 1)[-1].split(
             "manifest: dict[str, Any] = {", 1
         )[0]
-    manifest_written = 'archive.writestr("manifest.json"' in package_src
+    manifest_written = (
+        'archive.writestr("manifest.json"' in package_src
+        or "archive.writestr(MANIFEST_NAME" in package_src
+    )
     manifest_not_listed = "manifest.json" not in files_block
-    # The printed number has to be the manifest's count itself: a print that
-    # adds the manifest to it would make the material's number wrong.
-    cli_prints_files_count = re.search(r"len\(manifest\['files'\]\)\}\s*files", cli_src) is not None
+    # The printed number has to be the archive's own count, and it has to
+    # come from the package module — the one place that knows what the
+    # archive holds — or be the manifest's count plus the manifest itself.
+    # A print built from ``len(manifest['files'])`` alone is the manifest's
+    # count wearing the archive's name.
+    cli_prints_manifest_count = (
+        re.search(r"len\(manifest\['files'\]\)\}\s*files", cli_src) is not None
+    )
+    cli_prints_archive_count = (
+        re.search(r"package_\w+\(\s*manifest\s*\)", cli_src) is not None
+        or re.search(r"len\(manifest\['files'\]\)\s*\+\s*1", cli_src) is not None
+    )
 
     entries = _stated_numbers(reader_text, re.compile(r"(\d+)\s*个条目"))
     reports = _stated_numbers(reader_text, re.compile(r"(\d+)\s*份报告"))
@@ -954,20 +969,23 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
         bool(roles)
         and len(entries) == 1
         and len(reports) == 1
-        and len(cli_files) == 1
         and entries == {next(iter(reports)) + 1}
         and reports == {len(roles)}
-        and cli_files == reports
     )
 
     report.add(
         outcome_of(
             "PACKAGE.entry-count",
-            "证据包条目数：材料说的数目 = 报告数 + manifest，CLI 的数字指清单里的报告数",
-            counts_ok and manifest_written and manifest_not_listed and cli_prints_files_count,
+            "证据包条目数：材料说的数目 = 报告数 + manifest，CLI 打印归档里的条目数",
+            counts_ok
+            and manifest_written
+            and manifest_not_listed
+            and cli_prints_archive_count
+            and not cli_prints_manifest_count,
             f"代码：报告角色 {len(roles)} 个，manifest 写入归档={manifest_written}"
-            f"，不进清单={manifest_not_listed}，CLI 打印清单计数={cli_prints_files_count}"
-            f"；材料：条目数 {entries}，报告数 {reports}，CLI 打印 {cli_files}",
+            f"，不进清单={manifest_not_listed}，CLI 打印归档计数={cli_prints_archive_count}"
+            f"，CLI 打印清单计数={cli_prints_manifest_count}"
+            f"；材料：条目数 {entries}，报告数 {reports}，材料引用的 CLI 数字 {cli_files}",
         )
     )
 

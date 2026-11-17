@@ -61,7 +61,7 @@ from dexatlas.core.models import (
     index_gaps,
 )
 from dexatlas.core.pipeline import AnalysisFailed, AnalysisResult, Analyzer
-from dexatlas.reports.evidence_package import build_evidence_package
+from dexatlas.reports.evidence_package import build_evidence_package, package_file_summary
 from dexatlas.reports.html_report import render_html
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
@@ -895,7 +895,7 @@ def export(
     console.print(
         f"[bold green]{mark(OK)}[/bold green] evidence package {mark(ARROW)} "
         f"[bold]{output}[/bold] "
-        f"({len(manifest['files'])} files, apk {manifest['apk_sha256'][:16]})"
+        f"({package_file_summary(manifest)}, apk {manifest['apk_sha256'][:16]})"
     )
 
 
