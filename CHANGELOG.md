@@ -89,7 +89,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/benchmarks/m6-level2-narrow-verify3-traces.json`（6 题 × 3 轮 × 3
   配置 = 54 条 trace），全部数字由新脚本
   `scripts/m6_level2_narrow_verify3_report.py` 从 trace 重算生成，trace
-  缺失或不完整即拒绝生成报告。代码 `9f0dae3`：DexAtlas 转通过 **3/6**
+  缺失或不完整即拒绝生成报告。代码 `1e8d947`：DexAtlas 转通过 **3/6**
   （`manifest.permission.count-obfuscated` 3/3、`resources.app-name.demo`
   3/3、`multidex.dex-file-count` 2/3），确定性修复题 **3/5**——仍低于
   窄验证判据（≥4/6 且 ≥3/5）。实测 380,881 tokens，在 450,000 授权内，
@@ -122,7 +122,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   r2 低于单轮线，三轮合计 81.7% 低于 90%。三轮 trace 合计 1,080,116 tokens，
   在 1,200,000 授权之内；单题 24,000 闸触发 2 题如实判 budget-exhausted；
   运行中 MiniMax 端点两次成片 529 过载，对 errored（未判分）配置做了如实
-  重试并保留全部成功配置的原始 trace，判分失败与空答未重跑。
+  重试并保留全部成功配置的原始 trace，判分失败与空答未重跑。（此为执行层修复
+  **之前**的三轮复测；最终结论以修复后的 retest4 为准，逐轮 15/20、16/20、
+  18/20，见本节 retest4 条目）
 
 ### Changed
 
@@ -290,7 +292,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `docs/reports/m10-selfcheck.md`；[读者验收包](docs/reports/m10-reader-package.md)
   末尾增加指向自查报告的入口。M10 验收材料定稿：验收包按最新代码状态修订
   （邀请函钉定 commit、读者包补降级路径与工作区提示），读者彩排三项高优发现
-  修复（案例正文与验收包同步）。
+  修复（案例正文与验收包同步）。M10 **独立验收尚未开始**——验收包已成稿并
+  自检，但没有独立评审者跑过。
 - **双语 README 与文档状态同步（Phase 3 M9 + B5）。** README（英文）与
   README.zh-CN（简体中文）展示入口：双语状态段、路线图状态表、第三方署名表、
   文档地图；Quick start 的 analyze 示例直接使用仓库自带
@@ -305,7 +308,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   出 0）提供只含设计与版本化方案的提案文档
   `docs/proposals/exit-code-partial-read.md`：候选方案对比、推荐方案
   （新增 `EXIT_NO_INDEX = 6`，不改动 0–5 语义）、CHANGELOG 措辞草案与
-  红→绿测试计划。本条仅登记提案，未改任何实现；实施属后续版本决策。
+  红→绿测试计划。提案于 M8 阶段提交，**本版已按方案 A 实施**——退出码 6
+  的语义、判定条件与版本化方式见本节 Changed 段的「公共契约变更：新增退出码
+  6」，契约依据见 `docs/architecture/public-contracts.md` §1.2/§8.1（§8.1 已
+  由「已知缺口」转为「已按提案修复」）与 `docs/install.md` 的退出码表。
 - **Agent 回答契约与工具调优（Phase 3 M6-③）。** 依据 M6 层级 2 失败分析
   （`docs/benchmarks/m6-level2-failure-analysis.md`）的失败模式，改 agent 的
   回答契约并补一个查询工具，不动题集与判分：
@@ -343,8 +349,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **公共契约表（Phase 3 M8）。** 新增 `docs/architecture/public-contracts.md`：
   逐项固化对外承诺——CLI 全部 13 个子命令与退出码语义（0 成功 / 1 空答案 /
-  2 请求错误 / 3 分析失败 / 4 重载歧义 / 5 截断）、REST 全部 23 个端点的请求/
-  响应形状与状态码、MCP 十个只读工具的参数与返回形状、`SymbolCounts` 与证据
+  2 请求错误 / 3 分析失败 / 4 重载歧义 / 5 截断 / 6 无可用代码索引
+  （`EXIT_NO_INDEX`））、REST 全部 23 个端点的请求/响应形状与状态码、
+  MCP 十一个只读工具的参数与返回形状、`SymbolCounts` 与证据
   三级（verified/lead/insufficient）的判定边界、JSON 报告 `schema_version=3`
   顶层结构、证据包 manifest `schema_version=1` 字段，以及语义化版本政策
   （兼容变更进 CHANGELOG，破坏性变更显式升版本）。契约由真实接口验证：
