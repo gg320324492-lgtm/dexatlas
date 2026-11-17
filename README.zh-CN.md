@@ -6,6 +6,15 @@
 
 开源、证据优先的 Android 逆向工程与移动应用分析平台。
 
+[![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-1588%20passing-brightgreen.svg)](tests)
+[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)
+
+> 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录；英文版的徽章由
+> `scripts/refresh-report-figures.py` 生成，中文版此处需人工同步。
+
 </div>
 
 DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权限清单、完整的
@@ -19,19 +28,26 @@ DexAtlas 把一个 APK 变成一幅完整、可核验的图景：manifest 与权
 没能运行的分析报告。
 
 > [!IMPORTANT]
-> **当前状态：早期开发——v1.0.0 已发布（tag 2026-11-17，见发版说明）；Phase 3 已交付，
-但 M6 验收线与 M10 独立验收仍未完成。** CLI、分析内核与报告
+> **当前状态：早期开发——v1.0.0 已发布（tag 2026-11-17，见发版说明）；Phase 3 的交付物
+> 已发布，但退出标准未全部达成（M6 未收口、M10 未开始）。** CLI、分析内核与报告
 > 流水线在 `v0.1.0` 发布，此后每个版本都在交付。MCP server、证据优先的 Agent 与
 > Web 工作台的 M4 八屏——项目面板、上传与分析进度、检索与证据溯源、单方法调用
 > 关系、Agent 工作区、报告导出、M3 基准视图——随 `v0.2.0` 发布，其中除检索、
 > 源码与证据这一组外均已全部建成。
-> M4 已于 2026-11-14 通过源码评审。Phase 3 正按[作品集计划](docs/roadmap/phase3-plan.md)
-> 推进：M5（声明基线）与 M7（客户可审阅交付包）已完成；M6（有限 Agent 任务）的
+> M4 已于 2026-11-14 通过源码评审。Phase 3 各里程碑相对
+> [作品集计划](docs/roadmap/phase3-plan.md)的状态：M5（声明基线）与 M7（客户可审阅
+> 交付包）已完成；M6（有限 Agent 任务）的
 > 层级 0 与层级 1 演练已完成，层级 2 真实模型批次已跑——**未达验收线**
-> （DexAtlas 三轮合计 40.0%，验收线为每轮 ≥80%；见
-> [M6 层级 2 运行记录](docs/benchmarks/m6-level2-real.md)）；根因修复后的三轮完整
-> 复测 49/60 = 81.7%（逐轮 15/16/18），仍低于三轮合计 ≥90% 的验收门槛（见
-> [复测记录](docs/benchmarks/m6-level2-retest4.md)）；M8（干净安装、契约与
+> （DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 40.0% 低于
+> 三轮合计 ≥54/60（≥90%）线；见
+> [M6 层级 2 运行记录](docs/benchmarks/m6-level2-real.md)）；执行层修复后的三轮完整
+> 复测 49/60 = 81.7%（逐轮 15/16/18），仍低于三轮合计 ≥54/60（≥90%）的验收门槛（见
+> [复测记录](docs/benchmarks/m6-level2-retest4.md)）；修复后的窄验证在六个已知失败面上
+> （6 题 × 3 轮 × 3 配置）转通过 **2/6** 题（确定性子集 2/5），未达窄验证门槛（≥4/6 与
+> ≥3/5）；预算效率四项修复（resources 收口、notice 折叠、string excerpt 截断、空转软提示）
+> 之后的第三轮窄验证转通过 **3/6**（确定性子集 3/5），两轮窄验证均低于门槛，故按方案
+> 停止投入、M6 转入方案 3 现状披露（见[二轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify2.md)
+> 与[三轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify3.md)）；M8（干净安装、契约与
 > 导出安全）的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧
 > 已完成、Upwork 素材未发布；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
 > 详见[路线图](#路线图)与
@@ -96,7 +112,7 @@ DexAtlas 要解决的正是这个问题：
 | **Phase 1** | `v0.1.2`  | 验收清单补齐   | 5 个自建测试 APK、演示视频，并把退出清单恢复成计划书的原话                                        |
 | **Phase 1** | `v0.1.3`  | 证据能指回原处 | 交叉引用成为证据、locator 随报告迁移、文档与代码互相校验                                          |
 | **Phase 2** | `v0.2.0`  | Agent 智能分析 | Agent 任务规划、MCP Server、证据校验、可恢复任务、React 工作台                                       |
-| **Phase 3** | `v1.0.0`（tag 2026-11-17） | 作品集与交付 | 有限 Agent 流程（题集冻结、层级 0/1 判分完成，层级 2 真实模型批次已跑——未通过：首批 40.0%，低于 80% 验收线；根因修复后三轮完整复测 49/60 = 81.7%，仍低于三轮合计 ≥90% 门槛）、可迁移证据报告（`--html`/`export` 已交付）、干净安装验证与公共契约表（演练完成）、客户式案例（已交付）、独立验收（准备包就绪，未执行） |
+| **Phase 3** | `v1.0.0`（tag 2026-11-17） | 作品集与交付 | 有限 Agent 流程（题集冻结、层级 0/1 判分完成，层级 2 真实模型批次已跑——未通过：首批逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线、三轮合计 40.0% 低于三轮合计 ≥54/60（≥90%）线；执行层修复后三轮完整复测 49/60 = 81.7%，仍低于三轮合计 ≥54/60（≥90%）门槛；修复后的窄验证先转通过 2/6、预算效率四项修复后转通过 3/6，均低于 ≥4/6 门槛，转方案 3 现状披露）、可迁移证据报告（`--html`/`export` 已交付）、干净安装验证与公共契约表（演练完成）、客户式案例（已交付）、独立验收（准备包就绪，未执行） |
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。
 
@@ -419,10 +435,12 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | 里程碑 | 范围 | 状态 |
 |---|---|---|
 | M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 三轮合计 24/60 = 40.0%，验收线为每轮 ≥80%）；失败模式分析与五项根因修复后，三轮完整[复测](docs/benchmarks/m6-level2-retest4.md) DexAtlas 49/60 = 81.7%（逐轮 15/16/18，trace 1,182,356 tokens）——r2/r3 达单轮线、r1 未达，81.7% 仍低于三轮合计 ≥90% 的验收门槛，里程碑保持未收口 |
+| M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 24/60 = 40.0% 低于三轮合计 ≥54/60（≥90%）线）；执行层修复后，三轮完整[复测](docs/benchmarks/m6-level2-retest4.md) DexAtlas 49/60 = 81.7%（逐轮 15/16/18，trace 1,182,356 tokens）——r2/r3 达单轮 ≥16/20 线、r1 未达，81.7% 仍低于三轮合计 ≥54/60（≥90%）的验收门槛；修复后的[窄验证二轮](docs/benchmarks/m6-level2-narrow-verify2.md)在六个已知失败面上转通过 2/6 题（确定性子集 2/5），低于窄验证门槛（≥4/6 与 ≥3/5）；预算效率四项修复后的[窄验证三轮](docs/benchmarks/m6-level2-narrow-verify3.md)（54 条 trace，380,881 tokens，在 450,000 授权之内）转通过 3/6（确定性子集 3/5），仍低于门槛，故按方案停止投入、M6 转入方案 3 现状披露，里程碑保持未收口 |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
-| M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码问题已决策并记录为已知限制 |
+| M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |
 | M9 | GitHub 展示入口（本页）与 Upwork 素材 | **展示入口已完成；素材未发布** —— 本页与[项目简介](docs/outreach/project-brief.md)草稿已就位；Upwork 素材未发布 |
 | M10 | 独立验收、重新评分、发布候选 | **准备包已就绪；验收未执行** —— [准备包](docs/reports/m10-acceptance-pack.md)已就位；独立复现与重新评分尚未开始 |
 
-只有本计划的退出标准全部通过，才会考虑 `v1.0.0`——阶段推进靠证据，不靠日历。
+本计划原本以退出标准全部通过为 `v1.0.0` 的前提；`v1.0.0` 已于 2026-11-17 按现状披露
+口径发布，M6 与 M10 的验收仍未关闭（见 [`docs/status.md`](docs/status.md)）——阶段推进靠
+证据，不靠日历。

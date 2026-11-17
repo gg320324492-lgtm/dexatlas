@@ -41,7 +41,8 @@
 > 窄验证三轮（6 题 × 3 轮 × 3 配置，54 条 trace 完整，
 > [m6-level2-narrow-verify3.md](benchmarks/m6-level2-narrow-verify3.md)）仍**未达
 > 窄验证判据**：DexAtlas 转通过 3/6、确定性修复题 3/5（门槛 ≥4/6、≥3/5）；
-> 实测 380,881 tokens，在 450,000 授权之内。连续三轮未达后，按
+> 实测 380,881 tokens，在 450,000 授权之内。窄验证二、三两轮连续未达后
+> （第一轮运行不完整、不计为判定），按
 > [m6-verify3-plan.md](benchmarks/m6-verify3-plan.md) §7 停止，**方案 3
 > （现状披露）为最终定稿路径**，不再追加修复轮或模型调用。本页其余测量数字
 > 仍对应修复前代码（`main` `fbca3d5` 及更早）。
@@ -365,7 +366,7 @@ MCP 11 项全部正常，agent 提问端点按设计返回 503 + `agent_not_conf
 |---|---|---|
 | 60–90 秒端到端 demo | **完成（2026-11-14 重录）**——`ffprobe` 实测 demo.mp4 与 demo.gif 均 **84.8 秒**，覆盖空工作区 → 上传 demo.apk → 后台分析 → 符号检索 → 方法源码 → 证据 locator → 调用图一跳导航 → Agent 提问（planning→completed，三段式报告 + limitations）→ Markdown 报告导出（下载文件名带项目 id）的完整端到端链路；真实浏览器操作录屏（Edge app 窗口 + CDP 输入 + gdigrab 逐帧抓屏，无剪辑无合成帧），Agent 屏由项目自带的 scripted 演示 provider 驱动（无任何密钥、无真实模型调用），其余全部是真实分析产物 | `docs/assets/demo.mp4` / `demo.gif` |
 | 技术架构图 | **完成**——ASCII 图覆盖 CLI / REST API / MCP server / agent / workbench 五入口与 core / tools / reports 的关系，只画已存在的组件 | [architecture/diagram.md](architecture/diagram.md) |
-| ≥2 个完整案例研究 | **完成**——demo-app 从分析到证据链的完整走查；混淆样本走查（含 multi-DEX 附录），全部引用当次真实运行输出与证据 id | [case-studies/](case-studies/README.md) |
+| ≥2 个完整案例研究 | **完成**——demo-app 从分析到证据链的完整走查；混淆样本走查（含 multi-DEX 附录），全部引用当次真实运行输出与证据 id（M7 之后已扩为 3 篇，含 API 集成走查） | [case-studies/](case-studies/README.md) |
 | 公开 benchmark 摘要 | 已有（v0.2.0 前完成） | [benchmarks/comparison.md](benchmarks/comparison.md) · [comparison-real.md](benchmarks/comparison-real.md) |
 | 可下载示例分析报告 | 已有（屏 8 导出，实测与渲染器逐字节一致） | workbench 报告导出 · `dexatlas analyze -o` |
 | Upwork 风格 portfolio 描述 | **完成**——面向潜在客户：能做什么、技术亮点、适用场景、快速试用，全英文 | [portfolio.md](portfolio.md) |
