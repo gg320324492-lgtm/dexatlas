@@ -357,8 +357,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   （兼容变更进 CHANGELOG，破坏性变更显式升版本）。契约由真实接口验证：
   新增 `scripts/verify-public-contracts.py` 起 uvicorn 逐端点实测（26 项）、
   MCP 走协议实测（6 项）、CLI 退出码逐个触发（14 项），**M8 契约核对当时的
-  46 项全部通过**；结果记录在契约表"验证记录"一节。**v1.0.0 的契约表为 49 项**
-  （28 REST + 6 MCP + 15 CLI，含新增的退出码 6 活检）。新增契约快照测试
+  46 项全部通过**；结果记录在契约表"验证记录"一节。**v1.0.0 的契约清单为 49 个
+  检查项**（28 REST + 6 MCP + 15 CLI，含新增的退出码 6 活检）；这是静态条数，
+  实跑条数依机器而定——契约表"验证记录"一节记了两次实跑的数字。新增契约快照测试
   `tests/test_public_contracts.py`（22 项），把 REST 路由表、MCP 工具表、
   退出码表、报告/证据包 schema 固化为断言——任何契约变更先红测试，防止
   悄悄变更。
