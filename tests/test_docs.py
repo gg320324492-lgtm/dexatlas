@@ -937,6 +937,18 @@ def test_execution_report_does_not_claim_unbuilt_features() -> None:
 FAKE_CHECKS = 8
 
 
+def _test_file_table() -> str:
+    """The report's test-file table, as the real report has it.
+
+    The fake report stands in for the real one, and the real one's table
+    lists every test file. A stand-in that did not would be refused by the
+    refresh script for a reason the test using it is not about.
+    """
+    names = sorted(path.name for path in (REPO_ROOT / "tests").glob("test_*.py"))
+    rows = "\n".join(f"| `{name}` | |" for name in names)
+    return f"\n### 2.1 分层策略\n\n| 文件 | 覆盖内容 |\n|------|----------|\n{rows}\n"
+
+
 def _fake_report(*, skipped: int = 0, skipped_tests: list[str] | None = None) -> str:
     """A report small enough to read, with the figures the refresh script owns.
 
@@ -968,7 +980,10 @@ def _fake_report(*, skipped: int = 0, skipped_tests: list[str] | None = None) ->
         "<!--fig:suite.xfailed-->0<!--/fig--> xfailed\n\n"
         "Coverage: <!--fig:coverage.pct-->55.0%<!--/fig--> "
         "(<!--fig:coverage.covered-->55<!--/fig-->/<!--fig:coverage.total-->100<!--/fig-->)\n\n"
-        "<!--report-figures:" + json.dumps(record) + "-->\n"
+        + _test_file_table()
+        + "\n<!--report-figures:"
+        + json.dumps(record)
+        + "-->\n"
     )
 
 
@@ -1397,6 +1412,58 @@ def test_the_refresh_script_refuses_a_measurement_that_missed_tests(
     out = capsys.readouterr().out
     assert "did not account for every test" in out
     assert "Nothing was written" in out
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_the_refresh_script_refuses_a_report_whose_table_misses_a_test_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The table's rows are checked, not only the numbers in them.
+
+    The table is the reader's map from the report's claims to the code that
+    backs them, and its rows are written by hand. A file added to the suite
+    without a row in the table left the table quietly short of one file, and
+    the refresh wrote the new numbers into that table all the same: it read
+    the numbers the table carries and never the files the table names.
+
+    So the two sets are compared before anything is measured, and a table
+    that does not describe the suite is refused rather than written over.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    # The row for one test file of the suite is not there any more.
+    original = _fake_report().replace("| `test_docs.py` | |\n", "")
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 1
+
+    out = capsys.readouterr().out
+    assert "does not describe the suite" in out
+    assert "test_docs.py" in out
+    assert "Nothing was written" in out
+    assert report.read_text(encoding="utf-8") == original
+
+
+def test_the_refresh_script_refuses_a_report_whose_table_names_a_file_that_is_gone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A row for a file the suite does not have is as wrong as a missing one.
+
+    The reader is sent to a file that is not there, which is the same defect
+    as not being sent to a file that is.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report().replace("| `test_docs.py` | |", "| `test_gone.py` | |")
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 1
+
+    out = capsys.readouterr().out
+    assert "does not describe the suite" in out
+    assert "test_gone.py" in out
     assert report.read_text(encoding="utf-8") == original
 
 

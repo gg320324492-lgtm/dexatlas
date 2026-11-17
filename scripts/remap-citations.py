@@ -19,6 +19,12 @@ number twice. A citation that points at a place rather than at a named symbol
 has nothing to look up, so it is left alone and the checker reports it — a
 number is not worth guessing at.
 
+A document that describes a tree other than the working copy is left alone
+altogether. The release body says its line numbers refer to the v1.0.0
+release tree, and that tree does not move: moving its citations onto the
+working copy's lines would make the document point at a tree it says it is
+not about.
+
     uv run --no-sync python scripts/remap-citations.py            # the three documents
     uv run --no-sync python scripts/remap-citations.py docs/x.md  # one of them
 
@@ -111,7 +117,7 @@ def _anchors(checker, document: Path) -> dict[tuple[str, int, int], tuple[int, i
             for name in names:
                 anchor = name.rsplit(".", 1)[-1]
                 if checker.symbol_is_in_range(
-                    citation.target, anchor, citation.start, citation.end
+                    lines, anchor, citation.start, citation.end, citation.target.suffix == ".py"
                 ):
                     # The symbol is where the citation says it is. It still has
                     # to be placed, because the new range has to keep holding
@@ -150,7 +156,7 @@ def _where(checker, target: Path, symbol: str, citation) -> list[int]:
     name appears in other code, and dragging them into the new range would
     make it point at something else.
     """
-    line = checker.definition_line(target, symbol)
+    line = checker.definition_line(checker.file_lines(target), symbol, target.suffix == ".py")
     if line is not None:
         return [line]
     mentions = _mentions(checker, target, symbol)
@@ -160,6 +166,12 @@ def _where(checker, target: Path, symbol: str, citation) -> list[int]:
 
 def _rewrite(checker, document: Path) -> int:
     """Move every drifted citation onto where its symbol is."""
+    tree = checker.tree_of(document)
+    if not tree.is_working_copy:
+        # The document's line numbers describe another tree, and that tree does
+        # not move. Moving them onto the working copy's lines would make the
+        # document point at a tree it says it is not about.
+        return 0
     anchors = _anchors(checker, document)
     if not anchors:
         return 0
@@ -225,6 +237,11 @@ def main(argv: list[str] | None = None) -> int:
         if not document.is_file():
             print(f"{document}: not there")
             continue
+        tree = checker.tree_of(document)
+        if not tree.is_working_copy and not arguments.quiet:
+            print(
+                f"{document.name}: it describes the {tree.ref} tree; its line numbers do not move"
+            )
         if _uncommitted(document) and not arguments.quiet:
             print(f"{document.name}: it has uncommitted changes; the diff will mix them")
         moved = _rewrite(checker, document)

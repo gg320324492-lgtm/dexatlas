@@ -37,6 +37,25 @@ the lines, not for the lines being where the symbol is *defined*: a document
 that cites the place a class is used is not caught by pointing at another
 place it is used.
 
+Which tree a citation is about
+------------------------------
+
+A citation is a claim about *a* tree. Most documents describe the tree they
+are checked out in, and for them the working copy is the right tree. Some do
+not: the release body says in its own header that its line numbers refer to
+the v1.0.0 release tree, and the tag is not the working copy. A checker that
+reads every citation out of the working copy cannot honour that: it checks
+that the line is still there, not that the line is the one the document meant.
+The two trees have drifted apart since the tag, so the same number means two
+different things in them, and a document can mix them without anybody noticing.
+
+So the checker is told which tree each document describes, reads that
+document's citations out of that tree, and says so in its summary. The
+declaration is checked too: the tree has to be in this checkout, and the
+document has to quote the fingerprint of that tree's measurement. A registry
+that has drifted away from the documents it names is a finding, not a silent
+pass.
+
 The summary says how many citations each kind of check reached, so the number
 of citations that carry a real check is never a guess. The exit code is the
 answer: 0 when every citation holds, 1 when one has drifted. A checker that
@@ -47,9 +66,12 @@ from __future__ import annotations
 
 import ast
 import functools
+import hashlib
+import json
 import os
 import pathlib
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 
@@ -70,6 +92,119 @@ DOCS = [
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
+
+#: The trees some documents describe, and the ref each one names.
+#:
+#: A document that quotes line numbers has to say which tree those numbers are
+#: in, and this is where the checker learns it. The value is a git ref: the
+#: tree the document's citations are read out of.
+#:
+#: The release body is the one document that says so out loud -- its appendix
+#: header reads "Line numbers refer to the v1.0.0 release tree". Without this
+#: registry the checker read that document's citations out of the working
+#: copy, so it checked the release tree's numbers against a tree that had
+#: moved on since the release, and it had no way to say so.
+TREE_DOCUMENTS: dict[str, str] = {
+    "docs/reports/v1.0.0-github-release-body.md": "v1.0.0",
+}
+
+#: The document that carries a tree's measurement record. The record holds the
+#: fingerprint of the tree the measurement was taken on, and that fingerprint
+#: is what ties a document to the tree it says it describes.
+RECORD_DOCUMENT = "docs/reports/phase1-execution-report.md"
+
+#: The measurement record inside that document.
+RECORD = re.compile(r"<!--report-figures:(.*?)-->", re.DOTALL)
+
+#: A source fingerprint a document quotes. The documents abbreviate it --
+#: ``sha256:4e72ac49…`` -- so what is compared is the prefix they give.
+FINGERPRINT = re.compile(r"sha256:([0-9a-f]{8,})")
+
+
+def git_output(*args: str) -> str | None:
+    """What a git command says, or None when git cannot answer.
+
+    ``None`` means "this repository does not have that", not "the answer was
+    empty": a tree that is not in this checkout is a finding, and a finding
+    that reads like an empty answer would be missed.
+    """
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=REPO,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+class Tree:
+    """One tree a document's citations can be read against.
+
+    The working copy is a tree; a tagged release is another. A citation says
+    "line N of this file", and which file that is depends on the tree the
+    sentence is about.
+    """
+
+    def __init__(self, ref: str | None = None) -> None:
+        self.ref = ref
+
+    @property
+    def is_working_copy(self) -> bool:
+        return self.ref is None
+
+    @property
+    def label(self) -> str:
+        """How this tree is named in the checker's report."""
+        return "the working copy" if self.ref is None else f"the {self.ref} tree"
+
+    def exists(self) -> bool:
+        """Whether this tree is in this checkout."""
+        if self.ref is None:
+            return True
+        return git_output("rev-parse", "--verify", "--quiet", f"{self.ref}^{{commit}}") is not None
+
+    def lines(self, path: pathlib.Path) -> tuple[str, ...] | None:
+        """The lines of a file, as this tree has them.
+
+        None means the tree does not have the file at all, which is a different
+        answer from a file with no lines in it.
+        """
+        if self.ref is None:
+            return file_lines(path)
+        try:
+            relative = path.relative_to(REPO).as_posix()
+        except ValueError:
+            return None
+        return tree_file_lines(self.ref, relative)
+
+    def text(self, relative: str) -> str | None:
+        """The content of a file of this tree, named by its path in the repo."""
+        if self.ref is None:
+            path = REPO / relative
+            return path.read_text(encoding="utf-8") if path.is_file() else None
+        content = git_output("show", f"{self.ref}:{relative}")
+        return content
+
+
+@functools.cache
+def tree_file_lines(ref: str, relative: str) -> tuple[str, ...] | None:
+    """The lines of a file in a tagged tree, read once."""
+    content = git_output("show", f"{ref}:{relative}")
+    if content is None:
+        return None
+    return tuple(content.splitlines())
+
+
+#: The tree a document describes when it says nothing about one.
+WORKING_COPY = Tree()
 
 #: A backticked span of the documentation.
 SPAN = re.compile(r"`([^`\n]+)`")
@@ -191,10 +326,19 @@ class Citation:
     target: pathlib.Path | None
     ambiguous: bool
     text: str
+    #: The tree the document describes. The cited lines are read out of it,
+    #: not out of the working copy, when the document says which tree it means.
+    tree: Tree = WORKING_COPY
 
     @property
     def where(self) -> str:
         return f"{self.document.name}:{self.line}  {self.rel}:{self.start}-{self.end}"
+
+    def lines(self) -> tuple[str, ...] | None:
+        """The lines of the file this citation names, in the tree it describes."""
+        if self.target is None:
+            return None
+        return self.tree.lines(self.target)
 
 
 @dataclass(frozen=True)
@@ -245,6 +389,12 @@ class Report:
     named: int
     road_sign: int
     findings: tuple[Finding, ...]
+    #: For every tree a document was read against: its name, how many
+    #: documents it described and how many citations it answered for.
+    trees: tuple[tuple[str, int, int], ...] = ()
+    #: A digest of what the check was about: the documents it read and the
+    #: trees it resolved them against.
+    subject: str = ""
 
     @property
     def unresolved(self) -> tuple[Finding, ...]:
@@ -303,14 +453,14 @@ def file_lines(path: pathlib.Path) -> tuple[str, ...]:
     return tuple(path.read_text(encoding="utf-8", errors="replace").splitlines())
 
 
-def symbol_lines(path: pathlib.Path, symbol: str) -> list[int]:
+def symbol_lines(lines: tuple[str, ...], symbol: str) -> list[int]:
     """The lines of a file that name a symbol.
 
     The symbol is matched as a whole word, so ``kind`` does not match
     ``kinds``.
     """
     pattern = re.compile(rf"\b{re.escape(symbol)}\b")
-    return [number for number, line in enumerate(file_lines(path), 1) if pattern.search(line)]
+    return [number for number, line in enumerate(lines, 1) if pattern.search(line)]
 
 
 def use_utf8_output() -> None:
@@ -485,38 +635,38 @@ def is_symbolic(name: str) -> bool:
     return any(character.isupper() for character in name) or "_" in name
 
 
-def definition_line(path: pathlib.Path, symbol: str) -> int | None:
+def definition_line(lines: tuple[str, ...], symbol: str, is_python: bool) -> int | None:
     """The line where a class or a function is defined."""
-    if path.suffix == ".py":
+    if is_python:
         try:
-            tree = ast.parse("\n".join(file_lines(path)))
+            tree = ast.parse("\n".join(lines))
         except SyntaxError:
             tree = None
         if tree is not None:
-            lines = [
+            definitions = [
                 node.lineno
                 for node in ast.walk(tree)
                 if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
                 and node.name == symbol
             ]
-            if lines:
-                return min(lines)
-    for number, line in enumerate(file_lines(path), 1):
+            if definitions:
+                return min(definitions)
+    for number, line in enumerate(lines, 1):
         if re.match(rf"^\s*(?:async\s+)?(?:def|class)\s+{re.escape(symbol)}\b", line):
             return number
     return None
 
 
-def definition_span(path: pathlib.Path, symbol: str) -> tuple[int, int] | None:
+def definition_span(lines: tuple[str, ...], symbol: str, is_python: bool) -> tuple[int, int] | None:
     """The lines of a function's definition and of the body it opens.
 
     A citation that names a function may point at the function's definition
     or at code inside it — "the counting at ``storage.py:520-526``" is
     inside ``save_symbols`` even though the ``def`` is a hundred lines up.
     """
-    if path.suffix == ".py":
+    if is_python:
         try:
-            tree = ast.parse("\n".join(file_lines(path)))
+            tree = ast.parse("\n".join(lines))
         except SyntaxError:
             tree = None
         if tree is not None:
@@ -527,7 +677,6 @@ def definition_span(path: pathlib.Path, symbol: str) -> tuple[int, int] | None:
             ]
             if spans:
                 return min(spans)
-    lines = file_lines(path)
     pattern = re.compile(rf"^\s*(?:async\s+)?def\s+{re.escape(symbol)}\b")
     for number, line in enumerate(lines, 1):
         if not pattern.match(line):
@@ -544,7 +693,9 @@ def definition_span(path: pathlib.Path, symbol: str) -> tuple[int, int] | None:
     return None
 
 
-def symbol_is_in_range(target: pathlib.Path, name: str, start: int, end: int) -> bool | None:
+def symbol_is_in_range(
+    lines: tuple[str, ...], name: str, start: int, end: int, is_python: bool
+) -> bool | None:
     """Whether a symbol is inside a cited range.
 
     A symbol the file defines has to be defined in the range, or the range has
@@ -554,13 +705,13 @@ def symbol_is_in_range(target: pathlib.Path, name: str, start: int, end: int) ->
     None means the file does not name the symbol at all, so there is nothing
     to compare against.
     """
-    defined = definition_line(target, name)
+    defined = definition_line(lines, name, is_python)
     if defined is not None:
         if start - SLACK <= defined <= end + SLACK:
             return True
-        body = definition_span(target, name)
+        body = definition_span(lines, name, is_python)
         return bool(body is not None and body[0] - SLACK <= start and end <= body[1] + SLACK)
-    where = symbol_lines(target, name)
+    where = symbol_lines(lines, name)
     if not where:
         return None
     return any(start - SLACK <= line <= end + SLACK for line in where)
@@ -629,7 +780,7 @@ def resolve_citations(text: str) -> list[Resolved]:
     return resolved
 
 
-def document_clauses(document: pathlib.Path) -> list[Clause]:
+def document_clauses(document: pathlib.Path, tree: Tree = WORKING_COPY) -> list[Clause]:
     """Every clause of a document, with its citations and the symbols it names."""
     text = document.read_text(encoding="utf-8")
     resolved = resolve_citations(text)
@@ -655,6 +806,7 @@ def document_clauses(document: pathlib.Path) -> list[Clause]:
                     target=options[0] if len(options) == 1 else None,
                     ambiguous=len(options) > 1,
                     text=clause.strip()[:100],
+                    tree=tree,
                 )
             )
             citation_spans.append((item.match.start() - start, item.match.end() - start))
@@ -715,19 +867,34 @@ def holds_content(line: str) -> bool:
 
 
 def check_citation(citation: Citation) -> list[Finding]:
-    """The findings of one citation's location."""
+    """The findings of one citation's location.
+
+    The lines are read out of the tree the document describes. For most
+    documents that tree is the working copy; for the ones that say they are
+    about a release, it is that release's tree, and a line number that only
+    means something in the working copy is not a line of that release.
+    """
     if citation.target is None:
         kind = "ambiguous" if citation.ambiguous else "unresolved"
         detail = "the name could mean several files" if citation.ambiguous else "no such file"
         return [Finding(citation.where, kind, detail, citation.text)]
 
-    lines = file_lines(citation.target)
+    lines = citation.lines()
+    if lines is None:
+        return [
+            Finding(
+                citation.where,
+                "not in the tree",
+                f"{citation.tree.label} has no such file",
+                citation.text,
+            )
+        ]
     if citation.start < 1 or citation.end < citation.start or citation.end > len(lines):
         return [
             Finding(
                 citation.where,
                 "out of range",
-                f"the file has {len(lines)} lines",
+                f"the file has {len(lines)} lines in {citation.tree.label}",
                 citation.text,
             )
         ]
@@ -749,9 +916,14 @@ def check_clause(clause: Clause) -> list[Finding]:
     for citation, names in zip(clause.citations, clause.claims, strict=True):
         if citation.target is None:
             continue
+        lines = citation.lines()
+        if lines is None:
+            continue
         for name in names:
             anchor = name.rsplit(".", 1)[-1]
-            if symbol_is_in_range(citation.target, anchor, citation.start, citation.end):
+            if symbol_is_in_range(
+                lines, anchor, citation.start, citation.end, citation.target.suffix == ".py"
+            ):
                 located.add(name)
             else:
                 missing.setdefault(name, citation)
@@ -759,10 +931,11 @@ def check_clause(clause: Clause) -> list[Finding]:
     for name, citation in missing.items():
         if name in located:
             continue
-        if citation.target is None:
+        lines = citation.lines()
+        if lines is None:
             continue
         anchor = name.rsplit(".", 1)[-1]
-        where = symbol_lines(citation.target, anchor)
+        where = symbol_lines(lines, anchor)
         if where:
             nearest = min(where, key=lambda line: abs(line - citation.start))
             findings.append(
@@ -790,21 +963,146 @@ def is_compared(citation: Citation, names: tuple[str, ...]) -> bool:
     """
     if citation.target is None:
         return False
+    lines = citation.lines()
+    if lines is None:
+        return False
     for name in names:
         anchor = name.rsplit(".", 1)[-1]
-        if is_symbolic(name) or symbol_lines(citation.target, anchor):
+        if is_symbolic(name) or symbol_lines(lines, anchor):
             return True
     return False
+
+
+def relative_path(document: pathlib.Path) -> str:
+    """A document's path in the repository, as the repository spells it."""
+    try:
+        return document.relative_to(REPO).as_posix()
+    except ValueError:
+        return document.name
+
+
+def tree_of(document: pathlib.Path) -> Tree:
+    """The tree a document describes."""
+    ref = TREE_DOCUMENTS.get(relative_path(document))
+    return Tree(ref) if ref is not None else WORKING_COPY
+
+
+def tree_fingerprint(tree: Tree) -> str | None:
+    """The source fingerprint of the tree a measurement was taken on.
+
+    The measurement record of a tree holds it, and the record is in the tree,
+    so the fingerprint of a tree is read out of that tree.
+    """
+    text = tree.text(RECORD_DOCUMENT)
+    if text is None:
+        return None
+    match = RECORD.search(text)
+    if match is None:
+        return None
+    try:
+        record = json.loads(match.group(1))
+    except json.JSONError:
+        return None
+    value = record.get("source_fingerprint")
+    return value if isinstance(value, str) else None
+
+
+def check_declaration(document: pathlib.Path, tree: Tree) -> list[Finding]:
+    """Whether a document really is about the tree it says it is about.
+
+    Two things have to hold: the tree has to be in this checkout, and the
+    document has to quote the fingerprint of that tree's measurement. The
+    second one is what ties the two together -- a document that names a tree
+    nobody can check against is a document whose line numbers mean nothing.
+    """
+    where = f"{document.name}  declaration"
+    if not tree.exists():
+        return [
+            Finding(
+                where,
+                "no such tree",
+                f"the {tree.ref} tree is not in this checkout (fetch the tags: git fetch --tags)",
+                "",
+            )
+        ]
+    expected = tree_fingerprint(tree)
+    if expected is None:
+        return [
+            Finding(
+                where,
+                "unverified tree",
+                f"the {tree.ref} tree has no measurement record to compare a fingerprint with",
+                "",
+            )
+        ]
+    quoted = sorted(set(FINGERPRINT.findall(document.read_text(encoding="utf-8"))))
+    if not quoted:
+        return [
+            Finding(
+                where,
+                "unverified tree",
+                f"the document quotes no fingerprint, so it cannot be tied to the {tree.ref} tree",
+                "",
+            )
+        ]
+    prefix = expected.removeprefix("sha256:")
+    if not any(prefix.startswith(part) for part in quoted):
+        return [
+            Finding(
+                where,
+                "wrong tree",
+                f"the document quotes sha256:{', sha256:'.join(quoted)} "
+                f"but the {tree.ref} tree's fingerprint is sha256:{prefix}",
+                "",
+            )
+        ]
+    return []
+
+
+def subject_digest(documents: list[pathlib.Path], trees: dict[str, Tree]) -> str:
+    """A digest of what the check was about.
+
+    The documents it read and the trees it resolved them against. It is not a
+    staleness rule -- the checker reads its subject on every run, so nothing it
+    says can go stale -- but it makes "this verdict was about this subject" a
+    statement that can be compared, rather than an assumption.
+    """
+    digest = hashlib.sha256()
+    for document in sorted(documents):
+        if not document.is_file():
+            continue
+        digest.update(relative_path(document).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(document.read_bytes()).hexdigest().encode("utf-8"))
+        digest.update(b"\0")
+    for label, tree in sorted(trees.items()):
+        digest.update(label.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update((tree_fingerprint(tree) or "").encode("utf-8"))
+        digest.update(b"\0")
+    return "sha256:" + digest.hexdigest()
 
 
 def check_documents(documents: list[pathlib.Path]) -> Report:
     """Check every citation in every document."""
     clauses_found: list[Clause] = []
-    for document in documents:
-        if document.is_file():
-            clauses_found.extend(document_clauses(document))
-
     findings: list[Finding] = []
+    trees: dict[str, Tree] = {}
+    counts: dict[str, list[int]] = {}
+
+    for document in documents:
+        if not document.is_file():
+            continue
+        tree = tree_of(document)
+        trees[tree.label] = tree
+        found = document_clauses(document, tree)
+        clauses_found.extend(found)
+        entry = counts.setdefault(tree.label, [0, 0])
+        entry[0] += 1
+        entry[1] += sum(len(clause.citations) for clause in found)
+        if not tree.is_working_copy:
+            findings.extend(check_declaration(document, tree))
+
     for clause in clauses_found:
         findings.extend(check_clause(clause))
 
@@ -820,6 +1118,8 @@ def check_documents(documents: list[pathlib.Path]) -> Report:
         named=named,
         road_sign=citations - named,
         findings=tuple(findings),
+        trees=tuple((label, counts[label][0], counts[label][1]) for label in sorted(counts)),
+        subject=subject_digest(documents, trees),
     )
 
 
@@ -830,6 +1130,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"citations: {report.citations}")
     print(f"  naming a symbol: {report.named}")
     print(f"  pointing only at a location: {report.road_sign}")
+    print("trees:")
+    for label, documents, citations in report.trees:
+        print(f"  {label}: {documents} document(s), {citations} citation(s)")
+    print(f"subject: {report.subject}")
     print(f"unresolved paths: {len(report.unresolved)}")
     for finding in report.unresolved:
         print(f"  {finding.render()}")
