@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import os
 import re
 import unittest.mock
 from collections.abc import Iterator
@@ -777,10 +778,23 @@ CHECK_SPLIT = re.compile(r"(\d+) REST \+ (\d+) MCP \+ (\d+) CLI")
 #: "49".
 STATED_NUMBER = re.compile(r"(?<![\d,])49(?![\d,])")
 
+#: The root of the checked-out project.
+REPO_ROOT = Path(__file__).parent.parent
+
 #: Directories whose markdown is not the project's own.
 _NOT_DOCUMENTS = frozenset(
     {".git", ".venv", ".scratch", "build", "dist", "node_modules", ".mypy_cache", ".pytest_cache"}
 )
+
+#: Paths that are local working state, not part of the checked-out project.
+#:
+#: Everything under ``.claude/`` is ignored: a worktree parked there is a
+#: *second* copy of the whole repository, carrying documents written to
+#: resolve from *its* directories. Reading those as this tree's documents made
+#: every parallel session look broken while the project's own documents were
+#: fine — a failure pointing at a file nobody had edited. The walk stops at
+#: the directory instead of filtering its files afterwards.
+_LOCAL_STATE_PATHS = frozenset({".claude"})
 
 
 def _the_live_check_script() -> Path:
@@ -812,14 +826,50 @@ def _check_call_sites() -> dict[str, int]:
 
 
 def _the_documents() -> list[Path]:
-    """Every markdown document of the repository."""
-    root = Path(__file__).parent.parent
+    """Every markdown document of the repository.
+
+    The walk prunes the local working state (``.claude/``) instead of
+    filtering its files afterwards, the way ``tests/test_docs.py`` prunes its
+    own walk: a worktree parked under ``.claude/`` is another checkout of
+    this repository, not this tree's documentation.
+    """
     found: list[Path] = []
-    for path in sorted(root.rglob("*.md")):
-        if _NOT_DOCUMENTS & set(path.relative_to(root).parts):
-            continue
-        found.append(path)
-    return found
+    for root, directories, files in os.walk(REPO_ROOT):
+        directories[:] = [
+            name
+            for name in directories
+            if name not in _NOT_DOCUMENTS and name not in _LOCAL_STATE_PATHS
+        ]
+        found.extend(Path(root) / name for name in files if name.lower().endswith(".md"))
+    return sorted(found)
+
+
+def test_the_document_walk_ignores_the_local_working_state(tmp_path: Path) -> None:
+    """A worktree parked under ``.claude/`` is not this tree's documentation.
+
+    Another session's checkout carries the documents of an older tree. When
+    this walker read them as this tree's documents, a stale copy of a report
+    failed the contract checks while the project's own copy was fine: the
+    failure pointed at a file nobody had edited, and the red build it caused
+    said nothing about the tree being released. The walk must stop at
+    ``.claude/`` — and still find the project's own documents, which is what
+    the planted file below asserts.
+    """
+    nested = tmp_path / ".claude" / "worktrees" / "some-session" / "docs" / "reports"
+    nested.mkdir(parents=True)
+    (nested / "stale.md").write_text("28 REST + 6 MCP + 15 CLI\n")
+    (tmp_path / "docs").mkdir(exist_ok=True)
+    (tmp_path / "docs" / "own.md").write_text("a document of this tree\n")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("tests.test_public_contracts.REPO_ROOT", tmp_path)
+        documents = _the_documents()
+
+    outside = [path for path in documents if not path.is_relative_to(tmp_path)]
+    assert outside == [], f"the walk left the planted root: {outside[:3]}"
+
+    names = sorted(path.relative_to(tmp_path).as_posix() for path in documents)
+    assert names == ["docs/own.md"]
 
 
 def test_the_live_contract_script_has_the_number_of_checks_the_materials_state() -> None:
