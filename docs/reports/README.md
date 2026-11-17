@@ -84,7 +84,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [m10-reader-package.md](m10-reader-package.md) | 上面那份准备包整理成的**一站式执行包**：从它出发，读者不需要再向作者要任何步骤。 | 读者拿到验收任务、问「我该从哪开始」时看它。 |
 | [m10-reader-kit.md](m10-reader-kit.md) | 配套工具包：评分表、回填说明、常见问答。**不含任何结论，也不预填分数。** | 读者开始填表时看它。 |
 | [m10-executive-summary.md](m10-executive-summary.md) | 一页版执行摘要：项目是什么、验收要回答什么问题、读者要做哪几步、要多久、交回什么。 | 读者问「这事大概要花我多久」时看它。 |
-| [m10-invitation-final.md](m10-invitation-final.md) | 邀请函**成稿**：验收 commit 已钉定到 v1.0.0 发版 commit，只差发起人把完整 hash 填进占位符。**但这封信现在还不能发**：`v1.0.0` tag 仍停在 `8f9ddca`，`origin/main` 同样是 `8f9ddca`，两者都落后当前树；**tag 重打、远端推进到最终 commit 之前，成稿第二节那串 hash 填不出「读者能拿到的那个提交」**。这条发现至今未关闭，记在 [`m10-reader-walkthrough-2nd.md`](m10-reader-walkthrough-2nd.md) 的 N1。 | 要把验收正式发出去时看它；**发之前先确认 tag 与远端都已经推进。** |
+| [m10-invitation-final.md](m10-invitation-final.md) | 邀请函**成稿**：验收 commit 已钉定到 v1.0.0 发版 commit，只差发起人把完整 hash 填进占位符。**发之前只剩一件事**：把成稿第二节的完整 hash 填进去（`git rev-parse v1.0.0^{commit}` → `0104ccb…`）。原先那条「tag 仍停在旧 commit、成稿还不能发」的限制**已经解除**——`v1.0.0` tag 已重打并推上远端，`origin/main` 也已推进到同一个提交 ✓（原发现记在 [`m10-reader-walkthrough-2nd.md`](m10-reader-walkthrough-2nd.md) 的 N1 ✓）。 | 要把验收正式发出去时看它；**发之前先确认 tag 与远端都已经推进。** |
 | [m10-invitation-template.md](m10-invitation-template.md) | 邀请函**模板**：正文仍以「发起人钉定的固定 commit」表述，保持模板对后续轮次的通用性——但**验收 commit 已钉定为 v1.0.0 发版 commit**，**只有完整 hash 未填**，那串 hash 写在成稿第二节的占位符里（模板本身不预设具体 hash）。**成稿见上一行，模板见 §7。** | 需要改写信封语气、或另邀一位评审者时看它。 |
 | [m10-review-record-template.md](m10-review-record-template.md) | 验收记录模板（空白）：记录元数据、首次读者会话记录、评分回填。**填完不等于 M10 完成。** | 评审者要记录验收过程时看它。 |
 | [m10-selfcheck.md](m10-selfcheck.md) | 作者侧自动化预检（`scripts/m10_selfcheck.py`）的自测记录。**不产生任何「通过/不通过」判定。** | 提交验收材料前，作者想先抓文档层面的错时看它。 |
