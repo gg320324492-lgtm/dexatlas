@@ -14,17 +14,22 @@
 
 | 项 | 取值 | 说明 |
 |---|---|---|
-| 审查对象 | `docs/outreach/` 下 4 件对外素材 + 1 份核对记录 `publish-review.md` | 取自主线 `claude/m6-level2-verify` @ `78102a8`（该提交已合并上一轮校对 `08cb34f`） |
-| 本窗口 worktree | `E:\Dexatlas\.claude\worktrees\outreach-final-review-01a419`，分支 `claude/outreach-final-review-01a419` @ `fbca3d5` | `fbca3d5` **不含** `08cb34f`，所以素材一律用 `git show 78102a8:docs/outreach/…` 只读读取，工作树一行未改 |
-| 报告数字基准 | `git show 78102a8:docs/reports/phase1-execution-report.md` | 落盘值：**测试 1584**（1437 快 + 147 集成）、**一方代码覆盖率 93.2%**（7109/7631 行） |
+| 审查对象 | `docs/outreach/` 下 4 件对外素材 + 1 份核对记录 `publish-review.md` | 就在本分支工作树里，取自主线 `claude/m6-level2-verify` @ `78102a8`（该提交已合并上一轮校对 `08cb34f`） |
+| 本窗口 worktree | `E:\Dexatlas\.claude\worktrees\outreach-final-review-01a419`，分支 `audit/outreach-final-review`，基线 `origin/claude/m6-level2-verify` @ `78102a8` | 素材本体、核对记录、M6 基准报告、`docs/releases/v1.0.0.md` 全部在工作树内；本分支只比基线多一个提交（本文） |
+| 报告数字基准 | `docs/reports/phase1-execution-report.md`（基线提交落盘版） | 落盘值：**测试 1584**（1437 快 + 147 集成）、**一方代码覆盖率 93.2%**（7109/7631 行） |
 | 共享树工作副本 | **不作为基准** | `E:\Dexatlas\docs\reports\phase1-execution-report.md` 的未提交改动把覆盖率写成 **35.4%（2699/7631）**，测试数仍是 1584；这是并发 `pytest --cov` 互相清 `.coverage` 后的残缺值，不是真值。本报告一律不引用工作树版本 |
-| 行号基准 | 本文所有 `素材:行` 指向 `78102a8:docs/outreach/<文件>` | 校对提交改动了这些文件，行号以该提交为准 |
+| 行号基准 | 本文所有 `素材:行` 指向本分支工作树内的 `docs/outreach/<文件>` | 与基线提交逐字一致（已用 `diff` 比对，四件素材与校对后版本字节相同） |
 | 外部信息 | **未联网** | 官方指南链接的可达性与 Upwork 真实字段上限未经联网核实；本轮按任务给定门限（标题 ≤60、简介 ≤5,000）判定，提案正文另按 2,500 的保守口径复核 |
 
-两条线索（`fbca3d5` 与 `78102a8`）的落盘数字本身就不一样：`fbca3d5`（`origin/main`）的
-报告是 1515（1368 快 + 147 集成）/ 93.2%（6938/7445），`78102a8`（主线，多出 60 个提交）
+两条线索（`origin/main` 与主线）的落盘数字本身就不一样：`origin/main`（`fbca3d5`）的报告是
+1515（1368 快 + 147 集成）/ 93.2%（6938/7445），主线（`78102a8`，比 `fbca3d5` 多 60 个提交）
 是 1584（1437 + 147）/ 93.2%（7109/7631）。**素材与主线一致、与 `origin/main` 不一致**，
 所以发布必须以主线合并后的树为准（见 §6 M1）。
+
+> 审计轨迹：本轮最初把分支切在 `origin/main`（`fbca3d5`）上，那棵树**不含**校对提交
+> `08cb34f`，素材与核对记录都不在里面；第一版复核因此全部经 `git show 78102a8:…` 只读取用，
+> 结论逐条可复算。收到基线纠正后，分支已重切到 `origin/claude/m6-level2-verify` @ `78102a8`
+> 并把本文移到其上，所有结论已在工作树内重新核对一遍，**数值无变化**。
 
 ---
 
@@ -32,16 +37,16 @@
 
 | 素材文件:行 | 原文数字/表述 | 仓库出处 | 判定 |
 |---|---|---|---|
-| `cover-letter-templates.md:68` | `1,584 automated tests at 93.2% coverage` | `78102a8:docs/reports/phase1-execution-report.md:76-77`（`tests.total`=1584、`coverage.pct`=93.2%）；同 `docs/status.md:23-24`、`README.md:12-13` | 一致（但见 §6 M1） |
+| `cover-letter-templates.md:68` | `1,584 automated tests at 93.2% coverage` | `docs/reports/phase1-execution-report.md:76-77`（`tests.total`=1584、`coverage.pct`=93.2%）；同 `docs/status.md:23-24`、`README.md:12-13` | 一致（但见 §6 M1） |
 | `project-brief.md:50` | `1,584 automated tests, 93.2% coverage` | 同上 | 一致（但见 §6 M1） |
 | `project-brief.md:85` | `1,584 tests` | 同上 | 一致（但见 §6 M1） |
 | `scope-backend-automation.md:24` | `1,584 tests at 93.2% coverage` | 同上 | 一致（但见 §6 M1） |
-| `cover-letter-templates.md:132` | `eleven tools over stdio` | `78102a8:src/dexatlas/mcp/server.py` 注册 11 个 `@server.tool`：list_projects / get_project_status / get_manifest / search_symbols / get_class_source / get_method_source / find_callers / find_callees / get_evidence / resolve_locator / find_resource_declarations | 一致 |
+| `cover-letter-templates.md:132` | `eleven tools over stdio` | `src/dexatlas/mcp/server.py` 注册 11 个 `@server.tool`：list_projects / get_project_status / get_manifest / search_symbols / get_class_source / get_method_source / find_callers / find_callees / get_evidence / resolve_locator / find_resource_declarations | 一致 |
 | `project-brief.md:71` | `Eleven tools over stdio` | 同上 | 一致 |
 | `scope-ai-mcp.md:28` | `eleven tools over stdio` | 同上 | 一致 |
-| `project-brief.md:52-53` | `three complete case studies on first-party sample APKs` | `78102a8:docs/case-studies/README.md`「Three complete walkthroughs」；三篇正文 `demo-app-walkthrough.md` / `obfuscated-app.md` / `api-integration.md` | 一致（措辞提示见 §5.2） |
+| `project-brief.md:52-53` | `three complete case studies on first-party sample APKs` | `docs/case-studies/README.md`「Three complete walkthroughs」；三篇正文 `demo-app-walkthrough.md` / `obfuscated-app.md` / `api-integration.md` | 一致（措辞提示见 §5.2） |
 | `project-brief.md:109` | `` `v0.2.0` is the newest release `` | `git tag`：v0.1.0 / v0.1.1 / v0.1.2 / v0.1.3 / **v0.2.0**，v0.2.0 是最新；v1.0.0 尚未打 tag | 一致（**v1.0.0 发版后即成假话**，见 §6 M2） |
-| `project-brief.md:69`、`scope-backend-automation.md:25` | `CI across Python 3.12/3.13` | `78102a8:.github/workflows/ci.yml:96` → `python-version: ["3.12", "3.13"]` | 一致 |
+| `project-brief.md:69`、`scope-backend-automation.md:25` | `CI across Python 3.12/3.13` | `.github/workflows/ci.yml:96` → `python-version: ["3.12", "3.13"]` | 一致 |
 | `project-brief.md:114` | `https://github.com/gg320324492-lgtm/dexatlas` | `README.md:9-15` 徽章同域；`git remote -v` 同 | 一致 |
 | `scope-ai-mcp.md:14-15` | `What I offer`（`773 characters as written`） | 本轮实测 raw 781 / plain **773** | 一致（见 §3） |
 | `cover-letter-templates.md:39`、`:92` | 两行 `**Subject: {{job title}} — …**` | 模板占位符，不是字段值 | 需人工确认（替换后长度） |
@@ -263,17 +268,17 @@ study」**都不算假话**，但读者可能理解成三个不同样例；三�
 本轮全部数字可按下述方法重算：
 
 ```bash
-# 素材正文（校对后的版本，主线 HEAD）
-git show 78102a8:docs/outreach/cover-letter-templates.md
-git show 78102a8:docs/outreach/project-brief.md
-git show 78102a8:docs/outreach/scope-ai-mcp.md
-git show 78102a8:docs/outreach/scope-backend-automation.md
+# 素材正文（校对后的版本，本分支工作树即该版本）
+cat docs/outreach/cover-letter-templates.md
+cat docs/outreach/project-brief.md
+cat docs/outreach/scope-ai-mcp.md
+cat docs/outreach/scope-backend-automation.md
 
-# 报告落盘数字（不要用共享树工作副本，那份覆盖率是 35.4% 的残缺值）
+# 报告落盘数字（不要用共享树 E:\Dexatlas 的工作副本，那份覆盖率是 35.4% 的残缺值）
 git show 78102a8:docs/reports/phase1-execution-report.md | grep -n "fig:tests\.\|fig:coverage\."
 
 # MCP 工具数
-git show 78102a8:src/dexatlas/mcp/server.py | grep -c "@server.tool"
+grep -c "@server.tool" src/dexatlas/mcp/server.py
 
 # 证据包内容
 unzip -l docs/case-studies/attachments/demo-evidence-package.zip
