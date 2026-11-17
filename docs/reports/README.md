@@ -1,6 +1,6 @@
 # `docs/reports/` 索引
 
-这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**五十三份报告**
+这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**五十五份报告**
 （**这是 2026-11-18 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
 看到的是一堵墙；不知道哪一份是现状、哪一份是当时的快照、哪一份已经被后面的检查推翻了。
 
@@ -109,6 +109,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [v1.0.0-release-commit-draft.md](v1.0.0-release-commit-draft.md) | 发版 commit 的完整变更清单与 commit message 草案。**不执行发版。** | 要照着起草发版 commit 时看它。**是草案，已被执行，见 §7。** |
 | [v1.0.0-dry-run.md](v1.0.0-dry-run.md) | 发版流程的**本地预演**（2026-11-16）：只核对流程与证据，不创建 tag、不发布、不改版本号。 | **预演记录，不是发版执行记录**，见 §7。 |
 | [release-process-dry-run.md](release-process-dry-run.md) | 发版**清单本身**的实走演练（2026-11-18）：照 `v1.0.0-release-checklist.md` 走一遍，75 项判定里 17 项与仓库现状不符、2 项缺失、16 处前提过期。**只读演练：没有打 tag、没有推送、没有建 Release。** | 要知道「发版清单哪里对不上现实」时看它；清单已按它的发现修过一轮。 |
+| [v1.0.0-ci-run-record.md](v1.0.0-ci-run-record.md) | `v1.0.0` 这个 tag 的**每一次 CI run** 落盘记录：run 编号、时间、headSha、逐 job 结论，以及 tag 为何被重打 5 次、最后一次以 `failure` 结束（4 个 job 红）。末尾留了「待补：最终 run」的占位。 | 要查「这个发布版本的 CI 结论到底是什么」时看它。 |
 | [social-preview-howto.md](social-preview-howto.md) | GitHub social preview 图怎么设（图只能手动设，GitHub 没有 API），以及图上每一个字、每一个数是从哪个文件的哪一行读出来的。 | 要换那张图、或要核对图上的数字与报告是否一致时看它。 |
 
 发版本身的结果，以 [`docs/releases/v1.0.0.md`](../releases/v1.0.0.md) 与 git tag 为准，
