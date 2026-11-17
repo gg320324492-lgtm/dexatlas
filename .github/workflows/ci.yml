@@ -485,6 +485,32 @@ jobs:
       - name: M10 self-check
         run: uv run --no-sync python scripts/m10_selfcheck.py
 
+  # The card on the repository's front page quotes the project's measured
+  # numbers, and a picture cannot be diffed by a reviewer -- so the card
+  # could go stale silently, and it did: it named one test count while the
+  # badge named another and the report a third. The drawing script is in
+  # the repository now, it writes down the figures it drew, and this job
+  # asks whether those figures still are the ones in the reports.
+  #
+  # It compares numbers, never image bytes: a PNG drawn on one machine has
+  # different bytes on another, so the image is claimed by its hash and the
+  # numbers are checked. That is also why this job needs no font and no
+  # Pillow -- the runner has neither, and the check has to run where the
+  # card cannot be drawn.
+  social-preview:
+    name: Social preview card
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # The script itself needs nothing but the standard library.
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+      - name: The card's numbers still are the reports' numbers
+        run: uv run --no-sync python scripts/make-social-preview.py --check
+
   # The report's figures are generated, and this job asks whether the ones in
   # the repository still describe the tree the tag names. It runs on tag
   # pushes only: it is the most expensive check here (the whole suite with

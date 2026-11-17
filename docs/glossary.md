@@ -92,6 +92,7 @@
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
 | 结论 / 事实 / 线索 | finding / fact / lead | 结论 = 工具读出且带能解析的出处；事实 = 工具读到的字节；线索 = 模型的说法，只能待核，永远不能升级成结论。 | `how-to-verify.md:415`、`roadmap/phase3-plan.md:39`、`architecture/README.md:151` | how-to-verify:415 是（"模型的结论永远不是事实"）· phase3-plan:39 否 · architecture/README:151 是（英文表：`lead` = 静态分析或模型提示的风险指标） |
+| 可核查 | verifiable | 读者能自己把一条结论核到它的出处：指出是哪个工具、哪个版本、从哪个字节位置读出来的。本仓库统一写「可核查」，不写「可核验」——两个词说的是一件事，读者以为是两件。 | `../README.zh-CN.md:5`、`../README.zh-CN.md:25`、`reports/m10-acceptance-pack.md:443`、`benchmarks/service-regression-set.md:17` | 否（README.zh-CN.md:5 的 tagline 是定位语，不解释词义） |
 | 证据链 / 出处模型 | evidence chain / provenance model | 记录每条结论由哪个工具、哪个版本、从哪个字节位置读出来的那条链。 | `how-to-verify.md:40`、`analysis-provenance.md:880` | how-to-verify:40 是（括注一句）· analysis-provenance:880 是（§4 逐步给命令） |
 | 公共契约 | public contract | 对外承诺并版本化的行为表面：CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema。 | `architecture/public-contracts.md:1`、`roadmap/phase3-plan.md:7` | public-contracts:1 是（整份文件就是它）· phase3-plan:7 否 |
 | 证据包 | evidence package | `dexatlas export` 导出的 zip：报告本身 + 一份记录所引文件哈希的 `manifest.json`。 | `reports/release-process-dry-run.md:84`、`reports/v1.1.0-candidates.md:28`、`reports/v1.0.0-release-checklist.md:37`、`reports/portfolio-readiness-2026-11-18.md:207`、`architecture/public-contracts.md:32` | dry-run:84 是（已补）· candidates:28 是（已补）· checklist:37 是（已补）· portfolio:207 否 · public-contracts:32 是（§5.3 给出 manifest 字段） |

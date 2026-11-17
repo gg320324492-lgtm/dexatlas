@@ -3,6 +3,8 @@
 > 复核对象：`.github/social-preview.png`、`README.md`、`README.zh-CN.md`
 > 复核日期：2026年11月18日
 > 复核方式：**只读**。图、README、报告均未改动；本文件是本次复核新增的唯一文件。
+> 行号基准：§1 的 `file:line` 指的是**复核当时的树**（本文件合并时的样子）；这些行后来
+> 动过。处理结果在 §7，说的是处理之后的树。
 > 数字基准：`docs/reports/phase1-execution-report.md` 的 `<!--fig:...-->` 标记与其中的
 > 机器可读测量记录块（`<!--report-figures:...-->`）。复核时该记录为
 > `tests.total=1632` / `tests.fast=1485` / `tests.slow=147` /
@@ -638,3 +640,44 @@ sed -n '755,790p' tests/test_public_contracts.py
 图可以留，问题全在它旁边：**重测量一落定，卡片必须手工重画**（没有任何自动化会做这件事），
 而重画之前得先把 `README.md:15`、`:21` 的 `1612`、howto §4 的两处错、`49` 的分项口径
 这四件事定下来——否则重画出来的图仍然是上一轮的世界。
+
+---
+
+## 7. 这 14 条的处理结果（2026年11月18日）
+
+收口的做法：把绘图脚本入库，让它写下自己画进去的每一个数，再让一条检查断言那些数
+**此刻**仍然等于报告里的数。
+
+| 落地的东西 | 在哪 |
+|---|---|
+| 绘图脚本（画两张图 + 写旁证） | `scripts/make-social-preview.py` |
+| 旁证文件（图上的数 + 两张图的 sha256） | `.github/social-preview.json` |
+| 检查（CI 上跑，不画图、不比字节） | `scripts/make-social-preview.py --check` |
+| 回归测试（把树拆开，看门禁会不会红） | `tests/test_social_preview.py` |
+| CI job | `.github/workflows/ci.yml` 的 `social-preview` |
+| 怎么用这张图 | `docs/reports/social-preview-howto.md`（已改写成「脚本已入库」版） |
+
+逐条的处理：
+
+| # | 处理 |
+|---|---|
+| 1 | **已改。** 首屏不再出现第三个测试数：徽章与图各有一个数，正文与 alt 文本都不再抄一遍。alt 文本改成不含数字的 `DexAtlas — From APK to Evidence`。 |
+| 2 | **已改，并加了守护。** 检查断言测量记录的通过数与收集数相等（不相等就是一次没做完的测量），并断言两份 README 的徽章数 == `<!--fig:tests.total-->`、覆盖率徽章 == `<!--fig:coverage.pct-->`。 |
+| 3 | **已改。** 脚本入库，旁证落盘，`--check` 断言：旁证里的数 == 报告里的数；旁证里的出处 == 现在的出处；两张 PNG 的 sha256 == 旁证里记的（手改过图就会红）。CI 上是 `social-preview` job：只核数，Linux runner 上没有字体也没有 Pillow，比的是数不是字节。 |
+| 4 | **已改。** 图上写的是 `Static count: 28 REST + 6 MCP + 15 CLI checks`（合计 49 项）/「静态条数：28 REST + 6 MCP + 15 CLI 项检查」（合计 49 项）——是**检查调用点**的条数，不是接口数。 |
+| 5 | **已改。** 标签从「公共契约检查项」改成「公共契约检查清单」/ `Public-contract checklist`，副行写明「静态条数」。 |
+| 6 | **已改。** 出两版图：`.github/social-preview.png` 与 `.github/social-preview.zh-CN.png`。英文图的定位句取 `README.md:7`，三个标签是英文，页脚也是英文；中文版同理。 |
+| 7 | **已改。** howto §4 的表逐条重核：中文 tagline 的出处改成 `README.zh-CN.md:5`（那个字符串现在**在仓库里有一处落盘出处**：中文 README 的 tagline），`49` 的出处改成 `scripts/verify-public-contracts.py` 里三个函数的 `check()` 调用点（用 AST 数出来的，不是抄句子）。另外本 howto 加进了 `scripts/check-doc-citations.py` 的 `DOCS` 列表——这张表里的 `file:line` 现在逐条受检查。 |
+| 8 | **已改。** 英文 README 的徽章说明改英文，并挪到两行徽章之后（原来它插在两行徽章中间，把一组徽章看成了三段）。说明里原有的手抄数字也去掉了。 |
+| 9 | **已改。** 中文 README 的说明改成「同样由 `scripts/refresh-report-figures.py` 写回——**不要手改**」。 |
+| 10 | **已改。** `README.zh-CN.md:5` 改成「**从 APK 到可核查的证据 —— 由一个有边界的 AI agent 驱动。**」；`docs/roadmap/ROADMAP.md:3` 改成英文版的 `a bounded AI agent`。中英两版现在等强度。 |
+| 11 | **已改。** 中文 README 首屏挂上中文版卡片。 |
+| 12 | **已改。** Tests 与 Coverage 徽章改指向执行报告的对应小节；卡片上方加了一行指向 howto 的链接（「这张图上每个数的出处」）。 |
+| 13 | **已改。** 覆盖率成为主角：字号最大、带一条进度条（比率该有刻度）；两个计数次一号，并各自说清自己数的是什么。「只读」从页脚提到正文一行（它是全卡唯一一条能力边界级别的声明）；页脚补上成熟度信号 `early development` /「早期开发」。 |
+| 14 | **已改。** 中文 README 的「可核验」改成「可核查」，`docs/glossary.md` 的术语表里加了「可核查」一条，并写明本仓库统一用这个词。 |
+
+**没有改的**：图里仍然没有 agent 准确率、没有客户、没有性能承诺——那些数没达线或者没落盘。
+
+**顺带去掉的两个漂移源**：howto 不再抄 PNG 的字节数（确切字节数记在旁证里，由检查核对），
+README 的 alt 文本不再抄图上的数。
+

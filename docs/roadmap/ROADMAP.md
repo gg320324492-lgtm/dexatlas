@@ -1,6 +1,6 @@
 # DexAtlas Roadmap
 
-> **From APK to Evidence — Powered by AI Agents.**
+> **From APK to Evidence — Powered by a bounded AI agent.**
 > An open-source, evidence-first Android reverse engineering and mobile application analysis platform.
 
 This document is the working contract for how DexAtlas grows. It is a plan, not a
