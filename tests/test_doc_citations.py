@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -190,7 +191,7 @@ def test_a_citation_that_names_a_lowercase_symbol_is_checked(
     # typed into the test would fail for a different reason every time the
     # method moved -- which is not what the test is about.
     source = REPO_ROOT / "src" / "dexatlas" / "core" / "evidence.py"
-    line = checker.definition_line(source, "add_exported_components")
+    line = checker.definition_line(checker.file_lines(source), "add_exported_components", True)
     assert line is not None, "the method this test cites is not in the file"
     document.write_text(
         f"The `add_exported_components` method is at "
@@ -545,3 +546,177 @@ def test_a_citation_to_a_comment_is_not_drift(
     monkeypatch.setattr(checker, "DOCS", [document])
 
     assert checker.main() == 0
+
+
+# -- which tree a citation is about -----------------------------------------
+
+
+def _git(repository: Path, *args: str) -> None:
+    """Run a git command in a repository the test has made."""
+    subprocess.run(["git", *args], cwd=repository, check=True, capture_output=True)
+
+
+#: The fingerprint the made-up repository's measurement carries.
+FAKE_FINGERPRINT = "ab" * 32
+
+
+def _repository_with_two_trees(tmp_path: Path) -> Path:
+    """A repository whose working copy has moved on from the tree it tags.
+
+    The file the document cites loses the line the citation names after the
+    tag, so the citation holds in the tagged tree and not in the working copy.
+    That is the case a checker cannot tell apart if it reads every citation
+    out of the working copy: the number means one thing in one tree and
+    another thing in the other.
+    """
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    _git(repository, "init", "-q", "-b", "main")
+    _git(repository, "config", "user.email", "test@example.invalid")
+    _git(repository, "config", "user.name", "Test")
+
+    record = repository / "docs" / "reports"
+    record.mkdir(parents=True)
+    (record / "phase1-execution-report.md").write_text(
+        '<!--report-figures:{"source_fingerprint": "sha256:' + FAKE_FINGERPRINT + '"}-->\n',
+        encoding="utf-8",
+    )
+    (repository / "file.py").write_text(
+        "\n".join(f"line {number}" for number in range(1, 11)) + "\n", encoding="utf-8"
+    )
+    (repository / "doc.md").write_text(
+        f"The logic lives in `file.py:8`.\n\nThis document describes the tree "
+        f"`sha256:{FAKE_FINGERPRINT}`.\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "-A")
+    _git(repository, "commit", "-qm", "the release")
+    _git(repository, "tag", "v1")
+
+    # The working copy moves on: the cited line is gone from it.
+    (repository / "file.py").write_text("line 1\nline 2\nline 3\n", encoding="utf-8")
+    _git(repository, "commit", "-qam", "the tree moved on")
+    return repository
+
+
+def _checker_for(repository: Path, monkeypatch: pytest.MonkeyPatch, tree: str | None):
+    """The checker, pointed at the made-up repository."""
+    checker = _checker()
+    monkeypatch.setattr(checker, "REPO", repository)
+    checker._files_by_name.cache_clear()
+    monkeypatch.setattr(checker, "TREE_DOCUMENTS", {"doc.md": tree} if tree else {}, raising=False)
+    return checker
+
+
+def test_a_citation_is_read_out_of_the_tree_its_document_declares(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A document says which tree its line numbers are in, and it is honoured.
+
+    The citation points at line 8 of a file that had ten lines in the tagged
+    tree and three in the working copy. Read out of the tagged tree it holds;
+    read out of the working copy it is out of range. A checker that cannot
+    tell the two apart has no way to say which of the two it did.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+
+    checker = _checker_for(repository, monkeypatch, "v1")
+    report = checker.check_documents([document])
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+    # The same citation, read out of the tree the document does not name.
+    checker = _checker_for(repository, monkeypatch, None)
+    report = checker.check_documents([document])
+    assert [finding.kind for finding in report.findings] == ["out of range"]
+
+
+def test_a_document_that_quotes_another_tree_s_fingerprint_is_a_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The declaration is checked, not taken on trust.
+
+    A document that names a tree it does not quote the fingerprint of is a
+    document whose line numbers cannot be tied to anything, and the registry
+    entry that says so is a claim nobody has checked.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The logic lives in `file.py:8`.\n\nThis document describes the tree "
+        "`sha256:" + "cd" * 32 + "`.\n",
+        encoding="utf-8",
+    )
+
+    checker = _checker_for(repository, monkeypatch, "v1")
+    report = checker.check_documents([document])
+
+    kinds = [finding.kind for finding in report.findings]
+    assert "wrong tree" in kinds, [finding.render() for finding in report.findings]
+
+
+def test_a_tree_that_is_not_in_the_checkout_is_a_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declared tree that is not here cannot be checked, and says so.
+
+    A checker that quietly fell back to the working copy would pass a document
+    whose line numbers mean nothing in the tree it names.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+
+    checker = _checker_for(repository, monkeypatch, "v9")
+    report = checker.check_documents([document])
+
+    kinds = [finding.kind for finding in report.findings]
+    assert "no such tree" in kinds, [finding.render() for finding in report.findings]
+
+
+def test_the_release_body_is_read_out_of_the_release_tree() -> None:
+    """The release body says its line numbers refer to the v1.0.0 tree.
+
+    It is the one document in the repository that describes a tree other than
+    the one it is read from, and the checker has to say which tree it read
+    each citation out of.
+    """
+    checker = _checker()
+    report = checker.check_documents(checker.DOCS)
+
+    trees = {label: citations for label, _documents, citations in report.trees}
+    assert trees.get("the v1.0.0 tree"), (
+        f"the release body was not read out of the release tree: {report.trees}"
+    )
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+
+def test_every_document_that_declares_a_tree_is_one_the_checker_reads() -> None:
+    """A declaration nobody checks is a declaration nobody has to keep true."""
+    checker = _checker()
+    read = {checker.relative_path(document) for document in checker.DOCS if document.is_file()}
+
+    for relative in checker.TREE_DOCUMENTS:
+        assert relative in read, f"{relative} declares a tree but the checker never reads it"
+
+
+def test_the_subject_digest_follows_the_documents_it_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The digest is of what the check was about.
+
+    It is what makes "this verdict was about this subject" a statement that
+    can be compared: a document that changes has to change the digest, and a
+    check that changed nothing has to leave it alone.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+
+    checker = _checker_for(repository, monkeypatch, "v1")
+    before = checker.subject_digest([document], {"the v1 tree": checker.Tree("v1")})
+    assert before == checker.subject_digest([document], {"the v1 tree": checker.Tree("v1")})
+
+    document.write_text(
+        document.read_text(encoding="utf-8") + "\nOne more line.\n", encoding="utf-8"
+    )
+    after = checker.subject_digest([document], {"the v1 tree": checker.Tree("v1")})
+    assert after != before

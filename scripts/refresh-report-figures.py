@@ -110,6 +110,15 @@ EXAMPLES_ROOT = REPO_ROOT / "examples"
 #: that asks them. A change to any of them changes what the numbers mean.
 FINGERPRINT_FILES = ("pyproject.toml", "scripts/refresh-report-figures.py")
 
+#: A row of the report's test-file table.
+#:
+#: The table is the reader's map from the report's claims to the code that
+#: backs them. Its numbers are generated; its rows are written by hand.
+TEST_FILE_ROW = re.compile(r"^\| `(test_[A-Za-z0-9_]+\.py)` \|", re.MULTILINE)
+
+#: The section of the report that holds the test-file table.
+TEST_FILE_SECTION = "### 2.1"
+
 #: Coverage is measured on the package, so module paths are relative to it.
 SOURCE_PREFIX = "src/dexatlas/"
 
@@ -1000,6 +1009,32 @@ def read_record(text: str) -> dict[str, Any]:
         return {}
 
 
+def test_file_table(text: str) -> tuple[list[str], list[str]] | None:
+    """The test files the report's table leaves out, and the ones it names that are gone.
+
+    The table is the reader's map from the report's claims to the code that
+    backs them: a file that is not in it is a place the reader is not sent.
+    Its numbers are generated, but its rows are written by hand, and the
+    script that fills in the numbers never looked at them. A file added to
+    the suite without a row in the table left the table quietly short of one
+    file, and the refresh wrote the new numbers into it all the same.
+
+    So the two sets are compared here, before anything is written.
+
+    None means the document has no table at all. A document that never
+    claimed to hold one has nothing to compare with the suite, and whether
+    the report has to have one is the report's own test's business
+    (``tests/test_docs.py::test_execution_report_lists_every_test_file``).
+    The script says that it did not check, rather than passing in silence.
+    """
+    if TEST_FILE_SECTION not in text:
+        return None
+    section = text.split(TEST_FILE_SECTION, 1)[-1].split("\n### ", 1)[0]
+    listed = set(TEST_FILE_ROW.findall(section))
+    on_disk = {path.name for path in TESTS_ROOT.glob("test_*.py")}
+    return sorted(on_disk - listed), sorted(listed - on_disk)
+
+
 def undisclosed_modules(record: dict[str, Any], text: str) -> list[str]:
     """Weak modules the report's table does not mention — an incomplete disclosure.
 
@@ -1166,6 +1201,36 @@ def main(argv: list[str] | None = None) -> int:
 
     report_path = args.report if args.report.is_absolute() else REPO_ROOT / args.report
     text = report_path.read_text(encoding="utf-8")
+
+    # The report's test-file table is the reader's map from the report's claims
+    # to the code that backs them. Its numbers are generated; its rows are
+    # written by hand. Nothing checked them, so a file added to the suite
+    # without a row in the table left the table quietly short of one file --
+    # and the refresh wrote the new numbers into that table all the same.
+    #
+    # The two sets are compared before anything is measured, so a table that
+    # does not describe the suite is a two-second error rather than a
+    # two-minute measurement that ends in a report nobody should read.
+    mismatch = test_file_table(text)
+    if mismatch is None:
+        print(
+            f"This document has no {TEST_FILE_SECTION} section, so it has no "
+            "test-file table to check."
+        )
+    else:
+        missing, stale = mismatch
+        if missing or stale:
+            print("The report's test-file table does not describe the suite:")
+            for name in missing:
+                print(f"  the suite has {name}; the table does not list it")
+            for name in stale:
+                print(f"  the table lists {name}; the suite does not have it")
+            print(
+                "\nNothing was written. The table's rows are written by hand: "
+                "add the row that is missing, or take out the row that is stale."
+            )
+            return 1
+
     previous = read_record(text)
 
     # The report's figures describe one tree. A tree that has changed since
