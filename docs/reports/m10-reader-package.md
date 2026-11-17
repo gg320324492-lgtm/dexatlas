@@ -144,9 +144,9 @@ docker build -t dexatlas .
 docker run --rm dexatlas dexatlas backends
 ```
 
-预期：构建**首次约 15–20 分钟**（[M8 演练](m8-install-rehearsal.md)在有本地层缓存的
-机器上实测 2 分 16 秒；[读者实走演练](reader-dry-run.md)在无层缓存、走代理下载的机器
-上实测 **1099 秒 ≈ 18 分 19 秒**，镜像约 1.3 GB）；镜像内 JADX / Apktool 可用。容器内多个
+预期：构建**约 2–20 分钟**（两个口径：层已就绪时约 2 分 16 秒 —— [M8 演练](m8-install-rehearsal.md)；
+首台机器无层缓存、走代理下载时实测 **1099 秒 ≈ 18 分 19 秒** —— [读者实走演练](reader-dry-run.md)；
+镜像约 1.3 GB）；镜像内 JADX / Apktool 可用。容器内多个
 命令共享 workspace 时，用 `DEXATLAS_WORKSPACE=/workspace/ws` 统一（M8-2 已修复并合入：
 所有命令都带 `--workspace`/`-w`，这一项不再是已知限制；容器里仍建议用环境变量统一）。
 
@@ -154,10 +154,14 @@ docker run --rm dexatlas dexatlas backends
 要在容器里跑案例，得自己挂两个卷 ✓：
 
 ```bash
-docker run --rm \
+MSYS_NO_PATHCONV=1 docker run --rm \
   -v "$(pwd)/examples:/app/examples:ro" -v "$(pwd)/ws:/workspace" \
   dexatlas dexatlas analyze /app/examples/demo-app/demo.apk --workspace /workspace
 ```
+
+> **Git Bash 的坑**：不加 `MSYS_NO_PATHCONV=1` 时，MSYS 会把 `-v` 后面的**容器
+> 路径**改写成 Windows 路径**（`/app/examples` → `C:/Program Files/Git/app/examples` ✓），
+> 挂载就指错地方了 ✓。
 
 （读者实走演练实测：容器内三后端全 `available` ✓、分析退出码 0、约 8 秒 ✓，计数与本机一致 ✓）
 

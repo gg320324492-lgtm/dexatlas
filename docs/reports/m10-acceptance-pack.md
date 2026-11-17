@@ -247,8 +247,8 @@ docker run --rm \
   dexatlas sh -c 'dexatlas analyze /in/demo.apk -o /out/report.md --json /out/report.json --html /out/report.html && dexatlas export apk_80a8fe0e81204c9f -o /out/evidence.zip'
 ```
 
-预期：构建**首次约 15–20 分钟**（M8 演练在有本地层缓存的机器上实测 2 分 16 秒；
-[读者实走演练](reader-dry-run.md)在无层缓存、走代理下载的机器上实测 **1099 秒**）；镜像内
+预期：构建**约 2–20 分钟**（两个口径：层已就绪时约 2 分 16 秒 —— M8 演练；首台机器无层缓存、
+走代理下载时实测 **1099 秒** —— [读者实走演练](reader-dry-run.md)）；镜像内
 JADX / Apktool 可用；分析加导出约 10 秒；`out/` 下出现四份文件。
 
 > **M8-2 已修复：** 容器内的查询类命令现在同样有 `--workspace`/`-w`，
