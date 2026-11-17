@@ -8,8 +8,10 @@
 > 它记着核对基准、提交号与本机路径，那些是给自己看的；对外发出去的只有同
 > 目录下的四份素材本身。
 >
-> **核对基准：** `v1.0.0` 发版树（tag `v1.0.0`，2026-11-17），commit `0104ccb`
-> ——四份素材与本文件的最后一次改动都在这个发版 commit 里。**（2026-11-18：四份素材里的数字已按最新一次完整测量同步；下文的核对结论仍锚在 `0104ccb`。）**更早一轮的核对以
+> **核对基准：** `v1.0.0` 发版树（tag `v1.0.0`）——**它指向哪个 commit 会变（发版后重打过），
+> 要现查：`git rev-parse v1.0.0^{commit}`**，别抄本文件里的旧值。四份素材里的数字以
+> `docs/reports/phase1-execution-report.md` 的 `<!--fig:...-->` 落盘值为准。
+> 更早一轮的核对以
 > `claude/upwork-check` @ `8868e30` 为基准，那一轮的历史值在下文各自标了出处。
 
 ---
@@ -19,13 +21,13 @@
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
 | 测试总数 | 1,632（1,485 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
-| 一方代码覆盖率 | 93.3%（7,117 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| 一方代码覆盖率 | 93.3%（7,135 / 7,650 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
 | M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
 | M6 窄验证二轮 | 转通过 2/6（门槛 ≥4），未达标 | `docs/benchmarks/m6-level2-narrow-verify2.md` |
 | M6 窄验证三轮 | 转通过 3/6（门槛 ≥4），未达标 | `docs/benchmarks/m6-level2-narrow-verify3.md` |
-| 最新已发布版本 | `v1.0.0`（tag 2026-11-17；`src/dexatlas/__init__.py` 的 `__version__` 是 `1.0.0`） | `git tag` / `src/dexatlas/__init__.py` |
+| 最新已发布版本 | `v1.0.0`（tag 的作者本地时区日期是 **2026-11-18**，GitHub 上记的 UTC 是 2026-11-17；`src/dexatlas/__init__.py` 的 `__version__` 是 `1.0.0`） | `git tag` / `src/dexatlas/__init__.py` |
 
 报告里的数字由 `scripts/refresh-report-figures.py` 从真实测量生成，**本轮没有手改任何
 `<!--fig:...-->` 标记**，只按它们已落盘的值改写对外文案。
@@ -357,8 +359,8 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 
 | 门禁 | 结果 |
 |---|---|
-| `uv run --no-sync pytest tests/test_docs.py` | **60/60 通过，0 跳过** |
-| `uv run --no-sync python scripts/check-doc-citations.py` | 220 citations，unresolved 0，**drifted 0** |
+| `uv run --no-sync pytest tests/test_docs.py` | **64/64 通过，0 跳过**（2026-11-18 复核；原文一处写 60、一处脚注写 62，两数自相矛盾，现按实测） |
+| `uv run --no-sync python scripts/check-doc-citations.py` | **286 citations**，unresolved 0，**drifted 0**（2026-11-18 复核） |
 | `uv run --no-sync python scripts/check-version-claims.py --base auto` | **exit 1**，findings 3 条：2 条历史遗留（`docs/releases/v0.2.0.md`、`CHANGELOG.md` 里的旧版本覆盖率）+ 1 条 `docs/reports/outreach-recheck.md` 自己的过期事实。**本轮改动没有新增任何 finding**：改动前先跑一遍、再改动后跑一遍，两次输出逐字相同（都是 exit 1、同 3 条） |
 | §5 字符表复算（§5 的脚本，逐字抽取执行） | **14/14 一致** |
 

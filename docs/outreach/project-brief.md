@@ -47,7 +47,8 @@ recorded as verified. A backend that fails is reported as a value, not a
 crash: an APK that defeats the decompiler still yields a manifest, an index
 and a report that says which steps did not run.
 
-- 1,632 automated tests, 93.3% coverage, mypy strict, ruff, and a CI pipeline
+- 1,632 automated tests, 93.3% coverage of the project's own code (the
+  denominator is lines of code, not tests), mypy strict, ruff, and a CI pipeline
   across Python 3.12/3.13 and multiple backend configurations.
 - Full documentation with three complete case studies on first-party sample
   APKs that anyone can reproduce from the repository.
@@ -66,8 +67,9 @@ and a report that says which steps did not run.
   native-library inventory, binary-manifest decoding), a three-backend symbol
   index, and a SQLite workspace with a reproducible schema.
 - **Two transports over one core.** A CLI (`dexatlas analyze / manifest /
-  search / source / xref / evidence / report`) and a REST API (FastAPI) over
-  the same analyzer.
+  search / source / xrefs / export`) and a REST API (FastAPI) over
+  the same analyzer. `export` writes the evidence package; `analyze` writes the
+  Markdown/HTML/JSON reports.
 - **Read-only MCP server.** Eleven tools over stdio exposing projects,
   symbols, call sites, evidence and locators — bounded responses, no write
   path, no shell, no model dependency.
@@ -115,8 +117,9 @@ captured as values and surfaced in the report instead of aborting the run.
 - Case studies: [docs/case-studies/README.md](../case-studies/README.md) in the
   repository
 - Benchmark reports: `docs/benchmarks/` in the repository
-- Evidence packages, one per case study, each a zip holding the report and a
-  manifest of hashes:
+- Evidence packages, one per case study, each a zip holding the three report
+  formats (Markdown, HTML, JSON) and a manifest that hashes them. The CLI
+  prints `4 files: 3 reports + 1 manifest` for each package:
   [demo-evidence-package.zip](../case-studies/attachments/demo-evidence-package.zip),
   [obfuscated-evidence-package.zip](../case-studies/attachments/obfuscated-evidence-package.zip),
   [api-integration-evidence-package.zip](../case-studies/attachments/api-integration-evidence-package.zip)

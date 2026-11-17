@@ -76,7 +76,8 @@ environment you designate; secrets never go into code or repositories.
 **Relevant example (my own open-source work):** DexAtlas, an Android APK
 analysis platform I built end to end — a FastAPI REST API and CLI over a
 SQLite evidence store, three integrated analysis engines with per-engine
-failure reporting, 1,632 automated tests at 93.3% coverage, and CI across
+failure reporting, 1,632 automated tests at 93.3% coverage of the project's own
+code (the denominator is lines of code, not tests), and CI across
 Python 3.12/3.13. It is the same engineering style I would bring to your
 task: {{one sentence tying it to the job, e.g. "ingest messy binary input,
 normalize it, and produce structured, auditable output"}}.

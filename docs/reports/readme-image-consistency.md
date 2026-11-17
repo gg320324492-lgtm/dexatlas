@@ -50,7 +50,8 @@
 - `README.md:15`
   > `> 徽章是**完整环境下**的一次测量（1612 个测试、0 跳过）。在没抓第三方样本的机器上，`
 - `README.md:21`
-  > `  <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks" width="900">`
+  > `README.md:21` 的 img 标签，`src` 指向 `.github/social-preview.png`，`alt` 文本逐字是
+  > 「DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks」
 
 **读者会怎么误读**
 
@@ -81,7 +82,9 @@
 
 **原文（逐字）**
 
-- `README.md:12` → `[![Tests](https://img.shields.io/badge/tests-1631%20passing-brightgreen.svg)](tests)`
+- `README.md:12` → 本窗口基准树上的徽章是
+  徽章上的测试数是 **1631**（本窗口基准树的值；主会话随后把它改成了 **1632**——
+  徽章 URL 里那个数同理，这里不照抄，免得把旧值当成现状）
 - 图上第三栏大数字 → `1632`，其下小字 → `1485 快 + 147 集成`
 
 **读者会怎么误读**
@@ -396,7 +399,9 @@ README，中文 README 自己却没有卡片。
 **原文（逐字）**
 
 - `README.md:13` → `[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](pyproject.toml)`
-- `README.md:12` → `[![Tests](https://img.shields.io/badge/tests-1631%20passing-brightgreen.svg)](tests)`
+- `README.md:12` → 本窗口基准树上的徽章是
+  徽章上的测试数是 **1631**（本窗口基准树的值；主会话随后把它改成了 **1632**——
+  徽章 URL 里那个数同理，这里不照抄，免得把旧值当成现状）
 
 **读者会怎么误读**
 

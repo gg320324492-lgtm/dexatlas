@@ -226,7 +226,7 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 
 **原文（`docs/service-commitments.md:3` 与 `:41-49`，逐字）：**
 
-> **状态：对外表述边界文档。…最新实测基准：[m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)（2026-11-16）。**
+> **状态：对外表述边界文档。…最新实测基准：[m6-level2-retest2.md](../benchmarks/m6-level2-retest2.md)（2026-11-16）。**
 
 > ## 2. 已验证的服务能力（2026-11-16 实测）
 > …
@@ -255,7 +255,7 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 
 **建议改法：**
 
-> 状态：对外表述边界文档。…最新实测基准：[m6-level2-retest4.md](benchmarks/m6-level2-retest4.md)（三轮完整复测）。
+> 状态：对外表述边界文档。…最新实测基准：[m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md)（三轮完整复测）。
 
 > ## 2. 已实测的服务能力（未达验收线，按现状披露）
 
@@ -420,7 +420,8 @@ a manifest」对不上；也可能以为包里只有一份报告、另外两份�
 
 **原文（`README.md:21`，逐字）：**
 
-> <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks" width="900">
+> `README.md:21` 的 img 标签，`src` 指向 `.github/social-preview.png`，`alt` 文本逐字是
+> 「DexAtlas — From APK to Evidence: 93.3% first-party code coverage, 1612 tests, 49 public contract checks」
 
 当前测量是 **1632**。这个 alt 文字是**手写的**：`scripts/refresh-report-figures.py`
 只改两个 badge（`BADGE_TESTS` / `BADGE_COVERAGE`，见脚本 `:900-903`），
