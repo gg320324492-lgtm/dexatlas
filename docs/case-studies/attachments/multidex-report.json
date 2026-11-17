@@ -1,0 +1,300 @@
+{
+  "schema_version": 3,
+  "generated_at": "2026-11-17T18:31:18.971258+00:00",
+  "project": {
+    "id": "apk_a488e43e38c2b8e9",
+    "apk": {
+      "sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+      "size_bytes": 2350,
+      "path": "multidex.apk",
+      "dex_files": [
+        "classes.dex",
+        "classes2.dex"
+      ],
+      "native_libraries": [],
+      "has_signed_certificate": false
+    },
+    "status": "completed",
+    "created_at": "2026-11-17T18:31:12.479690+00:00",
+    "class_count": 4,
+    "method_count": 11,
+    "reference_count": 13,
+    "call_site_count": 13,
+    "call_edge_count": 10,
+    "evidence_count": 9,
+    "resource_count": 0
+  },
+  "run": {
+    "id": "run_4fde2fa0b5254ccb",
+    "status": "completed",
+    "completeness": "complete",
+    "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+    "tool_versions": {
+      "jadx": "1.5.2",
+      "apktool": "2.11.1",
+      "androguard": "4.1.4"
+    },
+    "started_at": "2026-11-17T18:31:12.479690+00:00",
+    "finished_at": "2026-11-17T18:31:17.181708+00:00",
+    "duration_seconds": 4.703000000095926
+  },
+  "latest_attempt_status": null,
+  "tools": {
+    "jadx": "1.5.2",
+    "apktool": "2.11.1",
+    "androguard": "4.1.4"
+  },
+  "errors": [],
+  "manifest": {
+    "package": "com.example.multidex",
+    "version_code": "2",
+    "version_name": "2.0",
+    "min_sdk": "24",
+    "target_sdk": "34",
+    "permissions": [
+      {
+        "name": "android.permission.INTERNET",
+        "protection_level": null
+      },
+      {
+        "name": "android.permission.READ_EXTERNAL_STORAGE",
+        "protection_level": null
+      }
+    ],
+    "components": [
+      {
+        "kind": "application",
+        "name": "com.example.multidex",
+        "exported": null,
+        "permission": null,
+        "intent_filters": []
+      },
+      {
+        "kind": "activity",
+        "name": "com.example.multidex.PrimaryHelper",
+        "exported": true,
+        "permission": null,
+        "intent_filters": [
+          "actions=android.intent.action.MAIN; categories=android.intent.category.LAUNCHER"
+        ]
+      },
+      {
+        "kind": "service",
+        "name": "com.example.multidex.SecondaryHelper",
+        "exported": false,
+        "permission": null,
+        "intent_filters": []
+      }
+    ],
+    "shared_user_id": null
+  },
+  "evidence": [
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:AndroidManifest.xml"
+        }
+      ],
+      "id": "E-0001",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "SDK levels read from the APK's binary manifest: minSdk=24, targetSdk=34",
+      "detail": {
+        "min_sdk": "24",
+        "target_sdk": "34"
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "apktool",
+          "tool_version": "2.11.1",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "apktool:AndroidManifest.xml"
+        }
+      ],
+      "id": "E-0002",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Package com.example.multidex (versionName=2.0, minSdk=24, targetSdk=34)",
+      "detail": {
+        "permissions": [
+          "android.permission.INTERNET",
+          "android.permission.READ_EXTERNAL_STORAGE"
+        ],
+        "components": 3
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "apktool",
+          "tool_version": "2.11.1",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "apktool:AndroidManifest.xml#/application"
+        }
+      ],
+      "id": "E-0003",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "1 component(s) are explicitly exported",
+      "detail": {
+        "components": [
+          {
+            "kind": "activity",
+            "name": "com.example.multidex.PrimaryHelper",
+            "permission": null
+          }
+        ]
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "jadx",
+          "tool_version": "1.5.2",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "jadx:sources"
+        }
+      ],
+      "id": "E-0004",
+      "kind": "observation",
+      "level": "verified",
+      "summary": "jadx produced real Java for 7 of 11 methods in 4 of 4 classes",
+      "detail": {
+        "decompilation": {
+          "methods_decompiled": 7,
+          "methods_total": 11,
+          "classes_with_source": 4,
+          "classes_total": 4,
+          "methods_jadx_failed": [],
+          "methods_jadx_failed_truncated": false,
+          "classes_without_source": [],
+          "classes_without_source_truncated": false
+        }
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:classes.dex#com.example.multidex.PrimaryHelper"
+        }
+      ],
+      "id": "E-0005",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class com.example.multidex.PrimaryHelper (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:classes.dex#com.example.multidex.SharedConfig"
+        }
+      ],
+      "id": "E-0006",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class com.example.multidex.SharedConfig (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:classes2.dex#com.example.multidex.PayloadLoader"
+        }
+      ],
+      "id": "E-0007",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class com.example.multidex.PayloadLoader (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:classes2.dex#com.example.multidex.SecondaryHelper"
+        }
+      ],
+      "id": "E-0008",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class com.example.multidex.SecondaryHelper (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    },
+    {
+      "provenance": [
+        {
+          "tool": "androguard",
+          "tool_version": "4.1.4",
+          "apk_sha256": "a488e43e38c2b8e9292ba4d3badf15fb73167bda92c2343cb2b656cdfd309d55",
+          "locator": "androguard:classes2.dex#com.example.multidex.SharedConfig"
+        }
+      ],
+      "id": "E-0009",
+      "kind": "declaration",
+      "level": "verified",
+      "summary": "Class com.example.multidex.SharedConfig (class)",
+      "detail": {
+        "superclass": "java.lang.Object",
+        "interfaces": []
+      }
+    }
+  ],
+  "summary": {
+    "classes": 4,
+    "methods": 11,
+    "call_sites": 13,
+    "call_edges": 10,
+    "call_sites_with_evidence": 0,
+    "call_edges_with_evidence": 0,
+    "cross_references": 13,
+    "resource_strings": 0,
+    "cross_references_with_evidence": 0,
+    "cross_reference_records": 0,
+    "evidence_by_level": {
+      "verified": 9
+    },
+    "decompilation": {
+      "methods_decompiled": 7,
+      "methods_total": 11,
+      "classes_with_source": 4,
+      "classes_total": 4,
+      "methods_jadx_failed": [],
+      "methods_jadx_failed_truncated": false,
+      "classes_without_source": [],
+      "classes_without_source_truncated": false
+    },
+    "index_complete": true,
+    "index_gaps": [],
+    "duration_seconds": 4.7,
+    "backends_with_errors": []
+  }
+}

@@ -277,7 +277,7 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 （[releases/v1.0.0.md:78](../releases/v1.0.0.md#L78)）。
 **素材已备好，但对外没有落点**——这是「能不能接活」与「能不能接活」之间的一步。
 
-### 3.4 三个证据包只覆盖了两次分析
+### 3.4 三个证据包只覆盖了两次分析（**2026-11-18 已闭合**）
 
 三个 zip（`demo-` / `obfuscated-` / `api-integration-`）里，
 **demo 与 api-integration 的 `report.md` / `report.html` 是同一份分析报告**（字节相同），
@@ -288,7 +288,15 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 
 **结论**：三篇走查、三个证据包，**实际只有两次独立分析**。附件时不能当成三份独立证据报数。
 
-### 3.5 第三个样本（multi-DEX）只有走查附录，没有证据包
+> **已闭合（2026-11-18）**：附件集换过一轮，现在仓库里是**四个证据包、四次
+> 分析**——`run_e8e49384…`（demo）、`run_fc8e432d…`（api-integration）、
+> `run_dd897202…`（obfuscated）、`run_4fde2fa0…`（multidex），run id 两两不同，
+> 每个包都过了 `verify_package`。demo 与 api-integration 仍然是**同一份 APK 的两次
+> 分析**（报告只差 `run_id` 与 `Analysis time` 两行），但那是「一次样本、两次
+> 分析」，不是「一次分析、两个包」。测量与逐条哈希见
+> [case-studies-third-package.md](case-studies-third-package.md)。
+
+### 3.5 第三个样本（multi-DEX）只有走查附录，没有证据包（**2026-11-18 已闭合**）
 
 走查 2 的附录覆盖了 `examples/multidex-app/multidex.apk`
 （[case-studies/README.md:30](../case-studies/README.md#L30)），
@@ -300,6 +308,11 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 §3.5 是「对外证据更丰富」的增益。而且从接活角度看，
 **它恰好是三篇走查里唯一能证明「多 DEX / 跨 DEX 类定义」这种难度的材料**，
 而这正是方向 A 里「数据摄取与归一化」能讲的硬活。
+
+> **已闭合（2026-11-18）**：`multidex-evidence-package.zip` 与
+> `multidex-report.{md,json,html}` 已落盘（`run_4fde2fa0b5254ccb`，4.7 s，
+> `verify_package` 与 9 条引用全部通过），走查 2 的附录与
+> [case-studies/README.md](../case-studies/README.md) 都已补上链接。
 
 ### 3.6 联系方式、时区、可用性在素材里一个都没有
 
@@ -398,7 +411,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 | 1 | **把 M10 独立验收的邀请发出去**（材料已齐：邀请函成稿 + 读者包 + 40 项检查表 + 发起人发送前清单 + 自查脚本 40/40）。先按发送前清单逐条勾，填 7 处空格、钉死验收 commit、确认三个后端、确认附件、约定反馈时限与提交渠道 | [status.md:138](../status.md#L138)（准备包就绪、验收未开始）、[m10-invitation-sender-checklist.md:16](../reports/m10-invitation-sender-checklist.md#L16)（§0 三分钟版）、[phase3-plan.md:211](../roadmap/phase3-plan.md#L211) | 外部读者 |
 | 2 | **同一次邀请里一并回填 README 独立首读复核**（§3.9 与 §3.1 可由同一位读者承担，M10 明确允许「同一读者可以承担两项」） | [phase3-plan.md:214](../roadmap/phase3-plan.md#L214)、[portfolio-readiness-2026-11-15-recheck.md:131](portfolio-readiness-2026-11-15-recheck.md#L131) | 依赖 #1 |
 | 3 | **决定方向 B 的服务承诺宽度**：要么等 M6 三轮 ≥90% 再对外说 agent 能力，要么**现在就把卖点收窄到工具层与证据链**，并在范围说明里明说 agent 判断力未达内部验收线 | [status.md:37](../status.md#L37)（49/60 = 81.7%，未达标）、[scope-ai-mcp.md:76](../outreach/scope-ai-mcp.md#L76)（排除条款已留位置） | 无（可与 #1 并行） |
-| 4 | **补第三个样本（multi-DEX）的证据包**（`analyze --html` / `export` + `verify_package`，照另两个样本的生成命令），落盘到 `docs/case-studies/attachments/` | [case-studies/README.md:30](../case-studies/README.md#L30)（附录已覆盖该样本）、[portfolio-readiness-2026-11-15-recheck.md:206](portfolio-readiness-2026-11-15-recheck.md#L206)（另两个样本的落盘方式） | 无 |
+| 4 | ~~**补第三个样本（multi-DEX）的证据包**~~ **（2026-11-18 已完成）**：`analyze --html` / `export` + `verify_package`，落盘到 `docs/case-studies/attachments/` | [case-studies-third-package.md](case-studies-third-package.md)（实测与哈希）、[case-studies/README.md:30](../case-studies/README.md#L30)（附录已覆盖该样本） | 无 |
 | 5 | **在素材里补上联系方式、时区、可用性**（只写真实可用的；不要虚构响应时长） | [publish-review.md:338](../outreach/publish-review.md#L338)（素材目前零命中） | 无 |
 | 6 | **清理外发隔离**：发布前删除素材里的 `Draft for review — not published.` 标记与 Identity note 引用块（按发稿形态决定删哪些）；**不要**把 `docs/outreach/publish-review.md` 当附件；处理素材里指向它的引用 | [publish-review.md:173](../outreach/publish-review.md#L173)（草稿标记与 Identity note 的位置）、[publish-review.md:345](../outreach/publish-review.md#L345)（内部记录不可外发） | 无 |
 | 7 | **替换全部 `{{...}}` 占位符**，改完逐个搜 `{{` 确认无残留（Template 1 有 11 处、Template 2 有 10 处） | [publish-review.md:336](../outreach/publish-review.md#L336) | 依赖 #5（联系方式进占位符） |
@@ -424,7 +437,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
   CI 覆盖 Python 3.12/3.13 与多种后端配置。
 - **四个入口都实现了**：CLI、FastAPI REST API、只读 MCP server（11 个工具）、
   内置的带引用 agent、本地 web workbench。
-- **三篇完整走查 + 可下载报告与最小证据包**（9 个文件，均过 `verify_package` 校验），
+- **三篇完整走查 + 可下载报告与最小证据包**（16 个文件，均过 `verify_package` 校验），
   样本是一方自带的，可在仓库里复现。
 - **两类服务范围、交付、验收、排除项**已经成文（`docs/outreach/`）。
 - **身份**：个人、自筹的开源项目，无客户、无客户结果、不声称收益或工时节省。
@@ -439,7 +452,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 | 「有客户 / 有客户案例 / 帮客户省了 X%」 | 没有任何客户；素材明确不宣称 | [publish-review.md:349](../outreach/publish-review.md#L349) |
 | 「可以做渗透测试 / 恶意软件定性 / native so 逆向 / 动态分析」 | 两份范围说明都把这些列在排除项里 | [scope-backend-automation.md:59](../outreach/scope-backend-automation.md#L59)、[scope-ai-mcp.md:74](../outreach/scope-ai-mcp.md#L74) |
 | 「小时费率 X」或任何固定报价 | 仓库里没有价格依据 | [phase3-plan.md:201](../roadmap/phase3-plan.md#L201) |
-| 「三份独立的交付样例」 | 三个证据包只覆盖两次分析 | [publish-review.md:341](../outreach/publish-review.md#L341) |
+| 「三份独立的交付样例」 | 三个证据包只覆盖两次分析（2026-11-18 起：四个包、四次分析，见 §3.4） | [publish-review.md:341](../outreach/publish-review.md#L341) |
 
 ### 5.3 两种走法，各自有代价
 
@@ -473,7 +486,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 ### 5.4 本文这一轮做了什么、没做什么
 
 **做了**：只读调研；核对 `docs/outreach/` 四份素材、`docs/roadmap/phase3-plan.md`、
-两份准备度评估、三篇走查与三个证据包（解压核对内容）、`docs/status.md` §4.0、
+两份准备度评估、三篇走查与证据包（解压核对内容）、`docs/status.md` §4.0、
 两份清单（[v1.0.0-release-checklist.md](v1.0.0-release-checklist.md)、
 [m10-invitation-sender-checklist.md](m10-invitation-sender-checklist.md)）、
 GitHub 元数据复核报告；新增本文。
@@ -495,7 +508,7 @@ GitHub 元数据复核报告；新增本文。
 | Phase 3 目标、服务定位、停止点条款 | [docs/roadmap/phase3-plan.md](../roadmap/phase3-plan.md) |
 | 准备度评估（基线）与复评（作者自评） | [portfolio-readiness-2026-11-15.md](portfolio-readiness-2026-11-15.md)、[portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md) |
 | 里程碑现状与 M10 状态 | [docs/status.md](../status.md) §4.0 |
-| 三篇走查与三个证据包 | [docs/case-studies/](../case-studies/) |
+| 三篇走查与四个证据包 | [docs/case-studies/](../case-studies/) |
 | M10 邀请函 / 读者包 / 发送前清单 | [m10-invitation-final.md](m10-invitation-final.md)、[m10-reader-package.md](m10-reader-package.md)、[m10-invitation-sender-checklist.md](m10-invitation-sender-checklist.md) |
 | 发版清单与发版说明 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md)、[docs/releases/v1.0.0.md](../releases/v1.0.0.md) |
 | GitHub 呈现层的缺口 | [github-repo-metadata-proposal.md](github-repo-metadata-proposal.md) |

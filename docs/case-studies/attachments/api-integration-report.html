@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DexAtlas analysis report — 
+apk_80a8fe0e81204c9f
+</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 60rem;
+       padding: 0 1rem; color: #1a1a2e; background: #fafafa; }
+h1 { border-bottom: 2px solid #4a5568; padding-bottom: .3rem; }
+h2 { border-bottom: 1px solid #cbd5e0; margin-top: 2rem; padding-bottom: .2rem; }
+table { border-collapse: collapse; margin: .8rem 0; width: 100%; }
+th, td { border: 1px solid #cbd5e0; padding: .35rem .6rem; text-align: left;
+         vertical-align: top; }
+th { background: #edf2f7; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+code { background: #edf2f7; padding: 0 .25rem; border-radius: 3px;
+       overflow-wrap: anywhere; }
+.note { background: #fffaf0; border-left: 4px solid #ecc94b; padding: .5rem .8rem;
+        margin: .8rem 0; }
+.error { background: #fff5f5; border-left: 4px solid #c53030; padding: .5rem .8rem;
+         margin: .8rem 0; }
+footer { border-top: 1px solid #cbd5e0; color: #4a5568; font-size: .9rem;
+         margin-top: 2rem; padding-top: .8rem; }
+dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: .2rem 1rem; }
+dl.meta dt { font-weight: 600; }
+dl.meta dd { margin: 0; overflow-wrap: anywhere; }
+
+</style>
+</head>
+<body>
+<h1>DexAtlas analysis report</h1>
+<dl class="meta"><dt>Project</dt><dd><code>apk_80a8fe0e81204c9f</code></dd><dt>APK</dt><dd><code>demo.apk</code></dd><dt>SHA-256</dt><dd><code>80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9</code></dd><dt>Status</dt><dd>completed</dd><dt>Run</dt><dd><code>run_fc8e432d4d094350</code> (completed, complete)</dd></dl>
+<h2>Summary</h2>
+<table><tbody><tr><th scope='row'>Index completeness</th><td class='num'>complete</td></tr><tr><th scope='row'>Classes indexed</th><td class='num'>5</td></tr><tr><th scope='row'>Methods indexed</th><td class='num'>8</td></tr><tr><th scope='row'>Methods decompiled by JADX</th><td class='num'>7 of 8</td></tr><tr><th scope='row'>Resource strings indexed</th><td class='num'>1</td></tr><tr><th scope='row'>Call sites indexed</th><td class='num'>23</td></tr><tr><th scope='row'>Call edges indexed</th><td class='num'>21</td></tr><tr><th scope='row'>Call sites with evidence</th><td class='num'>3</td></tr><tr><th scope='row'>Call edges with evidence</th><td class='num'>3</td></tr><tr><th scope='row'>Cross-reference records</th><td class='num'>3</td></tr><tr><th scope='row'>Evidence records</th><td class='num'>11</td></tr><tr><th scope='row'>DEX files</th><td class='num'>1</td></tr><tr><th scope='row'>Native libraries</th><td class='num'>0</td></tr><tr><th scope='row'>Analysis time</th><td class='num'>4.9s</td></tr></tbody></table>
+<p class="note">A cross-reference record is made for a method of this APK that is called from elsewhere. Calls into library code are indexed as cross-references but are not evidence: they say something about the JDK, not about this app. One record covers every call site of the method it is about, so the call sites the records cover add up to more than the number of records.</p>
+<h2>Tools</h2>
+<p>androguard 4.1.4, apktool 2.11.1, jadx 1.5.2</p>
+<h2>Evidence levels</h2>
+<table><tbody><tr><td><code>verified</code></td><td class='num'>11</td><td>Deterministically established by an analysis tool, with a citation that resolves inside this analysis.</td></tr><tr><td><code>lead</code></td><td class='num'>0</td><td>Risk indicator only. Not a confirmed issue.</td></tr><tr><td><code>insufficient</code></td><td class='num'>0</td><td>Not enough evidence either way; needs human review.</td></tr></tbody></table>
+<h2>Manifest</h2>
+<dl class="meta"><dt>Package</dt><dd><code>com.example.demo</code></dd><dt>Version</dt><dd><code>1.0</code> (code <code>1</code>)</dd><dt>minSdk / targetSdk</dt><dd><code>24</code> / <code>34</code></dd><dt>Permissions</dt><dd>1</dd><dt>Components</dt><dd>3</dd></dl>
+<h3>Exported components</h3>
+<table><thead><tr><th>Kind</th><th>Name</th><th>Permission</th></tr></thead><tbody><tr><td>activity</td><td><code>com.example.demo.MainActivity</code></td><td><code>-</code></td></tr><tr><td>service</td><td><code>com.example.demo.SyncService</code></td><td><code>-</code></td></tr></tbody></table>
+<h3>Permissions</h3>
+<ul><li><code>android.permission.INTERNET</code></li></ul>
+<h2>Evidence</h2>
+<p class="note">A cross-reference record is made for a method of this APK that is called from elsewhere. Calls into library code are indexed as cross-references but are not evidence: they say something about the JDK, not about this app. One record covers every call site of the method it is about, so the call sites the records cover add up to more than the number of records.</p>
+<table><thead><tr><th>ID</th><th>Level</th><th>Kind</th><th>Summary</th><th>Source</th></tr></thead><tbody><tr><td><code>E-0001</code></td><td><code>verified</code></td><td>declaration</td><td>SDK levels read from the APK&#x27;s binary manifest: minSdk=24, targetSdk=34</td><td><code>androguard 4.1.4 -&gt; androguard:AndroidManifest.xml</code></td></tr><tr><td><code>E-0002</code></td><td><code>verified</code></td><td>declaration</td><td>Package com.example.demo (versionName=1.0, minSdk=24, targetSdk=34)</td><td><code>apktool 2.11.1 -&gt; apktool:AndroidManifest.xml</code></td></tr><tr><td><code>E-0003</code></td><td><code>verified</code></td><td>declaration</td><td>2 component(s) are explicitly exported</td><td><code>apktool 2.11.1 -&gt; apktool:AndroidManifest.xml#/application</code></td></tr><tr><td><code>E-0004</code></td><td><code>verified</code></td><td>cross_reference</td><td>com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String; is called from 1 caller(s) at 1 call site(s)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V-&gt;com.example.demo.Crypto.sign(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;</code></td></tr><tr><td><code>E-0005</code></td><td><code>verified</code></td><td>cross_reference</td><td>com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String; is called from 1 caller(s) at 1 call site(s)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V-&gt;com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;</code></td></tr><tr><td><code>E-0006</code></td><td><code>verified</code></td><td>cross_reference</td><td>com.example.demo.NetworkClient.post(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String; is called from 1 caller(s) at 1 call site(s)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.MainActivity.onCreate(Landroid/os/Bundle;)V-&gt;com.example.demo.NetworkClient.post(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;</code></td></tr><tr><td><code>E-0007</code></td><td><code>verified</code></td><td>observation</td><td>jadx produced real Java for 7 of 8 methods in 5 of 5 classes</td><td><code>jadx 1.5.2 -&gt; jadx:sources</code></td></tr><tr><td><code>E-0008</code></td><td><code>verified</code></td><td>declaration</td><td>Class com.example.demo.Crypto (class)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.Crypto</code></td></tr><tr><td><code>E-0009</code></td><td><code>verified</code></td><td>declaration</td><td>Class com.example.demo.MainActivity (class)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.MainActivity</code></td></tr><tr><td><code>E-0010</code></td><td><code>verified</code></td><td>declaration</td><td>Class com.example.demo.NetworkClient (class)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.NetworkClient</code></td></tr><tr><td><code>E-0011</code></td><td><code>verified</code></td><td>declaration</td><td>Class com.example.demo.SyncService (class)</td><td><code>androguard 4.1.4 -&gt; androguard:classes.dex#com.example.demo.SyncService</code></td></tr></tbody></table>
+<footer>
+<p>Generated by DexAtlas — an evidence-first Android analysis platform.</p>
+<p>This report describes only what was deterministically established by the analysis tools listed above, and a verified record's citation resolves inside the analysis this report describes. Items marked <code>lead</code> or <code>insufficient</code> are not confirmed findings and require human validation.</p>
+</footer>
+</body>
+</html>

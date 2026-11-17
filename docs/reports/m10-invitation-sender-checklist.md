@@ -416,7 +416,7 @@ git status --porcelain                  # 组七：工作区必须干净
 
 ## 六、组六：确认要交出去的附件
 
-- [ ] **查什么：** 三个证据包 zip + 三篇案例正文，都在**验收 commit 那棵树**里。
+- [ ] **查什么：** 四个证据包 zip + 三篇案例正文，都在**验收 commit 那棵树**里。
 
   **怎么查：**
 
@@ -429,28 +429,31 @@ git status --porcelain                  # 组七：工作区必须干净
   `demo-app-walkthrough.md`、`obfuscated-app.md`、`api-integration.md`）、
   3 个证据包 zip（`demo-`、`obfuscated-`、`api-integration-evidence-package.zip`）、
   以及 demo 与 obfuscated 各自的报告三份（`.md` / `.json` / `.html`）。
+  **附件集后来换过一轮**（四个包、各自带报告三件套，共 16 个文件），
+  上面那组数字是当时的，不是现在的——以你验收 commit 上的
+  `git ls-tree` 输出为准。
 
   **不通过怎么办：** 换成你最终的验收 commit 再跑一次，结果应当一致；对不上
   说明附件没进那棵树——先解决树的问题（组二），再谈附件。
 
 - [ ] **查什么：** 知道 demo 与 api-integration 两个包里的 `report.md` /
-  `report.html` **字节相同是正常的**，不是发错了。
+  `report.html` **只差两行是正常的**，不是发错了。
 
-  **怎么查：** 把三个包解压后逐文件比对摘要。
+  **怎么查：** 把四个包解压后逐文件比对摘要。
 
   **查过是什么样：**
 
-  | 包里的文件 | demo 包 | api-integration 包 | obfuscated 包 |
-  |---|---|---|---|
-  | `reports/report.md` | 相同 | 相同 | 与前两者不同 |
-  | `reports/report.html` | 相同 | 相同 | 与前两者不同 |
-  | `manifest.json` | 各不相同 | 各不相同 | 各不相同 |
-  | `reports/report.json` | 各不相同 | 各不相同 | 各不相同 |
+  | 包里的文件 | demo 包 | api-integration 包 | obfuscated 包 | multidex 包 |
+  |---|---|---|---|---|
+  | `reports/report.md` | 与 api 包只差 `run_id`、`Analysis time` 两行 | 同上 | 与前两者不同 | 与前两者不同 |
+  | `reports/report.html` | 同上 | 同上 | 与前两者不同 | 与前两者不同 |
+  | `manifest.json` | 各不相同 | 各不相同 | 各不相同 | 各不相同 |
+  | `reports/report.json` | 各不相同 | 各不相同 | 各不相同 | 各不相同 |
 
   **不通过怎么办：** 不要「修」它。口径写在[案例集说明](../case-studies/README.md)里：
-  三篇走查涉及三个第一方 APK，但**三个证据包只覆盖两次分析**——demo 与
-  api-integration 是同一次分析的两种叙事（都是 `demo-app` 那个 APK）。被问到
-  时按这一条解释。
+  三篇走查涉及三个第一方 APK，**四个证据包对应四次分析**——demo 与
+  api-integration 是同一份 APK（`demo-app`）的两次分析，所以每一个数字都相同、
+  只有 run id 与耗时不同。被问到时按这一条解释。
 
 - [ ] **查什么：** 没有把你自己机器上**重新生成的**报告一起发出去。
 
@@ -466,7 +469,7 @@ git status --porcelain                  # 组七：工作区必须干净
   **怎么查：** `grep -n "multidex" docs/case-studies/obfuscated-app.md`
 
   **查过是什么样：** `obfuscated-app.md` 还涉及 `multidex-app` 那个多 DEX 附录，
-  仓库里只有 `obfuscated-` 的证据包覆盖到它。
+  仓库里现在有单独的 `multidex-evidence-package.zip` 与它的报告三件套覆盖到它。
 
   **不通过怎么办：** 不用补包。读者问到多 DEX 附录时，按案例集说明的口径解释，
   别让他以为少给了一个。

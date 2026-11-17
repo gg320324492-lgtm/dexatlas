@@ -119,40 +119,48 @@ tag（`git for-each-ref refs/tags/v1.0.0`），`src/dexatlas/__init__.py` 的
 
 ### 4.2 证据包与 case study 的对应关系
 
-`docs/case-studies/attachments/` 下共 9 个文件，三个证据包与三篇 case study
-一一对应，没有多余也没有缺失（对应的是**附件集合**，不是说每篇带的报告都不同
-——见下面的字节比对）：
+> **2026-11-18 复核**：附件集换过一轮（四个包、各自带报告三件套），本节按**新附件**
+> 重核过一遍；本文件其余部分仍按抬头写的核对基准。
+
+`docs/case-studies/attachments/` 下共 16 个文件，四个证据包与三篇 case study
+一一对应（第 2 篇带两个包：正文一个、multi-DEX 附录一个），没有多余也没有缺失
+（对应的是**附件集合**，不是说每篇带的报告都不同——见下面的字节比对）：
 
 | case study | 引用的附件（4 个） | 证据包 zip 内容 |
 |---|---|---|
 | `demo-app-walkthrough.md` | `demo-report.md` / `.json` / `.html` + `demo-evidence-package.zip` | `reports/report.html`、`reports/report.json`、`reports/report.md`、`manifest.json` |
 | `obfuscated-app.md` | `obfuscated-report.md` / `.json` / `.html` + `obfuscated-evidence-package.zip` | 同上 4 项 |
-| `api-integration.md` | `demo-report.md` / `.json` / `.html` + `api-integration-evidence-package.zip` | 同上 4 项 |
+| `obfuscated-app.md`（multi-DEX 附录） | `multidex-report.md` / `.json` / `.html` + `multidex-evidence-package.zip` | 同上 4 项 |
+| `api-integration.md` | `api-integration-report.md` / `.json` / `.html` + `api-integration-evidence-package.zip` | 同上 4 项 |
 
-三个 zip 都已解压核对，内含报告三件套与一份 `manifest.json`（哈希清单），不是空壳。
+四个 zip 都已解压核对，内含报告三件套与一份 `manifest.json`（哈希清单），不是空壳。
 素材里对外的描述（「a zip holding the report and a manifest of hashes」）与内容一致。
 
-**一处必须说明的事实：demo 与 api-integration 两个证据包里的报告是同一份。** 把两个
-zip 解开逐文件比对，`reports/report.md` 与 `reports/report.html` **字节完全相同**
-（sha256 前 16 位同为 `1594a0c19aa6c165` / `82bcb84c37db4f64`），只有
-`reports/report.json` 与 `manifest.json` 不同。两边的 `manifest.json` 也写明是同一次
-分析：APK sha256 同为 `80a8fe0e…`，`run_id` 同为 `run_e112e717…`。原因是 case
+**一处必须说明的事实：demo 与 api-integration 两个包分析的是同一份样本，但是两次
+不同的分析。** 把两个 zip 解开逐文件比对，`reports/report.md` 与
+`reports/report.html` **各只有两行不同**——`run_id` 一行与 `Analysis time` 一行，
+其余每一个数字相同。两边的 `manifest.json` 写明是两个不同的 `run_id`
+（`run_e8e49384…` 与 `run_fc8e432d…`），APK sha256 同为 `80a8fe0e…`。原因是 case
 study 1 与 case study 3 分析的是**同一个**一方样本 `examples/demo-app/demo.apk`
 ——case study 3 走的是 REST API / MCP 入口，不是另一个样本。
 
 **样本数与分析数不是一回事。** 三篇走查涉及**三个**一方样本：`demo.apk`
 （case study 1 与 3）、`obfuscated.apk`（case study 2）、`multidex.apk`（case study 2
-的 multi-DEX 附录）。但**三个证据包只覆盖两份分析**——demo 包与 api-integration 包是
-同一次分析（所以报告字节相同），obfuscated 包是另一次分析（`run_id`
-`run_8d6735d4…`）；`multidex.apk` 没有单独的证据包。对外不要读成三份独立分析，
-更不要读成三个客户案例。素材侧已各加了一句澄清（`project-brief.md` §Links、
+的 multi-DEX 附录）。**四个证据包对应四次分析**，每包一次：`run_e8e49384…`（demo）、
+`run_dd897202…`（obfuscated）、`run_4fde2fa0…`（multidex 附录）、`run_fc8e432d…`
+（api-integration）。对外可以说「四个包、四次分析」，但**不要**读成四份互不相干的
+证据，更不要读成客户案例——样本全是自建的一方样本，没有客户参与。
+素材侧已各加了一句澄清（`project-brief.md` §Links、
 `cover-letter-templates.md` 用法说明）。
 
 ### 4.3 素材里没有指错的东西
 
 - `project-brief.md` §Links 原来只指到 `docs/case-studies/README.md`，读者拿不到
-  可以直接打开的证据包；现在补齐了三个 zip 的确切路径。
-- 三个 case study 的附件引用在 `docs/case-studies/` 内原本就是对的，本轮未改动。
+  可以直接打开的证据包；现在补齐了四个 zip 的确切路径。
+- 三个 case study 的附件引用原来在 `docs/case-studies/` 内是对的；**附件集换过一轮
+  之后，第 3 篇的引用改了**——它现在指向自己的 `api-integration-report.*`，
+  不再借用第 1 篇的 `demo-report.*`；第 2 篇的 multi-DEX 附录也补上了自己的四个
+  附件。
 
 ---
 
@@ -290,7 +298,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 | 「已发布服务页」 | ✅ 四份文件首尾都写着 `Draft for review — not published`，没有任何「已上线 / 已发布服务」的措辞 |
 | 「M6 已达标」 | ✅ 四份文件**完全没有提到 M6 或层级 2**。M6 层级 2 实测 49/60 = 81.7%（未达 ≥90% 验收线），窄验证二轮转通过 2/6、三轮 3/6（门槛 ≥4），三件事都还没关闭 |
 | 「独立验收已完成」 | ✅ 四份文件**没有提到 M10**，也没有把 DexAtlas 自身的验收说成已完成；`docs/status.md` 写着 M10 独立验收尚未开始，素材口径与之一致。素材里出现的 acceptance / milestone 全部是**对客户的服务承诺**（开工前写下的验收标准、里程碑复盘），不是对本项目分析工作的验收结论 |
-| 「已验证可复现」类措辞 | ✅ 只在有落盘证据处使用：`docs/case-studies/` 的三篇走查、三个证据包、CI 配置 |
+| 「已验证可复现」类措辞 | ✅ 只在有落盘证据处使用：`docs/case-studies/` 的三篇走查、四个证据包、CI 配置 |
 | 「自主发现漏洞 / 替代分析师」类措辞 | ✅ 两份 scope 都明确排除，`project-brief.md` §Honest limitations 也写明 agent 不是通用自主漏洞发现器 |
 | 「把 APK 里的指令当数据而非命令」 | ✅ 有实现支撑：`src/dexatlas/agent/orchestrator.py` 的系统提示把工具输出定性为不可信数据，MCP 侧有 `UntrustedText` 包装，`tests/test_agent_untrusted_input.py` 是对应的性质测试 |
 | 第三方归属 | ✅ 三个分析引擎各自点名，注明不是自有工作 |
@@ -340,10 +348,11 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 7. **联系方式与可用性要按平台要求补齐。** 四份素材现在是**零联系方式、零时区、
    零可用性表述**（只有仓库网址）——素材刻意不写这些，但平台表单通常要填。
    补的时候只写本人真实可用的联系方式与时区，不要虚构响应时长。
-8. **附件要逐个确认真的上传了。** 三个证据包 zip 要分别附上；注意 **demo 与
-   api-integration 两个证据包里的 `report.md` / `report.html` 是同一份分析报告**
-   （字节相同，只有 `report.json` 与 `manifest.json` 不同）——附的时候不要当成
-   两份独立证据报数。§4.2 与素材侧的澄清句就是为了这件事。
+8. **附件要逐个确认真的上传了。** 四个证据包 zip 要分别附上；注意 **demo 与
+   api-integration 两个证据包分析的是同一份样本 `demo.apk`，但是两次不同的分析**
+   （`report.md` / `report.html` 各只有 `run_id` 与 `Analysis time` 两行不同）——
+   附的时候说清「四个包、四次分析」，不要读成四份互不相干的证据，更不要读成客户
+   案例。§4.2 与素材侧的澄清句就是为了这件事。
 9. **打包外发时逐个选文件，不要把内部核对记录一起发出去。**
    `docs/outreach/publish-review.md`（本文件）**只留在仓库里**，不对外、不作
    附件、不随提案发送——它记着核对基准、提交号与本机路径。素材里指向它的两处

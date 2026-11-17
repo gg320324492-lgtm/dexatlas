@@ -487,6 +487,12 @@ a manifest」对不上；也可能以为包里只有一份报告、另外两份�
 | 「12 条相对链接逐条存在」（`publish-review.md` §4.1） | 我用同一条正则逐条复跑：**12 条，全部存在** | ✅ |
 | 第三方归属、三个引擎各自的产出 | `docs/analysis-provenance.md` 与素材口径一致 | ✅ |
 
+> **一行已被后续改动推翻（2026-11-18）**：上表里「the three evidence packages hold
+> **only two analyses**」那一行核对的是**附件集换过一轮之前**的状态。那之后
+> `docs/case-studies/attachments/` 换成了**四个证据包、四次分析**（`run_id` 两两
+> 不同），对外文案也同步改成了「四个包、四次分析」。逐条实测见
+> [case-studies-third-package.md](case-studies-third-package.md)。
+
 ### 4.3 过度承诺：没发现把草稿说成交付
 
 - 四份素材首尾都有 `Draft for review — not published.`，**没有**「已上线 /

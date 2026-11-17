@@ -112,7 +112,8 @@ start). Full setup, including the JADX/Apktool backends and Docker, is in
 
 Three complete worked analyses — a walkthrough of the demo app from upload to
 evidence chain, an obfuscated-sample study, and an integration study that
-drives the same analysis over the REST API and the MCP server — are in
+drives a second, independent analysis of the same demo app over the REST API
+and the MCP server — are in
 [docs/case-studies/](case-studies/README.md). The architecture is drawn in
 [docs/architecture/diagram.md](architecture/diagram.md), and the benchmark
 methodology and its disclosures are in [docs/benchmarks/](benchmarks/comparison.md).

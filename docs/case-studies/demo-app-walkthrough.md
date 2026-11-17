@@ -3,7 +3,7 @@
 **Sample:** [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
 (sha256 `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`)
 **Run:** one `dexatlas analyze` — the session quoted in §3 took 4.9 s; the
-attached report is a later run of the same APK (`run_e112e71772d34a0e`, 6.6 s)
+attached package is a later run of the same APK (`run_e8e49384ab5246ab`, 4.5 s)
 **Backends:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 **Who this is for:** a developer or security researcher who wants to see, end to
 end, what an analysis produces and how each claim traces back to the code it
@@ -231,7 +231,7 @@ construction. DexAtlas reports what the bytes contain and where each fact was
 read from; impact assessment stays with the reader.
 
 **What a human does next with this**: a reviewer gets an accurate, complete
-map of a small app in seconds (6.6 s in the attached run) and can spend their
+map of a small app in seconds (4.5 s in the attached run) and can spend their
 time on the two findings that matter (the unguarded exported components, the
 credential in the code) instead of on rebuilding context.
 
@@ -288,10 +288,19 @@ above, on the same sample, with the tool versions printed in the report):
 [Markdown report](attachments/demo-report.md),
 [JSON report](attachments/demo-report.json),
 [offline HTML report](attachments/demo-report.html),
-[evidence package](attachments/demo-evidence-package.zip). The report is run
-`run_e112e71772d34a0e`; case study 3 analyses the same APK and so links these
-same files instead of copies of them. Regenerate them with the two commands to
-reproduce every number. One caveat when checking hashes: the package's
-manifest records the `report.json` **inside the package** (`56251060…`), which
-differs from the loose `report.json` above (`6cd7fa0b…`) by two timestamp
-fields — `generated_at` and `project.created_at` — and by nothing else.
+[evidence package](attachments/demo-evidence-package.zip).
+
+The package is run `run_e8e49384ab5246ab` (4.5 s) — a later run of the same
+APK than the session quoted in §3, so every count in the two reports agrees
+while the run id and the timing differ. The loose report files are the
+package's own `reports/` entries, copied out of it: the packaged
+`report.json` and the loose `report.json` are byte-for-byte identical
+(sha256 `921d3d3e3c8b6b08f5c3d23488e333d610bfeadf41cbb67ed8c471ea5a67f63e`),
+so the hash the manifest records is the hash of the loose file too. They are
+taken from the package rather than from the files `analyze` writes, because
+those carry this platform's CRLF line endings and their hashes would only
+match on the machine that produced them. Regenerate the package with the two
+commands above to reproduce every number.
+
+[Case study 3](api-integration.md) analyses the same APK through the REST
+API, and links its own report files.

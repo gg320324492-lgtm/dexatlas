@@ -17,11 +17,12 @@ edge — are reported as facts about the bytes, with the judgement left to the
 reader. Samples are first-party; their suspicious-looking constants are inert
 placeholders committed beside the APK.
 
-**Attachments:** [`attachments/`](attachments/) holds three evidence packages
-and the loose report files the walkthroughs link to — **three packages, six
-report files** — and which file belongs to which study is not obvious: case
-study 3 links case study 1's `demo-report.*` files, because both walkthroughs
-analyse the same `demo-app` APK. Open the HTML with no network, or unzip a
+**Attachments:** [`attachments/`](attachments/) holds four evidence packages
+and the loose report files the walkthroughs link to — **four packages, twelve
+report files**. Which file belongs to which study is spelled out in the
+walkthroughs themselves: study 1 links `demo-report.*`, study 2 links
+`obfuscated-report.*` and `multidex-report.*` (the multi-DEX appendix), study 3
+links `api-integration-report.*`. Open the HTML with no network, or unzip a
 package and check its manifest hashes; a reader does not need to run
 DexAtlas to review the evidence, only to reproduce it.
 
@@ -33,18 +34,22 @@ DexAtlas to review the evidence, only to reproduce it.
 
 Three walkthroughs cover three first-party APKs — `demo-app`, `obfuscated-app`
 and `multidex-app` (the multi-DEX appendix) — with case studies 1 and 3 both
-analysing the same `demo-app` APK; the three evidence packages cover only two
-analyses, because the demo and api-integration packages come from one run
-(`run_e112e717…`) and their `report.md` and `report.html` are byte-identical.
-The obfuscated package is the other run (`run_8d6735d…`).
+analysing the same `demo-app` APK. The four evidence packages come from
+**four separate analyses**, one package per analysis, and every manifest
+records the run it was made from: `run_e8e49384ab5246ab` (study 1's
+attachment), `run_dd897202eba74e28` (study 2's), `run_4fde2fa0b5254ccb`
+(study 2's multi-DEX appendix) and `run_fc8e432d4d094350` (study 3's).
 
-Two things a reader will hit while checking that. Each walkthrough quotes its
-own recorded session, which is not the run its attachment carries — the counts
-match, the run id and the timings do not. And a package's manifest records the
-hash of the `report.json` **inside the package**, which differs from the loose
-`report.json` of the same analysis by two timestamp fields. The measured
-hashes, the run ids, and what a third package would take are in [the
-correspondence report](../reports/case-studies-run-correspondence.md).
+Two things a reader will hit while checking that. Studies 1 and 3 analyse the
+same bytes, so every count in their two reports agrees while the run id and
+the timing differ — same input, two runs, two ids. And a package's manifest
+records the hash of the `report.json` **inside the package**, which is
+byte-for-byte the loose `report.json` of that same analysis. The measured
+hashes and the run ids are in [the third-package
+report](../reports/case-studies-third-package.md); the earlier
+[correspondence report](../reports/case-studies-run-correspondence.md)
+records what the attachment set looked like **before** that round and is
+kept for the comparison.
 
 All three APK samples are **first-party**: built from smali sources committed
 beside them, rebuildable with `scripts/build-test-apks.sh`, and free of
