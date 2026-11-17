@@ -66,7 +66,7 @@
 | `gh` CLI | 仅 fixtures 需要 | `scripts/fetch-fixtures.sh` 经 GitHub API 拉取 androguard 测试数据 |
 | 网络 | 首次需要 | clone、依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 1.5–2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒纯分析） |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 1.5–2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒；[读者实走演练](reader-dry-run.md)实测冷缓存 10 分 28 秒、clone + uv sync 4 分 24 秒、重建 venv 后 8 秒纯分析） |
 
 ## 3. 分步执行路径
 
@@ -144,10 +144,22 @@ docker build -t dexatlas .
 docker run --rm dexatlas dexatlas backends
 ```
 
-预期：构建约 2 分钟（[M8 演练](m8-install-rehearsal.md)实测 2 分 16 秒）；
-镜像内 JADX / Apktool 可用。容器内多个命令共享 workspace 时，用
-`DEXATLAS_WORKSPACE=/workspace/ws` 统一（M8-2 已修复并合入：所有命令都带
-`--workspace`/`-w`，这一项不再是已知限制；容器里仍建议用环境变量统一）。
+预期：构建**首次约 15–20 分钟**（[M8 演练](m8-install-rehearsal.md)在有本地层缓存的
+机器上实测 2 分 16 秒；[读者实走演练](reader-dry-run.md)在无层缓存、走代理下载的机器
+上实测 **1099 秒 ≈ 18 分 19 秒**，镜像约 1.3 GB）；镜像内 JADX / Apktool 可用。容器内多个
+命令共享 workspace 时，用 `DEXATLAS_WORKSPACE=/workspace/ws` 统一（M8-2 已修复并合入：
+所有命令都带 `--workspace`/`-w`，这一项不再是已知限制；容器里仍建议用环境变量统一）。
+
+**镜像里没有 `examples/`**（只有 `src/ pyproject.toml uv.lock README.md LICENSE`）→
+要在容器里跑案例，得自己挂两个卷 ✓：
+
+```bash
+docker run --rm \
+  -v "$(pwd)/examples:/app/examples:ro" -v "$(pwd)/ws:/workspace" \
+  dexatlas dexatlas analyze /app/examples/demo-app/demo.apk --workspace /workspace
+```
+
+（读者实走演练实测：容器内三后端全 `available` ✓、分析退出码 0、约 8 秒 ✓，计数与本机一致 ✓）
 
 ### 3.3 第 3 步：首次分析 demo.apk（验收项 A4）
 
@@ -166,6 +178,11 @@ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 r
 **后端缺失降级（验收项 A6）**：在 Androguard 可用、至少一个外部后端不可用的
 情况下重复分析，预期仍以退出码 0 完成并产出报告，错误记录写明哪个后端
 `not_installed`；不得崩溃或静默省略。
+
+> **当场记下证据**：CLI 没有「渲染某一次运行」的命令，而重复分析会把该项目的
+> 最新一次运行换成新的一次 —— 所以**那一次 stdout 上的降级证据要当场抄下来**
+> （后端状态表、`errors[]` 里的 `not_installed`），否则重跑后就找不回来了 ✓。
+> 库里的记录仍在（`analysis_runs.errors` ✓），只是没有 CLI 命令把它渲染出来 ✓。
 
 ### 3.4 第 4 步：检索、证据与 locator 解析（验收项 B2–B5、C1–C3）
 
@@ -418,9 +435,11 @@ uv run --no-sync python -c \
 ### 5.4 时间参考
 
 - 到第一份报告：首次 10–20 分钟（含下载），暖缓存约 1.5–2 分钟。
-  （[M8 演练](m8-install-rehearsal.md)在已就绪的会话工作树上实测约 30 秒，
-  同一环境差异下两者都成立；以你自己的实测为准，明显超出预期按 §5.2 记卡点。）
-- Docker 镜像构建：约 2 分钟。
+  （[M8 演练](m8-install-rehearsal.md)在已就绪的会话工作树上实测约 30 秒；
+  [读者实走演练](reader-dry-run.md)在重建 venv 后实测 **8 秒**——两个口径是**不同场景**，
+  以你自己的实测为准，明显超出预期按 §5.2 记卡点。）
+- clone + uv sync：约 4 分 30 秒（[读者实走演练](reader-dry-run.md)实测 4 分 24 秒）。
+- Docker 镜像构建：首次约 15–20 分钟（无本地层缓存时的实测；见 §3.2 路线 B 的两个数）。
 - 完整案例（analyze 到 xrefs）：约 1–2 分钟。
 - 40 项逐项判定 + 两平台打分：视抽查深度，建议预留半天。
 
