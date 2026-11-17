@@ -45,10 +45,10 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,612 automated tests, 93.3% coverage` | 1,612 / 93.3% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,612 tests, coverage and dead-code gates` | 1,612 |
-| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,612 tests at 93.3% coverage` | 1,612 / 93.3% |
-| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,612 automated tests at 93.3% coverage` | 1,612 / 93.3% |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,620 automated tests, 93.3% coverage` | 1,620 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,620 tests, coverage and dead-code gates` | 1,620 |
+| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,620 tests at 93.3% coverage` | 1,620 / 93.3% |
+| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,620 automated tests at 93.3% coverage` | 1,620 / 93.3% |
 
 覆盖率的措辞保持「一方代码覆盖率」的口径，没有写成「总覆盖率」——报告里
 `coverage.pct` 量的就是一方代码。
@@ -329,7 +329,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
    请在真实表单上逐个字段确认。**素材顶部引用的官方指南链接也要联网核实**
    （`support.upwork.com/hc/en-us/articles/360016144974`）：本轮**没有联网**，
    那条链接与其中的限制值都还没对过现网。
-5. **对外数字要跟最后一次测量同步。** 本轮的 1,612 / 93.3% 取自最近一次完整
+5. **对外数字要跟最后一次测量同步。** 本轮的 1,620 / 93.3% 取自最近一次完整
    测量落盘的报告（源指纹 `sha256:4e72ac49…`）——完整测量已重跑，这四份素材的
    数字已按新值核过一遍。**以后任何一次测量都会再改这两个数**，发版前请再核
    一次。
@@ -379,7 +379,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 > 包而**收集失败**（这两个文件共 51 个测试），`test_docs.py` 于是报「报告说
 > 1,588，树上只有 1,537」。要复现报告里的套件口径，需要装齐全部 extra：
 > `uv sync --extra dev --extra analysis --extra mcp --extra demo`（装齐后收集到
-> 1,612，与报告一致，`test_docs.py` 才 62/62）。
+> 1,620，与报告一致，`test_docs.py` 才 62/62）。
 
 ### 额外发现：并发测量会污染覆盖率（发版那一轮已重跑并落盘）
 
@@ -392,7 +392,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 **当前 `docs/reports/phase1-execution-report.md` 落盘的就是复原后的值**
-（1,612 / 93.3%），共享树在该文件上也没有未提交改动。
+（1,620 / 93.3%），共享树在该文件上也没有未提交改动。
 
 ---
 
