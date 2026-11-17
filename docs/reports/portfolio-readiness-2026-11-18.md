@@ -12,6 +12,15 @@
 > Upwork +5.0 个百分点），而最高权重、最能决定「能不能对外说『已验收』」的
 > **独立使用验证** 一分未动，仍是 1 / 4。
 
+> **更正（2026-11-18，主会话）**：本报告 §8 第 8 条原写「作者记录下的 CI 10 次并行
+> 运行**全绿**」，并以此作为「有一个可引用的发布版本了」的证据之一。**那句话是错的**：
+> tag `v1.0.0` 的那次 CI run（`44126968629`）以 `failure` 结束，**4 个 job 红**
+> （`Tests (Python 3.12)`、`Tests (Python 3.13)`、`Tests (Apktool only, no JADX)`、
+> `The report's figures describe the tagged tree`），根因是同一条契约判据，主会话已修。
+> 本报告的**分数不变**——「核心工程与证据链 4/4」的依据是 `ci.yml` 里的**机制**
+> （tag 触发、三个新 job、两处门禁盲区收口），不是那次运行的结果；但凡写着「全绿」
+> 的地方都已改成事实。详见 §4.1、§7 第 7 条、§8 第 8 与第 17 条。
+
 ---
 
 ## 0. 这份复评是什么、不是什么
@@ -115,8 +124,9 @@
 「已验收能力」这个限定范围内成立——插件化调度、跨平台后端等扩展不在声明范围内。
 本轮不构成下调理由。
 
-**要提升它要做什么**：该维度没有可提的档位。真实风险不在分数，在**这个 4 分里
-最硬的一块证据（CI 全绿）没有落盘记录**——见 §7 与 §8 第 17 条。
+**要提升它要做什么**：该维度没有可提的档位。真实风险不在分数，在**这个 4 分的证据
+全是「机制在仓库里」**——tag `v1.0.0` 那次 CI run 实际是**红的**（§8 第 8 条），
+而运行结果仓库里没有落盘记录——见 §7 与 §8 第 17 条。
 
 ### 4.2 首次试用与复现 — 3 → 3.5（升级）
 
@@ -278,7 +288,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 
 4. **「材料说的是不是真的」第一次被真机验过。**
    证据：读者实走演练（[reader-dry-run.md](reader-dry-run.md):39-45）——真 clone、
-   检出 tag、九步路径、七道门禁退出码全 0、契约 48/48、M10 自查 40/40；
+   检出 tag、九步路径、七道门禁退出码全 0、契约 48/48、M10 自查 **43 条自动化判定全过、0 失败**（另有 40 项留人工——两个分母不是一回事）；
    并查出 11 处材料与现实不符（:108-118）。
    改变的判断：上一轮所有安装/复现证据都来自项目自己的窗口（M8 演练也是作者执行），
    无法排除「材料按项目自己的想象写」。现在有了一份**逐字对照表**，
@@ -311,10 +321,17 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 8. **有一个可引用的发布版本了。**
    证据：tag `v1.0.0` = `75976e0`，与 `origin/main` 同指；
    [发版说明](../releases/v1.0.0.md) 与 [GitHub Release 正文成稿](v1.0.0-github-release-body.md) 都在仓库里；
-   作者记录下的 CI 10 次并行运行全绿（tag 推送时：9 个 job 定义，`test` 是 3.12/3.13 矩阵）——
-   **该结果本轮未联网复核，仓库里也没有落盘记录**（见 §7 第 7 条、§8 第 17 条）。
-   改变的判断：上一轮评的是「一个工作分支上的树」；这一轮评的是「一个发布出去的版本」。
-   影响：核心工程（4/4）、对外展示（3/3）。
+   **但该 tag 的 CI run 不是绿的**：run `44126968629` 以 `failure` 结束（耗时 14 分 32 秒），
+   **4 个 job 红**——`Tests (Python 3.12)`、`Tests (Python 3.13)`、
+   `Tests (Apktool only, no JADX)`、`The report's figures describe the tagged tree`；
+   根因是同一条契约判据（`social-preview-howto.md` 写了分项却没在 40 字内写出总数 49），
+   主会话已修（见 [release-process-dry-run.md](release-process-dry-run.md) §4.1）。
+   tag 推送时的 CI 规模是 **9 个 job 定义、10 次并行运行**（`test` 是 3.12/3.13 矩阵）。
+   **这一条结果是 2026-11-18 主会话用 `gh run view` 核出来的**（本报告写就时未联网）；
+   仓库里也确实没有落盘记录（见 §7 第 7 条、§8 第 17 条）。
+   改变的判断：上一轮评的是「一个工作分支上的树」；这一轮评的是「一个发布出去的版本」——
+   **但「发布出去」不等于「CI 验过」**，这一点本报告原版写反了。
+   影响：核心工程（4/4，**依据是 `ci.yml` 里的机制，不是那次运行的结果**）、对外展示（3/3）。
 
 9. **新增了一条限定：读者路径没在最终 tag 上再走一遍。**
    证据：演练基准 `0104ccb`（[reader-dry-run.md](reader-dry-run.md):9-13），
@@ -324,11 +341,13 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
    只能说「演练所在的树已验证，之后的差异是文档、门禁脚本与数字」。
    影响：首次试用（因此只给 3.5，不给 4）。
 
-10. **新增了一条限定：「CI 全绿」这件事，读者无法从仓库自行复核。**
+10. **新增了一条限定：CI 的运行结果，读者无法从仓库自行复核。**
     证据：机制落盘（[ci.yml](../../.github/workflows/ci.yml)），结果不落盘——
-    仓库里没有一份记录写着哪一次 run 全绿、覆盖哪些 job、对应哪个 commit。
+    仓库里没有一份记录写着哪一次 run 结论是什么、覆盖哪些 job、对应哪个 commit。
     改变的判断：上一轮的所有「全绿」都是作者口述；这一轮仍然如此，只是机制更硬了。
     影响：不改分，但写进 §7 与 §8。
+    **2026-11-18 主会话更正**：tag `v1.0.0` 那次 run 实际以 `failure` 结束、4 个 job 红
+    （§8 第 8 条）——所以「全绿」这个前提**本身不成立**，不只是读者无法复核。
 
 ---
 
@@ -384,7 +403,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 | 4 | **macOS 未验证** | 无 Apple 硬件，如实标注（[m8-install-rehearsal.md](m8-install-rehearsal.md):28） |
 | 5 | **三个证据包只覆盖两份分析** | demo 与 api-integration 两个包的 `report.md` / `report.html` 是**同一份分析报告**（字节相同），不能当成两份独立证据报数（[case-studies/README.md](../case-studies/README.md):36-37；[publish-review.md](../outreach/publish-review.md):342-343） |
 | 6 | **读者路径未在最终 tag 上复走** | 演练基准 `0104ccb`，tag 现指向 `75976e0`，相距 23 个提交（`src/` 一行未改）（[reader-dry-run.md](reader-dry-run.md):9-13） |
-| 7 | **「CI 全绿」没有落盘记录** | 机制在 [ci.yml](../../.github/workflows/ci.yml)，运行结果不在仓库里；读者无法自行复核 |
+| 7 | **CI 的运行结果没有落盘记录** | 机制在 [ci.yml](../../.github/workflows/ci.yml)，运行结果不在仓库里；读者无法自行复核（而且 tag `v1.0.0` 那次 run 实际是红的，见 §8 第 8 条） |
 | 8 | **README 独立首读复核结论未回填** | 上一轮列为待办 #5，至今无落盘结论 |
 
 **这一轮新增的还有两条口径限定**（上一轮没有）：
@@ -410,7 +429,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 | 6 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md):40 | 「最终 commit 上 CI **七个**并行运行全绿」 | 改为 10 次（tag 推送时） |
 | 7 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md):112、:423-427 | 「CI 只在 push 到 `main` 或 PR 到 `main` 时触发…**推 tag 也不产生** run」「21 项门禁里 CI 实际跑 14 项，6 道只存在于本地」 | 已被 [ci.yml](../../.github/workflows/ci.yml):18 与三个新 job 推翻；按新状态重写或加注记 |
 | 8 | [ci-gate-coverage.md](ci-gate-coverage.md):13、:35、:49 | 摘要与 §1/§3 说 tag 推送不触发 workflow、CI 是「6 个 job、7 次并行运行」 | 同上：改为 tag 会触发、9 个 job / 10 次运行。§7.1（:340-386）只记了另两个盲区，这条没记 |
-| 9 | [ci-gate-coverage.md](ci-gate-coverage.md):139-140、:414、:446 | 「`v1.0.0^{commit}` = `8f9ddca`」「tag 不可变，本轮没有动它」 | 现在是 `75976e0`；tag 已被重打两次，按当前指向改 |
+| 9 | [ci-gate-coverage.md](ci-gate-coverage.md):139-140、:414、:446 | 「`v1.0.0^{commit}` = `8f9ddca`」「tag 不可变，本轮没有动它」 | 现在是 `75976e0`；tag 已被重打**五次**（6 个 tag 状态：success → success → success → failure → cancelled → in_progress，见 [release-process-dry-run.md](release-process-dry-run.md) §4.3），按当前指向改 |
 | 10 | [next-engagements.md](next-engagements.md):3 | 「调研基准：本 worktree 的 `0104ccb`（= tag `v1.0.0` 指向的 commit）」 | tag 现指向 `75976e0`；改基准句或注明「本文写于 tag 重打之前」 |
 | 11 | [m10-invitation-final.md](m10-invitation-final.md):60 | commit 占位符「【待填：v1.0.0 发版 commit 的完整 hash】」仍是空的 | 填 `75976e0c884a8f9d6f6771abbaea730eb6490d0b`，或按该文件自述的写法让读者用 `git rev-parse v1.0.0^{commit}` 自取比对 |
 | 12 | [docs/reports/README.md](README.md) | 索引漏收两份报告：**reader-dry-run.md**（该文件 §7 自己承认「本文件尚未被收录」）与 **next-engagements.md** | 补进索引表；另 :87 那条把要填的 hash 写成 `0104ccb…`，而 tag 现指向 `75976e0` |
@@ -418,7 +437,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 | 14 | [m10-number-traceability.md](m10-number-traceability.md)（索引 [README.md](README.md):120 亦引） | 记录的权威值是「1,588 个测试、一方代码覆盖率 93.3%（7,117/7,631 行）、源指纹 `sha256:975afa8e…`」 | 套件数已更新为 1,620（1,473 快 + 147 集成）；覆盖率与指纹不变。回填并注明「发版后重测已刷新」 |
 | 15 | [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md):127-130 | §4 收敛清单的 GitHub 增量列（+10.0 / +2.5）与其自述口径算不平（按权重应为 +7.5 / +11.25） | 加一行注记说明该列的口径，或按权重改算；本文 §6 已改用可直接复算的算式 |
 | 16 | [status.md](../status.md):71-77 | 「已发布版本」表只列到 `v0.2.0`（`v1.0.0` 只出现在 §1 快照） | 表里补 `v1.0.0` 一行 |
-| 17 | 仓库内无落盘记录 | 「CI 10 次并行运行全绿」只有机制（[ci.yml](../../.github/workflows/ci.yml)）没有结果 | 落盘一份运行记录（run 链接、时间、覆盖的 job、对应的 commit、结论），放进 [docs/reports/](README.md) 并进索引 —— 否则本报告里最硬的一条证据读者无法自行复核 |
+| 17 | 仓库内无落盘记录 | CI 的运行结果只有机制（[ci.yml](../../.github/workflows/ci.yml)）没有结果——tag `v1.0.0` 那次 run 实际以 `failure` 结束、4 个 job 红 | 落盘一份运行记录（run 链接、时间、覆盖的 job、对应的 commit、结论），放进 [docs/reports/](README.md) 并进索引 —— 否则读者无从判断「这个发布版本的 CI 结论是什么」 |
 | 18 | [reader-dry-run.md](reader-dry-run.md):12-13、:41、:63 | 文中多处把 `0104ccb` 当作「tag 所指提交」 | 加一句「本文写于 tag 重打之前，当前 tag 指向 `75976e0`」，与 §7 已有的说明一致 |
 
 ---
