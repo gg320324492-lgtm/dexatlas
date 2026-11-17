@@ -459,6 +459,9 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Installation](docs/install.md)** — every command verified against a fresh clone
 - **[Current status](docs/status.md)** — where the project stands and what is left
   (Chinese; 当前状态)
+- **[How to verify every claim](docs/how-to-verify.md)** — the commands to re-check this
+  project's own numbers yourself, what you should see, and which claims are not met
+  (Chinese; 怎么自己复核这个项目说的每句话)
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend produced
   which conclusion, and how to check it yourself (Chinese; 分析覆盖度与证据来源)
 - **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
