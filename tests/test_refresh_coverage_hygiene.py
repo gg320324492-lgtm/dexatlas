@@ -188,6 +188,67 @@ def test_a_second_measurement_in_the_same_checkout_is_refused(tmp_path: Path) ->
     again.close()
 
 
+def test_the_slot_guards_the_checkout_report_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A run pointed at another document does not fight over this one.
+
+    The slot exists so that two measurements do not write the same report.
+    A run that writes a copy somewhere else -- the test suite refreshes
+    copies of the report -- leaves the checkout's report alone, so the slot
+    must not refuse it.
+    """
+    script = _figure_script()
+    monkeypatch.setattr(script, "MEASUREMENT_LOCK", tmp_path / "measure.lock")
+
+    def measure_code_tests() -> Any:
+        return script.Outcome(
+            counts={"passed": 1, "failed": 0, "skipped": 0, "xfailed": 0, "deselected": 0},
+            failures=(),
+        )
+
+    def measure_report_checks(candidate: str, report_path: Path) -> Any:
+        return script.Outcome(counts={"passed": 2, "failed": 0, "skipped": 0, "xfailed": 0})
+
+    def measure_status_checks(
+        report_candidate: str, status_candidate: str, report_path: Path, status_path: Path
+    ) -> Any:
+        return script.Outcome(counts={"passed": 2, "failed": 0, "skipped": 0, "xfailed": 0})
+
+    monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
+    monkeypatch.setattr(script, "measure_report_checks", measure_report_checks)
+    monkeypatch.setattr(script, "measure_status_checks", measure_status_checks)
+    monkeypatch.setattr(
+        script,
+        "read_coverage",
+        lambda: script.Coverage(files={"cli/main.py": [10, 1]}, statements=10, missing=1),
+    )
+    monkeypatch.setattr(script, "collected_tests", lambda marker: (1, 1))
+    monkeypatch.setattr(script, "collected_at_tag", lambda tag: None)
+
+    copy = tmp_path / "a-copy-of-the-report.md"
+    copy.write_text(_minimal_report(), encoding="utf-8")
+
+    slot = script.try_measurement_slot()
+    assert slot is not None
+    try:
+        script.main(["--report", str(copy)])
+        refused = capsys.readouterr().out
+        assert "already running in this checkout" not in refused, (
+            "a run that writes another document was refused by the checkout's slot"
+        )
+
+        script.main([])
+        refused = capsys.readouterr().out
+        assert "already running in this checkout" in refused, (
+            "a second run that would write the checkout's report was not refused"
+        )
+    finally:
+        slot.close()
+
+
 def _minimal_report() -> str:
     """A report with the figures and the record the refresh script owns."""
     record = {

@@ -1200,14 +1200,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {tag}: {entry['tests'] if entry else 'not measured'} tests")
 
     print("Running the suite with coverage (this takes a couple of minutes)...")
-    slot = try_measurement_slot()
-    if slot is None:
-        print(
-            "Another measurement is already running in this checkout. Two of them would "
-            "fight over the report, so this one did not start."
-        )
-        return 1
-    atexit.register(slot.close)
+    if report_path == REPORT_PATH:
+        # Only a run that writes this checkout's report needs the slot: two of
+        # them would fight over it, the second to finish writing the numbers
+        # the first one measured. A run pointed at another document writes
+        # that document and leaves this one alone.
+        slot = try_measurement_slot()
+        if slot is None:
+            print(
+                "Another measurement is already running in this checkout. Two of them would "
+                "fight over the report, so this one did not start."
+            )
+            return 1
+        atexit.register(slot.close)
     discard_stale_coverage()
     discard_stale_measurement_data()
     code = measure_code_tests()
