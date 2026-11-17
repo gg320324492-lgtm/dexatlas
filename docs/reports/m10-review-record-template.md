@@ -14,7 +14,7 @@
 | 姓名或代号 |  |
 | 是否参与实现 | 是 / 否（必须如实） |
 | 验收日期 |  |
-| commit hash |  |
+| commit hash | 照抄[邀请函成稿 §2](m10-invitation-final.md)钉定的那一串完整 hash（40 位） |
 | 副本来源 |  |
 | 操作系统与版本 |  |
 | Python / uv / JDK / Docker |  |
