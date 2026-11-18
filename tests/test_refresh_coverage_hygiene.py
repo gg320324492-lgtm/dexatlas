@@ -542,3 +542,36 @@ def test_the_check_does_not_compare_the_coverage_of_two_different_machines(
         "the check compared the coverage of two measurements that exercised different code:\n" + out
     )
     assert "were not compared" in out
+
+
+def test_a_run_whose_summary_line_follows_a_failure_is_still_counted() -> None:
+    """A run with a failure in it has its counts read.
+
+    pytest prints the failed test's assertion in the short summary, and that
+    line contains an ``==``. A reader that lets its match cross a line starts
+    there, runs on into the next line and swallows the ``=`` rules that open
+    the summary line: the last match is then the tail of that summary with
+    nothing in it, and a run that passed twelve tests and failed one comes
+    out as zero passed and zero failed.
+
+    The summary line is only preceded by an ``assert`` line when something
+    failed, which is why this stayed hidden: locally every self-check passed,
+    on the runner one failed, and only there did the run print the line that
+    broke the reader. The output below is the runner's, trimmed to the part
+    that matters.
+    """
+    script = _figure_script()
+    output = (
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_docs.py::test_execution_report_suite_figures_add_up_to_the_tests"
+        "_that_exist - AssertionError: the report says 1681 passed, 1 skipped, 0 xfailed, "
+        "0 failed and 0 xpassed, which is 1682\n"
+        "assert 1682 == 1695\n"
+        "================ 1 failed, 12 passed, 1682 deselected in 12.11s ================\n"
+    )
+
+    counts = script.outcome_counts(output)
+
+    assert counts["passed"] == 12, counts
+    assert counts["failed"] == 1, counts
+    assert counts["deselected"] == 1682, counts
