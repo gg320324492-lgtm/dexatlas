@@ -144,14 +144,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里三样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1695**（**1546** 快 + **149** 集成）。
+* **收集到的测试数** —— 当前这棵树上应当是 **1701**（**1552** 快 + **149** 集成）。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1546/1695 tests collected (149 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1695 tests collected (1546 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1552/1701 tests collected (149 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1701 tests collected (1552 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -453,7 +453,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:tests.total-->1695<!--/fig-->
+<!--fig:tests.total-->1701<!--/fig-->
 ```
 
 **改了会怎样？**
