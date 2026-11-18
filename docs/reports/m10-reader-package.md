@@ -286,7 +286,7 @@ uv run --no-sync python -c \
   5 截断、6 跑完但没有可用的代码索引（`EXIT_NO_INDEX`，v1.0.0 新增；自动化脚本
   请用 `exit_code in (0, 6)` 或 `summary.index_complete` 区分）；至少实测
   0/1/2 各一次。语义见[公共契约表](../architecture/public-contracts.md)。
-- **契约实测（F5–F6）**：
+- **契约实测（F5–F6）**（可照抄的命令与三个退出码的含义见 [§9.2](#92-契约活检与本机配置)）：
 
   ```bash
   uv run --no-sync pytest tests/test_public_contracts.py -q
@@ -300,7 +300,7 @@ uv run --no-sync python -c \
   [高风险声明清单](#4-需要重点核查的高风险声明)）各自证明什么、不证明什么。
 - **故障恢复（G1–G4）**：坏输入（非 ZIP 当 APK）应退出码 2 且不留半成品；
   清空后端环境变量后分析仍完成并写明 `not_installed`；同一 APK 分析两次
-  project id 相同。
+  project id 相同。四条可照抄的命令与预期输出见 [§9.1](#91-g-组故障恢复的可照抄命令)。
 
 ### 3.9 第 9 步：按检查表逐项打分
 
@@ -499,3 +499,135 @@ commit 上跑出来的不同，**以你的实测为准**，不要据此判「作
 打分、回填与常见问答另有[读者工具包](m10-reader-kit.md)：空白评分表（维度与权重
 逐字沿用[准备包 §5](m10-acceptance-pack.md)）、回填说明（写到哪、怎么交、耗时预期、
 遇到问题找谁）与 FAQ。工具包同样不含任何验收结论，也不预填任何分数。
+
+## 9. 附录：两条要照抄的补充路径
+
+§3 的路径里有两步只给了一句概括，读者最容易卡在这两处：**故障恢复（G 组）**与
+**契约活检**。本节把两处的可照抄命令、预期输出与「这个数字为什么是这样」写全。
+
+### 9.1 G 组故障恢复的可照抄命令
+
+这四条命令互相独立，各跑各的；每条跑完把**退出码**与**关键输出**抄进记录。
+下面标「实测」的输出是 2026年11月18日在 Windows 11 + JDK 21 + 三个后端齐备的机器
+上跑出来的（同一棵工作树）。换一台机器，耗时与「1 秒内能不能跑完」会不同——
+**判据是行为，不是数字**。
+
+**G1 坏输入（拿非 ZIP 当 APK 分析）**
+
+```bash
+uv run dexatlas analyze README.md
+```
+
+预期退出码 **2**，一行能读懂的错误（实测）：
+
+```text
+Not a usable APK: README.md is not a ZIP archive; APKs are ZIP archives
+```
+
+再确认**工作区里没有留下半成品项目**（实测）：
+
+```bash
+uv run dexatlas projects
+```
+
+预期：`No projects yet. Run \`dexatlas analyze <apk>\`.`——列表是空的。
+
+**G2 后端缺失（降级，不抛异常）**
+
+```bash
+DEXATLAS_JADX_PATH= DEXATLAS_APKTOOL_JAR= uv run dexatlas analyze examples/demo-app/demo.apk
+```
+
+预期退出码 **0**，报告照常产出，两条 `not_installed` 记进 `errors[]`（实测）：
+
+```text
+!  apktool is not installed or not on PATH: ...
+!  jadx is not installed or not on PATH: ...
+```
+
+PowerShell 写法：`$env:DEXATLAS_JADX_PATH=""; $env:DEXATLAS_APKTOOL_JAR=""; uv run dexatlas analyze examples/demo-app/demo.apk`。
+
+**空值与不写是两件事**：写成空值是「关掉这个后端」，不写这两个变量是「按默认路径
+去找它」（变量表见 [install.md](../install.md)）。报告 JSON 里 `errors[]` 的两条
+`code` 是 `not_installed`，`tools` 里 `jadx` 与 `apktool` 为 `null`、`androguard`
+有版本号；计数低于 A4 基线（5 classes / 1 resource string → 实测 4 classes /
+0 resource strings）是**降级不是回归**。
+
+> **当场抄下这一次的 stdout**：重复分析会把该项目的**最新一次运行**换成新的一次
+> （见 §3.3 的提醒），重跑之后就找不回这次的 `not_installed` 证据了。
+
+**G3 后端超时**
+
+超时的可配置点是环境变量 **`DEXATLAS_TOOL_TIMEOUT_SECONDS`**：**每个后端各自的
+超时秒数**，默认 **900**（变量表见 [install.md](../install.md)）。它读在
+`src/dexatlas/config/settings.py` 的 `tool_timeout_seconds` 上，变量名由
+`env_prefix="DEXATLAS_"` 加字段名拼出，取值不得小于 1。**它是环境变量，不是 CLI
+参数**——`dexatlas analyze --help` 里找不到它。
+
+```bash
+DEXATLAS_TOOL_TIMEOUT_SECONDS=1 uv run dexatlas analyze examples/demo-app/demo.apk
+```
+
+预期：报告照常产出，超时的后端**各记一条 `timeout`**（实测）：
+
+```text
+!  apktool exceeded its 1s timeout; its launcher had already exited
+!  androguard exceeded its 1s timeout; its launcher had already exited
+!  jadx exceeded its 1s timeout and was terminated
+```
+
+报告 JSON 里 `errors[]` 每条的 `code` 是 `timeout`；`summary.index_complete` 是
+**false**，`summary.index_gaps` 里有一条 `androguard` 的 `timeout`。
+
+> **退出码是 0，不是 6——这是对的。** 退出码 6（`EXIT_NO_INDEX`）说的是「跑完了，
+> 但**一个符号都没索引到**」；1 秒超时下 androguard 已经把类表交出来了
+> （`5 classes`），索引是**残缺**而不是**空**——残缺由 `index_complete=false` 与
+> `index_gaps` 说明，退出码仍是 0。要拿到 6，需要「三个后端全失败**且**一个类都
+> 没索引到」，而这个分支用超时变量在 demo APK 上测不出来（androguard 总是先交出
+> 类表）；它由契约活检脚本用一个没有索引的分析触发
+> （`scripts/verify-public-contracts.py` 里的 `an analysis with no index exits 6`）。
+> **把实际退出码记进记录**——准备包 G3 的判据就是「记录实际退出码」。
+
+> **若 androguard 在你的机器上 1 秒内就跑完了**，`errors[]` 会只有两条、
+> `index_complete` 是 `true`——**这同样是正确行为**（没超时的后端不留 `timeout`
+> 记录）。判据是「后端失败时记 `timeout`、不抛异常、报告照常产出」，
+> 不是「一定有三条 `timeout`」。
+
+**G4 幂等（同一个 APK 连着分析两次）**
+
+```bash
+uv run dexatlas analyze examples/demo-app/demo.apk
+uv run dexatlas analyze examples/demo-app/demo.apk
+uv run dexatlas projects
+```
+
+预期（实测）：两次的 project id 相同（`apk_80a8fe0e81204c9f`）、退出码都是 0；
+`projects` 只列 **1** 条，计数两次一致——project id 由 APK 的 sha256 决定，重跑是
+**更新同一个项目**，不是新建一个。
+
+### 9.2 契约活检与本机配置
+
+§3.8 的活检脚本 `scripts/verify-public-contracts.py` 在**装没装后端两种配置下都
+退出 0**：没装 JADX / Apktool 时它跑 47 条断言（少一条源码端点的 header 断言），
+三个后端齐备时跑 48 条——退出码一样是 0。所以**「本地绿」不等于「CI 绿」**：本地
+那台机器可能根本没跑过带 JADX 的那几条断言，而 CI 里有一道 job 是**刻意不装后端**
+的。
+
+契约表 §7 自己记着这个分叉（47 与 48 两行），下面这条命令会替你问「这台机器是不是
+CI 那台」：
+
+```bash
+uv run --no-sync python scripts/check-contract-records.py --expect with-jadx
+```
+
+它自己会把活检跑一遍，再拿这一次的结果跟契约表 §7 的记录比。三个退出码各有一句
+话，**不要把它们混为一谈**：
+
+| 退出码 | 意思 | 你该做什么 |
+|---|---|---|
+| 0 | 契约成立，**而且这台机器就是 CI 那台配置**（三个后端都在） | 记 0 |
+| 2 | 契约成立，但**这台机器不是那个配置**（没装 JADX / Apktool，或活检没跑到记录里描述的路径） | **需人工**：装上后端再跑一遍（`bash scripts/install-backends.sh`），或如实记录「本机未验证带 JADX 的那半边」 |
+| 1 | 契约破了，或契约表的记录已经过时 | 记 1，这是缺陷 |
+
+CI 上是**两道门**：装了后端的那道用 `--expect with-jadx`，**刻意不装后端**的那道用
+`--expect without-jadx`。两道题的期望不同——**别拿一道的绿当另一道的答案**。

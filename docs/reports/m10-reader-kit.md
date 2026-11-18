@@ -19,7 +19,7 @@
    遇到问题找谁」。它不替代[准备包](m10-acceptance-pack.md)的 40 项判定标准，
    也不替代[记录模板](m10-review-record-template.md)。
 2. **独立验收尚未开始。** 仓库里没有任何一项验收结论被判定为「通过」
-   （`docs/reports/m10-acceptance-pack.md:3`、`docs/status.md:128`）。
+   （`docs/reports/m10-acceptance-pack.md:3`、`docs/status.md:132`）。
 3. **M6 未达验收线，如实告知。** 修复后三轮完整重测合计 49/60 = 81.7%，
    低于三轮合计 ≥54/60 的验收线（`docs/benchmarks/m6-level2-retest4.md:83`）；
    窄验证转通过 3/6，未达 ≥4 的判据（`docs/benchmarks/m6-level2-narrow-verify3.md:61`）。
@@ -164,7 +164,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 - **提交物**：一份填写完成的[验收记录模板](m10-review-record-template.md)（Markdown 文件），
   含元数据、会话记录、卡点、客户视角备忘、（如承担）源码评审记录与两张评分表。
 - **回传方式**：按邀请函第六节指定的渠道交给验收发起人（邀请函发出时填写的
-  收件渠道，`docs/reports/m10-invitation-final.md:146`）。**不要自行 push 到仓库**；
+  收件渠道，`docs/reports/m10-invitation-final.md:184`）。**不要自行 push 到仓库**；
   如发起人要求归档，按其指定渠道提交。
 - **附 commit**：记录里必须写明所验的 commit hash（邀请函成稿 §2 钉定的那一串
   完整 hash，模板 §1「commit hash」栏），
@@ -172,7 +172,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
   拉取新提交。
 - **原始材料留本机**：日志、截图、证据包、`.dexatlas/` 工作区都留在你自己的机器上；
   仓库只接收脱敏后的记录——个人路径、密钥、账号一律写 `<redacted>`
-  （`docs/reports/m10-invitation-final.md:153`）。
+  （`docs/reports/m10-invitation-final.md:183`）。
 - **别带进来**：第三方 APK、DEX、`so`、含个人路径的日志、任何密钥。
 
 ### 3.3 耗时预期
@@ -236,7 +236,7 @@ jadx / apktool / androguard 各自「not installed」及原因，并把缺失造
 以**实际输出**为准，把差异写成卡点（模板 §3）：完整命令、退出码、原始输出、
 你期望的依据（文档哪一节哪一句）、是否可以重试、是否阻断后续。确认是自己的环境问题
 才修复后重试，**两次输出都留下**。文档缺步骤本身就是缺陷，不要替项目圆场
-（`docs/reports/m10-reader-package.md:44`）。特别提醒：M6 的数字以仓库落盘报告为准——
+（`docs/reports/m10-reader-package.md:46`）。特别提醒：M6 的数字以仓库落盘报告为准——
 修复后三轮完整重测逐轮 15/20、16/20、18/20、合计 49/60 = 81.7%
 （`docs/benchmarks/m6-level2-retest4.md:82`），另有一次更早的重测逐轮为 17/15/17
 （`docs/benchmarks/m6-level2-retest3.md:85`）；两者合计都是 49/60。看到不同文档里的
@@ -247,7 +247,7 @@ jadx / apktool / androguard 各自「not installed」及原因，并把缺失造
 含义是：**本次验收只认这一个 commit**。clone 后执行 `git checkout v1.0.0`，
 用 `git rev-parse HEAD` 核出的 hash 应与邀请函成稿 §2 填的那一串逐字相同；此后
 不要切换分支、不要拉取新提交，所有记录写明该 hash；不要用会移动的 `main` 分支做验收
-（`docs/reports/m10-invitation-final.md:54`）。这个 commit 由验收发起人钉定，邀请函里引用的
+（`docs/reports/m10-invitation-final.md:91`）。这个 commit 由验收发起人钉定，邀请函里引用的
 M6 数字对应的是该 commit 所在树上的落盘报告（`docs/benchmarks/m6-level2-retest4.md`）；
 若 clone 后找不到该 hash 或 `git checkout v1.0.0` 取不到，先联系发起人，不要自行换用
 其他提交。规则上的原因：验收针对一个
@@ -334,14 +334,14 @@ commit），不是验收 commit 的现状；数字对不上时以你的实测为
 | GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:477`–`:482` | §5.2 原文表 |
 | Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:491`–`:496` | §5.3 原文表 |
 | 基线 GitHub 约 75% / Upwork 约 65% | `docs/reports/portfolio-readiness-2026-11-15.md:28` | 人工基线，不是接单概率 |
-| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:501` | 门槛，不是预测 |
+| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:502` | 门槛，不是预测 |
 | M6 三轮合计 49/60 = 81.7% | `docs/benchmarks/m6-level2-retest4.md:38` | 脚本重算生成 |
 | M6 逐轮 15/20、16/20、18/20 | `docs/benchmarks/m6-level2-retest4.md:82` | 未达每轮 ≥16/20 的轮次存在 |
 | 验收线 每轮 ≥16/20、合计 ≥54/60 | `docs/benchmarks/m6-level2-retest4.md:83` | 未达 |
 | 更早一轮重测逐轮 17/15/17 | `docs/benchmarks/m6-level2-retest3.md:85` | 合计同为 49/60 |
 | 窄验证转通过 3/6（门槛 ≥4） | `docs/benchmarks/m6-level2-narrow-verify3.md:59` | 未达判据 |
 | 窄验证确定性修复相关题 3/5 | `docs/benchmarks/m6-level2-narrow-verify3.md:60` | — |
-| M10 独立验收尚未开始 | `docs/status.md:128`、`docs/reports/m10-acceptance-pack.md:3` | 如实状态 |
+| M10 独立验收尚未开始 | `docs/status.md:132`、`docs/reports/m10-acceptance-pack.md:3` | 如实状态 |
 | 冷缓存首次 10–20 分钟 | `docs/reports/m10-reader-package.md:69` | 时间口径 |
 | 验收 commit（v1.0.0 发版 commit） | `docs/reports/m10-invitation-final.md:60` | 由验收发起人钉定；完整 hash 填在邀请函成稿 §2 的占位符里 |
 
