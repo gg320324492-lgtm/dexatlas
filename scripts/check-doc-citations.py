@@ -136,6 +136,11 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "denominator-and-tree-pass.md",
     REPO / "docs" / "reports" / "local-vs-ci-gates.md",
     REPO / "docs" / "reports" / "english-reader-review-2.md",
+    # The evidence package's isolation report: it quotes the line numbers of
+    # the packager, of the pipeline that produced the workspace it checked and
+    # of the paths module. A citation nobody checks is a citation nobody has
+    # to keep true.
+    REPO / "docs" / "reports" / "evidence-package-isolation.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]

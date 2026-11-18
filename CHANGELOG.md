@@ -29,6 +29,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **证据包只装本次分析自己的文件。** `dexatlas export` 的打包器此前把「被证据引用到的任意文件」从反编译目录复制进包，既不解析链接，也不问那个文件是不是反编译器写的产物——反编译树里一个指向树外的链接会被当成分析的一个源文件原样复制给客户。现在复制之前先过两道：文件必须在反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或 `resources/`）；不满足的文件不进包，引用仍留在证据里，并由 `verify_citations` 记为未解析而不是假装带上了。清单的形状与 `not_included` 三键未变（那是公共契约，另议）。核对报告：[证据包的隔离边界](docs/reports/evidence-package-isolation.md)；回归测试：`tests/test_evidence_package_isolation.py`（5 条，其中 3 条在旧实现下变红）。
 - 自查判据条数在材料里的表述随之更新：`docs/reports/m10-selfcheck.md`、
   `docs/reports/m10-invitation-sender-checklist.md`、`docs/reports/ci-gate-coverage.md`、
   `docs/status.md`、`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md`。
