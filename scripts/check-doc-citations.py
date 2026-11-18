@@ -152,6 +152,17 @@ DOCS: list[pathlib.Path] = [
     # the JSON report's summary keys, the sample's pinned numbers and the CI
     # step that checks them, so all of those have to keep being true.
     REPO / "docs" / "reports" / "docker-image-samples.md",
+    # The wording of the "the backend did not finish" evidence record: it
+    # quotes the evidence module and the pipeline that writes the record, so
+    # the line numbers it names have to keep being true.
+    REPO / "docs" / "reports" / "evidence-incomplete-backend-wording.md",
+    # The outward-number parity report: it quotes the lines of the four
+    # outward texts it compared and of the checker it wrote.
+    REPO / "docs" / "reports" / "outward-number-parity.md",
+    # The candidate that carries the manifest's fourth key forward to v1.1.0:
+    # it quotes the packager, the contract table and the three places that
+    # pin the manifest's shape.
+    REPO / "docs" / "reports" / "v1.1.0-candidate-c10-manifest.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]

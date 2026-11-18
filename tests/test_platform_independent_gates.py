@@ -821,8 +821,8 @@ def test_every_ci_job_redirects_its_temporary_directory() -> None:
     text = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     tmp_steps = text.count("Keep generated files in .scratch")
     sync_steps = text.count("uv sync")
-    assert tmp_steps == 9, f"{tmp_steps} jobs redirect their temporary directory"
-    assert sync_steps == 11, f"{sync_steps} steps install dependencies"
+    assert tmp_steps == 10, f"{tmp_steps} jobs redirect their temporary directory"
+    assert sync_steps == 12, f"{sync_steps} steps install dependencies"
 
 
 # ---------------------------------------------------------------------------

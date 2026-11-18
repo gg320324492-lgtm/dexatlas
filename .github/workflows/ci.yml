@@ -780,6 +780,15 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+      - name: Keep generated files in .scratch
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
+          {
+            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
+          } >> "$GITHUB_ENV"
       - name: Install dependencies
         run: uv sync --extra dev --frozen
       - name: The outward texts agree on the release numbers
