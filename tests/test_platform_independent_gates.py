@@ -664,7 +664,9 @@ def test_wait_for_analysis_reads_a_project_that_appears_later() -> None:
         def get(self, path: str) -> _Response:
             return _Response(answers.pop(0) if answers else {"status": "completed"})
 
-    assert script.wait_for_analysis(_Client(), "apk_x", attempts=5, pause=0) == "completed"
+    assert script.wait_for_analysis(_Client(), "apk_x", attempts=5, pause=0) == {
+        "status": "completed"
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -723,7 +725,7 @@ def test_the_analysis_budget_grows_with_the_backends(monkeypatch: pytest.MonkeyP
 
     monkeypatch.setattr(script, "_backends_installed", lambda: False)
     started = script.wait_for_analysis(_Client(), "apk_x", pause=0)
-    assert started == "pending"  # the loop ran its 240 attempts
+    assert started == {"status": "pending"}  # the loop ran its 240 attempts
 
     monkeypatch.setattr(script, "_backends_installed", lambda: True)
     script.wait_for_analysis(_Client(), "apk_x", pause=0)
@@ -820,7 +822,7 @@ def test_every_ci_job_redirects_its_temporary_directory() -> None:
     tmp_steps = text.count("Keep generated files in .scratch")
     sync_steps = text.count("uv sync")
     assert tmp_steps == 9, f"{tmp_steps} jobs redirect their temporary directory"
-    assert sync_steps == 9
+    assert sync_steps == 11, f"{sync_steps} steps install dependencies"
 
 
 # ---------------------------------------------------------------------------

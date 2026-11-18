@@ -138,10 +138,11 @@ def wait_for_analysis(client, pid, attempts: int | None = None, pause: float = 0
     """
     if attempts is None:
         attempts = 1200 if _backends_installed() else 240
-    status = ""
+    project: dict[str, Any] = {}
     for _ in range(attempts):
         project = client.get(f"/projects/{pid}").json()
-        if project.get("status", "") in {"completed", "failed"}:
+        status = project.get("status", "")
+        if status in {"completed", "failed"}:
             break
         time.sleep(pause)
     return project

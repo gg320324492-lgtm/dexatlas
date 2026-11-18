@@ -253,6 +253,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_agent_round3_transcript_budget.py` | 真实工具 + 计量 provider 的整链路预算回归：字符串常量页任务在门限内作答而非预算耗尽（M6 第三轮修复新增） |
 | `test_review_fixes.py` | 审查遗留修复回归：证据记录承载被裁源码文本（分块 + 截断声明）、source/reference 四工具 offset 分页、call_sites/callees 纳入行裁剪、裁剪提示如实指向分页续读（M-1/L-1 修复新增） |
 | `test_social_preview.py` | 首页 social preview 卡：图上的数与报告里的数必须一致；报告变了而图没重画（旁证的数对不上、图被手改过、徽章与卡片分家）都要判红 |
+| `test_platform_independent_gates.py` | 门禁的平台无关性：链接检查、指纹归一化、子进程输出解码等规则在脚本自身上钉死 |
 
 ### 2.2 几类值得注意的测试
 
