@@ -190,13 +190,13 @@ facts:
   package version: 1.0.0
   changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.0
-documents read: 110
+documents read: 142
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
-findings: 2 (2 already in 8f9ddcaf)
-  docs/releases/v0.2.0.md:326  release-coverage  it says the coverage is 91.0%, the measured coverage is 91.6%
-  CHANGELOG.md:1033  release-coverage  it says the coverage is 93.9%, the measured coverage is 91.6%
+findings: 2 (2 already in 9e1aa616)
+  docs/releases/v0.2.0.md:326  release-coverage  it says the coverage of the release is 91.0%, the measured coverage is 91.6%
+  CHANGELOG.md:1072  release-coverage  it says the coverage of the release is 93.9%, the measured coverage is 91.6%
 
 Every version claim matches the repository.
 ```
@@ -205,7 +205,7 @@ Every version claim matches the repository.
 增删一份文档，这个数就变）里出现的版本号、发布日期、覆盖率和 tag 跟 git 事实
 （tag 列表、`pyproject.toml` 的版本、CHANGELOG）逐条比对。
 
-`findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 8f9ddcaf`）：
+`findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 9e1aa616`）：
 两份文档在描述**已发布的历史版本**时引用了当时的覆盖率，而门禁用当前树的覆盖率
 作参照，所以差一个百分点。门禁知道它们是历史事实，不判失败——但它**把这两条摆在你
 面前**，而不是藏起来。这是这个项目的习惯：**已知偏差要写出来，不要静音**。

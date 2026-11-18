@@ -500,8 +500,8 @@ Tests 徽章指向同一份报告的 §2.1（分层策略）；在卡片正上�
 | `开源、证据优先的 Android 逆向工程与移动应用分析平台。` | `README.zh-CN.md:7` | `README.zh-CN.md:7` 逐字 | ✅ 一致 |
 | `93.3%` | `phase1-execution-report.md:77` | `:77` `<!--fig:coverage.pct-->93.3%<!--/fig-->` | ✅ 一致 |
 | `7135/7650 行` | `phase1-execution-report.md:77` | `:77` `coverage.covered` / `coverage.total` | ✅ 一致 |
-| `1632` | `phase1-execution-report.md:76` | `:76` `<!--fig:tests.total-->1632<!--/fig-->` | ✅ 一致 |
-| `1485 快 + 147 集成` | `phase1-execution-report.md:76` | `:76` `tests.fast` / `tests.slow` | ✅ 一致 |
+| `1644` | `phase1-execution-report.md:76` | `:76` `<!--fig:tests.total-->1644<!--/fig-->` | ✅ 一致 |
+| `1497 快 + 147 集成` | `phase1-execution-report.md:76` | `:76` `tests.fast` / `tests.slow` | ✅ 一致 |
 | `49` / `公共契约检查项` | `public-contracts.md:348` | 实为 **`:355`** | ❌ 行号错，见 1.7 |
 | `28 REST + 6 MCP + 15 CLI`（合计 49 项） | `public-contracts.md:348` | 实为 **`:355`** | ❌ 行号错，见 1.7 |
 | `MCP 只读工具 11 个` | `public-contracts.md:207-217` | `:203` §3.1 表头，`:207-217` 恰 11 行工具 | ✅ 一致 |
@@ -638,8 +638,8 @@ sed -n '755,790p' tests/test_public_contracts.py
 ## 6. 给主会话的一句话
 
 图可以留，问题全在它旁边：**重测量一落定，卡片必须手工重画**（没有任何自动化会做这件事），
-而重画之前得先把 `README.md:15`、`:21` 的 `1612`、howto §4 的两处错、`49` 的分项口径
-这四件事定下来——否则重画出来的图仍然是上一轮的世界。
+而重画之前得先把 howto §4 的两处错、`49` 的分母口径这两件事定下来——否则重画出来的图
+仍然是上一轮的世界。
 
 ---
 

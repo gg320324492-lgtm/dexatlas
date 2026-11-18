@@ -35,11 +35,11 @@
 
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
-| 源指纹 / 源码指纹 | source fingerprint | 对 `src/`、`tests/`、`pyproject.toml` 和测量脚本求的哈希；它回答「还是不是同一份代码」，不回答「这份代码还绿吗」。 | `reports/release-process-dry-run.md:62`、`reports/v1.1.0-candidates.md:106`、`reports/portfolio-readiness-2026-11-18.md:442`、`reports/v1.0.0-release-checklist.md:529`、`reports/ci-gate-coverage.md:14`、`reports/phase1-execution-report.md:985` | dry-run:62 是（已补）· candidates:106 是（已补）· portfolio:442 否 · checklist:529 否 · ci-gate-coverage:14 否（§2.1 从 :91 起解释边界）· phase1-execution-report:985 是 |
+| 源指纹 / 源码指纹 | source fingerprint | 对 `src/`、`tests/`、`pyproject.toml` 和测量脚本求的哈希；它回答「还是不是同一份代码」，不回答「这份代码还绿吗」。 | `reports/release-process-dry-run.md:62`、`reports/v1.1.0-candidates.md:105`、`reports/portfolio-readiness-2026-11-18.md:442`、`reports/v1.0.0-release-checklist.md:529`、`reports/ci-gate-coverage.md:14`、`reports/phase1-execution-report.md:985` | dry-run:62 是（已补）· candidates:105 是（已补）· portfolio:442 否 · checklist:529 否 · ci-gate-coverage:14 否（§2.1 从 :91 起解释边界）· phase1-execution-report:985 是 |
 | 完整测量 / 重测量 | full measurement | 跑一遍完整测试套件并测覆盖率，把结果写回报告与 README 徽章；数字由此而来。 | `reports/release-process-dry-run.md:66`、`reports/v1.0.0-release-checklist.md:381`、`reports/ci-gate-coverage.md:12` | dry-run:66 否 · checklist:381 是（§8.1 L1 行给出命令）· ci-gate-coverage:12 否 |
 | 独占测量 | exclusive measurement | 同一个 checkout 同一时刻只允许一个测量进程在跑；两个进程会互相污染覆盖率数据。 | `reports/release-process-dry-run.md:194`、`reports/v1.0.0-release-checklist.md:353`、`reports/coverage-guard-audit.md:86` | dry-run:167 是（已补）· checklist:353 是（§7 N1 整节讲机制）· coverage-guard-audit:86 是 |
 | 基线 / 基准 | baseline | 一条判断所依据的那棵树或那个提交。同一个数字在不同基线上读出来可能不同。 | `reports/README.md:14`、`reports/release-process-dry-run.md:11`、`reports/portfolio-readiness-2026-11-18.md:7`、`reports/v1.1.0-candidates.md:3`、`reports/v1.0.0-release-checklist.md:3` | README:14 是 · dry-run:11 是（就地写明基线是什么）· portfolio:7 否 · candidates:3 是（已补）· checklist:3 否（已补于 :8） |
-| 口径 | measurement basis | 这个数是在哪个分母、哪套题、哪条判分规则下算出来的。 | `roadmap/phase3-plan.md:58`、`reports/v1.1.0-candidates.md:91` | phase3-plan:58 否 · candidates:91 否 |
+| 口径 | measurement basis | 这个数是在哪个分母、哪套题、哪条判分规则下算出来的。 | `roadmap/phase3-plan.md:58`、`reports/v1.1.0-candidates.md:90` | phase3-plan:58 否 · candidates:90 否 |
 | 分母 / 分子 | denominator / numerator | 比值的上数与下数：测试总数，或代码总行数。⚠ 本仓库里"分母"有两义——**测试数** 与 **代码总行数**，换个口径就换个意思。 | `reports/release-process-dry-run.md:68`、`reports/v1.1.0-candidates.md:166`、`reports/ci-gate-coverage.md:178`、`reports/coverage-guard-audit.md:75` | dry-run:68 否 · candidates:166 是（并说明"两个分母不是一回事"） |
 | 一方代码覆盖率 / 一方 | first-party coverage | 本仓 `src/dexatlas` 自身代码的覆盖率，不含第三方库。 | `reports/coverage-guard-audit.md:414` | 否 |
 | 落盘 | persisted to disk | 由工具写进磁盘、并成为后续读数来源的那一步。 | `reports/coverage-guard-audit.md:167` | 否 |
@@ -147,7 +147,7 @@
 
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
-| 准备包 / M10 准备包 | M10 acceptance pack | 交给外部读者执行的 M10 验收材料包（清单、记录模板、读者包）。 | `reports/m10-acceptance-pack.md:1`、`reports/portfolio-readiness-2026-11-18.md:4`、`reports/v1.0.0-release-checklist.md:5`、`reports/v1.1.0-candidates.md:130` | acceptance-pack:1 是（标题即定义）· portfolio:4 否（已补于 :5）· checklist:5 是（已补）· candidates:130 否 |
+| 准备包 / M10 准备包 | M10 acceptance pack | 交给外部读者执行的 M10 验收材料包（清单、记录模板、读者包）。 | `reports/m10-acceptance-pack.md:1`、`reports/portfolio-readiness-2026-11-18.md:4`、`reports/v1.0.0-release-checklist.md:5`、`reports/v1.1.0-candidates.md:129` | acceptance-pack:1 是（标题即定义）· portfolio:4 否（已补于 :5）· checklist:5 是（已补）· candidates:129 否 |
 | 独立验收 | independent acceptance | 由一个没参与实现的人执行准备包里的 40 项检查并给出结论。 | `reports/portfolio-readiness-2026-11-18.md:8`、`reports/v1.0.0-release-checklist.md:41`、`reports/v1.1.0-candidates.md:27` | portfolio:4 否（已补于 :5）· checklist:41 是（§1.2 标题括注）· candidates:27 是（已补） |
 | 留人工 | left for a human reader | 脚本判不了、要由人读材料下结论的那几项检查。 | `reports/m10-selfcheck.md:25`、`reports/portfolio-readiness-2026-11-18.md:296`、`reports/v1.1.0-candidates.md:166` | m10-selfcheck:25 是（§2.2「明确留人工的 40 项」，从 :62 起）· portfolio:296 是（已补）· candidates:166 是（已补） |
 | 三态 | three-state verdict | 一个验收项的三种结论：通过 / 不通过 / 未验证。 | `reports/m10-acceptance-pack.md:27` | 否（三个取值在 :81 才列出） |

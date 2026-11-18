@@ -8,9 +8,9 @@
 
 ## 摘要
 
-- CI 只在 `main` 上触发（`.github/workflows/ci.yml:3-7`），**推发版分支没有 CI 兜底**。
+- CI 现在的触发条件是 `push` 收 `branches: [main, 'release/**']` 与 `tags: ['v*']`、`pull_request` 收 `main`（`.github/workflows/ci.yml:4-22`），**推发版分支有 CI 兜底**。（复核树 `062c4b5` 上只收 `branches: [main]`，本文 §1.1 引的是那一版。）**本节其余 CI 事实属于复核树 `062c4b5`**（2026-11-17）——`ci.yml` 此后增补了触发条件与 job，现行是 **10 个 job 定义**，push/PR 上 **10 次**、推 tag 上 **11 次**并行运行；下面引的 `ci.yml` 行号与 §1 的 job 清单只对 `062c4b5` 成立。
 - 本报告 §2 的 **21 项门禁/检查**里，**CI 实际跑 14 项**（其中 1 项是间接的：`tests/test_doc_citations.py:49` 调 `check-doc-citations.py` 的 `main()`）。**只存在于本地的是 6 道**：完整测量、契约活检、M10 自查、对外素材点检、Release 附录行号重锚、`docs/how-to-verify.md` 的示例输出核对。
-- **重打 tag 这一动作本身不会被任何 CI job 验到**：tag 推送不触发 workflow（`on.push` 只收 `main` 分支，`ci.yml:4-5`）。
+- **重打 tag 这一动作本身不会被任何 CI job 验到**：复核树 `062c4b5` 上 tag 推送不触发 workflow；**现在 `on.push` 收 `tags: ['v*']`，推 tag 会触发 workflow**（`ci.yml:4-22`），但重打 tag 仍然不会让那十一次 run 重跑一遍。
 - 源指纹只覆盖 `src/dexatlas/`、`tests/`、`pyproject.toml`、`scripts/refresh-report-figures.py`（`scripts/refresh-report-figures.py:111`、`:583-602`）。**改 `scripts/` 下其它脚本、改 `docs/`、改 README，都不会让报告的数字变陈旧** —— 本轮 74 个 commit 里改了 5 个脚本，指纹未变，`tests/test_docs.py` 仍然全绿。
 
 ---
@@ -46,7 +46,7 @@ on:
 | 5 | `docker`（`:374`） | Docker image builds | 镜像构建 | 默认（浅） |
 | 6 | `security`（`:384`） | Dependency audit | 依赖审计 | 默认（浅） |
 
-CI 一共 6 个 job、7 次并行运行（`test` 是 3.12 / 3.13 两份）。
+CI 一共 6 个 job、7 次并行运行（`test` 是 3.12 / 3.13 两份）——**这是复核树 `062c4b5` 上的数**；现行 `ci.yml` 是 **10 个 job 定义，push/PR 上 10 次、推 tag 上 11 次**并行运行（多出的是 `social-preview` 图检查，以及只在 tag 上跑的 `measurement`）。
 
 ### 1.3 checkout 深度与 tag 的可见性
 

@@ -26,7 +26,7 @@
 **没做什么（硬边界）。**
 
 - 未运行 `pytest --cov`、任何 `coverage` 命令、`uv sync`、`scripts/refresh-report-figures.py`；
-  因此覆盖率 93.3%、测试数 1,588 一律按已归档的测量值引用，不重测。
+  因此覆盖率 93.3%、测试数 1,644 一律按已归档的测量值引用，不重测。
 - 未修改被核的任何一份文件；本次只新增本文件。
 - 未向共享树 `E:\Dexatlas` 写入任何内容。
 
@@ -44,14 +44,14 @@
 
 | 位置 | 问题 | 依据 | 建议改法 |
 |---|---|---|---|
-| `docs/how-to-verify.md`（41 个相对链接，0 个页内锚点） | 无 | 逐个解相对路径后确认目标存在；页面引用的每个小节（§1.2 / §1.3 / §6 / §4 / §7 / §8 等）按标题文字核对存在 | — |
-| `docs/reports/README.md`（65 个相对链接 + 7 个页内锚点） | 无 | 7 个锚点全部按**标题文字**重算 slug 后命中：`#1-执行评审与阶段结论phase-12`、`#2-m4--m8-验收与模型可禁用性`、`#3-里程碑与对外准备度`、`#4-m10-独立验收材料`、`#5-v100-发版材料`、`#6-本轮审计与走查2026-11-17`、`#7-历史记录不要当现状读` | — |
+| `docs/how-to-verify.md`（43 个相对链接，0 个页内锚点） | 无 | 逐个解相对路径后确认目标存在；页面引用的每个小节（§1.2 / §1.3 / §6 / §4 / §7 / §8 等）按标题文字核对存在 | — |
+| `docs/reports/README.md`（91 个相对链接 + 7 个页内锚点） | 无 | 7 个锚点全部按**标题文字**重算 slug 后命中：`#1-执行评审与阶段结论phase-12`、`#2-m4--m8-验收与模型可禁用性`、`#3-里程碑与对外准备度`、`#4-m10-独立验收材料`、`#5-v100-发版材料`、`#6-本轮审计与走查2026-11-17–18`、`#7-历史记录不要当现状读` | — |
 | `README.md:462` | 无 | `docs/how-to-verify.md` 存在 | — |
 
 核对方法与结果留痕：`.scratch/check_links.py`（本 worktree 内，未进仓库）逐行解出全部
 markdown 链接（方括号文字 + 圆括号目标），`dest` 含锚点时按 GitHub 的 slug 规则
 （转小写、去标点、空格转连字符）重算目标文件的标题集合再比对。**锚点全部命中**，
-`docs/reports/README.md` 的 65 条链接（含 7 条页内锚点）全部指向真实存在的位置。
+`docs/reports/README.md` 的 91 条链接（含 7 条页内锚点）全部指向真实存在的位置。
 
 **但「路径」这一半本来就有门禁，「锚点」这一半没有。** 仓库里有一条相对链接门禁
 `tests/test_docs.py::test_all_relative_links_resolve`：它遍历仓库里**每一份** Markdown
@@ -97,9 +97,9 @@ markdown 链接（方括号文字 + 圆括号目标），`dest` 含锚点时按 
 
 | 数字 | 页面出处 | 落盘出处 | 判定 |
 |---|---|---|---|
-| 测试数 1,588 = 1,441 快 + 147 集成 | `how-to-verify.md:113`–`:119` | `docs/reports/phase1-execution-report.md:76`、`:143`–`:145`（`<!--fig:tests.total-->` 等标记）、`README.md:12` 徽章 | ✅ 一致；**且实跑复核过**（见 §4） |
-| 覆盖率 93.3%（7,117 / 7,631 行） | `how-to-verify.md` 未复述，索引页 `:109` 复述 | `phase1-execution-report.md:77`、`:1065`、`:1082` | ✅ 一致（7,117 / 7,631 = 93.25% → 93.3%） |
-| 源指纹 `sha256:787282…` | `docs/reports/README.md:109` | `phase1-execution-report.md:1082` = `sha256:78728268669a0179765a58ef637ab6acea7ecb92271550107b250ab38d4352fe` | ✅ 前缀一致 |
+| 测试数 1,644 = 1,497 快 + 147 集成 | `how-to-verify.md:113`–`:119` | `docs/reports/phase1-execution-report.md:76`、`:143`–`:145`（`<!--fig:tests.total-->` 等标记）、`README.md:12` 徽章 | ✅ 一致；**且实跑复核过**（见 §4） |
+| 覆盖率 93.3%（7,135 / 7,650 行） | `how-to-verify.md` 未复述，索引页 `:136` 复述 | `phase1-execution-report.md:77`、`:1065`、`:1098` | ✅ 一致（7,135 / 7,650 = 93.27% → 93.3%） |
+| 源指纹 `sha256:014da93a…` | `docs/reports/README.md:136` | `phase1-execution-report.md:1098` = `sha256:014da93a0cac506102c271a3bb957e93a4d60f6d547503c74426c17c37d4b69a` | ✅ 前缀一致 |
 | MCP 工具 11 个 | `docs/reports/README.md:109` | `scripts/verify-public-contracts.py:327`–`:339` `EXPECTED_TOOLS` 11 个；`tests/test_public_contracts.py` `EXPECTED_MCP_TOOLS` 11 个；`public-contracts.md:423`「恰为 §3.1 的十一个名字」 | ✅ 一致 |
 | CLI 13 个子命令 | `phase1-execution-report.md:55` 的 `<!--fig:cli.commands-->` | `refresh-report-figures.py:659` `cli.count("@app.command()")` → **实算 13** | ✅ 一致 |
 | REST 23 个端点 | `phase1-execution-report.md:56` 的 `<!--fig:api.endpoints-->` | `refresh-report-figures.py:660` 正则数路由 → **实算 23**；`tests/test_public_contracts.py` `EXPECTED_REST_ROUTES` 46 条（method+path 配对 = 23 个路径） | ✅ 一致 |
@@ -460,6 +460,6 @@ EXIT=0
 
 **这两页已经足够带一个访客走完一遍复核——前提是先把 §7 的第 1 条（`documents read`）与第 9 条
 （抓 fixture 的一步）补上，再把 §8.3 的那条命令补进 §1 第 2 行。** 改完之后，一个访客可以在
-**不向作者要任何东西**的前提下，自己确认「1,588 个测试」「93.3% 覆盖率」「11 个 MCP 工具」
+**不向作者要任何东西**的前提下，自己确认「1,644 个测试」「93.3% 覆盖率」「11 个 MCP 工具」
 「23 个 REST 端点」「13 个 CLI 子命令」「退出码 0–6」「契约活检 48/48」「M6 未达标」这八件事——
 这是这个项目第一次把「怎么复核」写成一篇访客能自己走完的路。

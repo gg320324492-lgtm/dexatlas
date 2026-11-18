@@ -582,9 +582,9 @@ $ .venv/Scripts/python.exe -m pytest tests/test_docs.py -q
 
 **建议改法**：三处改成
 
-> `CI runs nine jobs (ten parallel runs on a tag push, eight on a push or PR): lint/format/mypy, tests on Python 3.12 (every backend),`
+> `CI runs ten jobs (eleven parallel runs on a tag push, ten on a push or a PR): lint/format/mypy, tests on Python 3.12 (every backend),`
 
-并把 `contracts`、`m10-selfcheck`、`measurement` 列进括号里的清单。
+并把 `contracts`、`m10-selfcheck`、`social-preview`、`measurement` 列进括号里的清单。
 **注意 `CLAUDE.md` 与 `AGENTS.md` 必须逐字相同**（`tests/test_docs.py` 有一道判据守着
 「这两个文件是同一个文件」），改一处就要改另一处。
 
@@ -602,10 +602,10 @@ $ .venv/Scripts/python.exe -m pytest tests/test_docs.py -q
 
 **为什么现在不对**：`0f1400b` 把 portfolio 的「six CI jobs」改成了「ten CI jobs」，
 把**运行次数**写成了**job 数**。清单里列的那十项里，`test` 出现两次（3.12 与 3.13），
-所以是 9 个 job、10 次运行。
+所以是 10 个 job、push/PR 上 10 次运行、推 tag 上 11 次运行。
 
-**建议改法**：改成「nine CI jobs — ten parallel runs on a tag push (the `test` job runs
-twice, on 3.12 and 3.13)」，与 `docs/status.md` 与发版清单同口径。
+**建议改法**：改成「ten CI jobs — eleven parallel runs on a tag push, ten on a push or a
+PR (the `test` job runs twice, on 3.12 and 3.13)」，与 `docs/status.md` 与发版清单同口径。
 
 ---
 
@@ -637,7 +637,7 @@ twice, on 3.12 and 3.13)」，与 `docs/status.md` 与发版清单同口径。
 
 ### M-11｜索引 §7 说「点名的文件都已经计在 §1–§5 里面了」，但有一份在 §6
 
-**原文（`docs/reports/README.md:164`，逐字）：**
+**原文（`docs/reports/README.md:167`，逐字）：**
 
 > `注意这一节是**横切视角**，不是新的一组：下面点名的文件都已经计在 §1–§5 里面了，`
 
@@ -727,11 +727,13 @@ GitHub 的 slugger 会**删掉**标题里的全角括号与 en dash（en dash �
 | `source_fingerprint` | `sha256:80bf8b0af31312d996cd271c80bcfdc0fb4f51724844e39fc4b6cd301df7e227` |
 | `code` | `api_endpoints 23 / cli_commands 13 / sample_apks 5` |
 
-`<!--fig:…-->` 标记全部与记录块一致；`README.md:12-13`（徽章 `1632 passing` / `93.3%`）、
-`README.md:15`（正文 1632）、`README.md:21`（alt 1632）、`README.zh-CN.md:12-13`、
-`docs/status.md:23-24`、`docs/releases/v1.0.0.md:90-94`、
+`<!--fig:…-->` 标记全部与记录块一致；`README.md:12-13`（徽章 `1644 passing` / `93.3%`）、
+`README.zh-CN.md:12-13`、`docs/status.md:23-24`、`docs/releases/v1.0.0.md:90-94`、
 `docs/reports/v1.0.0-github-release-body.md`、`docs/outreach/` 四份素材、
-`docs/portfolio.md:67-68` —— 全部对得上。
+`docs/portfolio.md:67-68` —— 全部对得上。**`README.md:15` 的正文与 `README.md:21` 的
+alt 文本已不再写数字**——alt 文本里不写数字是
+[social-preview-howto.md](social-preview-howto.md) §3 的一条规矩，数字由徽章与
+那张出处表负责。
 
 > ⚠️ **一处例外**：`ec52527` 往 `tests/` 里加了一个测试，于是记录块里的 **`tests.total`
 > （1632 → 树里是 1633）、`tests.fast`（1485 → 1486）与 `source_fingerprint`
