@@ -142,7 +142,7 @@ bash scripts/fetch-fixtures.sh
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `1664 passed, 31 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
-| 三后端齐备，**拉了**第三方样本 | `1694 passed`、**1 skipped**——那一条是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+| 三后端齐备，**拉了**第三方样本 | `1710 passed`、**1 skipped**——那一条是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
