@@ -83,8 +83,8 @@
   重测量，而这里**数字确实变了**（多一条测试 = 多一个 passed）—— 真正含糊的是它的**兄弟
   条目 R2**。
 - **漏过的后果**：报告与徽章描述的树不存在（CLAUDE.md 规则 3 的反面）。CI 的 `measurement`
-  job（`.github/workflows/ci.yml:700`，**仅 tag 触发**，跑
-  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:747`）会红 —— 但那已经在
+  job（`.github/workflows/ci.yml:708`，**仅 tag 触发**，跑
+  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:755`）会红 —— 但那已经在
   重打 tag 的半路上了。
 
 ---

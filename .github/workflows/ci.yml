@@ -453,14 +453,22 @@ jobs:
       - name: Analyse the bundled sample inside the image
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/docker-sample"
+          # The first run mounts nothing at all -- not the sample, not a
+          # workspace. That is the claim itself: the image alone can analyse a
+          # case, with nothing downloaded and nothing mounted.
           status=0
-          docker run --rm -v "$RUNNER_TEMP/docker-sample:/out" dexatlas:ci \
-            dexatlas analyze examples/demo-app/demo.apk --json /out/report.json || status=$?
+          docker run --rm dexatlas:ci dexatlas analyze examples/demo-app/demo.apk || status=$?
           if [ "$status" -ne 0 ]; then
             echo "the in-image analysis exited $status" >&2
             exit "$status"
           fi
+          # The second run is the same analysis, with the report written out so
+          # that the counts can be read from the JSON rather than from the
+          # console text -- the console wraps that line, so a line-oriented
+          # check would be reading a shape the output does not have.
+          mkdir -p "$RUNNER_TEMP/docker-sample"
+          docker run --rm -v "$RUNNER_TEMP/docker-sample:/out" dexatlas:ci \
+            dexatlas analyze examples/demo-app/demo.apk --json /out/report.json
           python3 - <<'PY'
           import json
           import os
@@ -474,8 +482,8 @@ jobs:
           summary = report["summary"]
           # The floors the repository's own test pins for this sample
           # (tests/test_demo_app.py): the DEX alone carries them, and the
-          # image's JADX may add classes of its own on top, so these are
-          # floors and not equalities.
+          # image's JADX adds classes of its own on top -- the R class -- so
+          # these are floors and not equalities.
           floors = {"classes": 4, "methods": 8, "call_sites": 23}
           for key, floor in floors.items():
               count = summary[key]

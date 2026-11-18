@@ -13,8 +13,9 @@
 1. **镜像现在自带样本**：`Dockerfile` 末尾多了一行 `COPY examples/ examples/`，
    样本落在镜像的 `/app/examples/` 下（`WORKDIR` 是 `/app`）。
 2. **CI 会验它**：`.github/workflows/ci.yml` 的 `docker` job 多了一步，在**刚构建出来的
-   镜像里**用**相对路径**跑通 `analyze examples/demo-app/demo.apk`，核出退出码为 0，
-   并核出报告里的四个计数（classes / methods / call sites / call edges）都不为空。
+   镜像里**用**相对路径**跑通 `analyze examples/demo-app/demo.apk`——第一遍什么卷都
+   不挂（这就是 C6 判据 (a) 的字面要求），核出退出码为 0；第二遍把报告写出来，核出
+   报告里的四个计数（classes / methods / call sites / call edges）都不为空。
 3. **说明跟着改**：`docs/install.md` 的 Docker 段从「镜像带代码不带样本」改成
    「镜像带样本」，挂卷只留「用你自己的 APK」这一种用法。
 4. **边界**：镜像内部的一切**只由 CI 验证**，本报告没有本地镜像内的输出；本报告里的
@@ -43,7 +44,7 @@ COPY examples/ examples/
 
 ### 1.2 CI 的 `docker` job：多了一步，名字也跟着改
 
-`.github/workflows/ci.yml:436-486` 的 `docker` job：
+`.github/workflows/ci.yml:436-494` 的 `docker` job：
 
 | | 改前 | 改后 |
 |---|---|---|
@@ -106,6 +107,14 @@ COPY examples/ examples/
 
 ## 3. 镜像内那条命令与它的预期输出
 
+镜像里的样本就在代码旁边，所以**一条命令、什么卷都不用挂**：
+
+```bash
+docker run --rm dexatlas dexatlas analyze examples/demo-app/demo.apk
+```
+
+要留着分析结果，就挂一个工作区卷（分析写进 `DEXATLAS_WORKSPACE`，即 `/workspace`）：
+
 ```bash
 docker run --rm -v dexatlas-workspace:/workspace dexatlas \
   dexatlas analyze examples/demo-app/demo.apk
@@ -120,12 +129,18 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 
 退出码 **0**。
 
+**镜像里的预期值是 5 / 8 / 23 / 21 / 1**（类 / 方法 / 调用点 / 调用边 / 资源字符串）：
+镜像里三个后端齐全，JADX 会加合成类（生成的 R 类），所以比宿主那次多一个类、一个
+资源字符串。这个数是前一份调研报告（[docker-examples-gap.md](docker-examples-gap.md)）
+按「镜像里三个后端都在」推导出来的，**不是镜像内的实测**——镜像内的实跑在 CI 上。
+
 三条读法上的坑，写在这里是因为它们会决定断言怎么写：
 
 1. **宿主那次没有 JADX 与 Apktool**，分析因此记录了 2 条「后端不可用」的错误
    （`!` 开头的那两行）。镜像里三个后端齐全，所以**镜像内的输出没有那两行警告**，
    而且类数可能比 4 多——JADX 会加合成类（比如生成的 R 类）。这就是 CI 用
-   **下界**（`>=`）而不是等值断言的原因。
+   **下界**（`>=`）而不是等值断言的原因：宿主那组数（4/8/23/21）与镜像里那组数
+   （5/8/23/21）都落在下界之内。
 2. **stdout 会被折行**：Rich 按终端宽度排版，宿主实测那一行在 80 列下断成了三行。
    所以 CI 断言的是 **JSON 报告**里的计数，不是 stdout 的文本。
 3. **计数取自 JSON 报告的 `summary`**：`call_sites` 与 `call_edges` 两个键在
@@ -133,24 +148,32 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 
 ## 4. CI 怎么验
 
-`.github/workflows/ci.yml:453-486` 那一步（`Analyse the bundled sample inside the image`）
+`.github/workflows/ci.yml:453-494` 那一步（`Analyse the bundled sample inside the image`）
 按顺序做四件事：
 
-1. `mkdir -p "$RUNNER_TEMP/docker-sample"`：给报告留一个宿主的落点。
-2. 跑镜像：
-   `docker run --rm -v "$RUNNER_TEMP/docker-sample:/out" dexatlas:ci dexatlas analyze examples/demo-app/demo.apk --json /out/report.json`。
-   - **退出码**：`|| status=$?` 把退出码接住，随后显式判它是不是 0——不是 0 就让这一步红。
+1. **第一遍：什么卷都不挂**。
+   `docker run --rm dexatlas:ci dexatlas analyze examples/demo-app/demo.apk`
+   —— 不挂样本、不挂工作区、不下载任何东西。这正是 C6 判据 (a) 的字面要求
+   （「`docker run` 在**不带卷**的机器上能跑通一个案例」）：
+   - **退出码**：`|| status=$?` 把退出码接住，随后显式判它是不是 0——不是 0 就让这一步红；
    - **相对路径**：`examples/demo-app/demo.apk` 在容器里解析（`WORKDIR` 是 `/app`），
      不经过宿主，所以不受 Git Bash 改写「看起来像 Windows 路径」参数的影响。
-3. 读回 JSON 报告，核四个计数：
+2. **第二遍：同一遍分析，把报告写出来**。
+   `mkdir -p "$RUNNER_TEMP/docker-sample"`，然后
+   `docker run --rm -v "$RUNNER_TEMP/docker-sample:/out" dexatlas:ci dexatlas analyze examples/demo-app/demo.apk --json /out/report.json`。
+   挂的只是**报告的落点**，不是样本——样本仍然来自镜像内部。
+3. **读回 JSON 报告，核四个计数**：
    - `classes >= 4`、`methods >= 8`、`call_sites >= 23`——这三个下界是仓库自己的测试
      为这份样本钉的数（`EXPECTED_METHODS`、`EXPECTED_REFERENCES`、
      `MIN_CLASSES_FROM_DEX` 在 `tests/test_demo_app.py:29-31`）；
-     镜像里的 JADX 可能在上面再加，所以是下界不是等值。
+     镜像里的 JADX 会在上面再加（合成类），所以是下界不是等值。
    - `call_edges > 0`。
    四个数都会打进 CI 日志。
 4. 任何一条不成立，这一步就红——**镜像里能不能跑案例，从此是 CI 验证过的事实，
    而不是文档里的一句话**。
+
+镜像里跑两遍的成本是分钟级 job 里多几秒：容器内三后端齐全的一次分析约 8 秒
+（读者实走演练的实测）。
 
 ## 5. 核实边界（务必先读）
 
@@ -189,15 +212,24 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 4. **仓库没有 `.dockerignore`**：构建上下文是整个工作树（含 `.git`）。本轮没有加
    ——加它会改变构建行为（`.git` 变小、上下文变小），需要主会话决定是否单独做。
 5. **本轮让两处行号跟着走**：`docs/reports/post-release-rehearsal.md` 里引用
-   `measurement` job 的两处行号（`.github/workflows/ci.yml:700` 与 `:747`）因为本轮
-   往 `ci.yml` 里加了 42 行而漂移，已用 `scripts/remap-citations.py` 重新推导。
+   `measurement` job 的两处行号（`.github/workflows/ci.yml:708` 与 `:755`）因为本轮
+   往 `ci.yml` 里加了步骤而漂移，已用 `scripts/remap-citations.py` 重新推导。
    另有一处漂移是 **main 自己的**（提交 `7593574` 改了测量脚本，一处裸行号落到了
    空行上），顺手把它改成显式的文件引用——那一处本来指的就是 `tests/test_docs.py`
    里那个测试函数。
-6. **`tests/test_docs.py` 有 4 条测试在 main 上已经是红的**（执行报告里的覆盖率数字
+6. **C6 的另一条判据没有做**：「选 (a) 要把新的构建时间写回所有引用旧口径的地方」。
+   本轮**没有重建镜像**（本地不构建），所以镜像的构建时间口径还是旧的那份
+   （调研报告里的冷缓存 18–20 分钟机时）。这一条要等 CI 上那次真实构建的日志出来
+   才能写，主会话合并后跑一次 `docker` job 就能拿到。
+7. **`tests/test_docs.py` 有 4 条测试在 main 上已经是红的**（执行报告里的覆盖率数字
    与树的语句数对不上：`reports/evidence_package.py` 记录 172、树里 187）。本轮没有碰
    `src/` 与 `docs/reports/phase1-execution-report.md`，所以这 4 条不是本轮造成的
    （`git diff main --name-only` 里没有这两个路径），它们要等主会话那轮完整重测量落盘。
+8. **M10 读者包里的那段命令没跟着改**：`docs/reports/m10-reader-package.md` 里
+   「**镜像里没有 `examples/`** → 要挂两个卷」那段，写的还是挂卷的办法。那条命令
+   **仍然能跑**（它把宿主的 `examples/` 挂到 `/app/examples`，盖住镜像里那份，读的
+   仍是同一份样本），但段首那句「镜像里没有 `examples/`」现在是假话，而且它不再是
+   唯一跑法。M10 材料归主会话，本轮没动。
 
 ## 7. 与既有报告的关系
 
