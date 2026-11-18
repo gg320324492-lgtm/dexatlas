@@ -20,7 +20,7 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,643（1,496 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 测试总数 | 1,644（1,497 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
 | 一方代码覆盖率 | 93.3%（7,135 / 7,650 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
@@ -47,10 +47,10 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,643 automated tests, 93.3% coverage` | 1,643 / 93.3% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,643 tests, coverage and dead-code gates` | 1,643 |
-| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,643 tests at 93.3% coverage` | 1,643 / 93.3% |
-| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,643 automated tests at 93.3% coverage` | 1,643 / 93.3% |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,644 automated tests, 93.3% coverage` | 1,644 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,644 tests, coverage and dead-code gates` | 1,644 |
+| 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,644 tests at 93.3% coverage` | 1,644 / 93.3% |
+| 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,644 automated tests at 93.3% coverage` | 1,644 / 93.3% |
 
 覆盖率的措辞保持「一方代码覆盖率」的口径，没有写成「总覆盖率」——报告里
 `coverage.pct` 量的就是一方代码。
@@ -339,7 +339,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
    请在真实表单上逐个字段确认。**素材顶部引用的官方指南链接也要联网核实**
    （`support.upwork.com/hc/en-us/articles/360016144974`）：本轮**没有联网**，
    那条链接与其中的限制值都还没对过现网。
-5. **对外数字要跟最后一次测量同步。** 本轮的 1,643 / 93.3% 取自最近一次完整
+5. **对外数字要跟最后一次测量同步。** 本轮的 1,644 / 93.3% 取自最近一次完整
    测量落盘的报告（源指纹 `sha256:d0e85b61…`）——完整测量已重跑，这四份素材的
    数字已按新值核过一遍。**以后任何一次测量都会再改这两个数**，发版前请再核
    一次。
@@ -403,7 +403,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 **当前 `docs/reports/phase1-execution-report.md` 落盘的就是复原后的值**
-（1,643 / 93.3%），共享树在该文件上也没有未提交改动。
+（1,644 / 93.3%），共享树在该文件上也没有未提交改动。
 
 ---
 
