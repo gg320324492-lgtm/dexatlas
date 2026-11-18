@@ -1046,6 +1046,35 @@ def test_a_wrong_test_count_in_an_outward_material_is_a_finding() -> None:
     assert "outward-tests" in _kinds(findings)
 
 
+def test_a_coverage_that_differs_by_a_fraction_is_not_a_finding() -> None:
+    """A platform's measurement can differ from the recorded one by a fraction.
+
+    The outward materials describe the project as it is now, and "now" was
+    measured on the machine that wrote the record. A fresh measurement on
+    another platform differs by a fraction of a point -- the POSIX-only tests
+    do not run on Windows, and the Windows-only ones do not run on Linux --
+    and before the tolerance that difference was a finding: the tag's own
+    measurement job went red on Linux over a number that was true.
+    """
+    checker = _checker()
+    figures = {"coverage.pct": "92.9%", "tests.total": "1690"}
+
+    findings = checker.check_outward_numbers(
+        [("docs/outreach/project-brief.md", "1,690 automated tests, 93.3% coverage\n")],
+        figures,
+        "1.0.0",
+    )
+    assert "outward-coverage" not in _kinds(findings)
+
+    # A difference that is not a fraction is still a finding.
+    findings = checker.check_outward_numbers(
+        [("docs/outreach/project-brief.md", "1,690 automated tests, 99.0% coverage\n")],
+        figures,
+        "1.0.0",
+    )
+    assert "outward-coverage" in _kinds(findings)
+
+
 def test_a_wrong_test_count_in_the_chinese_form_is_a_finding() -> None:
     """The count the review table writes in fullwidth brackets is read."""
     checker = _checker()

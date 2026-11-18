@@ -1137,8 +1137,20 @@ def check_stated_numbers(
                 continue
             if any(start <= item.start and item.end <= end for start, end in line_quoted):
                 continue
-            if percentage(item.value) == percentage(measured):
-                continue
+            stated_pct = percentage(item.value)
+            measured_pct = percentage(measured)
+            if stated_pct is not None and measured_pct is not None:
+                if stated_pct == measured_pct:
+                    continue
+                # The outward materials describe the project as it is now, and
+                # "now" was measured on the machine that wrote the record: a
+                # fresh measurement on another platform can differ by a
+                # fraction of a point (the POSIX-only tests do not run on
+                # Windows, and the Windows-only ones do not run on Linux).
+                # The same comparison, exact, for a release's own notes: there
+                # both numbers come from the same machine.
+                if kind == "outward" and abs(stated_pct - measured_pct) <= BADGE_TOLERANCE:
+                    continue
             findings.append(
                 Finding(
                     path=path,
