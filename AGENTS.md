@@ -76,7 +76,7 @@ the wrong code.
 
 ### The gates
 
-CI runs ten jobs (eleven parallel runs on a tag — the test job is a 3.12/3.13
+CI runs twelve jobs (thirteen parallel runs on a tag — the test job is a 3.12/3.13
 matrix): lint/format/mypy, tests on Python 3.12 (every backend), tests on
 Python 3.13 (no external backends), tests with Apktool only, the M3
 comparison re-run, the Docker image, the dependency audit, the live

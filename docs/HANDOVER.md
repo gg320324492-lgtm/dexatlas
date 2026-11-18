@@ -145,7 +145,7 @@ keeps the old figures, which leaves the record describing a tree that no
 longer exists. Run it with **all three backends present**, or the skipped
 tests make it a partial measurement.
 
-CI runs ten jobs (eleven parallel runs on a tag push, ten on a push or a PR):
+CI runs twelve jobs (thirteen parallel runs on a tag push, twelve on a push or a PR):
 lint/format/mypy, tests on Python 3.12 (every backend), tests on Python 3.13 (no
 external backends), tests with Apktool only, the M3 comparison re-run, the
 Docker image, the dependency audit, the live public-contract check, the M10
