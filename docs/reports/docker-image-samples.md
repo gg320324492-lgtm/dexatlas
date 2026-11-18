@@ -188,6 +188,16 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
    那一行，没有动计数——留给主线统一处理。
 4. **仓库没有 `.dockerignore`**：构建上下文是整个工作树（含 `.git`）。本轮没有加
    ——加它会改变构建行为（`.git` 变小、上下文变小），需要主会话决定是否单独做。
+5. **本轮让两处行号跟着走**：`docs/reports/post-release-rehearsal.md` 里引用
+   `measurement` job 的两处行号（`.github/workflows/ci.yml:700` 与 `:747`）因为本轮
+   往 `ci.yml` 里加了 42 行而漂移，已用 `scripts/remap-citations.py` 重新推导。
+   另有一处漂移是 **main 自己的**（提交 `7593574` 改了测量脚本，一处裸行号落到了
+   空行上），顺手把它改成显式的文件引用——那一处本来指的就是 `tests/test_docs.py`
+   里那个测试函数。
+6. **`tests/test_docs.py` 有 4 条测试在 main 上已经是红的**（执行报告里的覆盖率数字
+   与树的语句数对不上：`reports/evidence_package.py` 记录 172、树里 187）。本轮没有碰
+   `src/` 与 `docs/reports/phase1-execution-report.md`，所以这 4 条不是本轮造成的
+   （`git diff main --name-only` 里没有这两个路径），它们要等主会话那轮完整重测量落盘。
 
 ## 7. 与既有报告的关系
 

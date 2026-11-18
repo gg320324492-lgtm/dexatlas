@@ -83,8 +83,8 @@
   重测量，而这里**数字确实变了**（多一条测试 = 多一个 passed）—— 真正含糊的是它的**兄弟
   条目 R2**。
 - **漏过的后果**：报告与徽章描述的树不存在（CLAUDE.md 规则 3 的反面）。CI 的 `measurement`
-  job（`.github/workflows/ci.yml:658`，**仅 tag 触发**，跑
-  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:705`）会红 —— 但那已经在
+  job（`.github/workflows/ci.yml:700`，**仅 tag 触发**，跑
+  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:747`）会红 —— 但那已经在
   重打 tag 的半路上了。
 
 ---
@@ -110,14 +110,14 @@
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
   `scripts/check-doc-citations.py:166-179` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
-  （`scripts/check-doc-citations.py:1113-1116`）按这个 ref 取树；本地 tag 还没动 →
+  （`scripts/check-doc-citations.py:1117-1120`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
   `check_declaration()`（`scripts/check-doc-citations.py:1127-1177`）还会把正文里引的测量
   指纹与**那棵树**的测量记录比对 —— 旧树的指纹，于是也判「不符」。
 - **该在哪一步被拦住**：**第 4 步与第 6 步之间**。清单第 4 条只说了「按内容重锚」，没说
   重锚的**基准是本地 tag 还是远端 tag**，也没说重锚完要**在 tag 移过之后再核一次**。
 - **现在的判据**：机制是齐的 —— `TREE_DOCUMENTS` + `Tree` + `tree_fingerprint()`
-  （`scripts/check-doc-citations.py:1119-1122`）+ `check_declaration()`；
+  （`scripts/check-doc-citations.py:1123-1126`）+ `check_declaration()`；
   `tests/test_doc_citations.py::test_the_release_body_is_read_out_of_the_release_tree`
   （`tests/test_doc_citations.py:687-701`）守住「Release 正文必须是从 release 树里读出来的」。
   **缺的只是清单里的顺序要求**。
@@ -405,7 +405,7 @@
 | 2 | 改 `docs/` 下的文件**不进**指纹，所以改文档本身不需要重测量 | `fingerprint_files()`（`scripts/refresh-report-figures.py:721-744`）只收 `src/`、`tests/`、`pyproject.toml` 与测量脚本 —— R1 |
 | 3 | 已开始的 CI run **不会**被后来的 tag push 打断 | `.github/workflows/ci.yml:23-32`，`cancel-in-progress: false` —— R5 |
 | 4 | 第四份对外文本（GitHub 上已发布的那一份）确实**没有**自动比对，清单已如实标出 | §7 N6（`docs/reports/v1.0.0-release-checklist.md:448-464`）—— R8 |
-| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:747-774`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`:1339`）—— 这条**不是**重打 tag 路径的坑 |
+| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:747-774`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`tests/test_docs.py:1339`）—— 这条**不是**重打 tag 路径的坑 |
 
 ---
 
