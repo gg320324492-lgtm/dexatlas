@@ -71,8 +71,8 @@ README 里用的是双引号，两种都合法。）
 | `开源、证据优先的 Android 逆向工程与移动应用分析平台。` | `README.zh-CN.md:7` | 中文定位句，逐字 |
 | `93.3%` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.pct-->` |
 | `7135/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` 与 `<!--fig:coverage.total-->` |
-| `1644` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
-| `1497 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
+| `1649` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
+| `1502 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
 | `28 REST` | `scripts/verify-public-contracts.py:109` | `_rest_requests()` 里的检查调用点数 |
 | `6 MCP` | `scripts/verify-public-contracts.py:360` | `mcp_checks()` 里的检查调用点数 |
 | `15 CLI` | `scripts/verify-public-contracts.py:434` | `cli_checks()` 里的检查调用点数 || `49`（清单条数） | 上面三行之和 | 静态条数，不是任何一次实跑的通过数 |
