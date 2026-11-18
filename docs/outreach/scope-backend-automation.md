@@ -21,7 +21,7 @@ typing and documentation as part of the deliverable, not an afterthought.
 
 Demonstrated by: **DexAtlas** (open source) — an Android APK analysis platform
 with a FastAPI REST API, a CLI, a SQLite evidence store, three integrated
-third-party engines, 1,712 tests at 93.3% coverage of the project's own code
+third-party engines, 1,731 tests at 93.3% coverage of the project's own code
 (the denominator is lines of code, not tests), strict mypy typing, and
 CI across Python 3.12/3.13 and multiple engine configurations.
 

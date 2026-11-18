@@ -20,7 +20,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · v0.2.0（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） · **v1.0.0**（2026-11-17 已发布，见[发版说明](releases/v1.0.0.md)） |
-| 测试 | <!--fig:tests.total-->1712<!--/fig--> 个（<!--fig:tests.fast-->1563<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1731<!--/fig--> 个（<!--fig:tests.fast-->1582<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | **13 个 workflow job、tag 上 14 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 13 次）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
