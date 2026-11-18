@@ -703,3 +703,97 @@ jobs:
       # status page and the README badges stay as the repository has them.
       - name: The report's figures still describe this tree
         run: uv run --no-sync python scripts/refresh-report-figures.py --check
+
+  # TEMPORARY: why does the report's self-check measurement come back empty
+  # on the runner? The script's own code path is exercised here and whatever
+  # pytest said is printed, so the answer is in the log instead of in a guess.
+  self-check-diagnosis:
+    name: Diagnose the report's self-check measurement
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Keep generated files in .scratch
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
+          {
+            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
+          } >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --extra demo --extra mcp --frozen
+      - name: Run the self-check measurement and print what pytest said
+        run: |
+          set -uo pipefail
+          uv run --no-sync python - <<'PY'
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          spec = importlib.util.spec_from_file_location(
+              "rf", "scripts/refresh-report-figures.py"
+          )
+          rf = importlib.util.module_from_spec(spec)
+          sys.modules["rf"] = rf
+          spec.loader.exec_module(rf)
+
+          captured = []
+          original = rf.run
+
+          def spy(*args, env=None):
+              result = original(*args, env=env)
+              captured.append(result)
+              return result
+
+          rf.run = spy
+
+          report = rf.REPORT_PATH
+          text = report.read_text(encoding="utf-8")
+          print("report:", report)
+          print("collected:", rf.collected_tests("not slow"))
+
+          for label, candidate in (
+              ("the report as it is", text),
+              (
+                  "a candidate with another machine's numbers",
+                  text.replace(
+                      "<!--fig:suite.passed-->1694<!--/fig-->",
+                      "<!--fig:suite.passed-->1678<!--/fig-->",
+                  ).replace(
+                      "<!--fig:coverage.pct-->93.3%<!--/fig-->",
+                      "<!--fig:coverage.pct-->92.9%<!--/fig-->",
+                  ),
+              ),
+          ):
+              captured.clear()
+              print("=" * 30, label, "=" * 30)
+              outcome = rf.measure_report_checks(candidate, report)
+              print("counts:", outcome.counts)
+              print("describe:", outcome.describe())
+              for result in captured:
+                  print("exit code:", result.returncode)
+                  print("--- stdout tail ---")
+                  print(result.stdout[-4000:])
+                  print("--- stderr tail ---")
+                  print(result.stderr[-4000:])
+          print("=" * 30, "status page", "=" * 30)
+          captured.clear()
+          outcome = rf.measure_status_checks(
+              text, text, report, rf.STATUS_PATH
+          )
+          print("counts:", outcome.counts)
+          for result in captured:
+              print("exit code:", result.returncode)
+              print(result.stdout[-1500:])
+          PY
