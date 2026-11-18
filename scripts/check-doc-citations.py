@@ -163,6 +163,15 @@ DOCS: list[pathlib.Path] = [
     # it quotes the packager, the contract table and the three places that
     # pin the manifest's shape.
     REPO / "docs" / "reports" / "v1.1.0-candidate-c10-manifest.md",
+    # The reports of the batch that followed the release: the second reader
+    # rehearsal of the invitation, the build time C6's criterion (a) asks for,
+    # the gates' own regression tests, and the landing of the auto-write
+    # mechanism. Each one quotes line numbers of the tree it was written
+    # against, so their citations have to keep being true.
+    REPO / "docs" / "reports" / "m10-reader-rehearsal-2nd.md",
+    REPO / "docs" / "reports" / "c6-build-time-from-ci.md",
+    REPO / "docs" / "reports" / "gate-self-checks.md",
+    REPO / "docs" / "reports" / "figures-auto-write-landing.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
