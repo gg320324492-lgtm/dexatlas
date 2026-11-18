@@ -70,9 +70,9 @@ README 里用的是双引号，两种都合法。）
 | `从 APK 到可核查的证据` | `README.zh-CN.md:5` | 中文 tagline 的前半句，逐字 |
 | `开源、证据优先的 Android 逆向工程与移动应用分析平台。` | `README.zh-CN.md:7` | 中文定位句，逐字 |
 | `93.3%` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.pct-->` |
-| `7135/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` 与 `<!--fig:coverage.total-->` |
-| `1690` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
-| `1541 快 + 149 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
+| `7136/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` 与 `<!--fig:coverage.total-->` |
+| `1695` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
+| `1546 快 + 149 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
 | `28 REST` | `scripts/verify-public-contracts.py:164` | `_rest_requests()` 里的检查调用点数 |
 | `6 MCP` | `scripts/verify-public-contracts.py:421` | `mcp_checks()` 里的检查调用点数 |
 | `15 CLI` | `scripts/verify-public-contracts.py:509` | `cli_checks()` 里的检查调用点数 |

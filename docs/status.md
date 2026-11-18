@@ -20,7 +20,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · v0.2.0（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） · **v1.0.0**（2026-11-17 已发布，见[发版说明](releases/v1.0.0.md)） |
-| 测试 | <!--fig:tests.total-->1690<!--/fig--> 个（<!--fig:tests.fast-->1541<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1695<!--/fig--> 个（<!--fig:tests.fast-->1546<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | **9 个 workflow job、10 次并行运行**（`test` 是 3.12/3.13 矩阵）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检 / M10 自查 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
