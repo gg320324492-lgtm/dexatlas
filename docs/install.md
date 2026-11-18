@@ -59,6 +59,25 @@ docker run --rm dexatlas dexatlas backends
 The image carries JADX and Apktool; the build fails if either cannot be downloaded and
 run, so a broken backend is caught at build time rather than during your first analysis.
 
+**The image carries the code, not the samples.** It contains no APK: an analysis needs one
+mounted in. The repository's own first-party samples are the quickest thing to mount:
+
+```bash
+docker run --rm -v "$PWD/examples:/samples:ro" -v dexatlas-workspace:/workspace dexatlas \
+  dexatlas analyze /samples/demo-app/demo.apk
+```
+
+The analysis is written into the `dexatlas-workspace` volume, so it is still there for the
+next command:
+
+```bash
+docker run --rm -v dexatlas-workspace:/workspace dexatlas \
+  dexatlas projects --workspace /workspace
+```
+
+Use your own APK by mounting the directory it is in instead of `examples`. The volume is
+mounted read-only because the analysis reads the APK and writes only into the workspace.
+
 ```bash
 docker run --rm -p 127.0.0.1:8000:8000 -v dexatlas-workspace:/workspace dexatlas
 # API docs at http://localhost:8000/docs
