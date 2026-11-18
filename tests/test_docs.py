@@ -1042,6 +1042,7 @@ def _install_fake_measurements(
     skipped: int = 0,
     skipped_tests: tuple[str, ...] = (),
     unaccounted: int = 0,
+    prerequisites: tuple[str, ...] = (),
 ) -> None:
     """Replace the script's slow measurements with instant ones.
 
@@ -1050,6 +1051,10 @@ def _install_fake_measurements(
     the current one. That is the whole difference the refresh has to keep
     straight — a self-check that fails because the report is out of date is the
     refresh's own problem; a test that fails because the code is broken is not.
+
+    ``prerequisites`` says what this machine is missing, which is what makes a
+    measurement partial: the suite's own skips say which machine ran, not
+    whether the tree was measured.
     """
 
     def collected_tests(marker: str) -> tuple[int, int]:
@@ -1062,7 +1067,10 @@ def _install_fake_measurements(
                 "failed": len(code_failures),
                 "skipped": skipped,
                 "xfailed": 0,
-                "deselected": 0,
+                # The code run leaves the report's own self-checks out and they
+                # are measured on their own, so the run that measured the tree
+                # accounted for them by leaving them out.
+                "deselected": FAKE_CHECKS,
             },
             failures=code_failures,
             skipped=skipped_tests,
@@ -1111,6 +1119,7 @@ def _install_fake_measurements(
     monkeypatch.setattr(script, "measure_report_checks", measure_report_checks)
     monkeypatch.setattr(script, "read_coverage", read_coverage)
     monkeypatch.setattr(script, "collected_at_tag", collected_at_tag)
+    monkeypatch.setattr(script, "missing_prerequisites", lambda: list(prerequisites))
 
 
 def test_the_refresh_script_corrects_a_wrong_figure_in_one_run(
@@ -1225,14 +1234,20 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
 ) -> None:
     """A partial measurement must not be written as if it were a complete one.
 
-    A skipped test produces no coverage, so a run with skips measures a
-    different tree. The refresh keeps the previous coverage and says what is
-    missing instead of quietly publishing a lower number.
+    A skipped test produces no coverage, so a run without the backends and
+    the fixtures measures less than the report is about. The refresh keeps
+    the previous coverage and says what is missing instead of quietly
+    publishing a lower number -- and it reports the run as the failure it
+    is, because a gate that cannot fail is not a gate.
     """
     script = _figure_script()
     report = tmp_path / "phase1-execution-report.md"
     report.write_text(_fake_report(), encoding="utf-8")
-    _install_fake_measurements(script, monkeypatch)
+    _install_fake_measurements(
+        script,
+        monkeypatch,
+        prerequisites=("JADX (bash scripts/install-backends.sh)",),
+    )
 
     def measure_code_tests() -> Any:
         outcome = script.Outcome(
@@ -1244,7 +1259,7 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
 
     monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
 
-    assert script.main(["--report", str(report)]) == 0
+    assert script.main(["--report", str(report)]) == 1
 
     out = capsys.readouterr().out
     assert "partial" in out
@@ -1253,18 +1268,21 @@ def test_the_refresh_script_leaves_the_report_alone_when_the_measurement_is_part
     assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")
 
 
-def test_the_refresh_script_refuses_a_measurement_that_skipped_a_different_set_of_tests(
+def test_the_refresh_script_takes_a_measurement_that_skipped_a_different_set_of_tests(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The same number of skips is not the same set of skips.
+    """A different set of skips is a different machine, not a different tree.
 
-    Skipping and passing are different states, so the question "is this
-    measurement complete" is about *which* tests sat out, not about how many.
-    A measurement that skipped a different set of tests measured a different
-    tree, and publishing its numbers as *the* numbers would be a small lie.
+    The Windows-only tests skip on Linux and nowhere else, so a run whose
+    skips differ from the recorded ones did not measure a different tree: it
+    measured this tree on a different machine. Refusing the measurement for
+    that reason threw it away -- the CI job that asks whether the report's
+    figures describe the tagged tree kept the recorded figures and reported
+    success without looking.
 
-    The comparison this replaces was between the counts, and a count of one
-    skip matched a count of one skip however different the two were.
+    What two machines cannot be compared on is the coverage: it describes the
+    code the machine left unexercised, and the other machine exercised
+    different code.
     """
     script = _figure_script()
     report = tmp_path / "phase1-execution-report.md"
@@ -1282,21 +1300,21 @@ def test_the_refresh_script_refuses_a_measurement_that_skipped_a_different_set_o
     assert script.main(["--report", str(report)]) == 0
 
     out = capsys.readouterr().out
-    assert "partial" in out, "a measurement that skipped a different set was taken as complete"
-    # The coverage figures describe a complete measurement, so the previous
-    # ones stay rather than the partial measurement's.
-    assert "<!--fig:coverage.pct-->55.0%<!--/fig-->" in report.read_text(encoding="utf-8")
+    assert "partial" not in out, "a measurement of this tree was refused for the machine's sake"
+    # The measurement was taken, so its coverage is the one the report states.
+    assert "<!--fig:coverage.pct-->90.0%<!--/fig-->" in report.read_text(encoding="utf-8")
 
 
 def test_the_refresh_script_takes_a_measurement_that_skipped_the_same_tests(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The same set of skips is the same measurement, and it is complete.
+    """The same set of skips is the same measurement, and it is comparable.
 
-    The rule above refuses a measurement that skipped a different set of
-    tests. A measurement that skipped the same ones is the same measurement,
-    and it must not be refused: a tree whose basis has not changed is still
-    a tree whose basis has not changed.
+    Two measurements that left the same tests unexercised measured the same
+    code, so their coverage figures describe the same thing and the check
+    compares them. A measurement that skipped the same ones is the same
+    measurement, and it must not be refused: a tree whose basis has not
+    changed is still a tree whose basis has not changed.
     """
     script = _figure_script()
     report = tmp_path / "phase1-execution-report.md"
