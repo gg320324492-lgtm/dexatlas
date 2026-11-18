@@ -272,7 +272,13 @@ REPORT_PATH_ENV = "DEXATLAS_REPORT_PATH"
 STATUS_PATH_ENV = "DEXATLAS_STATUS_PATH"
 
 #: pytest's short summary: "FAILED tests/test_x.py::test_y - AssertionError: ...".
-FAILED_LINE = re.compile(r"^(?:FAILED|ERROR) (\S+)(?: - (.*))?$", re.MULTILINE)
+#:
+#: The node id is read greedily up to the " - " that starts the message,
+#: because a parametrized test's id carries its parameters: a failure of
+#: ``test_x[not slow-docs/a.md]`` has a space in it, and a reader that stops
+#: at the first blank drops that failure from the list -- which is how a run
+#: with eight failures was reported as having six.
+FAILED_LINE = re.compile(r"^(?:FAILED|ERROR) (.+?)(?: - (.*))?$", re.MULTILINE)
 
 
 @dataclass(frozen=True)

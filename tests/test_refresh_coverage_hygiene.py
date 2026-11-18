@@ -575,3 +575,27 @@ def test_a_run_whose_summary_line_follows_a_failure_is_still_counted() -> None:
     assert counts["passed"] == 12, counts
     assert counts["failed"] == 1, counts
     assert counts["deselected"] == 1682, counts
+
+
+def test_a_failure_whose_id_carries_a_parameter_is_still_listed() -> None:
+    """A parametrized test's id has a space in it, and it is still listed.
+
+    pytest writes the parameters into the id: ``test_x[not slow-docs/a.md]``.
+    A reader that stops at the first blank drops that failure from the list,
+    so a run with eight failures was reported as having six -- and the reader
+    was left looking for two problems that were not in the run at all.
+    """
+    script = _figure_script()
+    output = (
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_how_to_verify.py::test_the_expected_output_of_the_collect_command"
+        "_is_what_the_suite_prints[not slow-docs/how-to-verify.md] - AssertionError: the "
+        "page's expected output is not what the suite prints\n"
+        "FAILED tests/test_docs.py::test_execution_report_exists - AssertionError: nope\n"
+    )
+
+    failures = script.failed_tests(output)
+
+    assert len(failures) == 2, failures
+    assert "not slow-docs/how-to-verify.md" in failures[0], failures
+    assert "test_execution_report_exists" in failures[1], failures
