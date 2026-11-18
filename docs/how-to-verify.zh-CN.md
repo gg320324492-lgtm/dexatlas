@@ -123,8 +123,8 @@ uv run --no-sync pytest -q
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1546/1695 tests collected (149 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1695 tests collected (1546 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1561/1710 tests collected (149 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1710 tests collected (1561 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
