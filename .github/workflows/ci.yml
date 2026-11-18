@@ -461,8 +461,54 @@ jobs:
       # analyses the first-party demo APK that ships with the repository, so
       # it needs no third-party fixture. It keeps its own workspace and its
       # server's temporary files under .scratch.
+      #
+      # This step is the gate that was already here, and it stays exactly as
+      # it was: the live check, and its exit code. The step after it
+      # compares that run with the record the contract table keeps, and it
+      # is an addition -- the gate above does not depend on it.
       - name: Verify the public contracts
         run: uv run --no-sync python scripts/verify-public-contracts.py
+      # The contract table records what a live run looked like -- how many
+      # checks each backend configuration exercised, how many passed, what
+      # the script exited with. Nothing compared the run with the record, so
+      # a table that had stopped matching the script stayed in the
+      # repository behind a green job.
+      #
+      # This is the configuration this runner is in: all three backends, so
+      # the source endpoint answered and its headers were asked for. That is
+      # the one check the two configurations differ by.
+      - name: That run against the record in the contract table
+        run: uv run --no-sync python scripts/check-contract-records.py --expect with-jadx
+
+  # The same live check, in the other configuration the contract table
+  # records: no decompiler and no resource backend. The source endpoint
+  # answers 404 there and its headers are not asked for, which is the one
+  # check the two configurations differ by -- 47 checks instead of 48.
+  #
+  # That row used to be checked only on a machine that happened not to have
+  # the Java backends installed. This job asks for the configuration rather
+  # than installing everything and disabling half of it: "installed then
+  # removed" is not a configuration anybody can reason about, and the
+  # install script says so.
+  contracts-without-jadx:
+    name: Public contracts (live, no Java backends)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # No JRE and no backend download: Androguard is the only backend in
+      # this configuration, and it comes from the analysis extra.
+      - name: Install dependencies
+        run: uv sync --extra dev --extra analysis --extra mcp --frozen
+      # An empty path disables a backend outright, with no PATH lookup: the
+      # tool's own view is the one that counts, not the shell's.
+      - name: The contracts without the Java backends
+        env:
+          DEXATLAS_JADX_PATH: ""
+          DEXATLAS_APKTOOL_JAR: ""
+        run: uv run --no-sync python scripts/check-contract-records.py --expect without-jadx
 
   # The M10 acceptance pack states forty checks, and the automatable part of
   # them is this script. No job called it, so the pack could drift away from
@@ -484,6 +530,33 @@ jobs:
         run: uv sync --extra dev --frozen
       - name: M10 self-check
         run: uv run --no-sync python scripts/m10_selfcheck.py
+      # The snapshot in docs/reports/m10-selfcheck.md is the record of one
+      # run of that script: how many checks passed, how many failed, and
+      # which checks they were. Nobody compared it with the script, so the
+      # document could describe a run the script no longer makes and the
+      # job stayed green -- the job only ever asked the script.
+      - name: The snapshot against the script
+        run: uv run --no-sync python scripts/check-m10-snapshot.py
+
+  # Every gate in this repository is supposed to be run by something: a job
+  # in this file, or a test in tests/. A gate nobody runs is a document, not
+  # a gate, and the source fingerprint does not cover the scripts -- so
+  # nothing else would notice that one had stopped working.
+  #
+  # The script needs nothing but the standard library: it reads this file
+  # and the test suite.
+  gate-coverage:
+    name: Every gate is run by something
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+      - name: Every gate is run by something
+        run: uv run --no-sync python scripts/check-gate-coverage.py
 
   # The card on the repository's front page quotes the project's measured
   # numbers, and a picture cannot be diffed by a reviewer -- so the card

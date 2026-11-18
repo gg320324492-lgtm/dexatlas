@@ -83,23 +83,27 @@ def rest_checks() -> None:
         server.wait(timeout=15)
 
 
-def wait_for_analysis(client, pid, attempts: int = 240, pause: float = 0.5) -> str:
-    """The status of a project, once it has stopped changing.
+def wait_for_analysis(client, pid, attempts: int = 240, pause: float = 0.5) -> dict[str, Any]:
+    """The project row, once it has stopped changing.
 
     The REST API answers ``202`` and creates the project a moment later.
     Until that row exists, the answer carries no ``status`` field at all --
     and reading that absence as "the analysis is over" turned a slow start
     into a failed contract check: the loop broke on the first empty answer
     and reported ``status=`` instead of waiting for the work to finish.
+
+    The row is returned, not only its status. The checks that follow read
+    the project's fields, and the row used to be a leftover of this loop:
+    when the wait became a function of its own, the leftover stopped being
+    bound and the section died on a name it had never defined.
     """
-    status = ""
+    project: dict[str, Any] = {}
     for _ in range(attempts):
         project = client.get(f"/projects/{pid}").json()
-        status = project.get("status", "")
-        if status in {"completed", "failed"}:
+        if project.get("status", "") in {"completed", "failed"}:
             break
         time.sleep(pause)
-    return status
+    return project
 
 
 def _rest_requests() -> None:
@@ -144,7 +148,8 @@ def _rest_requests() -> None:
         )
         check("project id is apk_<sha256[:16]>", response.json()["project_id"] == pid)
 
-        status = wait_for_analysis(client, pid)
+        project = wait_for_analysis(client, pid)
+        status = project.get("status", "")
         check("analysis completes", status == "completed", f"status={status}")
 
         project_keys = {

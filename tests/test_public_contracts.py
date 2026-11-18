@@ -941,6 +941,14 @@ def test_the_contract_check_waits_for_the_project_row_to_appear() -> None:
     old loop broke on the first such answer and reported ``status=``, so a
     slow start turned into a failed contract check -- which is what happened
     on the ``v1.0.0`` tag run, on a tree whose same job passed on ``main``.
+
+    The wait returns the row, not only its status, and that is the second
+    half of the same contract. The row used to be a leftover of the loop:
+    when the wait became a function of its own, the leftover stopped being
+    bound, and the REST section kept reading a name it had never defined --
+    a ``NameError`` where a check should have been, which is what the next
+    run of the live check showed. A wait that returns a status string
+    cannot serve the section that reads the row.
     """
     from importlib.util import module_from_spec, spec_from_file_location
 
@@ -963,4 +971,8 @@ def test_the_contract_check_waits_for_the_project_row_to_appear() -> None:
         def get(self, path: str) -> _Response:
             return _Response(answers.pop(0) if answers else {"status": "completed"})
 
-    assert script.wait_for_analysis(_Client(), "apk_x", attempts=5, pause=0) == "completed"
+    # The row the wait ends on -- not the first answer it saw, and not a
+    # status string: the section reads this row's fields.
+    assert script.wait_for_analysis(_Client(), "apk_x", attempts=5, pause=0) == {
+        "status": "completed"
+    }
