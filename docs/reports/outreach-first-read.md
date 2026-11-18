@@ -181,7 +181,7 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 
 ### F-4｜`docs/portfolio.md` 说「six CI jobs」，括号里列了七项，仓库里其实是十个 job
 
-**原文（`docs/portfolio.md:67-72`，逐字）：**
+**原文（复核当时 `docs/portfolio.md:67-72`，逐字；该文件此后已改）：**
 
 > - **Quality gates.** Strict mypy typing, ruff lint/format, 1632 tests at
 >   93.3% coverage on the first-party code, and six CI jobs: lint, format and
@@ -190,10 +190,10 @@ tests」在英文里几乎必然被读成「1,632 个测试都通过」。这正
 >   a check that the published M3 comparison still reproduces; the Docker image; and
 >   the dependency audit.
 
-**仓库实况：** `.github/workflows/ci.yml` 有 **9 个 job 定义**（`lint`、`test`、
+**仓库实况：** `.github/workflows/ci.yml` 有 **10 个 job 定义**（`lint`、`test`、
 `test-partial-backends`、`m3-comparison`、`docker`、`security`、`contracts`、
-`m10-selfcheck`、`measurement`），其中 `test` 是 `["3.12", "3.13"]` 两版本矩阵，
-所以 tag 上实际跑的是 **10 个 job**。仓库自己的 CI 记录就是这么写的
+`m10-selfcheck`、`social-preview`、`measurement`），其中 `test` 是 `["3.12", "3.13"]`
+两版本矩阵，所以 push/PR 上跑 **10 次**、推 tag 上跑 **11 次**。仓库自己的 CI 记录就是这么写的
 （`docs/reports/v1.0.0-ci-run-record.md` §1）：
 
 > run [`44126968629`](https://github.com/gg320324492-lgtm/dexatlas/actions/runs/44126968629)，10 个 job 里 **4 个红**，6 个绿。
@@ -460,8 +460,8 @@ a manifest」对不上；也可能以为包里只有一份报告、另外两份�
 
 | 项 | 素材里的值 | 报告落盘值 | 结论 |
 |---|---|---|---|
-| 测试总数 | 1,632（四处） | `<!--fig:tests.total-->1632<!--/fig-->` | ✅ |
-| 快测 / 集成 | 素材**未写**拆分 | `<!--fig:tests.fast-->1485<!--/fig-->` / `<!--fig:tests.slow-->147<!--/fig-->` | ✅ 没有可被误读成「两套测试」的表述 |
+| 测试总数 | 1,644（四处） | `<!--fig:tests.total-->1644<!--/fig-->` | ✅ |
+| 快测 / 集成 | 素材**未写**拆分 | `<!--fig:tests.fast-->1497<!--/fig-->` / `<!--fig:tests.slow-->147<!--/fig-->` | ✅ 没有可被误读成「两套测试」的表述 |
 | 覆盖率 | 93.3% | `<!--fig:coverage.pct-->93.3%<!--/fig-->` | ✅ 数值一致（**限定词**另见 F-2） |
 | 覆盖行数 | 素材**未写** | `<!--fig:coverage.covered-->7135<!--/fig-->` / `<!--fig:coverage.total-->7650<!--/fig-->` | ✅ 素材没提，所以没有对不上的行 |
 | CLI 命令数 | 素材未写总数，只列了 7 个（其中 3 个有错） | `<!--fig:cli.commands-->13<!--/fig-->` | ⚠ 见 F-1 |

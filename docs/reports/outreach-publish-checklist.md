@@ -37,8 +37,8 @@
 
 | # | 数字 | 出现在 | 去哪核（落盘处） | 查过是什么样 |
 |---|---|---|---|---|
-| 1 | **1,588** 个测试（1,441 快 + 147 集成） | `cover-letter-templates.md:79`；`project-brief.md:50`、`:85`；`scope-backend-automation.md:24` | [phase1-execution-report.md](phase1-execution-report.md) 的 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` / `<!--fig:tests.slow-->`；同值另见 [status.md](../status.md) | `1588（1441 + 147）` ✅ 一致 |
-| 2 | **93.3%** 一方代码覆盖率（7,117 / 7,631 行） | 同上三处 | `phase1-execution-report.md` 的 `<!--fig:coverage.pct-->` / `<!--fig:coverage.covered-->` / `<!--fig:coverage.total-->`；`status.md` | `93.3%（7117/7631）` ✅ 一致 |
+| 1 | **1,644** 个测试（1,497 快 + 147 集成） | `cover-letter-templates.md:79`；`project-brief.md:50`、`:85`；`scope-backend-automation.md:24` | [phase1-execution-report.md](phase1-execution-report.md) 的 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` / `<!--fig:tests.slow-->`；同值另见 [status.md](../status.md) | `1644（1497 + 147）` ✅ 一致 |
+| 2 | **93.3%** 一方代码覆盖率（7,135 / 7,650 行） | 同上三处 | `phase1-execution-report.md` 的 `<!--fig:coverage.pct-->` / `<!--fig:coverage.covered-->` / `<!--fig:coverage.total-->`；`status.md` | `93.3%（7135/7650）` ✅ 一致 |
 | 3 | **eleven**（11）个 MCP 只读工具 | `cover-letter-templates.md:135`；`scope-ai-mcp.md:28` | [server.py](../../src/dexatlas/mcp/server.py) 里注册的 11 个 `Tool`；[public-contracts.md](../architecture/public-contracts.md) §1.3 的第 1–11 行；[README.md](../../README.md) 写 “eleven tools” | `11` ✅ 一致 |
 | 4 | 三个走查 / 三个一方样本 / **四个包、四次分析** | `cover-letter-templates.md:36-45`；`project-brief.md:127-135` | [case-studies/README.md](../case-studies/README.md) 表格下方那段说明 | 三篇走查覆盖 `demo-app` / `obfuscated-app` / `multidex-app`，四个证据包对应四次分析（run id 两两不同） ✅ 一致（详见 §1.3） |
 | 5 | 四个证据包（四个 zip） | `cover-letter-templates.md:32-35`；`project-brief.md:123-126` | [attachments/](../case-studies/attachments/) 下的四个 `.zip`，均已被 git 跟踪 | 四个 zip 都在 ✅ |
@@ -48,10 +48,10 @@
 
 **逐条自查：**
 
-- [ ] **1,588 / 1,441 / 147 仍与落盘一致。**
+- [ ] **1,644 / 1,497 / 147 仍与落盘一致。**
   怎么查：`grep -n "fig:tests\." docs/reports/phase1-execution-report.md`
-  查过是什么样：三个标记分别落盘为 `1588`、`1441`、`147`；素材里写的是 `1,588`。
-- [ ] **93.3%（7,117 / 7,631）仍与落盘一致，且口径仍是「一方代码覆盖率」。**
+  查过是什么样：三个标记分别落盘为 `1644`、`1497`、`147`；素材里写的是 `1,644`。
+- [ ] **93.3%（7,135 / 7,650）仍与落盘一致，且口径仍是「一方代码覆盖率」。**
   怎么查：`grep -n "fig:coverage\.\(pct\|covered\|total\)" docs/reports/phase1-execution-report.md`
   查过是什么样：`93.3%`、`7117`、`7631`。**不要写成「总覆盖率」**——那会把没测到的第三方代码算进分母。
 - [ ] **MCP 工具数仍是 11，措辞仍是 “eleven tools over stdio”。**

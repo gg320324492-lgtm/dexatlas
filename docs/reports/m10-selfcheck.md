@@ -111,8 +111,8 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 
 1. 验收包结构（40 项、19 阻断项、读者包链接）完整。
 2. 三份核心文档的相对链接全部可解析；CHANGELOG 版本与代码版本一致。
-3. README 徽章（tests 1620 / coverage 93.3%）与执行报告 `<!--fig:-->` 数字一致；
-   `tests.total = 1473 + 147` 加和成立。
+3. README 徽章（tests 1644 / coverage 93.3%）与执行报告 `<!--fig:-->` 数字一致；
+   `tests.total = 1497 + 147` 加和成立。
 4. F1/F3/F4/D3/D1/D5/E1/E5 的静态契约核对全部一致（退出码 **0–6**、MCP 11 工具、
    报告 10 顶层字段 + `schema_version=3`、`not_included` 三键、HTML 无外部资源、
    冻结 20 题、两套报告入口）。

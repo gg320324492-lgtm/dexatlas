@@ -438,7 +438,7 @@ GitHub 现已识别为 Apache-2.0，与 README 徽章、`pyproject.toml` 的声�
 | 4 | **macOS 未验证** | 无 Apple 硬件，如实标注（[m8-install-rehearsal.md](m8-install-rehearsal.md):28） |
 | 5 | **三个证据包只覆盖两份分析** | demo 与 api-integration 两个包的 `report.md` / `report.html` 是**同一份分析报告**（字节相同），不能当成两份独立证据报数（[case-studies/README.md](../case-studies/README.md):36-37；[publish-review.md](../outreach/publish-review.md):342-343） |
 | 6 | **读者路径未在最终 tag 上复走** | 演练基准 `0104ccb`，tag 的指向在本文写就之后又变过（现查 `git rev-parse v1.0.0^{commit}`），相距 23 个提交（`src/` 一行未改）（[reader-dry-run.md](reader-dry-run.md):9-13） |
-| 7 | **CI 的运行结果没有落盘记录** | 机制在 [ci.yml](../../.github/workflows/ci.yml)，运行结果不在仓库里；读者无法自行复核（而且 tag `v1.0.0` 那次 run 实际是红的，见 §8 第 8 条） |
+| 7 | **CI 的运行结果已落盘** | 逐 job 结论见 [v1.0.0-ci-run-record.md](v1.0.0-ci-run-record.md)（tag `v1.0.0` 那次 run 实际是红的，见 §8 第 8 条）；机制仍在 [ci.yml](../../.github/workflows/ci.yml) |
 | 8 | **README 独立首读复核结论未回填** | 上一轮列为待办 #5，至今无落盘结论 |
 
 **这一轮新增的还有两条口径限定**（上一轮没有）：

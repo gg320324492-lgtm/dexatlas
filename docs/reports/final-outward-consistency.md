@@ -26,7 +26,7 @@
 **没做什么（硬边界）。**
 
 - 未运行 `pytest --cov`、任何 `coverage` 命令、`uv sync`、`scripts/refresh-report-figures.py`；
-  因此**覆盖率 93.3%、测试数 1,588 一律按发版树已归档的测量值引用，不重测**。
+  因此**覆盖率 93.3%、测试数 1,644 一律按已归档的测量值引用，不重测**。
 - 未修改任何被核文本；本次只新增本文件。
 - 只读门禁已跑通：`scripts/check-doc-citations.py`（220 条引用，0 漂移、0 悬空路径）、
   `scripts/check-version-claims.py --base auto`（2 条发现，均为 `8f9ddcaf` 已记录的既有项）。
@@ -42,9 +42,9 @@
 
 | 主题 | 七份文本里的写法（文件:行） | 基准出处 | 判定 |
 |---|---|---|---|
-| 测试总数 **1,588**（1,441 快 + 147 集成） | `docs/releases/v1.0.0.md:86`；`docs/reports/v1.0.0-github-release-body.md:160`；`docs/status.md:23`；`docs/portfolio.md:66`（写作 1,588）；`README.md:12`（徽章 `tests-1588`）；`README.zh-CN.md` 无 | `docs/reports/phase1-execution-report.md:76` | 一致（5 处）。README.zh-CN 无徽章 → 见 §4.3 |
-| 完整环境 **1,588 passed + 0 xfailed + 0 skipped** | `docs/reports/v1.0.0-github-release-body.md:161` | `docs/reports/phase1-execution-report.md:877` | 仅一处有（无冲突） |
-| 一方覆盖率 **93.3%**（7,117 / 7,631 行） | `docs/releases/v1.0.0.md:90`；`docs/reports/v1.0.0-github-release-body.md:163`；`docs/status.md:24`；`docs/portfolio.md:67`；`README.md:13`（徽章）；`CHANGELOG.md` 1.0.0 段无；`README.zh-CN.md` 无 | `docs/reports/phase1-execution-report.md:77` | 一致（5 处） |
+| 测试总数 **1,644**（1,497 快 + 147 集成） | `docs/releases/v1.0.0.md:90`；`docs/reports/v1.0.0-github-release-body.md:164`；`docs/status.md:22`（脚本写，当前 1,643）；`docs/portfolio.md:67`（写作 1,644）；`README.md:12`（徽章，脚本写，当前 `tests-1643`）；`README.zh-CN.md` 无 | `docs/reports/phase1-execution-report.md:76` | 一致（5 处）——**手写的三处现值已是 1,644**；`docs/status.md:22` 与 `README.md:12` 那两处由 `scripts/refresh-report-figures.py` 写，当前仍是 1,643，最终重测量落盘即跟上。README.zh-CN 无徽章 → 见 §4.3 |
+| 完整环境 **1,644 passed + 0 xfailed + 0 skipped** | `docs/reports/v1.0.0-github-release-body.md:165` | `docs/reports/phase1-execution-report.md:879` | 仅一处有（无冲突） |
+| 一方覆盖率 **93.3%**（7,135 / 7,650 行） | `docs/releases/v1.0.0.md:94`；`docs/reports/v1.0.0-github-release-body.md:167`；`docs/status.md:23`；`docs/portfolio.md:68`；`README.md:13`（徽章）；`CHANGELOG.md` 1.0.0 段无；`README.zh-CN.md` 无 | `docs/reports/phase1-execution-report.md:77` | 一致（5 处） |
 | MCP 只读工具 **11** | `CHANGELOG.md:333`（十个增至十一个）、`:354`；`docs/releases/v1.0.0.md:146`；`docs/reports/v1.0.0-github-release-body.md:198`；`docs/status.md:248`、`:358`；`docs/portfolio.md:47`；`README.md:254`；`README.zh-CN.md:191`、`:239`、`:316`；`docs/architecture/public-contracts.md` §3.1（11 行）、`:404` | `docs/architecture/public-contracts.md` §3.1 | 一致（12 处） |
 | CLI **13** 个子命令 | `CHANGELOG.md:351`；`docs/architecture/public-contracts.md` §1.1 表 **13 行**（未写总数） | `src/dexatlas/cli/main.py`；契约表 §1.1 | 仅一处有总数（另一处可数，无冲突） |
 | REST **23** 个端点 | `CHANGELOG.md:353`；`docs/architecture/public-contracts.md` §2 各表合计 **23 行**（未写总数） | `src/dexatlas/api/app.py`（23 条路由） | 仅一处有总数（另一处可数，无冲突） |
@@ -108,7 +108,7 @@
 | 第三方署名表 | `README.md:481`–`:499` | `README.zh-CN.md:371`–`:386` | 等价 ✓ |
 | 状态横幅措辞 | 「early development」 | 「早期开发」 | 等价 ✓ |
 | release body 中英摘要 | `:105`–`:153` | `:235`–`:255` | **等价 ✓**（两处都写全了首测验收线；唯一分叉是「连续三轮」，见 §2） |
-| 测试/覆盖率徽章 | `README.md:12`–`:13`（tests-1588、coverage-93.3%） | `README.zh-CN.md:1`–`:9` **无徽章** | 不对等 → 第 23 条 |
+| 测试/覆盖率徽章 | `README.md:12`–`:13`（tests-1644、coverage-93.3%） | `README.zh-CN.md:1`–`:9` **无徽章** | 不对等 → 第 23 条 |
 
 ---
 
@@ -224,8 +224,8 @@
 ### I 组 — 中英对等（1 处，优先级：低）
 
 **23. `README.zh-CN.md:1`–`:9`**
-- 现状：整个文件没有 CI / Python / License / **Tests / Coverage** 徽章，而 `README.md:9`–`:15` 有 6 枚徽章（含 `tests-1588`、`coverage-93.3%`）。
-- 建议：至少补 `tests-1588` 与 `coverage-93.3%` 两枚。
+- 现状：整个文件没有 CI / Python / License / **Tests / Coverage** 徽章，而 `README.md:9`–`:15` 有 6 枚徽章（含 `tests-1644`、`coverage-93.3%`）。
+- 建议：至少补 `tests-1644` 与 `coverage-93.3%` 两枚。
 - 依据：`README.md:12`–`:13`；`docs/reports/phase1-execution-report.md:76`–`:77`。**取舍**：README.md 徽章是 `refresh-report-figures.py` 生成的，中文版无法自动同步，需人工维护——这一条要么补，要么在中文版写明「以英文版徽章为准」。
 
 ---

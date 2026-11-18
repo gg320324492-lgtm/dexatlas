@@ -145,10 +145,14 @@ keeps the old figures, which leaves the record describing a tree that no
 longer exists. Run it with **all three backends present**, or the skipped
 tests make it a partial measurement.
 
-CI runs six jobs (seven parallel runs): lint/format/mypy, tests on Python 3.12 (every backend),
-tests on Python 3.13 (no external backends), tests with Apktool only, the
-Docker image, and the dependency audit. Those are three separate backend
-configurations, not one, and each is worth running by hand before a push.
+CI runs ten jobs (eleven parallel runs on a tag push, ten on a push or a PR):
+lint/format/mypy, tests on Python 3.12 (every backend), tests on Python 3.13 (no
+external backends), tests with Apktool only, the M3 comparison re-run, the
+Docker image, the dependency audit, the live public-contract check, the M10
+acceptance self-check, and the social-preview figure check — plus the
+measurement re-measurement, which only runs on a tag. The backend
+configurations are three separate configurations, not one, and each is worth
+running by hand before a push.
 
 ### The scripts that were local and now are not
 

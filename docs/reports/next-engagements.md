@@ -408,7 +408,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 
 | # | 动作 | 依据 | 依赖 |
 |---:|---|---|---|
-| 1 | **把 M10 独立验收的邀请发出去**（材料已齐：邀请函成稿 + 读者包 + 40 项检查表 + 发起人发送前清单 + 自查脚本 40/40）。先按发送前清单逐条勾，填 7 处空格、钉死验收 commit、确认三个后端、确认附件、约定反馈时限与提交渠道 | [status.md:138](../status.md#L138)（准备包就绪、验收未开始）、[m10-invitation-sender-checklist.md:16](../reports/m10-invitation-sender-checklist.md#L16)（§0 三分钟版）、[phase3-plan.md:211](../roadmap/phase3-plan.md#L211) | 外部读者 |
+| 1 | **把 M10 独立验收的邀请发出去**（材料已齐：邀请函成稿 + 读者包 + 40 项检查表 + 发起人发送前清单 + 自查脚本 43/43）。先按发送前清单逐条勾，填 7 处空格、钉死验收 commit、确认三个后端、确认附件、约定反馈时限与提交渠道 | [status.md:138](../status.md#L138)（准备包就绪、验收未开始）、[m10-invitation-sender-checklist.md:16](../reports/m10-invitation-sender-checklist.md#L16)（§0 三分钟版）、[phase3-plan.md:211](../roadmap/phase3-plan.md#L211) | 外部读者 |
 | 2 | **同一次邀请里一并回填 README 独立首读复核**（§3.9 与 §3.1 可由同一位读者承担，M10 明确允许「同一读者可以承担两项」） | [phase3-plan.md:214](../roadmap/phase3-plan.md#L214)、[portfolio-readiness-2026-11-15-recheck.md:131](portfolio-readiness-2026-11-15-recheck.md#L131) | 依赖 #1 |
 | 3 | **决定方向 B 的服务承诺宽度**：要么等 M6 三轮 ≥90% 再对外说 agent 能力，要么**现在就把卖点收窄到工具层与证据链**，并在范围说明里明说 agent 判断力未达内部验收线 | [status.md:37](../status.md#L37)（49/60 = 81.7%，未达标）、[scope-ai-mcp.md:76](../outreach/scope-ai-mcp.md#L76)（排除条款已留位置） | 无（可与 #1 并行） |
 | 4 | ~~**补第三个样本（multi-DEX）的证据包**~~ **（2026-11-18 已完成）**：`analyze --html` / `export` + `verify_package`，落盘到 `docs/case-studies/attachments/` | [case-studies-third-package.md](case-studies-third-package.md)（实测与哈希）、[case-studies/README.md:30](../case-studies/README.md#L30)（附录已覆盖该样本） | 无 |
@@ -416,7 +416,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 | 6 | **清理外发隔离**：发布前删除素材里的 `Draft for review — not published.` 标记与 Identity note 引用块（按发稿形态决定删哪些）；**不要**把 `docs/outreach/publish-review.md` 当附件；处理素材里指向它的引用 | [publish-review.md:173](../outreach/publish-review.md#L173)（草稿标记与 Identity note 的位置）、[publish-review.md:345](../outreach/publish-review.md#L345)（内部记录不可外发） | 无 |
 | 7 | **替换全部 `{{...}}` 占位符**，改完逐个搜 `{{` 确认无残留（Template 1 有 11 处、Template 2 有 10 处） | [publish-review.md:336](../outreach/publish-review.md#L336) | 依赖 #5（联系方式进占位符） |
 | 8 | **决定 `scope-ai-mcp.md` 是「整篇做附件」还是「只贴 §What I offer（plain 773）」**；若整篇粘贴，需再压约 1,500 字符——这是编辑判断，得由人做 | [publish-review.md:322](../outreach/publish-review.md#L322)、[publish-review.md:246](../outreach/publish-review.md#L246) | 无 |
-| 9 | **按最后一次完整测量再核一次对外数字**（现在落盘的是 1,612 / 93.3%），并确认版本句仍指向当前最新 tag | [publish-review.md:332](../outreach/publish-review.md#L332)、[publish-review.md:312](../outreach/publish-review.md#L312) | 无 |
+| 9 | **按最后一次完整测量再核一次对外数字**（现在落盘的是 1,644 / 93.3%），并确认版本句仍指向当前最新 tag | [publish-review.md:332](../outreach/publish-review.md#L332)、[publish-review.md:312](../outreach/publish-review.md#L312) | 无 |
 | 10 | **在真实表单上逐个字段复核长度限制，并联网核实素材头部引用的官方指南链接**（本轮未联网） | [publish-review.md:326](../outreach/publish-review.md#L326) | 无 |
 | 11 | **附件逐个确认真的上传了**；注意 demo 与 api-integration 是同一份分析报告，**不要当成两份独立证据报数** | [publish-review.md:341](../outreach/publish-review.md#L341) | 依赖 #4 |
 | 12 | **发布**（作品集页 / 提案）。发布前最后确认：文案里没有收益、时时节省、客户案例（[publish-review.md:349](../outreach/publish-review.md#L349)）；`scope-ai-mcp.md` 与 `scope-backend-automation.md` 的附件按第 8 条处理 | [publish-review.md:307](../outreach/publish-review.md#L307)（§7 全文） | 依赖 #1–#11 |
@@ -432,7 +432,7 @@ Upwork 实际限制会随时间调整；素材头部引用的官方指南链接*
 ### 5.1 已经成立的事实（可以对外说）
 
 - **v1.0.0 已发布**：tag `v1.0.0`（2026-11-17），指向 commit `0104ccb`。
-- **1,612 项测试 / 93.3% 一方代码覆盖率**（`docs/reports/phase1-execution-report.md` 的
+- **1,644 项测试 / 93.3% 一方代码覆盖率**（`docs/reports/phase1-execution-report.md` 的
   落盘测量值，经 `scripts/refresh-report-figures.py` 生成），mypy strict、ruff、
   CI 覆盖 Python 3.12/3.13 与多种后端配置。
 - **四个入口都实现了**：CLI、FastAPI REST API、只读 MCP server（11 个工具）、
