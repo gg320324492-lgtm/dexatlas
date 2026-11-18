@@ -772,11 +772,18 @@ jobs:
   #
   # The script needs nothing but the standard library: it reads the
   # execution report, the documents and the published release body.
+  #
+  # The published release body is compared against the execution report *in
+  # the tagged tree*, because that is the tree the release shipped. So the
+  # tags have to be in this checkout: a shallow one has neither, and the
+  # comparison would have no tree to read.
   release-numbers:
     name: The outward texts agree on the release numbers
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
