@@ -23,21 +23,42 @@ It reads the numbers; it does not carry them. A hand-written list of expected
 values would be a second copy of the truth -- the same mistake the four
 documents make, one level down.
 
+Which tree a number is about
+-----------------------------
+There are two comparisons here, and they are about two different trees.
+
+* The **working copy**: the four texts in this checkout, against the
+  execution report in this checkout.
+* The **published release**: the release body published on GitHub for the
+  tag, against the execution report **in the tagged tree** -- the tree the
+  release actually shipped. It is read with ``git show <tag>:<path>``, the
+  way the citation checker reads a file out of a tree.
+
+They have to be two comparisons, because they are two different claims. The
+working copy's report is re-measured as soon as the next version starts, and
+a report measured after the next version began says nothing about the
+release that shipped before it. Comparing the published body of v1.0.0
+against that measurement would go red for a reason that has nothing to do
+with the release -- and a gate that goes red for the wrong reason is a gate
+that gets turned off.
+
 What it prints
 --------------
-For every source and every number: what the report says, what the source says,
-where in the source it says it, and whether the two agree. A number a source
-does not state is reported as "not written": a document that leaves a number
-out is not a document that states it wrongly, and the difference is visible
-here rather than hidden behind a green exit code.
+For every segment, for every source and every number: what the report of
+that segment's tree says, what the source says, where in the source it says
+it, and whether the two agree. A number a source does not state is reported
+as "not written": a document that leaves a number out is not a document
+that states it wrongly, and the difference is visible here rather than
+hidden behind a green exit code.
 
 The exit codes
 --------------
-* 0 -- every number that is written agrees with the report.
+* 0 -- every number that is written agrees with the report of its own tree.
 * 1 -- a number disagrees, or one text says two things about it.
-* 2 -- the published release body could not be read, so the comparison is
-  incomplete. That is not "the numbers agree": the fourth text was not
-  checked. ``--offline`` skips it on purpose, and says so.
+* 2 -- the published release body, or the tagged tree it is compared
+  against, could not be read, so the second comparison is incomplete. That
+  is not "the numbers agree": the fourth text was not checked. ``--offline``
+  skips it on purpose, and says so.
 
 ``--strict`` also fails when a text does not state a number at all.
 """
@@ -45,6 +66,8 @@ The exit codes
 from __future__ import annotations
 
 import argparse
+import functools
+import importlib.util
 import json
 import re
 import shutil
@@ -78,6 +101,11 @@ VERIFY_DOCUMENTS = (
     "docs/how-to-verify.md",
     "docs/how-to-verify.zh-CN.md",
 )
+
+#: The document that records the measurement of a tree. In the working copy it
+#: is the authority for the working copy's texts; in the tagged tree it is the
+#: authority for the published release body.
+REPORT_DOCUMENT = "docs/reports/phase1-execution-report.md"
 
 #: Markdown noise around a number: emphasis, code spans, spaces.
 _MARKDOWN = r"[*`_\t ]*"
@@ -204,6 +232,23 @@ class Finding:
     found: str
     line: int
     detail: str
+    segment: str = ""
+
+
+@dataclass(frozen=True)
+class Segment:
+    """One comparison: a set of texts and the numbers of one tree.
+
+    The name is what the report calls the comparison, so that a finding can
+    say which comparison it belongs to: "the working copy" and "the
+    published release" are two different claims about two different trees,
+    and a reader has to be able to tell them apart.
+    """
+
+    name: str
+    authority_label: str
+    authority: dict[str, str]
+    sources: tuple[Source, ...]
 
 
 def normalize(raw: str) -> str:
@@ -380,13 +425,56 @@ def extract(source: Source, authority: dict[str, str]) -> tuple[dict[str, list[C
     return dict(claims), others
 
 
-def read_authority() -> dict[str, str]:
-    """The figures the execution report records."""
-    path = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
+def figures_in(text: str) -> dict[str, str]:
+    """The figures a report records."""
     figures: dict[str, str] = {}
-    for match in _FIG.finditer(path.read_text(encoding="utf-8")):
+    for match in _FIG.finditer(text):
         figures.setdefault(match["key"], normalize(match["value"]))
     return figures
+
+
+def read_authority() -> dict[str, str]:
+    """The figures the working copy's execution report records."""
+    path = REPO_ROOT / REPORT_DOCUMENT
+    return figures_in(path.read_text(encoding="utf-8"))
+
+
+@functools.cache
+def citation_checker():
+    """The citation checker, loaded as a module.
+
+    How a file is read out of a tree is one rule, and it lives in the
+    citation checker: a ``Tree`` reads a file with ``git show`` and tells
+    "this tree does not have that file" apart from "the file is empty". A
+    second copy of that here would be a second answer to the same question,
+    and the two answers would drift.
+    """
+    script = Path(__file__).resolve().parent / "check-doc-citations.py"
+    spec = importlib.util.spec_from_file_location("dexatlas_doc_citations", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    # The module has to be in ``sys.modules`` before it runs: its annotations
+    # resolve through it.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def tagged_report(tag: str) -> tuple[str | None, str]:
+    """The execution report as the tagged tree has it.
+
+    The report of the tree the release shipped is the authority for the
+    release body published for it. Reading it out of the working copy would
+    compare a release with a measurement that was taken later, on a
+    different tree.
+    """
+    tree = citation_checker().Tree(tag)
+    if not tree.exists():
+        return None, f"the {tag} tag is not in this checkout"
+    text = tree.text(REPORT_DOCUMENT)
+    if text is None:
+        return None, f"the {tag} tree has no {REPORT_DOCUMENT}"
+    return text, ""
 
 
 def published_body(tag: str, repo: str = "") -> tuple[str | None, str]:
@@ -428,7 +516,10 @@ def release_body_portion(text: str) -> str:
 
 
 def compare(
-    source: Source, claims: dict[str, list[Claim]], authority: dict[str, str]
+    source: Source,
+    claims: dict[str, list[Claim]],
+    authority: dict[str, str],
+    segment: str = "",
 ) -> list[Finding]:
     """What the source says against what the report says."""
     findings: list[Finding] = []
@@ -442,7 +533,7 @@ def compare(
                 # The coverage is not stated at all; saying again that its
                 # line counts are missing says nothing new.
                 continue
-            findings.append(Finding(source.name, family, "missing", expected, "", 0, ""))
+            findings.append(Finding(source.name, family, "missing", expected, "", 0, "", segment))
             continue
         for claim in found:
             if not same(claim.value, expected):
@@ -455,6 +546,7 @@ def compare(
                         claim.value,
                         claim.line,
                         claim.text,
+                        segment,
                     )
                 )
     fast = authority.get("tests.fast", "?")
@@ -469,6 +561,7 @@ def compare(
                 claim.value,
                 claim.line,
                 claim.text,
+                segment,
             )
         )
     return findings
@@ -563,21 +656,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    authority = read_authority()
-    missing_authority = [family for family in FAMILIES if family not in authority]
-    if missing_authority:
-        print(
-            "the execution report records no "
-            + ", ".join(missing_authority)
-            + "; those numbers are not compared",
-            file=sys.stderr,
-        )
-
     print("dexatlas outward-number parity")
     print(f"tag: {args.tag}")
-    print("authority: docs/reports/phase1-execution-report.md")
-    for family in FAMILIES:
-        print(f"  {family:<16} {authority.get(family, '--')}")
+
+    findings: list[Finding] = []
+    incomplete = ""
+
+    # ---- the working copy: its texts against its own report -------------
+    authority = read_authority()
 
     sources: list[Source] = []
     for relative in VERIFY_DOCUMENTS:
@@ -605,35 +691,71 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"missing document: {body_relative}", file=sys.stderr)
 
+    segments: list[Segment] = [
+        Segment(
+            name="the working copy",
+            authority_label=f"{REPORT_DOCUMENT} (the working copy)",
+            authority=authority,
+            sources=tuple(sources),
+        )
+    ]
+
+    # ---- the published release: its body against the tree it shipped ----
     published: Source | None = None
-    unreadable = ""
     if args.offline:
         print("published release body: not checked (--offline)")
     else:
         body, reason = published_body(args.tag, args.repo)
         if body is None:
-            unreadable = reason
+            incomplete = f"the published release body could not be read: {reason}"
             print(f"published release body: NOT READ -- {reason}")
         else:
             published = Source(f"GitHub release {args.tag} (published body)", body)
-            sources.append(published)
             print("published release body: read")
+            tagged_text, tagged_reason = tagged_report(args.tag)
+            if tagged_text is None:
+                incomplete = f"the {args.tag} tree could not be read: {tagged_reason}"
+                print(f"the {args.tag} tree: NOT READ -- {tagged_reason}")
+            else:
+                print(f"the {args.tag} tree: read")
+                segments.append(
+                    Segment(
+                        name=f"the published release {args.tag}",
+                        authority_label=f"{REPORT_DOCUMENT} (the {args.tag} tree)",
+                        authority=figures_in(tagged_text),
+                        sources=(published,),
+                    )
+                )
 
-    findings: list[Finding] = []
-    extracted: dict[str, dict[str, list[Claim]]] = {}
-    for source in sources:
-        claims, others = extract(source, authority)
-        extracted[source.name] = claims
-        source_findings = compare(source, claims, authority)
-        findings.extend(source_findings)
+    for segment in segments:
         print()
-        for line in render_source(source, claims, authority, source_findings, others):
-            print(line)
+        print(f"=== segment: {segment.name} ===")
+        print(f"authority: {segment.authority_label}")
+        missing_authority = [family for family in FAMILIES if family not in segment.authority]
+        if missing_authority:
+            print(
+                "  the report records no "
+                + ", ".join(missing_authority)
+                + "; those numbers are not compared",
+                file=sys.stderr,
+            )
+        for family in FAMILIES:
+            print(f"  {family:<16} {segment.authority.get(family, '--')}")
+        for source in segment.sources:
+            claims, others = extract(source, segment.authority)
+            source_findings = compare(source, claims, segment.authority, segment.name)
+            findings.extend(source_findings)
+            print()
+            for line in render_source(source, claims, segment.authority, source_findings, others):
+                print(line)
 
     if published is not None and body_source is not None:
-        drift = compare_texts(
-            published, extracted[published.name], body_source, extracted[body_source.name]
-        )
+        # The two texts are read against the same numbers, so that the
+        # difference between them is a difference between the two texts and
+        # not a difference between the two trees they are read against.
+        published_claims, _ = extract(published, authority)
+        body_claims, _ = extract(body_source, authority)
+        drift = compare_texts(published, published_claims, body_source, body_claims)
         if drift:
             print()
             print(f"=== the published body against {body_relative} ===")
@@ -648,25 +770,38 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print("summary")
-    print(f"  sources: {len(sources)}")
-    print(f"  mismatches: {len(mismatches)}")
-    print(f"  not written: {len(missing)}")
+    for segment in segments:
+        segment_mismatches = [f for f in mismatches if f.segment == segment.name]
+        segment_missing = [f for f in missing if f.segment == segment.name]
+        print(f"  segment {segment.name}: {len(segment.sources)} source(s)")
+        print(f"    mismatches: {len(segment_mismatches)}")
+        print(f"    not written: {len(segment_missing)}")
     if mismatches:
         print()
         print("mismatches")
-        for finding in mismatches:
-            print(f"  {finding.source}  {finding.family}")
-            print(f"    report: {finding.expected}")
-            print(f"    this text: {finding.found}  (line {finding.line})")
+        for segment in segments:
+            segment_mismatches = [f for f in mismatches if f.segment == segment.name]
+            if not segment_mismatches:
+                continue
+            print(f"  {segment.name}")
+            for finding in segment_mismatches:
+                print(f"    {finding.source}  {finding.family}")
+                print(f"      report: {finding.expected}")
+                print(f"      this text: {finding.found}  (line {finding.line})")
     if missing:
         print()
         print("not written")
-        for finding in missing:
-            print(f"  {finding.source}  {finding.family}  (report: {finding.expected})")
+        for segment in segments:
+            segment_missing = [f for f in missing if f.segment == segment.name]
+            if not segment_missing:
+                continue
+            print(f"  {segment.name}")
+            for finding in segment_missing:
+                print(f"    {finding.source}  {finding.family}  (report: {finding.expected})")
 
-    if unreadable:
+    if incomplete:
         print()
-        print(f"the published release body could not be read: {unreadable}")
+        print(incomplete)
         return 2
     if mismatches:
         return 1

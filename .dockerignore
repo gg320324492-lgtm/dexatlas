@@ -1,0 +1,65 @@
+# The build context of the image.
+#
+# The image reads six things out of this tree: pyproject.toml, uv.lock,
+# README.md, LICENSE, src/ and examples/. Everything else is either
+# regenerable or too large to be worth sending to the daemon.
+#
+# The context used to carry the whole .git directory, and every untracked
+# file the working tree happened to hold.
+#
+# The patterns that name a directory are written "name/*" on purpose: a
+# plain "name" would match a directory of that name at any depth, and
+# would take a directory inside src/ out of the image. "name/*" only
+# matches the one at the root of the context.
+#
+# The samples are NOT excluded: examples/demo-app/demo.apk is the file the
+# image is checked against, and a "*.apk" rule here would take it out of
+# the build context and leave the image without a sample to analyse.
+
+# The version control data. Nothing in the image reads it, and it is the
+# largest thing in the tree.
+.git
+.gitattributes
+.gitignore
+
+# The working area of this machine: the virtual environment, the coverage
+# data of a measurement, the analysis output.
+.scratch
+.venv
+venv
+.coverage
+.coverage.*
+coverage.xml
+htmlcov
+junit*.xml
+.dexatlas/*
+workspace/*
+out/*
+_decompile/*
+jadx-out/*
+apktool-out/*
+
+# The caches the tools leave behind.
+__pycache__
+**/*.py[cod]
+**/*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+build/*
+dist/*
+
+# The third-party samples the integration suite fetches. They are large,
+# they are not the repository's own, and the image does not read them.
+fixtures/apk/*
+
+# The editors and the operating systems.
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# The documentation and the test suite. The image reads neither.
+docs/*
+tests/*
+benchmarks/*
