@@ -110,14 +110,14 @@
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
   `scripts/check-doc-citations.py:166-179` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
-  （`scripts/check-doc-citations.py:1113-1116`）按这个 ref 取树；本地 tag 还没动 →
+  （`scripts/check-doc-citations.py:1117-1120`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
   `check_declaration()`（`scripts/check-doc-citations.py:1127-1177`）还会把正文里引的测量
   指纹与**那棵树**的测量记录比对 —— 旧树的指纹，于是也判「不符」。
 - **该在哪一步被拦住**：**第 4 步与第 6 步之间**。清单第 4 条只说了「按内容重锚」，没说
   重锚的**基准是本地 tag 还是远端 tag**，也没说重锚完要**在 tag 移过之后再核一次**。
 - **现在的判据**：机制是齐的 —— `TREE_DOCUMENTS` + `Tree` + `tree_fingerprint()`
-  （`scripts/check-doc-citations.py:1119-1122`）+ `check_declaration()`；
+  （`scripts/check-doc-citations.py:1123-1126`）+ `check_declaration()`；
   `tests/test_doc_citations.py::test_the_release_body_is_read_out_of_the_release_tree`
   （`tests/test_doc_citations.py:687-701`）守住「Release 正文必须是从 release 树里读出来的」。
   **缺的只是清单里的顺序要求**。
@@ -213,7 +213,7 @@
   | GitHub 上已发布的那一份正文 | **无** | 不在仓库里 |
 
 - **§3 步骤 8 本该拦住但没拦住？** **是**。§7 N6
-  （`docs/reports/v1.0.0-release-checklist.md:448`）要求人工核四份，但**没指出哪几份其实
+  （`docs/reports/v1.0.0-release-checklist.md:463`）要求人工核四份，但**没指出哪几份其实
   一个数都没有机器在比** —— 于是人工核对成了唯一的兜底，而人工会漏。
 - **漏过的后果**：读者直接读到错的数。这一轮**最后一次**修正就是这一类：commit `3e943b5`
   「发布文本里的 passed 数改成落定值 1694」—— 正文里同时有「1695 个测试」（收集总数）和
@@ -364,7 +364,7 @@
 ### 判据 C：把「同一批数字相等」写成**一份写下来的清单**，并让每一份副本都有东西在比
 
 - **加在哪**：`docs/reports/v1.0.0-release-checklist.md:241`（§3 步骤 8 判据第 3 条），
-  配合 §7 N6（`:448`）。
+  配合 §7 N6（`:463`）。
 - **判据文本**：
 
   > 「四份对外文本的同一批数字集合相等」这句话里的「同一批数字」，**要写下来**，

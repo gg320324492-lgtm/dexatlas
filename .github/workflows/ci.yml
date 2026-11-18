@@ -777,3 +777,35 @@ jobs:
           code = rf.main(["--check"])
           print("### script exit:", code)
           PY
+
+  # The same numbers are written by hand in four outward-facing texts -- two
+  # of them in the repository, one in the release notes, one in the release
+  # body published on GitHub -- and nobody compared them. A number that
+  # drifted in one copy left the other three saying something else, and the
+  # release went out with both. This job asks whether they still say the
+  # same thing.
+  #
+  # The authority is the execution report, whose figures the measurement
+  # writes; the four texts are compared against it. The published release
+  # body is one of the four, so this job needs the token to read it -- and a
+  # release body that nobody re-published after the numbers moved is exactly
+  # what this job is looking for.
+  #
+  # The script needs nothing but the standard library: it reads the
+  # execution report, the documents and the published release body.
+  release-numbers:
+    name: The outward texts agree on the release numbers
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+      - name: The outward texts agree on the release numbers
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          uv run --no-sync python scripts/check-release-numbers.py
+          --repo "${{ github.repository }}"

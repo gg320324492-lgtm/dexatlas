@@ -148,6 +148,10 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
     REPO / "docs" / "reports" / "docker-examples-gap.md",
     REPO / "docs" / "reports" / "post-release-rehearsal.md",
+    # The report on the outward texts' release numbers. It states, for every
+    # one of the four, which line holds which number -- so a number that
+    # moved and a line that moved are both things a citation has to catch.
+    REPO / "docs" / "reports" / "outward-number-parity.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
