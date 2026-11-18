@@ -206,7 +206,7 @@ FAILED tests/test_failure_wording.py::test_the_report_and_the_json_report_carry_
 | `docs/analysis-provenance.md` | 文档里的 JSON 样例的 `summary` 换成新文案；**5 处** `core/evidence.py` 引用行号因插行而漂移（2 处由 `scripts/remap-citations.py` 重映射，3 处手改到新行号） |
 | `docs/reports/evidence-package-isolation.md` | 1 处引用行号被重映射（同样是插行造成的漂移） |
 | `docs/reports/post-release-rehearsal.md` | 2 处**既存**漂移：它指向 `v1.0.0-release-checklist.md` 的 §7 N6，那一节被前面的一次改动挤走了（原引用指的那一行现在只剩一个空行），已改指到 §7 N6 现在所在的位置。修它是因为门禁要求 `drifted: 0` |
-| `docs/how-to-verify.md`、`docs/how-to-verify.zh-CN.md` | 两处**手写**的 `collect` 预期输出更新为本窗口实测值（1561/1710）。这两处不由 `scripts/refresh-report-figures.py` 维护，只能人手改；本窗口动手**之前**它们就已经落后 6 个测试 |
+| `docs/how-to-verify.md`、`docs/how-to-verify.zh-CN.md` | 每份 **4 处手写数字**更新为本窗口实测值（1561/1710）：两条 `collect` 预期输出、散文里「应当是 N 个测试」那一句、示例块里的那个 `tests.total`。这些**不由** `scripts/refresh-report-figures.py` 维护（脚本只写执行报告、`docs/status.md` 与 README 徽章），只能人手改；本窗口动手**之前**它们就已经落后 6 个测试 |
 | `docs/reports/phase1-execution-report.md` | **只加了测试文件表里的一行**（`test_failure_wording.py`）。这行**必须**加：`scripts/refresh-report-figures.py` 在测量**之前**先比对那张表与实际套件，对不上就打印「Nothing was written」并退出 1——不加这一行，主会话合入后的重测会被脚本直接挡住。表里的**数字一个没动**（`<!--fig:tests.*-->` 留给刷新脚本） |
 | `docs/reports/evidence-incomplete-backend-wording.md` | 本文件 |
 | `docs/reports/README.md` | 索引登记（§6），份数与合计同步 |
@@ -225,7 +225,7 @@ FAILED tests/test_failure_wording.py::test_the_report_and_the_json_report_carry_
 | `tests/test_docs.py` 5 条 | 执行报告里的数字（测试数、覆盖率指纹、语句计数）与树不符 → 正是留给主会话重测的那件事 |
 | `tests/test_platform_independent_gates.py::test_every_ci_job_redirects_its_temporary_directory` | CI job 数 10 ≠ 期望 9（别的会话往 CI 里加了本地门禁 job，没同步这个期望值）。与本改动无关 |
 | `tests/test_evidence_package.py::test_the_cli_counts_the_files_the_reader_finds_in_the_zip` | 本机控制台宽度把输出折了行（期望串 `1 source fragment` 被拆成 `1 source \nfragment`）。与本改动无关 |
-| `tests/test_how_to_verify.py` 6 条 | 文档里手写的 `collect` 预期输出过期 → **本窗口已更新**，见 §7.1 |
+| `tests/test_how_to_verify.py` 6 条 | 文档里手写的数字过期 → **本窗口已全部更新**，现 6 条全绿（见 §7.1） |
 
 ### 7.2 留给主会话
 
@@ -242,11 +242,10 @@ FAILED tests/test_failure_wording.py::test_the_report_and_the_json_report_carry_
    - 执行报告的测试文件清单——**那一行本窗口已经补上了**（见 §7.1），剩下的是数字。
 3. **本窗口新增 9 个测试**，套件计数因此 +9（not slow 1552 → 1561，total 1701 →
    1710）。`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md` 里**手写**的
-   `collect` 预期输出**已按本窗口实测更新**（1561/1710）——那份文档**不由**
-   `scripts/refresh-report-figures.py` 维护（脚本只写执行报告、`docs/status.md` 与
-   README 徽章），只能人手改。顺带说明：它在本窗口动手**之前**就已经落后 6 个测试
-   （它写 1546/1695，树里是 1552/1701），不是本窗口引入的；**合入后若树再变，
-   这两处要再核一次**。
+   数字（每份 4 处，见 §7.1）**已按本窗口实测更新**（1561/1710）——那两份文档**不由**
+   `scripts/refresh-report-figures.py` 维护，只能人手改。顺带说明：它们在本窗口动手
+   **之前**就已经落后 6 个测试（写 1546/1695，树里是 1552/1701），不是本窗口引入
+   的；**合入后若树再变，这些数字要再核一次**。
 4. **M-2 的材料侧那一半没有动**：验收项 C4（「报告中的计数与证据记录一致」）怎么
    给基线，是材料侧的决定；本窗口只处理了工具侧那条记录的文案。读者包 §9.1 已经
    说明了「条数随后端配置变化，判据是以报告自身为准」，因此 C4 在改文案之后仍然
