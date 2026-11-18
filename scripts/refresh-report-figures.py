@@ -24,6 +24,10 @@ Two rules keep the report honest:
   pass/skip split, and publishing that as *the* number would be a small lie. The
   script refreshes what it can, says what it could not measure, and leaves the
   coverage figures alone until a complete run is possible.
+* A run that could not measure the tree says so with its exit code. It exits
+  non-zero, because a gate that cannot fail is not a gate: ``--check`` on a
+  tree it could not measure has verified nothing, and reporting success would
+  be the small lie this script exists to avoid.
 * The report states the basis of every environment-dependent number, so a reader
   knows what to install before trying to reproduce one.
 
@@ -1050,8 +1054,12 @@ def undisclosed_modules(record: dict[str, Any], text: str) -> list[str]:
 def missing_prerequisites() -> list[str]:
     """What a complete measurement needs and this machine may not have.
 
-    Only used to explain a partial measurement. Whether the measurement was
-    complete is decided by what the suite did, not by what is installed here.
+    A measurement is complete when the suite accounted for every test in the
+    tree *and* this machine has everything the report names as the basis of
+    its coverage numbers. The suite's own skips are the first half of that
+    question; this is the second. A run without a backend skips the tests
+    that need it, and the coverage of such a run is not the coverage the
+    report claims, so the missing thing is what makes the run partial.
     """
     missing: list[str] = []
     if not shutil.which("jadx") and not os.environ.get("DEXATLAS_JADX_PATH"):
@@ -1066,6 +1074,91 @@ def missing_prerequisites() -> list[str]:
     if not all((fixtures / name).is_file() for name in ("TestActivity.apk", "multidex.apk")):
         missing.append("the integration fixtures (bash scripts/fetch-fixtures.sh)")
     return missing
+
+
+def measured_the_tree(code: Outcome, total: int) -> tuple[bool, str]:
+    """Did the run account for every test the tree collects?
+
+    A run accounted for a test when it ran it, when it skipped it, when it
+    failed it, and when it deselected it -- the report's and the status
+    page's own self-checks are deselected by the code run and measured
+    separately, so they are accounted for as well.
+
+    Whether a test skipped is a fact about the machine, not about the tree:
+    the Windows-only tests skip on Linux by design, and that says nothing
+    about the tree, so it does not make the measurement a measurement of a
+    smaller tree.
+
+    Returns whether the run accounted for the whole tree and, when it did
+    not, what it accounted for.
+    """
+    accounted = sum(
+        code.counts.get(name, 0)
+        for name in ("passed", "failed", "skipped", "xfailed", "xpassed", "error", "deselected")
+    )
+    if accounted != total:
+        return False, f"the tree has {total} tests; the run accounted for {accounted}"
+    return True, ""
+
+
+def measurement_is_complete(code: Outcome) -> tuple[bool, str]:
+    """Could this machine take the measurement the report describes?
+
+    The report names the basis of its coverage numbers: the analysis
+    backends, the integration fixtures and the demo extra. A run without
+    one of them skips the tests that need it, and the coverage of such a run
+    is not the coverage the report claims, so the missing thing is what
+    makes the run partial.
+
+    Returns whether the measurement is complete and, when it is not, what is
+    missing.
+    """
+    missing = missing_prerequisites()
+    if missing:
+        return False, "missing " + ", ".join(missing)
+    return True, ""
+
+
+def same_measurement(recorded: dict[str, Any], fresh: dict[str, Any]) -> bool:
+    """Did two measurements exercise the same code?
+
+    The tests that skipped are the tests whose code did not run, so two
+    measurements that left the same tests unexercised measured the same code
+    and their coverage figures describe the same thing. Two that did not are
+    measurements of two different machines: the platform makes some tests
+    skip on one of them, the code those tests cover does not run on the
+    other, and the two numbers are not two measurements of one thing.
+
+    This is a question about two measurements, not about whether a
+    measurement was complete -- ``measurement_is_complete`` answers that.
+    """
+    old = recorded.get("suite", {})
+    new = fresh.get("suite", {})
+    if "skipped_tests" in old and "skipped_tests" in new:
+        skipped_same = list(old["skipped_tests"]) == list(new["skipped_tests"])
+        xfailed_same = list(old.get("xfailed_tests", [])) == list(new.get("xfailed_tests", []))
+        return skipped_same and xfailed_same
+    # A record from before the identities were kept: the counts are all
+    # there is, so they are what is compared.
+    return old.get("skipped") == new.get("skipped") and old.get("xfailed") == new.get("xfailed")
+
+
+def comparable_record(recorded: dict[str, Any], fresh: dict[str, Any]) -> dict[str, Any]:
+    """The fresh measurement, with the figures of the machine taken from the record.
+
+    A measurement's coverage and its pass/skip split describe the machine it
+    was taken on as much as the tree it was taken on: the same tree measures
+    a different coverage on a different platform, because the platform makes
+    some tests skip and the code they cover does not run there. When the two
+    measurements are not comparable, the recorded figures are the ones the
+    check compares, and the check says which ones it could not compare.
+    """
+    if not recorded.get("coverage") or not recorded.get("suite"):
+        return fresh
+    comparison = dict(fresh)
+    comparison["coverage"] = recorded["coverage"]
+    comparison["suite"] = recorded["suite"]
+    return comparison
 
 
 def converge(
@@ -1304,21 +1397,44 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    # A measurement is complete when it ran the same set of tests the recorded one
-    # ran. Skipping and passing are different states, so what is compared is the
-    # *identities* of the tests that did not run, not the number of them: the
-    # same number of skips can be a different set of skips, and a measurement
-    # that skipped a different set of tests measured a different tree. The
-    # self-checks never skip, so the code tests alone decide this.
-    recorded_tests = previous.get("suite", {}).get("skipped_tests")
+    # The run has to have accounted for every test the tree collects. A run
+    # that did not account for them all measured a smaller tree, and the
+    # report is about the bigger one.
+    accounted_for, why_not = measured_the_tree(code, total)
+    if not accounted_for:
+        print(
+            "The run did not account for every test in the tree:\n"
+            f"  {why_not}\n"
+            "  ("
+            + ", ".join(
+                f"{name}={code.counts.get(name, 0)}"
+                for name in ("passed", "failed", "skipped", "xfailed", "deselected")
+                if code.counts.get(name)
+            )
+            + ")"
+        )
+        print(
+            "\nNothing was written. The figures would describe a tree smaller "
+            "than the one the report is about."
+        )
+        return 1
+
+    # A measurement is complete when this machine has everything the report
+    # names as the basis of its coverage numbers.
+    #
+    # The question is whether *this tree* was measured, not whether this run
+    # ran on the same machine as the recorded one. Whether a test skipped is
+    # a fact about the machine: the Windows-only tests skip on Linux by
+    # design, and that says nothing about the tree. Comparing the identities
+    # of the skipped tests with the recorded ones answers a different
+    # question -- "did this run run on the machine that wrote the record?" --
+    # and it made the measurement gate idle: a Linux run disagreed with a
+    # Windows record about which tests skip, threw the measurement away, and
+    # reported success.
+    complete, incomplete_because = measurement_is_complete(code)
     skipped = code.counts.get("skipped", 0)
-    if recorded_tests is None:
-        # A record from before the identities were kept: the counts are all
-        # there is, so they are what is compared.
-        recorded_skips = previous.get("suite", {}).get("skipped")
-        complete = skipped == recorded_skips if recorded_skips is not None else skipped == 0
-    else:
-        complete = set(code.skipped) == set(recorded_tests)
+    if not complete:
+        print(f"This measurement was incomplete: {incomplete_because}.")
 
     if complete:
         print("Measuring the report's self-checks against a candidate report...")
@@ -1406,7 +1522,24 @@ def main(argv: list[str] | None = None) -> int:
         checks = Outcome(counts={})
         status_checks = Outcome(counts={})
 
-    hidden = undisclosed_modules(record, updated)
+    # The figures that describe the machine a measurement was taken on are not
+    # the same on two machines: the same tree measures a different coverage on
+    # a different platform, because the platform makes some tests skip and the
+    # code they cover does not run there. Two measurements are comparable when
+    # they left the same tests unexercised; when they are not, the check
+    # compares the figures that describe the tree and says which ones it
+    # could not compare.
+    comparable = complete and same_measurement(previous, record)
+    comparison = record if comparable else comparable_record(previous, record)
+
+    if args.check:
+        checked = render_or_fail(text, comparison)
+        checked_status = render_status(comparison, status_text) if status_text is not None else None
+    else:
+        checked = updated
+        checked_status = status_updated
+
+    hidden = undisclosed_modules(comparison if args.check else record, checked)
     if hidden:
         print(
             "These modules are below "
@@ -1432,7 +1565,11 @@ def main(argv: list[str] | None = None) -> int:
     # and the suite would do it on every run.
     readmes: list[tuple[Path, str, str]] = []
     if report_path == REPORT_PATH:
-        measured_values = render_figures(record)
+        # The check compares the figures that describe the tree. The ones that
+        # describe the machine -- the coverage and the pass/skip split -- are
+        # only compared when the two measurements are comparable, so the
+        # badge is read against the figures the check is comparing.
+        measured_values = render_figures(comparison if args.check else record)
         badge_values = {
             "tests.passing": measured_values.get("suite.passed", ""),
             "coverage.pct": measured_values.get("coverage.pct", ""),
@@ -1445,9 +1582,9 @@ def main(argv: list[str] | None = None) -> int:
             if refreshed != original:
                 readmes.append((readme, original, refreshed))
 
-    changes = figure_changes(text, record)
+    changes = figure_changes(text, comparison if args.check else record)
     if status_text is not None:
-        changes.extend(figure_changes(status_text, record))
+        changes.extend(figure_changes(status_text, comparison if args.check else record))
     for readme, original, refreshed in readmes:
         for badge in (BADGE_TESTS, BADGE_COVERAGE):
             before = badge.search(original)
@@ -1462,12 +1599,21 @@ def main(argv: list[str] | None = None) -> int:
                 )
 
     if not complete:
-        warn_partial(code)
+        warn_partial(code, incomplete_because)
 
-    status_matched = status_updated is None or status_updated == status_text
+    status_matched = checked_status is None or checked_status == status_text
     badges_matched = not readmes
     if args.check:
-        if updated == text and status_matched and badges_matched and not tree_changed:
+        if complete and not comparable:
+            print(
+                "This run measured the tree on a machine that is not the one the record "
+                "was taken on: the coverage and the pass/skip split describe the code "
+                "that machine left unexercised, so they were not compared. The figures "
+                "that describe the tree were."
+            )
+        if not complete:
+            print("The report was not compared: this run did not measure this tree.")
+        elif checked == text and status_matched and badges_matched and not tree_changed:
             print("The report matches a fresh measurement.")
         else:
             for key, old, new in changes:
@@ -1475,7 +1621,7 @@ def main(argv: list[str] | None = None) -> int:
             if tree_changed:
                 print(f"source fingerprint: {previous_fingerprint} -> {current_fingerprint}")
             print("The report does not match a fresh measurement.")
-        matched = updated == text and status_matched and badges_matched and not tree_changed
+        matched = checked == text and status_matched and badges_matched and not tree_changed
     else:
         report_path.write_bytes(updated.encode("utf-8"))
         if status_path is not None and status_updated is not None:
@@ -1509,10 +1655,16 @@ def main(argv: list[str] | None = None) -> int:
             status_checks.failures,
         )
         return 1
+    if not complete:
+        # The run could not measure this tree, so it checked nothing about the
+        # report's figures: the previous measurement was kept -- it still
+        # describes a tree -- but a run that verified nothing must not report
+        # success. A gate that returns 0 here is a gate that cannot fail.
+        return 1
     return 0 if matched else 1
 
 
-def warn_partial(code: Outcome) -> None:
+def warn_partial(code: Outcome, because: str) -> None:
     """Say plainly what this run could and could not measure."""
     print(
         "\nThis run was partial: "
@@ -1521,9 +1673,13 @@ def warn_partial(code: Outcome) -> None:
             for name in ("passed", "skipped", "xfailed")
             if code.counts.get(name)
         )
+        + ".\nIt could not measure this tree: "
+        + because
         + ".\nThe coverage figures were left as they were, because they describe a "
         "complete measurement. A complete one needs:\n  "
         + "\n  ".join(missing_prerequisites() or ["(nothing obvious is missing)"])
+        + "\nThe report's figures were not verified against a complete measurement of "
+        "this tree, so this run reports failure."
     )
 
 

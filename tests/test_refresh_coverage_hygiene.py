@@ -281,3 +281,264 @@ def _minimal_report() -> str:
         "| `cli/main.py` | 90.0% | 1 / 10 |\n<!--/fig-->\n"
         "<!--report-figures:" + json.dumps(record) + "-->\n"
     )
+
+
+# -- the measurement gate ---------------------------------------------------
+#
+# A measurement is complete when it accounted for every test the tree
+# collects, when nothing failed, and when the machine has everything the
+# report names as the basis of its coverage numbers. It is not complete
+# because it skipped the same tests the recorded measurement skipped: that
+# says which machine the run was on, not whether the tree was measured.
+#
+# The tests below keep that true. They run on every platform: the skips
+# they describe are the ones a platform makes, and a test that only failed
+# on one of them would not be a test.
+
+
+def _gate_record(total: int = 4, passed: int = 4, skipped: int = 0) -> dict[str, Any]:
+    """The record of a measurement taken where nothing skipped."""
+    return {
+        "schema": 4,
+        "code": {"api_endpoints": 1, "cli_commands": 1, "sample_apks": 1},
+        "coverage": {"files": {"cli/main.py": [10, 1]}, "missing": 1, "statements": 10},
+        "history": {},
+        "source_fingerprint": "sha256:recorded",
+        "suite": {
+            "passed": passed,
+            "skipped": skipped,
+            "xfailed": 0,
+            "failed": 0,
+            "xpassed": 0,
+            "skipped_tests": [],
+            "xfailed_tests": [],
+        },
+        "tests": {"fast": total - 1, "slow": 1, "total": total},
+    }
+
+
+def _gate_report(script: Any, record: dict[str, Any]) -> str:
+    """A report that states the figures of the record, the way the script writes them."""
+    values = script.render_figures(record)
+    return (
+        "# A report\n\n"
+        f"Tests: <!--fig:tests.total-->{values['tests.total']}<!--/fig--> "
+        f"<!--fig:tests.fast-->{values['tests.fast']}<!--/fig--> "
+        f"<!--fig:tests.slow-->{values['tests.slow']}<!--/fig-->\n"
+        f"Passed: <!--fig:suite.passed-->{values['suite.passed']}<!--/fig--> "
+        f"<!--fig:suite.skipped-->{values['suite.skipped']}<!--/fig--> "
+        f"<!--fig:suite.xfailed-->{values['suite.xfailed']}<!--/fig-->\n"
+        f"Coverage: <!--fig:coverage.pct-->{values['coverage.pct']}<!--/fig--> "
+        f"<!--fig:coverage.covered-->{values['coverage.covered']}<!--/fig--> "
+        f"<!--fig:coverage.total-->{values['coverage.total']}<!--/fig-->\n"
+        "<!--fig:coverage.weak_modules-->" + values["coverage.weak_modules"] + "<!--/fig-->\n"
+        "<!--report-figures:" + script.render_record(record) + "-->\n"
+    )
+
+
+def _stub_measurement(
+    script: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    total: int,
+    passed: int,
+    skipped: int,
+    prerequisites: list[str] | None = None,
+    self_check_failures: tuple[str, ...] = (),
+) -> None:
+    """Stub the measurement: the suite ran, and some of its tests sat out.
+
+    ``deselected`` counts the report's own self-checks: the code run leaves
+    them out and measures them on their own, so they are the tests that make
+    the tree bigger than the code run.
+    """
+    deselected = total - passed - skipped
+    monkeypatch.setattr(
+        script,
+        "measure_code_tests",
+        lambda: script.Outcome(
+            counts={
+                "passed": passed,
+                "failed": 0,
+                "skipped": skipped,
+                "xfailed": 0,
+                "xpassed": 0,
+                "error": 0,
+                "deselected": deselected,
+            },
+            failures=(),
+            skipped=tuple(f"tests/test_platform.py::test_{n}" for n in range(skipped)),
+        ),
+    )
+    monkeypatch.setattr(
+        script,
+        "measure_report_checks",
+        lambda candidate, report_path: script.Outcome(
+            counts={"passed": deselected, "failed": 0, "skipped": 0, "xfailed": 0},
+            failures=self_check_failures,
+        ),
+    )
+    monkeypatch.setattr(
+        script,
+        "measure_status_checks",
+        lambda *args: script.Outcome(counts={"passed": 0, "failed": 0, "skipped": 0, "xfailed": 0}),
+    )
+    monkeypatch.setattr(
+        script,
+        "read_coverage",
+        lambda: script.Coverage(files={"cli/main.py": [10, 1]}, statements=10, missing=1),
+    )
+    # The script checks that the coverage run and the tree name the same
+    # modules, so the tree is the one the stubbed coverage measured.
+    monkeypatch.setattr(script, "source_statements", lambda: {"cli/main.py": 10})
+    monkeypatch.setattr(
+        script,
+        "collected_tests",
+        lambda marker: (1, total) if marker == "slow" else (total - 1, total),
+    )
+    monkeypatch.setattr(script, "collected_at_tag", lambda tag: None)
+    monkeypatch.setattr(script, "missing_prerequisites", lambda: prerequisites or [])
+    monkeypatch.setattr(script, "source_fingerprint", lambda: "sha256:recorded")
+    monkeypatch.setattr(
+        script,
+        "code_facts",
+        lambda: {"api_endpoints": 1, "cli_commands": 1, "sample_apks": 1},
+    )
+
+
+def test_a_measurement_that_skipped_the_platform_tests_is_not_thrown_away(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The tests a platform makes skip are not a reason to discard the run.
+
+    The Windows-only tests skip on Linux by design, so a Linux run skips
+    tests a Windows run did not. That says which machine the run was on, not
+    whether the tree was measured -- and the run that judged it by the
+    identities of the skipped tests threw the measurement away, kept the
+    recorded figures and reported success. The figures of a tree that was
+    measured are the ones this run measured.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_measurement(script, monkeypatch, total=4, passed=2, skipped=1)
+
+    script.main(["--report", str(report)])
+
+    written = script.read_record(report.read_text(encoding="utf-8"))
+    assert written["suite"]["skipped"] == 1, (
+        "the run threw the measurement away and kept the recorded one: the report's "
+        "figures are not the ones this tree measured"
+    )
+    assert written["suite"]["skipped_tests"] == ["tests/test_platform.py::test_0"]
+    assert written["suite"]["passed"] == 3
+
+
+def test_a_run_that_could_not_measure_the_tree_reports_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A gate that cannot fail is not a gate.
+
+    A run that could not measure the tree kept the recorded figures and
+    reported success, so the CI job that asks whether the report's figures
+    describe the tagged tree was green because it never looked. A run that
+    measured nothing has to say so with its exit code.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_measurement(
+        script,
+        monkeypatch,
+        total=4,
+        passed=2,
+        skipped=1,
+        prerequisites=["JADX (bash scripts/install-backends.sh)"],
+    )
+
+    code = script.main(["--report", str(report), "--check"])
+
+    assert code != 0, (
+        "a run that could not measure the tree reported success: the measurement gate cannot fail"
+    )
+
+
+def test_the_check_measures_the_reports_own_self_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The self-checks are part of the measurement, not a formality.
+
+    The run that judged the measurement by the identities of the skipped
+    tests never measured the report's own self-checks, so a report whose
+    figures disagree with its own record passed. A run that measured the
+    tree has to measure those too.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_measurement(
+        script,
+        monkeypatch,
+        total=4,
+        passed=2,
+        skipped=1,
+        self_check_failures=("tests/test_docs.py::test_execution_report_numbers",),
+    )
+
+    code = script.main(["--report", str(report), "--check"])
+
+    assert code != 0, "the report's own self-checks failed and the run reported success"
+
+
+def test_a_coverage_figure_no_measurement_produces_is_caught(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check compares the numbers with the measurement, not with the record.
+
+    Two measurements of one tree on one machine are comparable, so the
+    coverage they measured has to be the coverage the report states.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_measurement(script, monkeypatch, total=4, passed=3, skipped=0)
+    monkeypatch.setattr(
+        script,
+        "read_coverage",
+        lambda: script.Coverage(files={"cli/main.py": [10, 5]}, statements=10, missing=5),
+    )
+
+    code = script.main(["--report", str(report), "--check"])
+
+    assert code != 0, "a coverage figure that no measurement of this tree produces was accepted"
+
+
+def test_the_check_does_not_compare_the_coverage_of_two_different_machines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Two measurements that left different tests unexercised are two numbers.
+
+    The Windows-only tests skip on Linux and nowhere else, so a Linux run
+    and the Windows record describe different code: the coverage of the one
+    is the coverage of the code the other did not run. Comparing them would
+    be comparing a Windows number with a Linux number, so the check says so
+    instead of failing on it. The figures that describe the tree are
+    compared either way.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_measurement(script, monkeypatch, total=4, passed=2, skipped=1)
+    monkeypatch.setattr(
+        script,
+        "read_coverage",
+        lambda: script.Coverage(files={"cli/main.py": [10, 5]}, statements=10, missing=5),
+    )
+
+    code = script.main(["--report", str(report), "--check"])
+
+    out = capsys.readouterr().out
+    assert code == 0, (
+        "the check compared the coverage of two measurements that exercised different code:\n" + out
+    )
+    assert "were not compared" in out
