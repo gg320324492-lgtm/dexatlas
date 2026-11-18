@@ -11,6 +11,14 @@ record cites. What is missing is named in the manifest as not included — a
 package that implies more than it holds is the failure mode this exists to
 prevent.
 
+What is in it is the analysis and nothing else. A source fragment is a file
+of the analysis's own decompiler tree, and the packager checks that before it
+copies one: the file has to be inside that tree with links resolved, and it
+has to be under one of the two trees the decompiler writes. The operator's own
+working material — review records, working documents, anything not published
+— lives outside the analysis, and a link inside the tree that pointed at it
+would otherwise be copied out like a file of the analysis.
+
 Every locator travels as ``<tool>:<relative place>``, never as a machine path:
 the package must survive being copied to another machine, and a local absolute
 path would name the machine that made it rather than the analysis.
@@ -20,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 import zipfile
 from collections.abc import Mapping
@@ -28,10 +37,13 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from dexatlas.core.models import Evidence
+from dexatlas.core.paths import is_inside
 from dexatlas.core.pipeline import Analyzer
 from dexatlas.reports.html_report import render_html
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
+
+logger = logging.getLogger(__name__)
 
 #: The package manifest's own version. A reader checks this before it trusts
 #: anything else in the file; a change to the manifest's shape moves it.
@@ -47,6 +59,12 @@ _REPORT_PATHS = {
 #: The tree the package's own source fragments live under. Not the
 #: decompiler's tree name: the package's tree is the package's own.
 _SOURCES_PREFIX = "sources/"
+
+#: The two trees the decompiler writes into its output directory. A packaged
+#: source fragment is the decompiler's own output, so it comes from one of
+#: these two; a file that sits anywhere else in that directory was put there
+#: by something else, and what something else put there is not the analysis.
+_DECOMPILER_TREES = ("sources/", "resources/")
 
 #: The manifest's own name inside the archive. It is written into the zip
 #: but never listed in the manifest's own ``files`` array: a file cannot
@@ -183,9 +201,13 @@ def _cited_sources(evidence: list[Evidence], workspace: Path | None) -> dict[str
     ``sources/``, so a reader can follow the citation without the workspace:
     the locator's relative place, read from the package's tree, is the same
     place it named inside the analysis.
+
+    What is copied has to be the analysis's own file: see
+    :func:`_why_not_an_analysis_file`, which says no to anything else.
     """
     if workspace is None:
         return {}
+    tree_root = workspace / "jadx"
     packaged: dict[str, bytes] = {}
     for item in evidence:
         for provenance in item.provenance:
@@ -207,14 +229,52 @@ def _cited_sources(evidence: list[Evidence], workspace: Path | None) -> dict[str
                 inside_tree = inside_tree[len("resources/") :]
             if not inside_tree:
                 continue
-            source = workspace / "jadx" / place
+            source = tree_root / place
             if not source.is_file():
                 # A locator the analysis no longer backs is not silently
                 # rewritten: it stays in the evidence, and the package simply
                 # does not carry a file the analysis does not have.
                 continue
+            reason = _why_not_an_analysis_file(tree_root, place, source)
+            if reason is not None:
+                # The citation stays in the evidence and the file stays out of
+                # the package. The reader who follows the citation finds no
+                # file and knows it was not there; ``verify_citations`` counts
+                # it as unresolved rather than pretending it was there.
+                logger.warning(
+                    "evidence package: %s is not packaged — %s",
+                    place,
+                    reason,
+                )
+                continue
             packaged[f"{_SOURCES_PREFIX}{inside_tree}"] = source.read_bytes()
     return packaged
+
+
+def _why_not_an_analysis_file(tree_root: Path, place: str, source: Path) -> str | None:
+    """Why this file is not the analysis's own output, or ``None`` when it is.
+
+    The package is what a client takes away, so it carries the analysis and
+    nothing else. Two questions decide that, and both have to come out yes:
+
+    - Is the file inside the tree the decompiler wrote, with links resolved?
+      A link inside that tree pointing somewhere else would otherwise be
+      copied out like a file of the analysis, and "somewhere else" is where
+      the operator's own material lives: review records, working documents,
+      anything not published.
+    - Is it under one of the two trees the decompiler writes? A file that
+      sits anywhere else in that directory is not decompiler output; it is
+      something that was put there.
+
+    The answer is the reason in words, because the reason is what the
+    operator needs to see: a bare refusal says that something was left out,
+    and a named reason says what.
+    """
+    if not is_inside(tree_root, source):
+        return "it points outside the analysis"
+    if not place.startswith(_DECOMPILER_TREES):
+        return "it is not one of the decompiler's output trees"
+    return None
 
 
 def verify_package(package_path: Path) -> dict[str, Any]:

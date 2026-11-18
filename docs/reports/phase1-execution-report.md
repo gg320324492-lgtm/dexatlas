@@ -240,6 +240,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_resource_references.py` | 资源之间的引用边：解析、存储、检索、CLI 与 API（resource-references 新增） |
 | `test_html_report.py` | 离线 HTML 报告：与 Markdown/JSON 同源的事实、样本文本转义、页面自包含、证据表上限（M7 新增） |
 | `test_evidence_package.py` | 最小证据包：清单校验、路径遍历拒绝、篡改检测、样本绑定、迁移后引用解析（M7 新增） |
+| `test_evidence_package_isolation.py` | 证据包的边界：包里只有本次分析——反编译树之外的文件、指向树外的链接都不进包，引用留在证据里并记为未解析（C10 新增） |
 | `test_public_contracts.py` | 公共契约快照：REST 路由表、MCP 工具表、CLI 退出码表、报告/证据包 schema 固化为断言，契约变更先红测试（M8 新增） |
 | `test_openai_empty_completion.py` | 空 assistant 消息是可重试的端点故障：content 空且无 tool_calls 抛 retryable ProviderError，orchestrator 重试后正常作答（M6 三轮复测 A 类修复新增） |
 | `test_search_symbols_decoy.py` | 字符串检索诱饵遮蔽：多词查询命中 string 类符号时常量池枚举并集返回，诱饵常量不再遮蔽同池关键常量（M6 三轮复测 C2 修复新增） |

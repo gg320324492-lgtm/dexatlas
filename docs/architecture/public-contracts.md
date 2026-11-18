@@ -300,10 +300,10 @@ Markdown、JSON、HTML 由同一组指标渲染：`reports/summary.py` 的
 
 ### 5.3 证据包 manifest
 
-`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:84-133`），
+`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:102-152`），
 `schema_version = 1`（`PACKAGE_SCHEMA_VERSION`，
-`src/dexatlas/reports/evidence_package.py:38`）。字段（
-`src/dexatlas/reports/evidence_package.py:108-125`）：
+`src/dexatlas/reports/evidence_package.py:50`）。字段（
+`src/dexatlas/reports/evidence_package.py:126-143`）：
 
 ```text
 schema_version: 1
@@ -317,9 +317,14 @@ not_included: {apk, full_sources, unrelated_strings}
 ```
 
 包内路径固定：`reports/report.{json,md,html}`、`sources/<相对路径>`、
-`manifest.json`（`src/dexatlas/reports/evidence_package.py:41-55`）。定位符一律是
+`manifest.json`（`src/dexatlas/reports/evidence_package.py:53-73`）。定位符一律是
 `<tool>:<包内相对位置>`，绝无机器绝对路径
-（`src/dexatlas/reports/evidence_package.py:14-16`）。
+（`src/dexatlas/reports/evidence_package.py:22-24`）。
+
+包内只有本次分析。被引用的源码片段必须**是分析自己的反编译产物**：文件在
+反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或
+`resources/`）。不满足的文件不进包；引用仍留在证据里，并由
+`verify_citations` 记为未解析，而不是被当作已经带在包里。
 
 `dexatlas export` 的成功消息打印的是**归档里的文件数**，不是清单列出的
 数：清单列的是归档里除清单以外的文件，加上清单自己才是归档的全部条目。
