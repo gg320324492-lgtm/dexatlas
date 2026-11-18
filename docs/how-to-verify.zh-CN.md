@@ -117,14 +117,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里三样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1649**（**1502** 快 + **147** 集成）。
+* **收集到的测试数** —— 当前这棵树上应当是 **1687**（**1538** 快 + **149** 集成）。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1502/1649 tests collected (147 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 147/1649 tests collected (1502 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1538/1687 tests collected (147 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1687 tests collected (1538 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -141,8 +141,8 @@ bash scripts/fetch-fixtures.sh
 
 | 环境 | 汇总行 |
 |---|---|
-| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `1622 passed, 27 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
-| 三后端齐备，**拉了**第三方样本 | `1649 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `1656 passed, 31 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
+| 三后端齐备，**拉了**第三方样本 | `1684 passed`、**0 skipped**——这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -402,7 +402,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:tests.total-->1649<!--/fig-->
+<!--fig:tests.total-->1687<!--/fig-->
 ```
 
 **改了会怎样？**
