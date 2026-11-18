@@ -148,6 +148,12 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
     REPO / "docs" / "reports" / "docker-examples-gap.md",
     REPO / "docs" / "reports" / "post-release-rehearsal.md",
+    # The candidate note for the evidence package's manifest: it names the
+    # line of every place the manifest's shape is pinned -- the constant, the
+    # two test files, the blocking self-check and the contract document. A
+    # list of places to change is only worth anything while the lines in it
+    # are true, so this document is on the list from the day it is written.
+    REPO / "docs" / "reports" / "v1.1.0-candidate-c10-manifest.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
