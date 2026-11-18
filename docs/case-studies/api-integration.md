@@ -259,10 +259,15 @@ search:   string  sk_live_2f8a91c4e7b3
 report:  schema 3, run run_fc8e432d4d094350 (complete)
 ```
 
+Two counts, two meanings: a *call site* is one place in the bytecode where a
+call happens, and a *call edge* is the caller → callee relationship, aggregated
+over the sites that make it — one method that calls the same target twice is
+two call sites and one call edge.
+
 The upload here answers `completed` rather than `pending` because it hits the
 same API, and that workspace already holds the project from §3.2 — the
-short-circuit described above. The run it reports is the one that upload
-started.
+short-circuit described above. The run it reports is the one §3.2's upload
+started; this upload added no analysis of its own.
 
 The module is ~150 lines with no dependency beyond `httpx` (already in the
 `dev` extra), and exists to be copied, not imported as a framework.

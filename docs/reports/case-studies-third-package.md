@@ -124,7 +124,9 @@ def new_id(cls, sha256: str) -> str:
 | `multidex-evidence-package.zip`（可选） | `apk_a488e43e38c2b8e9` | `run_4fde2fa0b5254ccb` | `a8c03be8fb001e67b41bae34413977d040d76ac5707b6f48572352bfb01af950` | 6279 |
 
 四个包的 `apk_sha256` 分别是 `80a8fe0e…` / `80a8fe0e…` / `2f8d476f…` /
-`a488e43e…`，与 `examples/` 里四个 APK 的实际 sha256 一致（已核）。
+`a488e43e…`——**三个**不同的 APK，其中 `demo.apk` 出现两次（demo 包与
+api-integration 包是同一份字节的两次分析）。`examples/` 下另有
+`strings-app/strings.apk` 与 `wide-app/wide.apk` 两个样本，未进入案例材料。
 
 ### 2.2 包内三份报告
 

@@ -72,6 +72,11 @@ uv run dexatlas analyze examples/obfuscated-app/obfuscated.apk
   0 resource strings (5.1s)
 ```
 
+Two counts, two meanings: a *call site* is one place in the bytecode where a
+call happens, and a *call edge* is the caller → callee relationship, aggregated
+over the sites that make it — one method that calls the same target twice is
+two call sites and one call edge.
+
 The index is complete: 4 of 4 classes, all 11 methods, 10 call sites, 9 call
 edges. The manifest reads cleanly through apktool despite the mangling:
 
@@ -308,6 +313,11 @@ keeps **both**, each with a locator naming the DEX file it was read from. The
 call-site rows carry a `dex_name` column (`classes.dex` / `classes2.dex`), so
 every call site says which container it was read from — the raw material an
 analyst needs to reason about what a class-loader would actually resolve.
+
+`Classes indexed` counts **distinct** classes, so the five class definitions in
+the two DEX files are four classes: `SharedConfig` is defined twice and counted
+once. Both definitions stay in the symbol index, each with its own locator —
+which is why the single row above carries one androguard locator per DEX file.
 
 The summary for this run: 4 classes, 11 methods, 13 call sites, 10 call edges,
 evidence records E-0001…E-0009, jadx 7 of 11 methods decompiled, 4.8 s.

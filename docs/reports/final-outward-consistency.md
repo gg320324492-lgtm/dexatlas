@@ -40,6 +40,10 @@
 
 ## 1. 数字逐条核对
 
+> **附件集在 2026-11-18 换过一轮**（3 包 / 9 文件 → 4 包 / 16 文件，
+> 覆盖 2 次分析 → 4 次分析）。本节这一行按 v1.0.0 发版树记录；
+> 现状见 [case-studies-third-package.md](case-studies-third-package.md)。
+
 | 主题 | 七份文本里的写法（文件:行） | 基准出处 | 判定 |
 |---|---|---|---|
 | 测试总数 **1,588**（1,441 快 + 147 集成） | `docs/releases/v1.0.0.md:86`；`docs/reports/v1.0.0-github-release-body.md:160`；`docs/status.md:23`；`docs/portfolio.md:66`（写作 1,588）；`README.md:12`（徽章 `tests-1588`）；`README.zh-CN.md` 无 | `docs/reports/phase1-execution-report.md:76` | 一致（5 处）。README.zh-CN 无徽章 → 见 §4.3 |
@@ -53,7 +57,7 @@
 | 退出码 **0–6**（6 = `EXIT_NO_INDEX`） | `CHANGELOG.md:131`、`:138`、`:352`；`docs/releases/v1.0.0.md:74`、`:139`–`:146`；`docs/reports/v1.0.0-github-release-body.md:108`–`:110`、`:199`–`:201`；`docs/status.md:136`；`docs/architecture/public-contracts.md:43`–`:54` | `src/dexatlas/cli/main.py` | 一致 |
 | 退出码 5 属 **v0.2.0**、6 是 **v1.0.0 新增** | `docs/releases/v1.0.0.md:138`；`docs/reports/v1.0.0-github-release-body.md:191`；`CHANGELOG.md:775`（位于 `[0.2.0]` 段内，段起于 `:520`）；`docs/status.md:135` | `docs/releases/v0.2.0.md` | 一致 |
 | 一方示例 APK **5** 个 | `docs/releases/v1.0.0.md:76`；`docs/reports/v1.0.0-github-release-body.md:74`、`:180`；`docs/status.md:443`；`README.zh-CN.md:96`；`examples/` 下 5 个目录 | `docs/reports/phase1-execution-report.md:81` | 一致 |
-| 案例附件 **9 个文件** / **3 个证据包** / 覆盖 **2 份分析** | `CHANGELOG.md:262`–`:266`（9 个文件、三个证据包、两个 project id）；`docs/releases/v1.0.0.md:57`–`:61`（nine files、两个 project id）；`docs/reports/v1.0.0-github-release-body.md:92`–`:94`（nine files，**未提覆盖几份分析**）、`:235`；`docs/portfolio.md:108`–`:110`（「the same analysis」）；`docs/status.md:134`（未给数） | `docs/case-studies/README.md`（三案例、三样本、三包、两份分析）；`docs/case-studies/attachments/` 实为 9 个文件、3 个 zip | 数字一致；**「三包只覆盖两分析」仅 `docs/case-studies/README.md` 披露** → 见 §3 第 20 条 |
+| 案例附件 **9 个文件** / **3 个证据包** / 覆盖 **2 份分析** | `CHANGELOG.md:262`–`:266`（9 个文件、三个证据包、两个 project id）；`docs/releases/v1.0.0.md:57`–`:61`（nine files、两个 project id）；`docs/reports/v1.0.0-github-release-body.md:92`–`:94`（nine files，**未提覆盖几份分析**）、`:235`；`docs/portfolio.md:108`–`:110`（「the same analysis」）；`docs/status.md:134`（未给数） | `docs/case-studies/README.md`（三案例、三样本、三包、两份分析）；`docs/case-studies/attachments/` 实为 9 个文件、3 个 zip | 数字一致（**按 v1.0.0 发版树**；附件集已于 2026-11-18 换过一轮，见本节上方）；**「三包只覆盖两分析」仅 `docs/case-studies/README.md` 披露** → 见 §3 第 20 条 |
 | 案例研究 **3 篇** / 一方样本 **3** 个 | `docs/portfolio.md:108`–`:110`；`docs/status.md:134`；`docs/releases/v1.0.0.md:55`；`docs/reports/v1.0.0-github-release-body.md:92`；`CHANGELOG.md:261`；**`docs/status.md:368` 写「≥2 个完整案例研究」** | `docs/case-studies/`（3 篇） | **不一致**（status.md 两处）→ 见 §3 第 21 条 |
 | CI **6 job / 7 并行** | `docs/status.md:26`、`:49`；`docs/portfolio.md:67`（six CI jobs） | `.github/workflows/ci.yml` | 一致 |
 | 契约快照测试项数 | `CHANGELOG.md:362`「`tests/test_public_contracts.py`（**22 项**）」 | `git show v1.0.0:tests/test_public_contracts.py` → **26** 个 `def test_`；退出码 6 的提交 `1f6ef05` 增 4 项 | **不一致** → 见 §3 第 11 条 |
@@ -256,6 +260,8 @@
    > （`run_id` 两两不同，multidex 附录也有了自己的包），对外文案已同步。
    > 见 [case-studies-third-package.md](case-studies-third-package.md)。
 6. **「九个附件都经过 `verify_package` 校验」** —— 只有 3 个证据包经过该校验，6 个是报告文件。
+   > **按 v1.0.0 发版树**：附件集换过一轮后是 **4 个证据包经过该校验、
+   > 12 个是报告文件**（共 16 个文件）。
 7. **「退出码问题只是被记为已知限制」** —— 退出码 6 已经实施并写进公共契约表。
 8. **「GitHub Release 页面已经发布」** —— 仓库内 tag `v1.0.0` 确实存在（2026-11-17），但 Release 正文仍是**草稿**，其抬头明确写着「本稿不打 tag、不建 Release」。README 说「已发布」指的是版本与 tag，不是 GitHub 上的 Release 页面。
 9. **「有客户案例 / 客户成果」** —— 仓库里没有已发布的客户案例或服务页；`docs/portfolio.md` 是**能力描述**，不是交付履历（它自己写了「not a malware classifier」这类边界）。
