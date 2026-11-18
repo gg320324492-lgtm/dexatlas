@@ -2,7 +2,7 @@
 
 **Sample:** [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
 (sha256 `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`)
-**Run:** one `dexatlas analyze` — the session quoted in §3 took 4.9 s; the
+**Run:** one `dexatlas analyze` — the session quoted in §3 took 5.0 s; the
 attached package is a later run of the same APK (`run_e8e49384ab5246ab`, 4.5 s)
 **Backends:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 **Who this is for:** a developer or security researcher who wants to see, end to
@@ -13,7 +13,7 @@ was read from.
 
 ## 1. Background and the question
 
-`demo-app` is a deliberately small five-class application. It is not a real
+`demo-app` is a deliberately small four-class application. It is not a real
 product — it is a sample with recognisable shapes in it: an exported activity
 and service with no permission guard, a crypto helper, a network client, a
 key-shaped string constant. Its purpose is to be analysed immediately after
@@ -61,6 +61,16 @@ uv run dexatlas analyze examples/demo-app/demo.apk
   1 resource string (5.0s)
 ```
 
+**What that "5" counts.** `Classes indexed` is the **merged symbol index** — the
+class definitions androguard read from the DEX together with the classes JADX
+decompiled — so it can be larger than the number of classes the APK defines.
+This APK's `classes.dex` defines **four** classes (`class_defs_size = 4`):
+`Crypto`, `MainActivity`, `NetworkClient`, `SyncService`. Those four are the
+ones the evidence table in §4 names, and they are the whole of the app's
+declared surface. The fifth index entry comes from one of the two backend
+views rather than from a fifth class definition in the DEX; the report does not
+name which view contributed it, so this walkthrough does not either.
+
 The project id is the sha256 prefix of the APK, so re-running the same bytes
 lands on the same project. The summary counts come from the run's report:
 
@@ -76,10 +86,12 @@ lands on the same project. The summary counts come from the run's report:
 | DEX files | 1 |
 
 Eight of the nine indexes are complete for this sample; jadx decompiled 7 of 8
-methods and 5 of 5 classes. The one method jadx did not decompile is not a
-silence — the report's decompilation evidence (E-0007, below) records the
-count, and the class in question still has its smali representation available
-through the apktool fallback.
+methods and 5 of 5 **indexed** classes. The one method jadx did not decompile
+is not a silence — the report's decompilation evidence (E-0007, below) records
+the count, and the class in question still has its smali representation
+available through the apktool fallback: *smali* is the DEX bytecode rendered as
+assembly-like text, so a method jadx could not turn into Java is still
+readable line by line.
 
 ### 3.2 Read the manifest
 
@@ -211,7 +223,7 @@ where":
 
 Every record carries the full provenance: tool, tool version, the sha256 of
 the APK the reading was made from, and a locator that names the file and the
-position inside it. Opening the report on screen 8, or via
+position inside it. Opening the report in the workbench's report screen, or via
 `analyze -o report.md`, prints the same table — the workbench renders the
 renderer's output byte for byte (measured in the
 [M4 end-to-end run](../reports/m4-e2e-run.md), 2026-11-14).
@@ -221,8 +233,9 @@ renderer's output byte for byte (measured in the
 **Established by the tools** (verified records): the app exports an activity
 and a service with no permission guard; it carries a credential-shaped string
 constant; `onCreate` passes that constant to a signing helper and posts the
-result to a hardcoded `api.example.com` endpoint; the whole surface is four
-classes plus one activity, one service.
+result to a hardcoded `api.example.com` endpoint; the whole surface is the four
+classes the evidence table names — `Crypto`, `MainActivity`, `NetworkClient`,
+`SyncService` — one of them the exported activity, one the exported service.
 
 **Not established here**: whether any of this is exploitable, what the real
 endpoint would do, or whether the sample resembles any particular production

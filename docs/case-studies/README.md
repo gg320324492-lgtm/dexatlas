@@ -19,12 +19,12 @@ placeholders committed beside the APK.
 
 **Attachments:** [`attachments/`](attachments/) holds four evidence packages
 and the loose report files the walkthroughs link to — **four packages, twelve
-report files**. Which file belongs to which study is spelled out in the
-walkthroughs themselves: study 1 links `demo-report.*`, study 2 links
-`obfuscated-report.*` and `multidex-report.*` (the multi-DEX appendix), study 3
-links `api-integration-report.*`. Open the HTML with no network, or unzip a
-package and check its manifest hashes; a reader does not need to run
-DexAtlas to review the evidence, only to reproduce it.
+report files, sixteen files in all**. Which file belongs to which study is
+spelled out in the walkthroughs themselves: study 1 links `demo-report.*`,
+study 2 links `obfuscated-report.*` and `multidex-report.*` (the multi-DEX
+appendix), study 3 links `api-integration-report.*`. Open the HTML with no
+network, or unzip a package and check its manifest hashes; a reader does not
+need to run DexAtlas to review the evidence, only to reproduce it.
 
 | # | Case study | Sample | What it shows |
 |---|---|---|---|
@@ -39,6 +39,10 @@ analysing the same `demo-app` APK. The four evidence packages come from
 records the run it was made from: `run_e8e49384ab5246ab` (study 1's
 attachment), `run_dd897202eba74e28` (study 2's), `run_4fde2fa0b5254ccb`
 (study 2's multi-DEX appendix) and `run_fc8e432d4d094350` (study 3's).
+
+Those four are the runs the packages were made from, not the only runs the
+material mentions: the three walkthroughs quote seven runs in total, because
+each study also quotes the session it narrates before the packaged one.
 
 Two things a reader will hit while checking that. Studies 1 and 3 analyse the
 same bytes, so every count in their two reports agrees while the run id and

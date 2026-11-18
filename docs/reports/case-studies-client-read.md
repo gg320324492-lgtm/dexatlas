@@ -11,8 +11,10 @@
 > `docs/portfolio.md`、`docs/service-commitments.md` 放在一起读一遍，
 > 回答一个问题：**读完这些材料，客户会不会数错、会不会被误导？**
 >
-> **本文不是什么**：不是验收结论，不是改稿。本文**一个既有文件都没有改**，
+> **本文不是什么**：不是验收结论，不是改稿。**复核轮**一个既有文件都没有改，
 > 只新增了本文一个文件。所有改动留给主会话统一做。
+> **处置轮（2026-11-18）**的结果记在 [§7](#7-处置2026-11-18处置轮追加)——
+> §1–§6 是复核轮的原样产出，结论与行号未动。
 >
 > **本轮纪律**：没有运行 `dexatlas analyze`、没有重新生成任何附件、
 > 没有运行 `scripts/refresh-report-figures.py`、没有跑 `pytest`、没有联网、
@@ -783,3 +785,49 @@ uv run --no-sync python .scratch/linkcheck.py             # broken: 0（含本�
 
 第二个脚本是本轮临时写在 `.scratch/` 里的（已被 `.gitignore` 忽略，不入库），
 它复刻 `tests/test_docs.py::test_all_relative_links_resolve` 的判定逻辑。
+
+---
+
+## 7. 处置（2026-11-18，处置轮追加）
+
+本文的 11 条发现已逐条处置。改动只落在 `docs/` 与 `CHANGELOG.md`：**没有重新生成
+任何附件**、没有跑 `dexatlas analyze`、没有跑 `scripts/refresh-report-figures.py`、
+没有动 `src/`、`tests/`、`scripts/`。
+
+| 条 | 发现 | 处置 | 落在哪 |
+|---|---|---|---|
+| §2.1 | demo 走查的类数在同一篇里有 4 / 5 / 6 三个数 | §5 的结论句改为点名四个类；§3.1 的输出下面补一段口径（`Classes indexed` 是两个后端类视图的**合并索引**，可以大于 DEX 定义的类数，DEX 里是 `class_defs_size = 4`）；§1 的「five-class application」改为 four-class；§3.1 末尾的「5 of 5 classes」改为「5 of 5 **indexed** classes」。§3.1 引用的输出与 §4 的证据表是原件，不动 | [demo-app-walkthrough.md](../case-studies/demo-app-walkthrough.md) |
+| §2.2 | 同一篇抬头与 §3.1 两个耗时 | 抬头的 `4.9 s` 改为 `5.0 s`，与 §3.1 引用的输出对齐 | 同上 |
+| §2.3 | CHANGELOG 以现在时写「三个证据包 / 9 个文件」 | `## [Unreleased]` 的 `### Added` 加一条（附件集扩到四个包、16 个文件、四次分析）；v1.0.0 那条末尾加限定语，指向 [Unreleased] | `CHANGELOG.md` |
+| §2.4 | api 走查 §3.5 末句与上一句互相否定 | 末句改为「The run it reports is the one §3.2's upload started; this upload added no analysis of its own.」 | [api-integration.md](../case-studies/api-integration.md) |
+| §2.5 | 第三个案例包报告把「四个包」写成了「`examples/` 里四个 APK」 | 改为「三个不同的 APK，`demo.apk` 出现两次」，并点名 `examples/` 下另有两个未进案例材料的样本 | [case-studies-third-package.md](case-studies-third-package.md) |
+| §2.6 | 发版说明与 Release 正文仍说 nine files / three packages / two analyses | 两处各加一句限定语：v1.0.0 tag 时是那个样子，2026-11-18 附件集换过一轮 | [v1.0.0.md](../releases/v1.0.0.md)、[v1.0.0-github-release-body.md](v1.0.0-github-release-body.md) |
+| §2.7 | `final-outward-consistency.md` 的「数字一致」结论与它引用的句子都已过期 | §1 的表上方加限定语；那一行的判定注明「按 v1.0.0 发版树」；§5.2 第 6 条补上当前状态 | [final-outward-consistency.md](final-outward-consistency.md) |
+| §2.8 | 「四次分析」没有一处说明它是「有包的那四次」 | 案例索引补一句：三篇走查引用 7 次运行，四次是出包的那几次 | [README.md](../case-studies/README.md) |
+| §2.9 | 索引只写「四个包 + 十二份报告」 | 改为「four packages, twelve report files, sixteen files in all」 | 同上 |
+| §2.10 | 「on screen 8」指向不明 | 改为「in the workbench's report screen」 | [demo-app-walkthrough.md](../case-studies/demo-app-walkthrough.md) |
+| §2.11 | multi-DEX 附录说索引 keeps both，摘要行却是 4 classes | 摘要句前补一句去重口径：5 个类定义去重后是 4 个类，两份定义各自带 locator | [obfuscated-app.md](../case-studies/obfuscated-app.md) |
+
+§4 标低的两处黑话也一并处置了：`call site` / `call edge` 在 obfuscated 与 api 两篇
+首次出现处各加一句解释，demo 走查里的 `smali` 加了半句。
+
+**处置后复算的结果**（读包、算哈希，没有重新生成任何东西）：
+
+- 四个包的 `project_id` / `run_id` / `apk_sha256` / 包 sha256 / 字节数与 §5 的表逐项
+  相同；四个 `run_id` 两两不同，覆盖三个不同的 APK（`demo.apk` 两次）；
+- 附件目录仍是 16 个文件 = 4 个 zip + 12 份散装报告；四个包的 `manifest.json` 的
+  `files[]` 逐文件 sha256 与包内字节一致；散装报告与包内 `reports/` 逐字节相同；
+- `examples/demo-app/demo.apk` 的 `classes.dex` 仍是 `class_defs_size = 4`，四个类名
+  与 §4 证据表所列一致。
+
+**处置之后仍然需要人判断的两处**：
+
+1. **`Classes indexed` 多出来的那一条来自哪个后端、叫什么。** 报告不列类清单，
+   本轮没有跑分析，所以走查只写明「合并索引可能大于 DEX 定义的类数」，没有点名
+   那一条——这是工具侧的事（§2.1 的建议 ②），不在这一轮文档处置的范围里。
+2. **GitHub 上已发布的 v1.0.0 Release 正文改不了。** 仓库里两份文本已加限定语，
+   但已经贴出去的正文要靠一条 Release comment 或下一个 release 的正文说清——
+   这一条要人决定（§2.6 末段）。
+
+> 本节由处置轮追加；§1–§6 是复核轮的原样产出，结论与行号未动。
+

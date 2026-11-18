@@ -9,6 +9,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **案例证据包扩到四个、覆盖四次独立分析。** 第 3 篇走查改用它自己那一次
+  REST API 分析的包（`run_fc8e432d4d094350`），第 2 篇的 multi-DEX 附录
+  补上自己的包与报告；`docs/case-studies/attachments/` 由 9 个文件变为
+  16 个（4 个证据包 + 12 份散装报告），四个包的 `run_id` 两两不同
+  （`run_e8e49384ab5246ab` / `run_dd897202eba74e28` / `run_4fde2fa0b5254ccb` /
+  `run_fc8e432d4d094350`）。四个包的 `verify_package` 与 `verify_citations`
+  均通过；逐包的 `project_id` / `run_id` 与 sha256 见
+  [第三个案例包报告](docs/reports/case-studies-third-package.md)。
 - **M10 自查脚本的三条新判据——读者实走演练暴露的三处缺口。**
   [读者实走演练](docs/reports/reader-dry-run.md)按材料在干净机器上真走一遍，
   暴露出自查脚本没查的三件事：①装环境那一步不抓第三方样本，集成用例就
@@ -28,6 +36,23 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **案例材料里三处自相矛盾的数与两个过期数。** 一次客户视角复核按「读完会不会
+  相信一件不成立的事」这把尺子读了一遍案例材料，报出 11 条，已逐条处置：
+  ① demo 走查的类数在同一篇里写了 4 / 5 / 6（§3.1 引用的输出与附件报告写 5、
+  §4 的证据表列 4 个类、§5 的结论句字面读是 6），现改为点名 `classes.dex`
+  实测的四个类（`class_defs_size = 4`），并写明 `Classes indexed` 是两个
+  后端类视图的合并索引，可以大于 DEX 定义的类数；② 同一篇抬头的耗时（4.9 s）
+  与 §3.1 引用的输出（5.0 s）对不上，按被引用的输出改；③ 第 3 篇走查 §3.5
+  末句原写「这次上传启动的 run」，与同节「本次上传短路」的说明相反，改回
+  §3.2 那次上传启动的 run；④ v1.0.0 段仍以现在时写「9 个文件 / 3 个证据包 /
+  2 次分析」，改为加一句限定语指向 [Unreleased]，`docs/releases/v1.0.0.md`
+  与 Release 正文草稿同样加限定语；⑤ `case-studies-third-package.md` 把
+  「四个包」写成了「`examples/` 里四个 APK」（实为三个不同 APK，`demo.apk`
+  出现两次）；⑥ 案例索引补上「附件共 16 个文件」与「三篇走查引用 7 次运行、
+  其中 4 次是出包的那几次」；⑦ demo 走查的 "on screen 8" 改成 workbench 的
+  报告界面；⑧ multi-DEX 附录补上「5 个类定义去重后是 4 个类」的口径。
+  本轮只改文档，未重新生成任何附件，未改动 `src/`、`tests/`、`scripts/`。
+  复核报告：[客户视角复核](docs/reports/case-studies-client-read.md)。
 - **`dexatlas export` 打印的文件数是清单里的报告数，比归档里的条目少一个。**
   CLI 那行 `(N files, apk …)` 取自 `manifest['files']`——那是清单列出的文件
   数，不含清单自己（`manifest.json` 不进清单：文件无法给自己做哈希）。读者
@@ -306,6 +331,9 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   校验（manifest 含逐文件 sha256 与 `not_included` 三键声明）。三篇案例文档
   与案例 README 增补附件引用节，注明生成命令与可复现性——读者无需安装
   DexAtlas 即可审阅证据。
+  （本条记录的是 v1.0.0 发版时的附件集：9 个文件、3 个证据包、覆盖 2 次分析；
+  2026-11-18 起附件集已换过一轮——4 个证据包、16 个文件、4 次分析，
+  见 [Unreleased]。）
 - **v1.0.0 发版流程本地 dry-run 报告。** 按
   [发版前检查清单](docs/reports/v1.0.0-release-checklist.md) 完成一次本地预演
   （不创建 tag、不发布、不改版本号）：7 步流程逐项核对、5 项阻断与 4 项披露的
