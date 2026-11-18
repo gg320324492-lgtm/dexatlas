@@ -76,12 +76,15 @@ the wrong code.
 
 ### The gates
 
-CI runs twelve jobs (thirteen parallel runs on a tag — the test job is a 3.12/3.13
+CI runs thirteen jobs (fourteen parallel runs on a tag — the test job is a 3.12/3.13
 matrix): lint/format/mypy, tests on Python 3.12 (every backend), tests on
 Python 3.13 (no external backends), tests with Apktool only, the M3
 comparison re-run, the Docker image, the dependency audit, the live
-public-contract check, the M10 acceptance self-check, the social-preview
-figure check, and the job that re-measures the report against the tagged tree.
+public-contract check and the same one without the Java backends, the M10
+acceptance self-check, a job that checks every gate is run by something, a job
+that checks the social preview card's numbers against the report, a job that
+checks the outward texts agree on the release numbers, and the job that
+re-measures the report against the tagged tree.
 The same configurations are worth running by hand before a push — the three
 backend configurations are separate configurations, not one.
 

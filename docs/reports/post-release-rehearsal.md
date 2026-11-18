@@ -207,7 +207,7 @@
   | `README.md:12` / `README.zh-CN.md:12` 徽章 URL | **有** | 徽章由测量脚本写；`tests/test_docs.py::test_the_readme_badge_states_the_measured_numbers`（`tests/test_docs.py:1377`） |
   | `.github/social-preview*.png` 两张卡片 | **有** | `scripts/make-social-preview.py --check`（CI job + pytest） |
   | `docs/status.md:24` 覆盖率 | **有** | `<!--fig:coverage.pct-->` 标记 |
-  | `docs/how-to-verify.md:168`、`docs/how-to-verify.zh-CN.md:145` | **无** | `tests/test_how_to_verify.py` 比的是该页的 **collect 汇总数**（总数/快测/集成，见 `tests/test_how_to_verify.py:114-132`），**不比对这一行的 passed/skipped** |
+  | `docs/how-to-verify.md:172`、`docs/how-to-verify.zh-CN.md:149` | **无** | `tests/test_how_to_verify.py` 比的是该页的 **collect 汇总数**（总数/快测/集成，见 `tests/test_how_to_verify.py:114-132`），**不比对这一行的 passed/skipped** |
   | `docs/releases/v1.0.0.md:95` | **无** | `scripts/check-version-claims.py` 的 `release_documents()`（`scripts/check-version-claims.py:976-996`）把发版说明纳入检查，但 `expected["tests.total"]` 取自 `history.<tag>.tests`（`scripts/check-version-claims.py:1275`），而 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:228`）只有 `v0.1.0`–`v0.1.3`，**不含 v1.0.0** → 这个数**没有可比的测量**，规则跳过 |
   | `docs/reports/v1.0.0-github-release-body.md:168`、`:175`、`:267`、`:299`、`:304` | **部分** | 测量**指纹**被 `check-declaration` 比对；**测试数没有** |
   | GitHub 上已发布的那一份正文 | **无** | 不在仓库里 |

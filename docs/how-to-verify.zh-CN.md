@@ -115,7 +115,7 @@ uv run dexatlas backends
 uv run --no-sync pytest -q
 ```
 
-**正常会看到什么：** 一行点号和一行汇总。汇总行里三样东西要一起读：
+**正常会看到什么：** 一行点号和一行汇总。汇总行里四样东西要一起读：
 
 * **收集到的测试数** —— 当前这棵树上应当是 **1712**（**1563** 快 + **149** 集成）。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
@@ -129,6 +129,10 @@ uv run --no-sync pytest -q
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
 * **skipped 的数量** —— **这一栏要能说清每一个 skip 的原因。skip 不是通过。**
+* **xfailed 的数量** —— 报告里 `<!--fig:suite.xfailed-->` 记的那个数。xfail 是「已知失败、
+  按预期不通过」的用例：不计入 passed，汇总行里单独列一条。**这个项目现在没有预期失败的用例**
+  （`tests/test_large_apk_scale.py` 里那几条曾经是 `xfail(strict=True)`，后来修好了，标记已经摘掉），
+  所以看到 xfailed 非零，先怀疑跑的是别的分支或环境不对，别把它读成「已知问题」。
 
 **skip 从哪来。** 两个第三方集成样本（Apache-2.0 许可，随仓库分发二进制会让读者
 无法核对来源）不在 clone 里，要自己拉：
@@ -142,7 +146,7 @@ bash scripts/fetch-fixtures.sh
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `1664 passed, 31 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
-| 三后端齐备，**拉了**第三方样本 | `1710 passed`、**1 skipped**——那一条是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->`） |
+| 三后端齐备，**拉了**第三方样本 | `1710 passed`、**1 skipped**、**0 xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->` / `<!--fig:suite.xfailed-->`） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 

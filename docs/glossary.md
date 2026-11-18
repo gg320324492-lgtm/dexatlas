@@ -77,13 +77,13 @@
 | 去掉的测试 | deselected tests | 被 pytest 的 `-m` 过滤掉的用例；pytest 把它记作 deselected，不是 removed。 | `how-to-verify.md:134` | 否（已补于 :135） |
 | 集成样本 | third-party integration fixture | 不随仓库分发、由 `scripts/fetch-fixtures.sh` 拉取的第三方测试 APK；不取它，相关测试会 skip。 | `how-to-verify.md:24` | 否（§2.0 解释了怎么取，但词本身没定义） |
 | 层级 | level / tier | M6 评测任务的分级：0 = 确定性判分，1 = 替身脚本（scripted），2 = 用真实模型跑冻结题集。**scripted 是替身，不是模型能力。** | `how-to-verify.md:37`、`reports/m10-acceptance-pack.md:38`、`benchmarks/service-regression-set.md:175` | how-to-verify:37 否（已补）· acceptance-pack:38 否（层级含义在 :140 才说开）· service-regression-set:175 是（各层标题自解释） |
-| 验收线 | acceptance threshold | 认定某个里程碑通过所需的最低分数门槛。 | `how-to-verify.md:413`、`benchmarks/service-regression-set.md:159` | how-to-verify:413 是（已补）· service-regression-set:159 是 |
-| 未达成 / 未验证 | not met / not verified | **未达成** = 量过但没过线；**未验证** = 从未测过。两者对读者的意义不同：前者是坏消息，后者是不知道。 | `how-to-verify.md:404` | 否（已补于 :406） |
-| 参考线 | reference threshold | 预先写下、只作对照比较的分数线；**不等于**验收线，对照参考线的报告不算验收成绩。 | `how-to-verify.md:329` | 否（已补于 :330） |
-| 冻结纪律 | freeze discipline | 调优前冻结题集与门槛，不许靠删掉做对的题来提高通过率。 | `how-to-verify.md:413`、`benchmarks/service-regression-set.md:155`、`architecture/README.md:204` | how-to-verify:413 是（已补）· service-regression-set:155 是（§5，并链到 architecture/README.md）· architecture/README:204 是（英文定义） |
+| 验收线 | acceptance threshold | 认定某个里程碑通过所需的最低分数门槛。 | `how-to-verify.md:417`、`benchmarks/service-regression-set.md:159` | how-to-verify:417 是（已补）· service-regression-set:159 是 |
+| 未达成 / 未验证 | not met / not verified | **未达成** = 量过但没过线；**未验证** = 从未测过。两者对读者的意义不同：前者是坏消息，后者是不知道。 | `how-to-verify.md:408` | 否（已补于 :410） |
+| 参考线 | reference threshold | 预先写下、只作对照比较的分数线；**不等于**验收线，对照参考线的报告不算验收成绩。 | `how-to-verify.md:333` | 否（已补于 :334） |
+| 冻结纪律 | freeze discipline | 调优前冻结题集与门槛，不许靠删掉做对的题来提高通过率。 | `how-to-verify.md:417`、`benchmarks/service-regression-set.md:155`、`architecture/README.md:204` | how-to-verify:417 是（已补）· service-regression-set:155 是（§5，并链到 architecture/README.md）· architecture/README:204 是（英文定义） |
 | 窄验证 | narrow verification | 只在六道已知失败面上重跑的缩小复测：6 题 × 3 轮。 | `how-to-verify.md:37` | 否（已补） |
-| 转通过 | flipped to pass | 原先判失败、这一轮改成通过的题。 | `how-to-verify.md:414` | 是（已补） |
-| 确定性修复题 | deterministic-fix task | 预期修法确定、可判对错的题（窄验证六题中的五题）。 | `how-to-verify.md:414` | 是（已补） |
+| 转通过 | flipped to pass | 原先判失败、这一轮改成通过的题。 | `how-to-verify.md:418` | 是（已补） |
+| 确定性修复题 | deterministic-fix task | 预期修法确定、可判对错的题（窄验证六题中的五题）。 | `how-to-verify.md:418` | 是（已补） |
 | 题次 | question instance | 一道题在一轮里的一次计分。 | `benchmarks/service-regression-set.md:264` | 否 |
 | 缺席事实 | the fact of absence | "某样东西不存在"这件事本身，必须按与失败记录相同的形状记下来。 | `benchmarks/service-regression-set.md:276` | 否 |
 
@@ -91,8 +91,8 @@
 
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
-| 结论 / 事实 / 线索 | finding / fact / lead | 结论 = 工具读出且带能解析的出处；事实 = 工具读到的字节；线索 = 模型的说法，只能待核，永远不能升级成结论。 | `how-to-verify.md:415`、`roadmap/phase3-plan.md:39`、`architecture/README.md:151` | how-to-verify:415 是（"模型的结论永远不是事实"）· phase3-plan:39 否 · architecture/README:151 是（英文表：`lead` = 静态分析或模型提示的风险指标） |
-| 可核查 | verifiable | 读者能自己把一条结论核到它的出处：指出是哪个工具、哪个版本、从哪个字节位置读出来的。本仓库统一写「可核查」，不写「可核验」——两个词说的是一件事，读者以为是两件。 | `../README.zh-CN.md:5`、`../README.zh-CN.md:25`、`reports/m10-acceptance-pack.md:443`、`benchmarks/service-regression-set.md:17` | 否（README.zh-CN.md:5 的 tagline 是定位语，不解释词义） |
+| 结论 / 事实 / 线索 | finding / fact / lead | 结论 = 工具读出且带能解析的出处；事实 = 工具读到的字节；线索 = 模型的说法，只能待核，永远不能升级成结论。 | `how-to-verify.md:419`、`roadmap/phase3-plan.md:39`、`architecture/README.md:151` | how-to-verify:419 是（"模型的结论永远不是事实"）· phase3-plan:39 否 · architecture/README:151 是（英文表：`lead` = 静态分析或模型提示的风险指标） |
+| 可核查 | verifiable | 读者能自己把一条结论核到它的出处：指出是哪个工具、哪个版本、从哪个字节位置读出来的。本仓库统一写「可核查」，不写「可核验」——两个词说的是一件事，读者以为是两件。 | `../README.zh-CN.md:5`、`../README.zh-CN.md:25`、`reports/m10-acceptance-pack.md:445`、`benchmarks/service-regression-set.md:17` | 否（README.zh-CN.md:5 的 tagline 是定位语，不解释词义） |
 | 证据链 / 出处模型 | evidence chain / provenance model | 记录每条结论由哪个工具、哪个版本、从哪个字节位置读出来的那条链。 | `how-to-verify.md:40`、`analysis-provenance.md:880` | how-to-verify:40 是（括注一句）· analysis-provenance:880 是（§4 逐步给命令） |
 | 公共契约 | public contract | 对外承诺并版本化的行为表面：CLI 子命令、退出码、REST 端点、MCP 工具、报告 schema。 | `architecture/public-contracts.md:1`、`roadmap/phase3-plan.md:7` | public-contracts:1 是（整份文件就是它）· phase3-plan:7 否 |
 | 证据包 | evidence package | `dexatlas export` 导出的 zip：报告本身 + 一份记录所引文件哈希的 `manifest.json`。 | `reports/release-process-dry-run.md:111`、`reports/v1.1.0-candidates.md:28`、`reports/v1.0.0-release-checklist.md:37`、`reports/portfolio-readiness-2026-11-18.md:207`、`architecture/public-contracts.md:32` | dry-run:84 是（已补）· candidates:28 是（已补）· checklist:37 是（已补）· portfolio:207 否 · public-contracts:32 是（§5.3 给出 manifest 字段） |
@@ -114,7 +114,7 @@
 | 公共契约 | public contract | 对外承诺并版本化的行为表面：CLI 子命令、退出码、REST 端点、MCP 工具、计数的含义、报告 schema；改动要显式升版本。 | `architecture/public-contracts.md:1`、`roadmap/phase3-plan.md:7` | public-contracts:1 是（整份文件就是它）· phase3-plan:7 否 |
 | 退出码 | exit code | CLI 退出码。**1 是"答案合法但为空"，不是报错**；2、3 才是错误。 | `architecture/public-contracts.md:3` | 否（§1.2 的表逐条给了含义，但词本身没定义） |
 | 后端 | backend | 外部工具（Apktool / JADX / androguard）；它失败被记成一个值，不抛异常。 | `architecture/public-contracts.md:23`、`analysis-provenance.md:15` | public-contracts:23 否 · analysis-provenance:15 否（:15 说清是 3 个分析后端 + 1 个不依赖后端的） |
-| 三后端齐备 / 三后端 | all three backends present | Apktool、JADX、androguard **三个都在**；只装两个时相关检查会 skip，skip 不是通过。 | `reports/release-process-dry-run.md:59`、`reports/portfolio-readiness-2026-11-18.md:59`、`reports/v1.0.0-release-checklist.md:326`、`how-to-verify.md:168`、`architecture/public-contracts.md:378`、`reports/ci-gate-coverage.md:80` | dry-run:59 是（已补）· portfolio:59 是（已补）· checklist:326 否 · how-to-verify:168 是（已补）· public-contracts:378 否（§7 只用这个词，不解释它）· ci-gate-coverage:80 否 |
+| 三后端齐备 / 三后端 | all three backends present | Apktool、JADX、androguard **三个都在**；只装两个时相关检查会 skip，skip 不是通过。 | `reports/release-process-dry-run.md:59`、`reports/portfolio-readiness-2026-11-18.md:59`、`reports/v1.0.0-release-checklist.md:326`、`how-to-verify.md:172`、`architecture/public-contracts.md:378`、`reports/ci-gate-coverage.md:80` | dry-run:59 是（已补）· portfolio:59 是（已补）· checklist:326 否 · how-to-verify:172 是（已补）· public-contracts:378 否（§7 只用这个词，不解释它）· ci-gate-coverage:80 否 |
 | 索引 | index | 工作区库里从 DEX 抽出的符号表（类、方法、字段、调用点）；Smali 与 Java 不入表。 | `architecture/public-contracts.md:48` | 否 |
 | 索引缺口 | index gap | 符号索引短于整个 APK 的那部分；**不等于**"后端没装"那种错误。 | `architecture/public-contracts.md:58` | 是（:56-60 的判据段） |
 | 已发布 run | published run | 当前发布在工作区快照里的那一次运行；失败或取消的 run 不发布。 | `architecture/public-contracts.md:50` | 否 |

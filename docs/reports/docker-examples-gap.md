@@ -3,6 +3,17 @@
 > 调研日期：2026年11月18日。对象：候选清单 [C6](v1.1.0-candidates.md#L679)。
 > 本轮**只做调研与建议，没有改动任何既有文件**：`Dockerfile`、CI 配置、`examples/` 一律未动。
 > 复核工作树：`E:\Dexatlas\.claude\worktrees\gracious-perlman-8560f2`（分支 `claude/gracious-perlman-8560f2`）。
+>
+> **后续（2026年11月18日，本文写完当天）**：本文的**方案 A 已经落地**——
+> `Dockerfile` 末尾加了 `COPY examples/ examples/`，CI 的 `docker` job 什么都不挂就在镜像里
+> 实跑了一次分析（过程与边界见 [docker-image-samples.md](docker-image-samples.md)）。
+> **构建时间的新口径也已经测出来**：CI runner 上 `docker build` 这一步实测 **46 秒**
+> （run `44334171465` 的 `Build image` 步骤），**唯一落点**是
+> [c6-build-time-from-ci.md](c6-build-time-from-ci.md)。
+> 本文下面出现的「18–20 分钟机时」「1099 秒」是**调研当时的成本估计**与
+> **读者本机冷缓存、走代理下载时**的实测——它们测的是**读者本机那一段**，仍然成立，
+> 但**不再是最新的口径**：新口径测的是 CI runner，别处一律指向
+> [c6-build-time-from-ci.md](c6-build-time-from-ci.md)。
 
 ## 0. 结论先说
 
@@ -16,8 +27,10 @@
    而是**一条不用挂卷的命令**，以及**一个能证明"镜像里能跑案例"的验证**。
 3. **建议：值得现在就做**——`Dockerfile` 加一行 `COPY examples/ examples/`（实测约 44 KB），
    CI 的 docker job 加一步在镜像内跑通 demo 案例（相对路径，不受 Git Bash 路径改写影响），
-   `docs/install.md` 的 Docker 段补上这条命令。唯一昂贵项是**复测构建时间**（冷缓存口径约 18–20 分钟机时），
-   且要把新口径写回 7 处引用。若本轮不安排镜像重建，则退一步先做"写进说明"的最小版。
+   `docs/install.md` 的 Docker 段补上这条命令。唯一昂贵项是**复测构建时间**
+   （调研当时按冷缓存口径估约 18–20 分钟机时），且要把新口径写回 7 处引用。
+   若本轮不安排镜像重建，则退一步先做"写进说明"的最小版。
+   **（这一条后来做了——新口径见开头的「后续」与 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)）**
 
 ## 1. 核到的事实
 
@@ -177,12 +190,18 @@ docker:
    [m10-acceptance-pack.md:250-251](m10-acceptance-pack.md#L250)、[m10-acceptance-pack.md:336](m10-acceptance-pack.md#L336)、
    [m10-materials-alignment.md:129](m10-materials-alignment.md#L129)（G5）与 [m10-materials-alignment.md:268](m10-materials-alignment.md#L268)、
    [m10-reader-walkthrough-4th.md:259-260](m10-reader-walkthrough-4th.md#L259)。
+   **（已做。新口径在 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)；写回时**只改口径陈述**——
+   [m8-install-rehearsal.md](m8-install-rehearsal.md)、[reader-dry-run.md](reader-dry-run.md)、
+   [m10-reader-walkthrough-4th.md](m10-reader-walkthrough-4th.md) 这三份是**测量记录**，
+   记的是当时某台机器上发生过什么，把数换掉就是篡改记录，不改。）**
 
 **代价**
 
 - 镜像 +44 KB（相对"约 1.3 GB"可忽略）；构建多一个 COPY 层。
-- 复测构建时间：冷缓存口径一次约 18 分 19 秒（1099 秒，[reader-dry-run.md:117](reader-dry-run.md#L117)）
+- 复测构建时间：调研当时估的是冷缓存口径一次约 18 分 19 秒（1099 秒，[reader-dry-run.md:117](reader-dry-run.md#L117)）
   + 层缓存口径一次约 2 分 16 秒（[m8-install-rehearsal.md:15](m8-install-rehearsal.md#L15)），外加写回 7 处。
+  **实际没有付这 20 分钟机时**：新口径改由 CI 实测（**CI runner 上 `docker build` 这一步 46 秒**，
+  见 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)）。
 - CI 每个 docker job 多一次容器内分析（秒级；实走演练记录容器内分析约 8 秒）。
 
 **风险**
@@ -245,6 +264,7 @@ docker:
 > 而不是文档里的一句承诺。
 
 **若本轮不安排镜像重建**（复测构建时间需要一次冷缓存构建 ≈ 18–20 分钟机时），则退一步做方案 B 的最小版：
+（**后续没有走这条路**：新口径改由 CI 实测，见 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)）
 把 [m10-reader-package.md:164-171](m10-reader-package.md#L164) 那段逐字抄进 install.md 的 Docker 段，
 并把两处命令收敛到同一个脚本引用上。C6 因此从"读者卡住"降级为"读者要多绕一步"，方案 A 留到能复测构建时间的那一轮再做。
 
@@ -256,7 +276,7 @@ docker:
 | 没核实的 | 为什么 |
 |---|---|
 | 镜像内部的实跑行为 | 本机无 `dexatlas:*` 镜像；构建需联网下载 JADX/Apktool（[Dockerfile:51-61](../../Dockerfile#L51)），本轮不联网、不构建镜像。镜像内的结论由 `Dockerfile` + 同版本 CLI 实测推导 |
-| 加 COPY 后的构建时间 | 同上，未构建镜像；文中引用的是既有实测口径（1099 秒 / 2 分 16 秒） |
+| 加 COPY 后的构建时间 | 本轮（调研时）未构建镜像；文中引用的是既有实测口径（1099 秒 / 2 分 16 秒）。**后续已补**：新镜像在 CI 上实测，`docker build` 这一步 **46 秒**（唯一落点 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)） |
 | 镜像体积变化 | 未构建镜像；按 `examples/` 实测 43,995 B 估算，相对"约 1.3 GB"可忽略 |
 | PowerShell / CMD 下的路径行为 | 本轮只实测了 Git Bash（MSYS）；Windows 上另两种 shell 未测（相对路径在三种 shell 上都不会被改写，但未实测） |
 | 预构建镜像场景 | 目前不存在发布镜像的流水线，无从核实；方案 B 的有效期依赖这一前提 |

@@ -19,13 +19,13 @@
    遇到问题找谁」。它不替代[准备包](m10-acceptance-pack.md)的 40 项判定标准，
    也不替代[记录模板](m10-review-record-template.md)。
 2. **独立验收尚未开始。** 仓库里没有任何一项验收结论被判定为「通过」
-   （`docs/reports/m10-acceptance-pack.md:3`、`docs/status.md:132`）。
+   （`docs/reports/m10-acceptance-pack.md:3`、`docs/status.md:136`）。
 3. **M6 未达验收线，如实告知。** 修复后三轮完整重测合计 49/60 = 81.7%，
    低于三轮合计 ≥54/60 的验收线（`docs/benchmarks/m6-level2-retest4.md:83`）；
    窄验证转通过 3/6，未达 ≥4 的判据（`docs/benchmarks/m6-level2-narrow-verify3.md:61`）。
    项目已按既定方案停止追加修复轮，把 Agent 服务定稿为**现状披露**——
    「有界、证据可核查的 agent 演练」，不宣称达到验收线。这是读者应当重点核对的
-   高风险声明之一（`docs/reports/m10-reader-package.md:317`）。
+   高风险声明之一（`docs/reports/m10-reader-package.md:319`）。
 
 ## 1. 你的路径
 
@@ -41,7 +41,7 @@
 
 > **维度与权重逐字沿用[准备包 §5](m10-acceptance-pack.md)，一字未改。**
 > 不因本轮完成了什么而改权重——改了权重，分数就与 75% / 65% 的基线不可比
-> （`docs/reports/m10-acceptance-pack.md:455`）。基线权重出处：
+> （`docs/reports/m10-acceptance-pack.md:457`）。基线权重出处：
 > `docs/reports/portfolio-readiness-2026-11-15.md:34`。
 
 ### 2.1 评分等级（0–4）
@@ -121,8 +121,8 @@
 | 独立使用验证 | 5% / 10% | **就是您这一份记录**：有没有未参与实现的读者复现并留痕 | 可见记录主要是项目自身演练与评审，未见独立读者复现及客户式验收记录；不推断项目没有外部用户 |
 
 > 权重一列按准备包原表抄写：GitHub 30/20/10/10/25/5
-> （`docs/reports/m10-acceptance-pack.md:477`–`:482`）、Upwork 20/15/15/25/15/10
-> （`docs/reports/m10-acceptance-pack.md:491`–`:496`）。
+> （`docs/reports/m10-acceptance-pack.md:479`–`:482`）、Upwork 20/15/15/25/15/10
+> （`docs/reports/m10-acceptance-pack.md:493`–`:496`）。
 
 ### 2.6 总评与一句话结论
 
@@ -266,7 +266,7 @@ uv run --no-sync python -c \
 
 预期：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定），
 `citations_resolved` 为 `True`、`citations_unresolved` 为空
-（`docs/reports/m10-reader-package.md:251`）。再把包复制到另一个目录或另一台机器复验一次
+（`docs/reports/m10-reader-package.md:253`）。再把包复制到另一个目录或另一台机器复验一次
 （验收项 C6），并解压对照 `manifest.json` 的 `not_included` 声明，确认包里没有 APK、
 全量源码和未被证据引用的字符串（验收项 D3、G5）。
 
@@ -279,10 +279,10 @@ uv run --no-sync python -c \
 - 层级 1 scripted 成绩——那是替身模型，只证明管线端到端可用，不是模型能力基线
   （`docs/benchmarks/m6-level1-scripted.md`）；
 - 测试与覆盖率数字——以你本机 `uv run --no-sync pytest -q` 的实际结果为准
-  （`docs/reports/m10-reader-package.md:394`）；
+  （`docs/reports/m10-reader-package.md:396`）；
 - 已知限制只剩 macOS 未验证（M8-2、M8-3 已修复并合入）；M8-4（三个后端全部失败时
   退出码仍为 0）已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
-  （`docs/reports/m10-reader-package.md:369`）；
+  （`docs/reports/m10-reader-package.md:371`）；
 - 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，不是成绩。
   两组数字用的是同一组维度与权重：75%/65% 是[准备度评估](portfolio-readiness-2026-11-15.md)
   的基线，77.5%/68.75% 是同一基线上的自评更新。**你的重评请与 75%/65% 这一档
@@ -330,18 +330,18 @@ commit），不是验收 commit 的现状；数字对不上时以你的实测为
 |---|---|---|
 | 40 个验收项、7 组 | `docs/reports/m10-acceptance-pack.md:27` | A–G 七组 |
 | 19 个 ★ 阻断项 | `docs/reports/m10-acceptance-pack.md:173` | 清单同处 |
-| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:460` | §5.1 原文表 |
-| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:477`–`:482` | §5.2 原文表 |
-| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:491`–`:496` | §5.3 原文表 |
+| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:462` | §5.1 原文表 |
+| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:479`–`:482` | §5.2 原文表 |
+| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:493`–`:496` | §5.3 原文表 |
 | 基线 GitHub 约 75% / Upwork 约 65% | `docs/reports/portfolio-readiness-2026-11-15.md:28` | 人工基线，不是接单概率 |
-| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:502` | 门槛，不是预测 |
+| 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:504` | 门槛，不是预测 |
 | M6 三轮合计 49/60 = 81.7% | `docs/benchmarks/m6-level2-retest4.md:38` | 脚本重算生成 |
 | M6 逐轮 15/20、16/20、18/20 | `docs/benchmarks/m6-level2-retest4.md:82` | 未达每轮 ≥16/20 的轮次存在 |
 | 验收线 每轮 ≥16/20、合计 ≥54/60 | `docs/benchmarks/m6-level2-retest4.md:83` | 未达 |
 | 更早一轮重测逐轮 17/15/17 | `docs/benchmarks/m6-level2-retest3.md:85` | 合计同为 49/60 |
 | 窄验证转通过 3/6（门槛 ≥4） | `docs/benchmarks/m6-level2-narrow-verify3.md:59` | 未达判据 |
 | 窄验证确定性修复相关题 3/5 | `docs/benchmarks/m6-level2-narrow-verify3.md:60` | — |
-| M10 独立验收尚未开始 | `docs/status.md:132`、`docs/reports/m10-acceptance-pack.md:3` | 如实状态 |
+| M10 独立验收尚未开始 | `docs/status.md:136`、`docs/reports/m10-acceptance-pack.md:3` | 如实状态 |
 | 冷缓存首次 10–20 分钟 | `docs/reports/m10-reader-package.md:69` | 时间口径 |
 | 验收 commit（v1.0.0 发版 commit） | `docs/reports/m10-invitation-final.md:60` | 由验收发起人钉定；完整 hash 填在邀请函成稿 §2 的占位符里 |
 

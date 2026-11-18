@@ -153,7 +153,9 @@ docker run --rm dexatlas dexatlas backends
 
 预期：构建**约 2–20 分钟**（两个口径：层已就绪时约 2 分 16 秒 —— [M8 演练](m8-install-rehearsal.md)；
 首台机器无层缓存、走代理下载时实测 **1099 秒 ≈ 18 分 19 秒** —— [读者实走演练](reader-dry-run.md)；
-镜像约 1.3 GB）；镜像内 JADX / Apktool 可用。容器内多个
+镜像约 1.3 GB）；镜像内 JADX / Apktool 可用。**这两个口径测的是你这台机器**——
+CI runner 上另测过一段（`docker build` 这一步 **46 秒**），那是另一段，不是你本机的预期，
+出处见 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)。容器内多个
 命令共享 workspace 时，用 `DEXATLAS_WORKSPACE=/workspace/ws` 统一（M8-2 已修复并合入：
 所有命令都带 `--workspace`/`-w`，这一项不再是已知限制；容器里仍建议用环境变量统一）。
 

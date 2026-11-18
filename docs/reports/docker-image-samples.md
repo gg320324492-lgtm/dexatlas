@@ -217,10 +217,15 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
    另有一处漂移是 **main 自己的**（提交 `7593574` 改了测量脚本，一处裸行号落到了
    空行上），顺手把它改成显式的文件引用——那一处本来指的就是 `tests/test_docs.py`
    里那个测试函数。
-6. **C6 的另一条判据没有做**：「选 (a) 要把新的构建时间写回所有引用旧口径的地方」。
+6. **C6 的另一条判据这一轮没做，下一轮做完了**：「选 (a) 要把新的构建时间写回所有引用旧口径的地方」。
    本轮**没有重建镜像**（本地不构建），所以镜像的构建时间口径还是旧的那份
    （调研报告里的冷缓存 18–20 分钟机时）。这一条要等 CI 上那次真实构建的日志出来
    才能写，主会话合并后跑一次 `docker` job 就能拿到。
+   **后续（2026年11月18日）已补**：那份日志出来了——**`docker build` 这一步实测 46 秒**
+   （run `44334171465` 的 `Docker image builds and analyses a bundled sample` job 里的
+   `Build image` 步骤），唯一落点是 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)。
+   旧的那个数（读者本机冷缓存、走代理下载，1099 秒）测的是**另一段**，仍然成立，
+   但不再是最新的口径——新口径测的是 CI runner。
 7. **`tests/test_docs.py` 有 4 条测试在 main 上已经是红的**（执行报告里的覆盖率数字
    与树的语句数对不上：`reports/evidence_package.py` 记录 172、树里 187）。本轮没有碰
    `src/` 与 `docs/reports/phase1-execution-report.md`，所以这 4 条不是本轮造成的
@@ -239,3 +244,5 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 - 本报告不是只读审计——它当场改了 `Dockerfile`、CI 与文档，所以
   `docs/reports/README.md` §6 里「本轮唯一当场实施了改动的是
   `evidence-package-isolation.md`」那句已同步改成本报告也在内。
+- 构建时间的新口径落在 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)——
+  本报告 §6 第 6 条留下的那一件，就是它。
