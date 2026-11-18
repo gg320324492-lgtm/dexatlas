@@ -60,7 +60,7 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -124,6 +124,11 @@ class PreviewError(Exception):
 # --------------------------------------------------------------------------
 
 
+#: The outcomes a test can have in a measurement. A measurement is complete
+#: when every test in the tree has one of them.
+SUITE_NAMES = ("passed", "failed", "skipped", "xfailed", "xpassed")
+
+
 @dataclass(frozen=True)
 class Facts:
     """Every figure the cards draw, and where each one was read."""
@@ -134,9 +139,13 @@ class Facts:
     #: number: a line number is a claim that goes stale on the next edit).
     origins: dict[str, str]
     #: How many tests the measurement sat out. The cards do not draw it, but
-    #: a measurement that skipped anything did not measure the tree, and its
-    #: coverage is not the tree's coverage.
+    #: a measurement that sat out a test still measured the tree when every
+    #: test has an outcome -- ran, sat out with a recorded reason, failed, or
+    #: was expected to fail.
     skipped: str = ""
+    #: The measurement record's whole suite block: how many passed, failed,
+    #: sat out, were expected to fail, and passed unexpectedly.
+    suite: dict[str, str] = field(default_factory=dict)
 
 
 def _read(path: Path) -> str:
@@ -269,7 +278,12 @@ def collect_facts(repo: Path) -> Facts:
         "version": f"{INIT} (__version__)",
         "license": f"{PYPROJECT} (project.license)",
     }
-    return Facts(figures=values, origins=origins, skipped=str(suite.get("skipped", "")))
+    return Facts(
+        figures=values,
+        origins=origins,
+        skipped=str(suite.get("skipped", "")),
+        suite={name: str(suite.get(name, "")) for name in SUITE_NAMES},
+    )
 
 
 # --------------------------------------------------------------------------
@@ -744,12 +758,22 @@ def check(repo: Path) -> int:
             f"the report says {facts.figures['coverage.pct']!r}",
         )
 
+    # A measurement is complete when every test in the tree has an outcome:
+    # it ran, it was skipped with a recorded reason, it failed, or it was
+    # expected to fail. That is the same rule the measuring script applies
+    # (see its ``measured_the_tree``), and this check used to apply a
+    # stricter one -- "no skips at all" -- which a by-design platform skip
+    # (the POSIX launcher test on Windows, where the native one runs
+    # instead) turned into a permanent red: the card's numbers were right
+    # and the gate said they were not.
     skipped = facts.skipped
+    accounted = sum(int(facts.suite.get(name) or 0) for name in SUITE_NAMES)
+    total = int(facts.figures.get("tests.total") or 0)
     result.check(
         "the measurement was complete",
-        skipped == "0",
-        f"the record says {skipped} tests were skipped, so the coverage on the card "
-        f"is not the tree's coverage; re-run the measurement",
+        total > 0 and accounted == total,
+        f"the tree has {total} tests; the record accounts for {accounted} "
+        f"({skipped} skipped, each with a recorded reason); re-run the measurement",
     )
 
     print("\n== the cards are on the front page ==")

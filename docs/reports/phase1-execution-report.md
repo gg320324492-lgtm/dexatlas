@@ -877,7 +877,7 @@ uv run python scripts/refresh-report-figures.py
 uv run pytest          # 收集 <!--fig:tests.total-->1690<!--/fig--> 个：<!--fig:tests.fast-->1541<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7136<!--/fig-->/<!--fig:coverage.total-->7650<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1689<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->0<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1689<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1100,8 +1100,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "suite": {
     "failed": 0,
     "passed": 1689,
-    "skipped": 0,
-    "skipped_tests": [],
+    "skipped": 1,
+    "skipped_tests": [
+      "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
+    ],
     "xfailed": 0,
     "xfailed_tests": [],
     "xpassed": 0

@@ -23,7 +23,7 @@
 | 测试 | <!--fig:tests.total-->1690<!--/fig--> 个（<!--fig:tests.fast-->1541<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
-| CI | **12 个 workflow job、13 次并行运行**（`test` 是 3.12/3.13 矩阵）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检 / M10 自查 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
+| CI | **9 个 workflow job、10 次并行运行**（`test` 是 3.12/3.13 矩阵）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检 / M10 自查 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
 > M6 层级 2 的执行层修复（判分链路、预算分类、重试、检索兜底）已在本分支
@@ -47,8 +47,8 @@
 > （现状披露）为最终定稿路径**，不再追加修复轮或模型调用。本页其余测量数字
 > 仍对应修复前代码（`main` `fbca3d5` 及更早）。
 
-**CI 的十二个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
-矩阵，展开后是十三次并行运行）：
+**CI 的九个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
+矩阵，展开后是十次并行运行）：
 
 | Job | 覆盖什么 |
 |---|---|
