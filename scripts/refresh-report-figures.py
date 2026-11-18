@@ -372,7 +372,7 @@ def collected_tests(marker: str) -> tuple[int, int]:
 
 
 def outcome_counts(output: str) -> dict[str, int]:
-    """Read pytest's final summary: how many tests passed, skipped, xfailed.
+    r"""Read pytest's final summary: how many tests passed, skipped, xfailed.
 
     Only pytest's own summary line -- the one between the ``=`` rules -- is
     read, never the whole output. A coverage or warning block elsewhere in
@@ -380,9 +380,21 @@ def outcome_counts(output: str) -> dict[str, int]:
     there is a count of a different run: one measurement added such a stray
     to its own numbers and then could not account for the tree it had just
     measured.
+
+    The match is not allowed to cross a line. A backslash-s matches a newline, so a
+    pattern ending in ``\s*`` can start at an ``=`` in the middle of a line -- at
+    the ``==`` of an ``assert 1682 == 1695`` -- and run on into the next line,
+    swallowing the ``=`` rules that open pytest's summary line. The last match is
+    then the tail of that summary line with nothing in it, and the counts of a run
+    that passed twelve tests and failed one come out as zero. A summary line that
+    is only there when a test failed is exactly the case that hid this: locally
+    every self-check passed, on the runner one failed, and only there did the run
+    print an ``assert`` line.
     """
     counts: dict[str, int] = {}
-    summaries = re.findall(r"=+\s*(.*?)\s*=+", output)
+    summaries = [
+        text for text in re.findall(r"=+[^\S\n]*([^\n]*?)[^\S\n]*=+", output) if text.strip()
+    ]
     summary = summaries[-1] if summaries else output
     for name in OUTCOMES:
         found = re.findall(rf"(\d+) {name}s?\b", summary)
