@@ -1633,3 +1633,150 @@ def test_the_readmes_state_what_the_source_fingerprint_covers() -> None:
             assert excluded in text, (
                 f"{name} does not say the fingerprint does not cover {excluded}"
             )
+
+
+# -- the readme first screen --------------------------------------------------
+
+#: The front page's header block ends here. Everything above it is what a
+#: visitor reads before they scroll.
+FIRST_SCREEN_END = "</div>"
+
+#: Any digit at all. The alt text names a picture; the numbers *on* the
+#: picture belong to the reports that hold them. A number written into an alt
+#: text goes stale more quietly than any other number in the repository, and
+#: ``docs/reports/social-preview-howto.md`` has said so since the card was
+#: drawn: "alt 文本里不写数字".
+A_DIGIT = re.compile(r"\d")
+
+#: A run of three or more digits. One and two digit numbers are dates,
+#: versions and section numbers ("v1.0.0", "M10", "Phase 3"); three or more
+#: are counts -- "1612 tests", "1,690", "7135/7650 lines".
+MANY_DIGITS = re.compile(r"\d{3,}")
+
+#: A percentage. The coverage figure is "93.3%": its digits sit on either
+#: side of the point, so a rule about digit runs cannot see it.
+A_PERCENTAGE = re.compile(r"\d+(?:\.\d+)?\s*%")
+
+#: A number counting something the measurement measures: "1612 tests",
+#: "27 skips", "1612 个测试". A two digit count is a count too -- the unit it
+#: is counted in is what tells it apart from a version or a date.
+A_COUNTED_QUANTITY = re.compile(
+    r"\d+\s*(?:个\s*)?(?:tests?|skips?|checks?|测试|跳过|检查)",
+    re.IGNORECASE,
+)
+
+
+def _first_screen(text: str) -> str:
+    """The header block of a front page: everything above its closing ``</div>``."""
+    end = text.find(FIRST_SCREEN_END)
+    if end < 0:
+        raise AssertionError("the readme's header block has no closing </div>")
+    return text[:end]
+
+
+def _visible_text(line: str) -> str:
+    """What a reader of one line actually sees.
+
+    Markup is not text and an address is not text either: the width of a
+    picture ("900") and the measured numbers inside a badge's URL are numbers
+    no reader reads as a measurement -- the badge is written from the
+    measurement, so it cannot go stale.
+    """
+    without_tags = re.sub(r"<[^>]*>", " ", line)
+    return re.sub(r"\]\([^)]*\)", "]", without_tags)
+
+
+def _alt_texts(line: str) -> list[str]:
+    """The alt text of every image in a line, in HTML and in Markdown."""
+    return re.findall(r'alt="([^"]*)"', line) + re.findall(r"!\[([^\]]*)\]", line)
+
+
+def _stated_measurements(region: str) -> list[str]:
+    """The numbers the front screen puts in front of its reader.
+
+    Every number a reader can see in the header block: in the text, or in the
+    alt text of a picture. The badge URLs carry the measured numbers as well,
+    and they are left alone -- ``apply_badges`` writes them from the
+    measurement, so they cannot go stale.
+    """
+    stated: list[str] = []
+    for line in region.splitlines():
+        for alt in _alt_texts(line):
+            if A_DIGIT.search(alt):
+                stated.append(alt)
+        visible = _visible_text(line)
+        stated.extend(MANY_DIGITS.findall(visible))
+        stated.extend(A_PERCENTAGE.findall(visible))
+        stated.extend(A_COUNTED_QUANTITY.findall(visible))
+    return stated
+
+
+def test_the_readme_first_screen_states_no_measurement() -> None:
+    """The front page must not restate the measurement.
+
+    The card's numbers change on every re-measurement, and the front page is
+    the one page nobody diffs: the badges are written by the measurement
+    script, and everything around them is written by hand. When the sentence
+    under the badges used to say what had been measured -- "one measurement of
+    the whole tree (1612 tests, 0 skipped)" -- and the alt text of the card
+    used to repeat it ("93.3% first-party code coverage, 1612 tests, 49 public
+    contract checks"), each of those numbers was a second copy of the
+    measurement, kept in step by hand, and this release cycle is what proved
+    it is not kept in step: they went stale and nothing said so.
+
+    The fix is not a second place to update. It is no number at all: the
+    front page points at the report, and the report holds the numbers. This
+    test is what keeps it that way -- it fails the moment a number is written
+    back into the header block, in the text or in an alt attribute.
+    """
+    for name in ("README.md", "README.zh-CN.md"):
+        text = (REPO_ROOT / name).read_text(encoding="utf-8")
+        stated = _stated_measurements(_first_screen(text))
+        assert stated == [], f"{name} states {stated} in its first screen"
+
+
+def test_the_gate_catches_the_alt_text_that_used_to_carry_the_measurement() -> None:
+    """The gate has to bite on the wording that was there before.
+
+    This is the alt text the card carried until it was written out by hand:
+    three measured numbers, none of them written by the measurement script.
+    """
+    alt = (
+        "DexAtlas — From APK to Evidence: 93.3% first-party code coverage, "
+        "1612 tests, 49 public contract checks"
+    )
+    line = f'  <img src=".github/social-preview.png" alt="{alt}" width="900">'
+
+    assert _stated_measurements(line) == [alt]
+
+
+def test_the_gate_catches_the_sentence_that_used_to_state_the_measurement() -> None:
+    """The same for the sentence under the badges.
+
+    The old wording was in Chinese in both readmes, and it stated the test
+    count, the number of skipped tests, and the number of missing samples.
+    """
+    line = (
+        "> 徽章是**完整环境下**的一次测量（1612 个测试、0 跳过）。"  # noqa: RUF001
+        "在没抓第三方样本的机器上，`pytest` 会显示 27 个 skip"  # noqa: RUF001
+    )
+    stated = _stated_measurements(line)
+
+    assert "1612" in stated
+    assert "0 跳过" in stated
+    assert "27 个 skip" in stated
+
+
+def test_the_gate_leaves_the_written_badges_alone() -> None:
+    """The badge carries the measured numbers, and they are not a fault.
+
+    The badge's URL is written from the measurement by ``apply_badges``, so it
+    cannot go stale. A checker that read the raw line instead of what a reader
+    sees would fail on every badge, and would be turned off.
+    """
+    line = (
+        "[![Tests](https://img.shields.io/badge/tests-1689%20passing-brightgreen.svg)]"
+        "(docs/reports/phase1-execution-report.md)"
+    )
+
+    assert _stated_measurements(line) == []
