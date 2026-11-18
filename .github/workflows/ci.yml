@@ -434,7 +434,7 @@ jobs:
           PY
 
   docker:
-    name: Docker image builds
+    name: Docker image builds and analyses a bundled sample
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -442,6 +442,56 @@ jobs:
         run: docker build -t dexatlas:ci .
       - name: Verify the backends in the image actually run
         run: docker run --rm dexatlas:ci dexatlas backends
+      # The image carries the repository's own first-party samples, so the
+      # claim "the image alone can analyse a sample" is checked here instead of
+      # being asserted in the documentation.
+      #
+      # The APK path is relative on purpose: it is resolved inside the
+      # container, where the samples sit next to the code, so it does not
+      # depend on how the host rewrites an argument that looks like a Windows
+      # path.
+      - name: Analyse the bundled sample inside the image
+        run: |
+          set -euo pipefail
+          # The first run mounts nothing at all -- not the sample, not a
+          # workspace. That is the claim itself: the image alone can analyse a
+          # case, with nothing downloaded and nothing mounted.
+          status=0
+          docker run --rm dexatlas:ci dexatlas analyze examples/demo-app/demo.apk || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "the in-image analysis exited $status" >&2
+            exit "$status"
+          fi
+          # The second run is the same analysis, with the report written out so
+          # that the counts can be read from the JSON rather than from the
+          # console text -- the console wraps that line, so a line-oriented
+          # check would be reading a shape the output does not have.
+          mkdir -p "$RUNNER_TEMP/docker-sample"
+          docker run --rm -v "$RUNNER_TEMP/docker-sample:/out" dexatlas:ci \
+            dexatlas analyze examples/demo-app/demo.apk --json /out/report.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(
+              (Path(os.environ["RUNNER_TEMP"]) / "docker-sample" / "report.json").read_text(
+                  encoding="utf-8"
+              )
+          )
+          summary = report["summary"]
+          # The floors the repository's own test pins for this sample
+          # (tests/test_demo_app.py): the DEX alone carries them, and the
+          # image's JADX adds classes of its own on top -- the R class -- so
+          # these are floors and not equalities.
+          floors = {"classes": 4, "methods": 8, "call_sites": 23}
+          for key, floor in floors.items():
+              count = summary[key]
+              assert count >= floor, f"{key} is {count}, expected at least {floor}"
+          assert summary["call_edges"] > 0, summary["call_edges"]
+          for key in ("classes", "methods", "call_sites", "call_edges"):
+              print(f"{key}: {summary[key]}")
+          PY
 
   security:
     name: Dependency audit

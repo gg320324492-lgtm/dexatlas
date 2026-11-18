@@ -164,6 +164,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [evidence-package-isolation.md](evidence-package-isolation.md) | 证据包的**隔离边界**核对：包里到底会被打进什么（逐个打开四个已入库的包，再现跑一个包核过），「内部核对记录不得随证据包外发」这条今天成立到什么程度、缺的是哪一道闸。结论：那条通路今天走不通——源码片段只可能来自被分析 APK 的反编译树；但**这条性质只靠实现细节成立**，代码里没写死、没检查、清单里也没声明。 | 打包时的守卫（反编译树之外的文件、指向树外的链接都不进包）、契约文档 §5.3 的明文、5 条红→绿回归测试（`tests/test_evidence_package_isolation.py`）。清单的 `not_included` 未动——那是公共契约变更，留给主会话决定。 |
 | [invitation-reader-rehearsal.md](invitation-reader-rehearsal.md) | 照**定稿的邀请函与读者包**把 34 步实跑一遍（只读预演，作者侧执行，不具备独立性）。结论：**2 处卡住**（★F1 要实测退出码 1，而材料里没有任何一条命令能产生退出码 1；F2/F3/F4 有判据无命令）、**7 处误读**（★G3 准备包要「三后端记录 timeout」而读者包说「两条也是正确行为」，读者无从裁定哪份说了算）、**3 处多余**；40 个验收项里 39 项能自己判、1 项必须问作者。 | 只出记录，未改材料。发邀请函之前要先统一 G3 的口径、把 C1–C6 从记录模板挪到别处、并补三条能复制粘贴的命令。 |
 | [docker-examples-gap.md](docker-examples-gap.md) | **C6**：Docker 镜像里到底能不能跑仓库自带的案例（只读调研）。结论：**不能**——`Dockerfile` 只 COPY 四样文件加 `src/`，镜像里没有 `examples/`，今天只能挂卷（唯一验证跑通的命令在读者包 §164）；镜像里 13 个 CLI 子命令在样本可达时全流程通。 | 只出调研，未动 `Dockerfile`/CI/`examples/`。建议：`Dockerfile` 加一行 `COPY examples/ examples/`（镜像 +44 KB）+ CI 的 docker job 用相对路径在镜像内跑通 `analyze examples/demo-app/demo.apk` + install.md 补上这条命令。 |
+| [docker-image-samples.md](docker-image-samples.md) | **C6 方案 A 的落地**：镜像里能不能跑仓库自带的案例。结论：**能，而且由 CI 验证**——`Dockerfile` 末尾多一行 `COPY examples/ examples/`（放在最后一次 `uv sync` 与后端安装之后，改样本不会让依赖层失效）；CI 的 `docker` job 多一步，在刚构建的镜像里用**相对路径**跑通 `analyze examples/demo-app/demo.apk`，核出退出码 0 与 classes / methods / call sites / call edges 四个非空计数；`docs/install.md` 的 Docker 段改成「镜像自带样本」，挂卷只留「用你自己的 APK」。**边界**：镜像内未本地实跑（本地不构建镜像），由 CI 验证。 | 改动进了 `Dockerfile`、`.github/workflows/ci.yml` 的 `docker` job（job 显示名与 `docs/status.md` 的 job 行同步改）、`docs/install.md` 与本索引的份数；本报告已登记进 `scripts/check-doc-citations.py` 的 `DOCS` 清单。`tests/` 的回归测试按本轮约束未加，需求写在报告的「需要主会话接手」一节。 |
 | [post-release-rehearsal.md](post-release-rehearsal.md) | 「**发布后修正并重打 tag**」这条路径的端到端演练（只读，演练记录不是发版记录）。结论：12 条（R1–R12）里 **8 条**「§3 步骤 8 本该拦住但没拦住」，另 3 处判据含糊；给出三条该补的判据——按**指纹**而不是数字决定要不要重测量、本地 tag 与远端 tag 分开查且引用检查排在 tag 移过之后、把「同一批数字相等」写成一份让每份副本都有东西在比的清单。 | 只出记录。三条建议尚未落进清单，等主线处置。 |
 | [outward-number-parity.md](outward-number-parity.md) | **判据 C 的落地**：四份对外文本里的同一批数字（测试总数、快/集成、passed、skipped、xfailed、一方覆盖率），机器逐个数比对。结论：仓库内的三份彼此一致、也与执行报告一致；**GitHub 上已发布的那一份 Release 正文不一致**——它写的是旧树上的数（1620 一族），而 tag `v1.0.0` 指向的树上是 1695 一族。 | 新增门禁 `scripts/check-release-numbers.py` + CI job `release-numbers`；**没有**改那四份文本里的任何数字。门禁第一次跑就是红的，等主线重新发布 Release 正文。 |
 | [figures-coverage-design.md](figures-coverage-design.md) | **测量数字自动覆盖设计**（只读调研）：怎样让「数字随测量走」管住所有手写位置。结论：源指纹只覆盖 `src/`、`tests/`、`pyproject.toml` 与测量脚本本身，`docs/` 下手写的数字不受它管。 | 只出调研（提交 `d6b8edf`），方案尚未落成改动。 |
@@ -193,8 +194,8 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 
 - **凡带基线声明的报告，数字只在该基线上成立。** §6 的三十份审计报告各自锚在自己的基线上，
   基线之后的变动写在报告开头；跨报告引用同一个数字前，先确认基线是否一致。
-- **「只读审计」不等于「结论已落地」。** §6 的报告只记录发现，改动由主线执行（本轮唯一当场实施了改动的是
-  `evidence-package-isolation.md`）；
+- **「只读审计」不等于「结论已落地」。** §6 的报告只记录发现，改动由主线执行（本轮当场
+  实施了改动的是 `evidence-package-isolation.md` 与 `docker-image-samples.md`）；
   判断某条发现是否已修，看对应提交与当前文件，不要只看报告。
 - **历史陈述不是过期数字。** 过期数字是「现在仍然这样陈述，但已经不成立」；历史陈述是
   「当时就是这样，现在仍然正确，只是描述的是过去」。`stale-number-scan.md` 把这两类分开列，

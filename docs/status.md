@@ -56,7 +56,7 @@
 | Tests (Python 3.13) | **两个外部后端都不在**——JADX 和 Apktool 需要 Java，Androguard 是 Python 包，还在 |
 | Tests (Apktool only, no JADX) | **Apktool 在、JADX 不在**——Smali 回退存在的理由 |
 | M3 comparison stays reproducible | 从已提交的 92 题对比 trace 重算八项指标，**报告与数据保持可复现** |
-| Docker image builds | 镜像里三个后端真的能跑 |
+| Docker image builds and analyses a bundled sample | 镜像里三个后端真的能跑；镜像自带的样本在镜像内分析得通（退出码 0，类/方法/调用点/调用边的计数非空） |
 | Dependency audit | 锁文件的已知漏洞 |
 | Lint and format | ruff、mypy、**actionlint**（workflow 文件本身）、**版本状态陈述检查** |
 | Public contracts (live) | 公共契约活检实跑：三个后端齐备时跑 `scripts/verify-public-contracts.py`，退出码要判 |

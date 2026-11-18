@@ -68,3 +68,24 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
 CMD ["uvicorn", "dexatlas.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# The repository's own first-party samples, copied last on purpose.
+#
+# Two reasons, and both of them are about not breaking something else:
+#
+# * they go after the dependency install and after the backends, so that
+#   editing a sample never invalidates a cached layer -- the layers above are
+#   the expensive ones (the backend downloads take minutes), and they stay
+#   valid while a sample changes; and
+# * they go after every line the documentation cites, so the line numbers in
+#   docs/ still point at the lines they pointed at.
+#
+# With them in the image, a reader can analyse a sample without mounting an
+# APK of their own:
+#
+#     docker run --rm dexatlas dexatlas analyze examples/demo-app/demo.apk
+#
+# The path is relative on purpose: it is resolved inside the container, where
+# the samples sit next to the code, so it does not depend on how the host
+# rewrites an argument that looks like a Windows path.
+COPY examples/ examples/

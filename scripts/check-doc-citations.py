@@ -148,10 +148,10 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
     REPO / "docs" / "reports" / "docker-examples-gap.md",
     REPO / "docs" / "reports" / "post-release-rehearsal.md",
-    # The report on the outward texts' release numbers. It states, for every
-    # one of the four, which line holds which number -- so a number that
-    # moved and a line that moved are both things a citation has to catch.
-    REPO / "docs" / "reports" / "outward-number-parity.md",
+    # The landing of the Docker sample change: it quotes the CLI's count line,
+    # the JSON report's summary keys, the sample's pinned numbers and the CI
+    # step that checks them, so all of those have to keep being true.
+    REPO / "docs" / "reports" / "docker-image-samples.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
