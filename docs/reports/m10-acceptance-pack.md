@@ -190,7 +190,7 @@
 | Docker | 可选 | 不想装 Python/JDK 时走 Docker 路线；镜像自带 JADX 与 Apktool |
 | 网络 | 首次需要 | clone、uv 依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写到系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）约 1.5–2 分钟 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)）；[读者实走演练](reader-dry-run.md) 实测冷缓存 10 分 28 秒、clone + uv sync 4 分 24 秒 |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告**按 1.5–2 分钟预留** | **1.5–2 分钟是预算档位，不是实测值**——两处实测锚点的口径不同、都比它快：[M8 演练](m8-install-rehearsal.md)「空目录 → 第一份报告，暖缓存」**约 30 秒**（同一次**首次分析本身 6.8 秒**）；[读者实走演练](reader-dry-run.md) 实测冷缓存 **10 分 28 秒**、clone + `uv sync` **4 分 24 秒**、「重建 `.venv` → 第一份报告」**8 秒**。**做快于 30 秒不是卡点** |
 
 **固定版本。** 验收针对验收发起人钉定的 commit（本轮为 v1.0.0 发版 commit，
 完整 hash 随[邀请函成稿 §2](m10-invitation-final.md)给出）。
@@ -625,23 +625,27 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
   部分运行保留旧覆盖率和旧套件数，等于描述一棵不存在的树。
 - 三种后端配置（全后端 / 无外部后端 / 仅 Apktool）都要有结果或明确记录未跑。
 
-**编写本包时的门禁现状（2026-11-15，基准 `ff5c4cc`）——历史账，不是验收 commit 的现状**
+**门禁现状（材料定稿树）——历史账，不是验收 commit 的现状**
+
+2026-11-15 初稿写这份包时，这几道门禁**是红的**（`check-version-claims.py` 3 项、
+`tests/test_docs.py` 5 项失败）：原因是既有报告数字/指纹/测试文件表没随源码树更新，
+不是本包引入。按项目规则不得手改数字，只能完整重测量后复跑。材料定稿那棵树上
+复跑的结果：
 
 - `ruff check .` 与 `ruff format --check .`：通过。
-- `scripts/check-doc-citations.py`：通过（226 条引用，0 漂移）。
+- `scripts/check-doc-citations.py`：通过（**0 漂移**；引用条数随材料增删变化，
+  本包不写死条数）。
 - `tests/test_docs.py::test_all_relative_links_resolve` 与
-  `tests/test_doc_citations.py`：通过（16 项）。
+  `tests/test_doc_citations.py`：通过。
 - `scripts/check-version-claims.py --base auto`：通过（0 新增；2 条历史遗留已在案）。
-- `tests/test_docs.py` 全量：**60 项全通过**，报告的测试数/文件表/指纹与当前树一致。
-- 这些门禁在编写本包时是红的（`check-version-claims.py` 3 项、`tests/test_docs.py`
-  5 项失败），原因是既有文档数字未随源码树更新，不是本包引入。按项目规则不得手改
-  数字；最终 commit 上必须完整重测量后复跑至全绿。详见 §7。
+- `tests/test_docs.py` 全量：**全部通过**（用例数随树变化，本包不写死个数——
+  以你在验收 commit 上跑出来的为准）；报告的测试数/文件表/指纹与当前树一致。
 
-> **读者怎么用这张表：** 上面的数字描述的是 2026-11-15 写本包时的那棵树，**不是**
+> **读者怎么用这张表：** 上面的状态描述的是**材料定稿那棵树**，**不是**
 > 验收 commit 的现状。v1.0.0 发版的完整重测量已在其后执行（见
 > [发版说明](../releases/v1.0.0.md)）。**以你在验收 commit 上复跑的结果为准**：
 > 上面 7 条命令应当全部以退出码 0 结束；任何一条非 0，按 §3.7 记卡点，并把
-> 实际输出原文贴进记录——不要拿本表的历史数字去判通过或不通过。
+> 实际输出原文贴进记录——不要拿本表的历史状态去判通过或不通过。
 
 
 
@@ -672,7 +676,7 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 | — | M6 层级 2 已执行但未达验收线（retest4 三轮 49/60 = 81.7%，逐轮 15/16/18） | 不能声称真实模型在冻结集上达标；首测/中间轮的 24/60、40.0% 等是过渡数字 | 以 [m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md) 为当前事实；**B1 验收线**未达，scripted 不得替代 | 未达标（B1 验收线未关闭） |
 | — | 独立验收尚未执行 | M10 未完成 | 本包就是为此准备；执行后回填 §8 | 未执行 |
 | — | `install.md` 过去写「No APK is committed」，与 `examples/` 已提交的一方 APK 矛盾 | 首次读者可能误以为必须 fetch fixtures | 已修正：install.md 现写明五个一方样例 APK 已提交于 `examples/`（各带 Smali 源码），完整案例直接用 `examples/`；第三方夹具仍走 `scripts/fetch-fixtures.sh`；见[发版检查清单 D2](v1.0.0-release-checklist.md) | 已修复并合入 |
-| — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 已在当前树复跑三项只读门禁：`check-doc-citations.py` 0 漂移、`check-version-claims.py --base auto` 0 新增 finding（2 条历史遗留已在基线内）、`pytest tests/test_docs.py` 60 passed；读者仍需在最终 commit 上自行复跑；不得手改数字，不得用部分测量刷新 | 已关闭（当前树三项全绿；复跑结果由读者记录） |
+| — | 文档门禁在编写时未全绿：`check-version-claims.py` 3 项、`tests/test_docs.py` 5 项失败 | 既有报告数字/指纹/测试文件表与当前树不一致；不能据此发布 | 已在材料定稿树复跑三项只读门禁：`check-doc-citations.py` 0 漂移、`check-version-claims.py --base auto` 0 新增 finding（2 条历史遗留已在基线内）、`pytest tests/test_docs.py` 全部通过（用例数随树变化，材料不写死个数）；读者仍需在最终 commit 上自行复跑；不得手改数字，不得用部分测量刷新 | 已关闭（材料定稿树三项全绿；复跑结果由读者记录） |
 
 ## 8. M10 退出门槛对照（当前全部未验证）
 

@@ -69,8 +69,8 @@
 
 | # | 问题 | 为什么不在这轮改 |
 |---|---|---|
-| 1 | `docs/reports/next-engagements.md:398` 与 `docs/reports/v1.0.0-release-runbook.md:389` 仍写「作者侧自检 40/40」——自助检查的自动化判定早已从 40 提到 **43**（见[自查报告](m10-selfcheck.md)） | 属于另外两份文档的数字同步，不在本轮三份交付物的范围内；改前应先确认它们指的是哪一个 40 |
-| 1b | `docs/reports/next-engagements.md:398` 还写着「填 7 处空格」——邀请函重写后是 **5 处**（抬头三项 + 落款签名 + hash 占位） | 同上；清单与邀请函本轮已改成按内容查找，不再依赖这个数字 |
+| 1 | `docs/reports/next-engagements.md:236` 与 `docs/reports/v1.0.0-release-runbook.md:389` 仍写「作者侧自检 40/40」——自助检查的自动化判定早已从 40 提到 **43**（见[自查报告](m10-selfcheck.md)） | 属于另外两份文档的数字同步，不在本轮三份交付物的范围内；改前应先确认它们指的是哪一个 40 |
+| 1b | `docs/reports/next-engagements.md:411` 还写着「填 7 处空格」——邀请函重写后是 **5 处**（抬头三项 + 落款签名 + hash 占位） | 同上；清单与邀请函本轮已改成按内容查找，不再依赖这个数字 |
 | 2 | `docs/reports/reader-dry-run.md:64` 记的是「通过 40 / 失败 0 / 需人工 40」，那是三条新判据加入**之前**的快照 | 那是**某次演练的历史记录**，改它就改掉了历史 |
 | 3 | `docs/reports/m10-number-traceability.md:62`、`:105`、`:131` 等处按行号引用邀请函的旧行号 | 同上：那是某棵基线树上的核对记录；本轮重写了邀请函，行号会漂。**注意**：这些引用**不在** `scripts/check-doc-citations.py` 的受检文档清单里，机器不会报错，但人读时会指错位置 |
 | 4 | 第三轮走查报告（`m10-reader-walkthrough-3rd.md`）里的 tag hash 与「落后 85 个提交」是那轮基线上的历史值 | 同上，那是**当时那棵树**上的取证记录 |
@@ -91,14 +91,14 @@
 | 核查 | 命令 | 实测 |
 |---|---|---|
 | tag 是附注 tag | `git cat-file -t v1.0.0` | `tag` |
-| tag 对象 | `git rev-parse v1.0.0` | `2453b7d15ccac391ac15af10fd8049edfd46f094` |
-| tag 指向的提交 | `git rev-parse "v1.0.0^{commit}"` | `b71bf309b870d92c805629b53900a4a8f9ae98db` |
+| tag 对象 | `git rev-parse v1.0.0` | 40 位 hash，**每次重打 tag 都变**——现查现填，本表不写死 |
+| tag 指向的提交 | `git rev-parse "v1.0.0^{commit}"` | 另一串 40 位 hash，**同上**；它才是填进邀请函 §2 的那一串 |
 | tag 指向的树与本轮树的关系 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- src/ tests/` | 空（代码与测量数字不受材料修正影响） |
-| 材料目录的差异 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/` | 本轮提交前只差 `docs/reports/v1.0.0-github-release-body.md`（发版正文，非 M10 材料）；**本轮这几份文档改完并提交后，差异里会多出本轮的 5 个文件**——这正是组二要处理的事：tag 必须重打到材料定稿的提交上 |
-| 案例与证据包在验收树上 | `git ls-tree -r --name-only "v1.0.0^{commit}" docs/case-studies/` | 13 个文件（4 篇 markdown + 3 个证据包 zip + 6 份报告） |
-| 凭据形状扫描 | `git grep -nEI "(api[_-]?key\|secret\|access[_-]?token\|password)\s*[:=]\s*['\"][A-Za-z0-9_\-]{12,}"` | 命中 2 处，都是第一方样例源码里的占位常量（`tests/test_search_substring_fallback.py`、`tests/test_workbench_agent.py`） |
+| M10 材料的差异 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/m10-*.md` | tag 重打到材料定稿提交后应为**空**；不为空就是「读者读到旧稿」 |
+| 案例与证据包在验收树上 | `git ls-tree -r --name-only "v1.0.0^{commit}" docs/case-studies/` | 材料定稿时是 20 个文件（4 篇 markdown + 4 个证据包 zip + 12 份报告）；**个数随附件集增删变化**，要核的是结构 |
+| 凭据形状扫描 | `git grep -nEI "(api[_-]?key\|secret\|access[_-]?token\|password)\s*[:=]\s*['\"][A-Za-z0-9_\-]{12,}"` | 命中 2 处，都是仓库内一方测试里的占位常量（`tests/test_search_substring_fallback.py`、`tests/test_workbench_agent.py`），不是真凭据 |
 | 作者侧自查 | `python scripts/m10_selfcheck.py`（本机**未装** dev extras） | `通过 42，失败 1，需人工 40`，唯一失败项 `G.vulture`（判的是 vulture 在不在 PATH/venv 里）；装齐依赖后应为 `通过 43，失败 0，需人工 40` |
-| 引用检查 | `python scripts/check-doc-citations.py` | 286 条引用、0 漂移、退出码 0 |
+| 引用检查 | `python scripts/check-doc-citations.py` | **0 漂移**、退出码 0（引用条数随材料增删变化，本表不写死条数） |
 | 版本声明检查 | `python scripts/check-version-claims.py --base auto` | 退出码 0，2 条 finding 已在基线内 |
 
 **两处未实测：** 远端 tag 状态（`git ls-remote`，本轮不联网）与本机三个后端的
@@ -127,10 +127,10 @@ available 状态（本 worktree 没有 `.scratch/env.sh`）。这两项在清单
 
 | 措辞 | 出处（示例） |
 |---|---|
-| 独立验收尚未执行 | `docs/reports/m10-acceptance-pack.md:3`、`:656`、`:673`、`:692`；`docs/reports/README.md:88` |
-| 独立验收尚未开始 | `docs/reports/m10-reader-package.md:3`；`docs/reports/m10-reader-kit.md:3`；`docs/status.md:13`、`:129`；`CHANGELOG.md:334`；`docs/reports/v1.0.0-github-release-body.md:247` |
-| 验收未执行 | `README.zh-CN.md:517` |
-| acceptance not run | `README.md:643` |
+| 独立验收尚未执行 | `docs/reports/m10-acceptance-pack.md:3`、`:660`、`:677`；`docs/reports/README.md:91` |
+| 独立验收尚未开始 | `docs/reports/m10-reader-package.md:3`；`docs/reports/m10-reader-kit.md:3`；`docs/status.md:13`、`:132`；`CHANGELOG.md:334`；`docs/reports/v1.0.0-github-release-body.md:247` |
+| 验收未执行 | `README.zh-CN.md:522` |
+| acceptance not run | `README.md:647` |
 | Independent acceptance has not started | `docs/reports/v1.0.0-github-release-body.md:155`；`docs/releases/v1.0.0.md:265` |
 | 尚未发起 | `docs/status.md:3` |
 

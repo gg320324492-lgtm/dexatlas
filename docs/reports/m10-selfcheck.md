@@ -8,8 +8,10 @@
 > 明显缺口，降低外部读者的执行负担。独立验收仍以读者亲手执行[验收记录模板](m10-review-record-template.md)
 > 的结果为准。
 >
-> 执行日期：2026年11月17日 · 运行树：`v1.0.0` 这个 tag 所指的提交（含本轮 M10 读者材料修正；
-> 读者在自己的验收 commit 上复跑时以自己的实际输出为准）
+> 执行日期：2026年11月17日 · 运行树：`v1.0.0` 这个 tag 所指的提交（发出前由发起人
+> 把 tag 重打到材料定稿的那棵树上，**这里不写死某一串 hash**——本文里的
+> `file:line` 引用只对本文所在的那棵树成立；读者在自己的验收 commit 上复跑时
+> 以自己的实际输出为准）
 
 ## 1. 脚本用法
 
@@ -57,7 +59,7 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 | `M8-1.regression` | §6.2 M8-1 | `verify_citations` 回归测试存在 |
 | `FIXTURE.precondition` | 读者实走演练 §3.2 | 装环境那一步必须抓第三方样本：不抓则 27 个集成用例 skip（退出码 0 不说明该跑的都跑了），样本数与 skip 数在读者包/工具包/摘要三处一致 |
 | `A6.on-the-spot` | 读者实走演练 §3.3 | A6 的降级证据要当场记下：CLI 没有按 run 选运行的命令、新分析替换已发布运行，材料因此要求当场抄下并说明原因 |
-| `PACKAGE.entry-count` | 读者实走演练 §3.6 | 证据包条目数：材料说的条目数 = 报告数 + `manifest.json`，CLI 打印的「N files」指清单里的报告数 |
+| `PACKAGE.entry-count` | 读者实走演练 §3.6 | 证据包条目数：材料说的数目 = 报告数 + `manifest.json`；CLI 打印的是**归档自己的文件数**（含 `manifest.json`），不是清单里的报告数 |
 
 ### 2.2 明确留人工的 40 项（脚本标「需人工」）
 
@@ -89,10 +91,17 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 - 脚本输出末行原文：
   `自动化判定：通过 43，失败 0，需人工 40；已判定项通过率 100.0%`
 
+**判据数 43 / 40 是稳定的，「通过 / 失败」的拆分不是**：脚本里有 1 项判据
+（`G.vulture`）要 `vulture` 这个可执行文件，装齐 dev extras 的环境里通过；
+在没装 dev extras 的工作树上，**只有这一项失败**，其余 42 项照过
+（末行变成「通过 42，失败 1，需人工 40；已判定项通过率 97.7%」，退出码 `1`）。
+上面这个快照来自装齐 dev extras 的机器。
+
 本轮新增的三条判据来自[读者实走演练](reader-dry-run.md)：演练真的按材料走了一遍，
 暴露出三条自查没查的事——装环境那一步不抓第三方样本就 27 个集成用例 skip
 （退出码仍是 0）；A6 要的降级证据当场记下就找不回来（CLI 没有按 run 选运行的命令，
-重跑会换掉最新一次运行）；证据包实为 4 个条目而 CLI 打印「3 files」。
+重跑会换掉最新一次运行）；证据包归档里是 4 个文件（3 份报告 + `manifest.json`），
+而 CLI 当时只打印清单里的报告数（**现已改为打印归档自己的文件数**）。
 三条判据各配一条红→绿回归测试（`tests/test_m10_selfcheck.py`）：把材料改成缺口的样子，
 判据必须判红。
 
@@ -111,8 +120,13 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 
 1. 验收包结构（40 项、19 阻断项、读者包链接）完整。
 2. 三份核心文档的相对链接全部可解析；CHANGELOG 版本与代码版本一致。
-3. README 徽章（tests 1620 / coverage 93.3%）与执行报告 `<!--fig:-->` 数字一致；
-   `tests.total = 1473 + 147` 加和成立。
+3. README 徽章与执行报告 `<!--fig:-->` 数字一致（徽章上的 tests 数 = 报告的
+   `suite.passed`，徽章上的覆盖率 = 报告的 `coverage.pct`），
+   `tests.total = tests.fast + tests.slow` 加和成立。**这些数字不在本文写死**：
+   以 [`phase1-execution-report.md`](phase1-execution-report.md) 里的
+   `<!--fig:tests.total-->`、`<!--fig:suite.passed-->`、`<!--fig:coverage.pct-->`、
+   `<!--fig:tests.fast-->`、`<!--fig:tests.slow-->` 为准——重测一次它们就换新，
+   材料跟着换，读者以自己 checkout 出来的那一份为准。
 4. F1/F3/F4/D3/D1/D5/E1/E5 的静态契约核对全部一致（退出码 **0–6**、MCP 11 工具、
    报告 10 顶层字段 + `schema_version=3`、`not_included` 三键、HTML 无外部资源、
    冻结 20 题、两套报告入口）。

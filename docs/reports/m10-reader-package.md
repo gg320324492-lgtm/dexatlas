@@ -6,9 +6,10 @@
 > **未参与实现**的读者的完整执行包：从这里出发，不需要再向作者要任何步骤。
 > 验收记录填写[验收记录模板](m10-review-record-template.md)。
 >
-> 编写日期：2026-11-16（2026-11-17 定稿）· 验收 commit：**随邀请函给出**
-> ——即 v1.0.0 发版 commit，完整 hash 写在[邀请函成稿 §2](m10-invitation-final.md)
-> 的占位符里（由发起人填好）；不要使用移动的 `main` 分支
+> 编写日期：2026-11-16（2026-11-17 定稿）· 验收对象：**`v1.0.0` 这个 tag 所指的提交**
+> ——发出前由发起人把 tag 重打到材料定稿的那棵树上，完整 hash 写在
+> [邀请函成稿 §2](m10-invitation-final.md)的占位符里（由发起人填好）；
+> **不要使用移动的 `main` 分支**
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
 > （GitHub 77.5% / Upwork 68.75%，均为作者自评，不是验收结论）。
@@ -66,7 +67,7 @@
 | `gh` CLI | 仅 fixtures 需要 | `scripts/fetch-fixtures.sh` 经 GitHub API 拉取 androguard 测试数据 |
 | 网络 | 首次需要 | clone、依赖、后端下载；装好后分析本身可离线 |
 | 磁盘 | 预留数 GB | 记录实际占用；不要写系统盘根目录 |
-| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告约 1.5–2 分钟；完整验收建议预留半天 | 暖缓存彩排实测约 1.5 分钟（Windows 11，[M8 演练](m8-install-rehearsal.md)另测 6.8 秒；[读者实走演练](reader-dry-run.md)实测冷缓存 10 分 28 秒、clone + uv sync 4 分 24 秒、重建 venv 后 8 秒纯分析） |
+| 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告**按 1.5–2 分钟预留**；完整验收建议预留半天 | **1.5–2 分钟是预算档位，不是实测值**——两处实测锚点的口径不同、都比它快：[M8 演练](m8-install-rehearsal.md)「空目录 → 第一份报告，暖缓存」**约 30 秒**（同一次**首次分析本身 6.8 秒**）；[读者实走演练](reader-dry-run.md)实测冷缓存 **10 分 28 秒**、clone + `uv sync` **4 分 24 秒**、「重建 `.venv` → 第一份报告」**8 秒**（分析本身 3.8 秒）。**做快于 30 秒不是卡点**；口径说明见 §5.4 |
 
 ## 3. 分步执行路径
 
@@ -107,9 +108,15 @@ bash scripts/fetch-fixtures.sh
 > 都写在了脚本里 ✓。**前置条件**：一台能上网的机器 + 一个**已登录的 GitHub CLI**
 > （脚本用 `gh api` 取文件 ✓，`gh auth status` 能看到已登录即可 ✓）。
 > **不抓的后果**：案例分析照常能做 ✓，但测试套件里 **27 个集成用例会 skip**
-> （实测：三后端齐备但未取样本时汇总行是 `1593 passed, 27 skipped` ✓，27 个 skip
-> 全部出自缺样本 ✓；取到之后是 `1620 passed`、`0 skipped` ✓ ——**这才是报告里记录的
-> 那次完整测量** ✓）。**退出码 0 只说明没有失败，不说明该跑的都跑了** ✓。
+> （这 27 个是 3 个样本门控测试文件里依赖第三方 APK 的用例，静态可数；
+> 三后端齐备但未取样本时，那 27 个 skip 的原因全部是
+> `fixture not present; run scripts/fetch-fixtures.sh` ✓；取到之后套件**零 skip**
+> ✓ ——**那才是报告里记录的那次完整测量** ✓）。
+> **退出码 0 只说明没有失败，不说明该跑的都跑了** ✓。
+> 套件总数与「快 / 集成」的拆分以
+> [执行报告](phase1-execution-report.md) 的 `<!--fig:tests.total-->`、
+> `<!--fig:tests.fast-->`、`<!--fig:tests.slow-->` 为准（重测一次换一次新，
+> 材料不写死数字）——你只需核对**自己的汇总行里 `skipped` 是不是 0**。
 
 > **M8-3（历史问题，已修复并合入）：** [install.md](../install.md) 的安装节过去
 > 把最小安装（`uv venv` + `uv pip install -e ".[analysis]"`，不含 `mcp` 与
@@ -245,8 +252,12 @@ uv run --no-sync python -c \
 `citations_resolved` 为 `True`，`citations_unresolved` 为空。
 
 > **包里有几个文件**：zip 内是 **4 个条目** —— 3 份报告（`report.md` /
-> `report.json` / `report.html`）加一份 `manifest.json`。CLI 打印的「3 files」指的是
-> 那 3 份报告 ✓（清单在 `manifest.json` 里 ✓）——不是少了一个文件 ✓。
+> `report.json` / `report.html`）加一份 `manifest.json`。CLI 打印的「4 files」指的是
+> **归档自己的文件数** —— 完整输出形如 `4 files: 3 reports + 1 manifest` ✓，
+> 说的是 zip 里打开能看到的数，**不是** `manifest.json` 里 `files` 清单的长度
+> （清单里没有 `manifest.json` 自己：文件不能给自己算哈希 ✓）。
+> 所以你数 zip 得到 4、CLI 也说 4 —— 一致 ✓；若只数 manifest 的清单会得到 3，
+> 那是少算了一个 ✓。
 
 **迁移复验（C6）**：把 `evidence.zip` 复制到另一个目录（或另一台机器）再跑一次
 校验，仍应通过；包内路径不得指向生成它的机器。
@@ -442,10 +453,13 @@ uv run --no-sync python -c \
 
 ### 5.4 时间参考
 
-- 到第一份报告：首次 10–20 分钟（含下载），暖缓存约 1.5–2 分钟。
-  （[M8 演练](m8-install-rehearsal.md)在已就绪的会话工作树上实测约 30 秒；
-  [读者实走演练](reader-dry-run.md)在重建 venv 后实测 **8 秒**——两个口径是**不同场景**，
-  以你自己的实测为准，明显超出预期按 §5.2 记卡点。）
+- 到第一份报告：首次 10–20 分钟（含下载）；暖缓存**按 1.5–2 分钟预留**——
+  **这是预算档位，不是实测值**。
+  两处实测锚点的口径不同、都比它快：[M8 演练](m8-install-rehearsal.md)「空目录 →
+  第一份报告，暖缓存」**约 30 秒**（同一次**首次分析本身 6.8 秒**）；
+  [读者实走演练](reader-dry-run.md)「重建 `.venv` → 第一份报告」**8 秒**
+  （分析本身 3.8 秒）——**做快于 30 秒不是卡点**，以你自己的实测为准；
+  明显超出预期按 §5.2 记卡点。
 - clone + uv sync：约 4 分 30 秒（[读者实走演练](reader-dry-run.md)实测 4 分 24 秒）。
 - Docker 镜像构建：首次约 15–20 分钟（无本地层缓存时的实测；见 §3.2 路线 B 的两个数）。
 - 完整案例（analyze 到 xrefs）：约 1–2 分钟。

@@ -8,7 +8,9 @@
 >
 > 编写日期：2026-11-17 · 验收对象：**`v1.0.0` 这个 tag 所指的提交**——完整 hash 写在
 > [邀请函成稿 §2](m10-invitation-final.md)的占位符里，由验收发起人填好后随函给你；
-> 你 `git checkout v1.0.0` 拿到的就是含本轮全部修正的那棵树 · 判定依据：[验收准备包](m10-acceptance-pack.md)
+> 发出前发起人会把 tag 重打到材料定稿的那棵树上，所以**你 `git checkout v1.0.0`
+> 拿到的就是材料定稿的那棵树**（用 `git rev-parse v1.0.0^{commit}` 与邀请函里的
+> 那一串逐字比对）· 判定依据：[验收准备包](m10-acceptance-pack.md)
 > · 评分基线：[准备度评估](portfolio-readiness-2026-11-15.md)
 
 ## 0. 先读这三条
@@ -23,7 +25,7 @@
    窄验证转通过 3/6，未达 ≥4 的判据（`docs/benchmarks/m6-level2-narrow-verify3.md:61`）。
    项目已按既定方案停止追加修复轮，把 Agent 服务定稿为**现状披露**——
    「有界、证据可核查的 agent 演练」，不宣称达到验收线。这是读者应当重点核对的
-   高风险声明之一（`docs/reports/m10-reader-package.md:261`）。
+   高风险声明之一（`docs/reports/m10-reader-package.md:317`）。
 
 ## 1. 你的路径
 
@@ -119,13 +121,13 @@
 | 独立使用验证 | 5% / 10% | **就是您这一份记录**：有没有未参与实现的读者复现并留痕 | 可见记录主要是项目自身演练与评审，未见独立读者复现及客户式验收记录；不推断项目没有外部用户 |
 
 > 权重一列按准备包原表抄写：GitHub 30/20/10/10/25/5
-> （`docs/reports/m10-acceptance-pack.md:476`–`:481`）、Upwork 20/15/15/25/15/10
-> （`docs/reports/m10-acceptance-pack.md:490`–`:495`）。
+> （`docs/reports/m10-acceptance-pack.md:477`–`:482`）、Upwork 20/15/15/25/15/10
+> （`docs/reports/m10-acceptance-pack.md:491`–`:496`）。
 
 ### 2.6 总评与一句话结论
 
 打分只依据**您自己的验收记录**。引用作者报告的数字时，注明「作者自述，未独立复现」，
-或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:73`、`:348`）。
+或附上您复现的命令与退出码（`docs/reports/m10-reader-package.md:74`、`:443`）。
 
 ```text
 GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
@@ -178,10 +180,10 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 | 事项 | 预期 | 说明 |
 |---|---|---|
 | 首次复现（冷缓存：clone + 依赖 + 后端下载） | **10–20 分钟** | 首次需要网络；装好后分析本身可离线 |
-| 抓第三方集成样本 | 一次网络请求 | `bash scripts/fetch-fixtures.sh`；**不抓则 27 个集成用例 skip**（实测 `1593 passed, 27 skipped`），取到后是 `1620 passed` / `0 skipped` |
-| 暖缓存到第一份报告 | 约 1.5–2 分钟 | M8 演练另测 6.8 秒纯分析；另一次在**已就绪的会话工作树**上实测约 30 秒，见 [M8 演练](m8-install-rehearsal.md) |
+| 抓第三方集成样本 | 一次网络请求 | `bash scripts/fetch-fixtures.sh`（**两个**第三方 APK：`TestActivity.apk`、`multidex.apk`，均取自 androguard 的 Apache-2.0 测试数据）；**不抓则 27 个集成用例 skip**（这 27 个是 3 个样本门控测试文件里依赖第三方 APK 的用例，静态可数），取到后套件**零 skip** |
+| 暖缓存到第一份报告 | 材料按 **1.5–2 分钟** 预留 | **这是预算档位，不是实测值。**两处实测锚点口径不同、都比它快：[M8 演练](m8-install-rehearsal.md)「空目录 → 第一份报告，暖缓存」**约 30 秒**（同一次**首次分析本身 6.8 秒**）；[读者实走演练](reader-dry-run.md)「重建 `.venv` → 第一份报告」**8 秒**（分析本身 3.8 秒）。**做快于 30 秒不是卡点** |
 | 一个完整案例 | 1–2 分钟 | Docker 路线另加约 2 分钟 |
-| 完整验收（含 40 项判定与评分） | 建议预留半天 | 时间口径见 `docs/reports/m10-reader-package.md:69` |
+| 完整验收（含 40 项判定与评分） | 建议预留半天 | 时间口径见 `docs/reports/m10-reader-package.md:70` |
 
 慢不一定是卡点：后端下载、JDK 首次安装、首次依赖安装都是一次性开销。把**每一步**
 的耗时记下来，读者包要求的是分步耗时，不只是总耗时（验收项 A7）。
@@ -194,7 +196,7 @@ GitHub 总分：____%    Upwork 总分：____%    （各保留一位小数）
 | 命令报错了、文档缺步骤 | 验收发起人 | 附完整命令、退出码、原始输出、你期望的依据 → 走 §3 卡点 |
 | 判定有争议 | 验收发起人 | 把两种判法和各自依据都写进记录，不要口头结论了事 |
 | 确认是产品缺陷 | 验收发起人 → 作者 | 缺陷由作者修复；**修复后取新 commit 并复验受影响项** |
-| 只在 macOS 上、或环境实在装不上 | 验收发起人 | macOS 未验证，如实记录即可（`docs/reports/m10-reader-package.md:61`） |
+| 只在 macOS 上、或环境实在装不上 | 验收发起人 | macOS 未验证，如实记录即可（`docs/reports/m10-reader-package.md:62`） |
 
 **边界**：发起人可以解释名词和意图，不能替您补一条文档里没有的命令、改您的环境或
 远程操作您的机器。凡是靠口头补充才走通的步骤，相关验收项判不通过
@@ -264,7 +266,7 @@ uv run --no-sync python -c \
 
 预期：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定），
 `citations_resolved` 为 `True`、`citations_unresolved` 为空
-（`docs/reports/m10-reader-package.md:209`）。再把包复制到另一个目录或另一台机器复验一次
+（`docs/reports/m10-reader-package.md:251`）。再把包复制到另一个目录或另一台机器复验一次
 （验收项 C6），并解压对照 `manifest.json` 的 `not_included` 声明，确认包里没有 APK、
 全量源码和未被证据引用的字符串（验收项 D3、G5）。
 
@@ -277,10 +279,10 @@ uv run --no-sync python -c \
 - 层级 1 scripted 成绩——那是替身模型，只证明管线端到端可用，不是模型能力基线
   （`docs/benchmarks/m6-level1-scripted.md`）；
 - 测试与覆盖率数字——以你本机 `uv run --no-sync pytest -q` 的实际结果为准
-  （`docs/reports/m10-reader-package.md:337`）；
+  （`docs/reports/m10-reader-package.md:394`）；
 - 已知限制只剩 macOS 未验证（M8-2、M8-3 已修复并合入）；M8-4（三个后端全部失败时
   退出码仍为 0）已在 v1.0.0 由新退出码 6（`EXIT_NO_INDEX`）关闭
-  （`docs/reports/m10-reader-package.md:318`）；
+  （`docs/reports/m10-reader-package.md:369`）；
 - 准备度评估与复评里的 75%/65% 与 77.5%/68.75%——**作者自评**，不是成绩。
   两组数字用的是同一组维度与权重：75%/65% 是[准备度评估](portfolio-readiness-2026-11-15.md)
   的基线，77.5%/68.75% 是同一基线上的自评更新。**你的重评请与 75%/65% 这一档
@@ -306,7 +308,7 @@ uv run --no-sync python -c \
 
 不能。[作者自查记录](m10-selfcheck.md) 覆盖的是文档、徽章、契约清单这类自动化项，
 **不替代你的任何一项判定**，需人工的项仍要你亲手执行并记录
-（`docs/reports/m10-reader-package.md:434`–`:435`）。
+（`docs/reports/m10-reader-package.md:491`）。
 注意：那份自查记录是**它自己那一次执行时的快照**（记录里写明了当时的日期与
 commit），不是验收 commit 的现状；数字对不上时以你的实测为准，按 §3 记卡点。
 
@@ -317,16 +319,20 @@ commit），不是验收 commit 的现状；数字对不上时以你的实测为
 > 两边下判断。模型生成的文字只能落在 `lead` 或 `insufficient`，永远不能落成
 > `verified`。判定口径以验收准备包与 `benchmarks/model.py` 的 `check()` 为准。
 
-所有数字均抄自仓库落盘文件，未手改；行号指向引用时所在的那棵树——即
-`v1.0.0` 这个 tag 所指的提交（见[邀请函成稿 §2](m10-invitation-final.md)）。
+所有数字均抄自仓库落盘文件，未手改；行号指向**本文所在的那棵树**——发出前
+发起人会把 `v1.0.0` 重打到材料定稿的那棵树上，所以「本文所在的树」就是
+`v1.0.0` 所指的提交（见[邀请函成稿 §2](m10-invitation-final.md)）。
+本文里的 `file:line` 引用是否仍然指对，用
+`uv run --no-sync python scripts/check-doc-citations.py` 一条命令就能核；
+它报「0 漂移」时，本文与准备包的引用与当前树一致。
 
 | 数字 | 出处 | 说明 |
 |---|---|---|
 | 40 个验收项、7 组 | `docs/reports/m10-acceptance-pack.md:27` | A–G 七组 |
 | 19 个 ★ 阻断项 | `docs/reports/m10-acceptance-pack.md:173` | 清单同处 |
-| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:457` | §5.1 原文表 |
-| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:476`–`:481` | §5.2 原文表 |
-| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:490`–`:495` | §5.3 原文表 |
+| 0–4 分定义 | `docs/reports/m10-acceptance-pack.md:460` | §5.1 原文表 |
+| GitHub 权重 30/20/10/10/25/5 | `docs/reports/m10-acceptance-pack.md:477`–`:482` | §5.2 原文表 |
+| Upwork 权重 20/15/15/25/15/10 | `docs/reports/m10-acceptance-pack.md:491`–`:496` | §5.3 原文表 |
 | 基线 GitHub 约 75% / Upwork 约 65% | `docs/reports/portfolio-readiness-2026-11-15.md:28` | 人工基线，不是接单概率 |
 | 目标 90%（两平台分别） | `docs/reports/m10-acceptance-pack.md:501` | 门槛，不是预测 |
 | M6 三轮合计 49/60 = 81.7% | `docs/benchmarks/m6-level2-retest4.md:38` | 脚本重算生成 |
