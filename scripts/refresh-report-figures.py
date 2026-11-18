@@ -292,10 +292,20 @@ def collected_tests(marker: str) -> tuple[int, int]:
 
 
 def outcome_counts(output: str) -> dict[str, int]:
-    """Read pytest's final summary: how many tests passed, skipped, xfailed."""
+    """Read pytest's final summary: how many tests passed, skipped, xfailed.
+
+    Only pytest's own summary line -- the one between the ``=`` rules -- is
+    read, never the whole output. A coverage or warning block elsewhere in
+    the output can carry the same words ("16 skipped"), and a count read from
+    there is a count of a different run: one measurement added such a stray
+    to its own numbers and then could not account for the tree it had just
+    measured.
+    """
     counts: dict[str, int] = {}
+    summaries = re.findall(r"=+\s*(.*?)\s*=+", output)
+    summary = summaries[-1] if summaries else output
     for name in OUTCOMES:
-        found = re.findall(rf"(\d+) {name}s?\b", output)
+        found = re.findall(rf"(\d+) {name}s?\b", summary)
         counts[name] = int(found[-1]) if found else 0
     return counts
 
@@ -546,16 +556,21 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
 
     The candidate is written to a temporary file and the checks are pointed at
     it, so a check never sees the report half-refreshed and the report on disk
-    is only ever replaced whole. The coverage of this run is appended to the
-    coverage of the code tests, so the figures describe the whole suite.
+    is only ever replaced whole. The coverage data file is private to this run
+    and thrown away with the directory afterwards: these rounds exist to learn
+    which of the self-checks pass, not to add coverage, and appending to the
+    shared file made the merged coverage grow every round -- a measurement
+    that could never settle, because the numbers one round wrote changed the
+    numbers the next round read.
     """
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / report_path.name
         path.write_text(candidate, encoding="utf-8")
         env = measurement_env()
+        env["COVERAGE_FILE"] = str(Path(directory) / ".coverage")
         env[REPORT_PATH_ENV] = str(path)
         return measure_tests(
-            ["--cov=dexatlas", "--cov-append", "-k", REPORT_CHECK],
+            ["--cov=dexatlas", "-k", REPORT_CHECK],
             env=env,
         )
 
@@ -567,7 +582,8 @@ def measure_status_checks(
 
     The status page states the same figures as the report, so its checks are
     measured against both candidates: a page that has fallen out of step with
-    the report is exactly what they are there to notice.
+    the report is exactly what they are there to notice. The coverage data
+    file is private to this run, for the same reason the report checks' is.
     """
     with tempfile.TemporaryDirectory() as directory:
         report_copy = Path(directory) / report_path.name
@@ -575,10 +591,11 @@ def measure_status_checks(
         report_copy.write_text(report_candidate, encoding="utf-8")
         status_copy.write_text(status_candidate, encoding="utf-8")
         env = measurement_env()
+        env["COVERAGE_FILE"] = str(Path(directory) / ".coverage")
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
         return measure_tests(
-            ["--cov=dexatlas", "--cov-append", "-k", STATUS_CHECK],
+            ["--cov=dexatlas", "-k", STATUS_CHECK],
             env=env,
         )
 
