@@ -38,6 +38,7 @@ from dexatlas.core.models import (
     Provenance,
     Sourced,
     ToolError,
+    ToolErrorCode,
 )
 
 #: References listed in evidence detail before truncating.
@@ -51,6 +52,37 @@ MAX_LISTED_CALLERS = 50
 #: how many it left out. This limit is what keeps the findings from being
 #: drowned by index data; it is not a promise that they all fit.
 MAX_EVIDENCE_CALLED_METHODS = 100
+
+#: The codes that mean the tool was never run at all. A record about one of
+#: them says nothing about output, because there was none — and a reader told
+#: only "it did not complete" would have to wonder whether some output had
+#: been withheld.
+NEVER_RAN_CODES = frozenset({ToolErrorCode.NOT_INSTALLED, ToolErrorCode.UNSUPPORTED})
+
+
+def _failure_summary(error: ToolError) -> str:
+    """The wording of the record a backend failure produces.
+
+    The record is about *this step of this run*, and the wording has to keep
+    it about that. A backend that was stopped part-way through had already
+    handed over what it had produced, and that output is recorded in its own
+    right; a wording that only says the tool "did not complete" reads as
+    "this tool produced nothing", and then stands next to another record
+    about the same backend saying the opposite. The two do not contradict each
+    other — one is about the step, the other about the output it had
+    delivered — but a reader drawing both cannot see that, and concludes the
+    evidence chain is broken.
+
+    A backend that never ran at all is the other case, and there the honest
+    sentence is the opposite one: there was no output to withhold.
+    """
+    head = f"{error.tool} did not complete in this run: {error.message}"
+    if error.code in NEVER_RAN_CODES:
+        return f"{head}. It never ran, so it produced nothing."
+    return (
+        f"{head}. It stopped part-way: what it had produced before it stopped "
+        f"is recorded separately, not withheld."
+    )
 
 
 class InvalidProvenanceError(ValueError):
@@ -283,11 +315,17 @@ class EvidenceBuilder:
         return self.add(kind, level, summary, source.provenance, detail)
 
     def add_error(self, error: ToolError) -> Evidence:
-        """A backend failure is itself evidence — it is why a result may be missing."""
+        """A backend failure is itself evidence — it is why a result may be missing.
+
+        The wording says which step it is about, and says whether the tool
+        produced anything: a step that was stopped part-way had already
+        handed over what it produced, and the record must not read as though
+        that output had been withheld. See :func:`_failure_summary`.
+        """
         return self.add(
             kind=EvidenceKind.OBSERVATION,
             level=EvidenceLevel.VERIFIED,
-            summary=f"{error.tool} did not complete: {error.message}",
+            summary=_failure_summary(error),
             provenance=[
                 Provenance(
                     tool=error.tool,

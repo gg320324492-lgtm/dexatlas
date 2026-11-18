@@ -522,14 +522,14 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 
 1. **类数从 5 掉到 4。** 少掉的那个是 `com.example.demo.R`——它**只存在于 JADX 的输出里**，
    DEX 里没有这个类（见 5.2）。
-2. **缺后端会变成一条证据**（`core/evidence.py:285-300` 的 `add_error`）：
+2. **缺后端会变成一条证据**（`core/evidence.py:317-332` 的 `add_error`）：
 
 ```json
 {
   "id": "E-0010",
   "kind": "observation",
   "level": "verified",
-  "summary": "jadx did not complete: jadx is not installed or not on PATH",
+  "summary": "jadx did not complete in this run: jadx is not installed or not on PATH. It never ran, so it produced nothing.",
   "provenance": [
     {"tool": "jadx", "tool_version": null,
      "apk_sha256": "80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9",
@@ -946,7 +946,7 @@ com.example.demo.SyncService class
 
 - **`lead` 和 `insufficient` 两个证据等级在 Phase 1 一次都不会出现。**
   管道里所有证据都是显式传 `EvidenceLevel.VERIFIED` 的
-  （`core/evidence.py:289`、`122`、`139`、`173`，`core/pipeline.py:520`、`573`、`1287`、`1324`）。
+  （`core/evidence.py:327`、`157`、`171`、`205`，`core/pipeline.py:520`、`573`、`1287`、`1324`）。
   这两个等级是给 Phase 2 的模型输出准备的。
 
 - **原生库（`.so`）只被统计，不被分析。** `ApkMetadata.native_libraries`
@@ -1083,7 +1083,7 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 报告里看不到「谁调用了什么」这一层，只能在索引里查。
 
 **现在的行为：** 管道会为**这个 APK 自己的、被调用过的方法**各记一条证据
-（`core/pipeline.py:670` 调用 `core/evidence.py:414-443` 的
+（`core/pipeline.py:670` 调用 `core/evidence.py:452-481` 的
 `add_cross_references`）。粒度是**被调用的方法**，不是「调用」：
 一个被五十处调用的方法是**一条**结论。调用库代码（`java.lang.StringBuilder.append`）
 **不产生记录**——那是关于 JDK 的事实，不是关于这个应用的结论；
@@ -1098,7 +1098,7 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 
 ### 6.5 「已导出组件」这条证据的 `tool_version` 是 `null`（已修）
 
-**当时的现象：** `core/evidence.py:340-366` 的 `add_exported_components` 硬编码了
+**当时的现象：** `core/evidence.py:378-404` 的 `add_exported_components` 硬编码了
 `tool_version=None`，**即使 apktool 的版本是已知的**。对比同一份报告里 manifest 那条证据：
 
 ```console
@@ -1132,7 +1132,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 | `E-0001` Package com.example.demo (...) | `apktool 2.11.1 -> apktool:AndroidManifest.xml` |
 | `E-0002` 2 component(s) are explicitly exported | `apktool 2.11.1 -> apktool:AndroidManifest.xml#/application` |
 
-**后端失败那条证据也一样**（`core/evidence.py:285-300` 的 `add_error`）：它以前也硬编码
+**后端失败那条证据也一样**（`core/evidence.py:317-332` 的 `add_error`）：它以前也硬编码
 `tool_version=None`，现在写的是**失败的那个工具**的版本——
 「jadx 1.5.2 超时」比「jadx 超时」有用得多。
 
