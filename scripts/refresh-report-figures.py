@@ -82,7 +82,7 @@ import tarfile
 import tempfile
 import xml.etree.ElementTree as ET
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.util import find_spec
 from pathlib import Path
 from typing import IO, Any
@@ -230,6 +230,27 @@ HISTORY_TAGS = ("v0.1.0", "v0.1.1", "v0.1.2", "v0.1.3")
 #: ``<!--fig:key-->value<!--/fig-->`` — everything between the markers is generated.
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
 
+#: A fenced code block. The figures inside one are examples of what a figure
+#: marker looks like — the page that teaches the reader what ``<!--fig:...-->``
+#: is — and not numbers the script has to fill in.
+CODE_BLOCK = re.compile(r"```.*?```|~~~.*?~~~", re.DOTALL)
+
+#: An inline code span: the same thing, said in a sentence.
+INLINE_CODE = re.compile(r"`[^`\n]*`")
+
+#: The documents the script does not write its figures into, and why.
+#:
+#: A release note states what a past release measured: it is a historical
+#: record, and a script that rewrote it would change what it says happened.
+#: The outward material is written for other platforms; its numbers are
+#: checked against the measurement by ``scripts/check-version-claims.py``,
+#: not filled in by it. Everything else that carries a generated figure is
+#: written by this script.
+FIGURE_EXCLUSIONS = (
+    REPO_ROOT / "docs" / "releases",
+    REPO_ROOT / "docs" / "outreach",
+)
+
 #: ``<!--report-figures:{...}-->`` — the machine-readable record of the measurement.
 RECORD = re.compile(r"<!--report-figures:(.*?)-->", re.DOTALL)
 
@@ -316,6 +337,11 @@ class Coverage:
     statements: int
     missing: int
 
+    def describe(self) -> str:
+        """The coverage, in a sentence."""
+        covered = self.statements - self.missing
+        return f"{percent(covered, self.statements)} of {self.statements} statements"
+
 
 @dataclass(frozen=True)
 class Refresh:
@@ -328,6 +354,62 @@ class Refresh:
     rounds: int
     status_text: str | None = None
     status_checks: Outcome = Outcome(counts={})
+
+
+class SummaryUnreadable(Exception):
+    """A run whose summary line could not be read.
+
+    pytest prints its counts in one line, between two rules of ``=``. A run
+    that does not have that line has not said how many tests passed, and a
+    count read as zero says something else entirely: it says the suite ran
+    nothing. That is a fact, and a false one — a run that could not read the
+    line is not a run that measured zero.
+
+    So the run stops here, and says what it did and did not measure. A number
+    that was not measured is not a number of zero, and a reader who is told
+    "zero" goes looking for a broken suite instead of a broken reader.
+    """
+
+    def __init__(self, what: str, output: str) -> None:
+        self.what = what
+        self.output = output
+        super().__init__(f"pytest's summary line could not be read out of {what}")
+
+
+@dataclass
+class Ledger:
+    """What this run measured, and what it did not.
+
+    A run that stops half way has still established some facts: the tree it
+    measured, the tests it collected. Saying which is the difference between
+    "the measurement failed" and "the measurement never ran", and the reader
+    needs the difference: a fact that was not established is not a fact of
+    zero.
+    """
+
+    #: (what the fact is, what it turned out to be); the value is ``None``
+    #: until the run reaches it.
+    facts: list[tuple[str, str | None]] = field(default_factory=list)
+
+    def expect(self, what: str) -> None:
+        """Declare a fact the run is about to establish."""
+        self.facts.append((what, None))
+
+    def note(self, what: str, value: str) -> None:
+        """Record what a fact turned out to be."""
+        for index, (name, _) in enumerate(self.facts):
+            if name == what:
+                self.facts[index] = (what, value)
+                return
+        self.facts.append((what, value))
+
+    def measured(self) -> list[str]:
+        """The facts the run established."""
+        return [f"{what}: {value}" for what, value in self.facts if value is not None]
+
+    def missing(self) -> list[str]:
+        """The facts the run did not reach."""
+        return [what for what, value in self.facts if value is None]
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -377,7 +459,7 @@ def collected_tests(marker: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2) or match.group(1))
 
 
-def outcome_counts(output: str) -> dict[str, int]:
+def outcome_counts(output: str, what: str = "the run's output") -> dict[str, int]:
     r"""Read pytest's final summary: how many tests passed, skipped, xfailed.
 
     Only pytest's own summary line -- the one between the ``=`` rules -- is
@@ -396,12 +478,20 @@ def outcome_counts(output: str) -> dict[str, int]:
     is only there when a test failed is exactly the case that hid this: locally
     every self-check passed, on the runner one failed, and only there did the run
     print an ``assert`` line.
+
+    And when there is no summary line at all, the counts are not read as zero.
+    Zero is a measurement -- "the suite ran nothing" -- and a run whose line
+    cannot be found measured nothing of the kind: reading it as zero publishes
+    a number that describes a suite that does not exist. So the run stops, and
+    says what it measured and what it did not.
     """
     counts: dict[str, int] = {}
     summaries = [
         text for text in re.findall(r"=+[^\S\n]*([^\n]*?)[^\S\n]*=+", output) if text.strip()
     ]
-    summary = summaries[-1] if summaries else output
+    if not summaries:
+        raise SummaryUnreadable(what, output)
+    summary = summaries[-1]
     for name in OUTCOMES:
         found = re.findall(rf"(\d+) {name}s?\b", summary)
         counts[name] = int(found[-1]) if found else 0
@@ -422,9 +512,9 @@ def failed_tests(output: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(failures))
 
 
-def read_outcome(output: str) -> Outcome:
+def read_outcome(output: str, what: str = "the run's output") -> Outcome:
     """Read a pytest run's summary: the counts and the names that failed."""
-    return Outcome(counts=outcome_counts(output), failures=failed_tests(output))
+    return Outcome(counts=outcome_counts(output, what), failures=failed_tests(output))
 
 
 def discard_stale_coverage() -> None:
@@ -596,7 +686,11 @@ def read_junit_outcomes(path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
 
 
 def measure_tests(
-    args: list[str], env: dict[str, str] | None = None, *, full_command: bool = False
+    args: list[str],
+    env: dict[str, str] | None = None,
+    *,
+    full_command: bool = False,
+    what: str = "the suite",
 ) -> Outcome:
     """Run a set of tests and read both what they said and which ones sat out.
 
@@ -605,13 +699,17 @@ def measure_tests(
     arguments of a ``pytest`` invocation; ``full_command`` says that they are
     already a whole command — the ``coverage run -m pytest`` form the
     subprocess-aware measurement uses — and are to run as they stand.
+
+    ``what`` names the run in the message that says the summary line could
+    not be read: a reader who is told "the suite" can guess what went wrong,
+    a reader who is told "the report's self-checks" can go and look.
     """
     command = args if full_command else [sys.executable, "-m", "pytest", *args]
     with tempfile.TemporaryDirectory() as directory:
         junit = Path(directory) / "outcomes.xml"
         result = run(*command, f"--junitxml={junit}", env=env)
         skipped, xfailed = read_junit_outcomes(junit)
-    outcome = read_outcome(result.stdout)
+    outcome = read_outcome(result.stdout, what)
     return Outcome(
         counts=outcome.counts,
         failures=outcome.failures,
@@ -669,6 +767,7 @@ def measure_code_tests() -> Outcome:
         ],
         env=env,
         full_command=True,
+        what="the suite",
     )
     run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}", env=measurement_env())
     return outcome
@@ -697,6 +796,7 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
         return measure_tests(
             ["--cov=dexatlas", "-k", REPORT_CHECK],
             env=env,
+            what="the report's self-checks",
         )
 
 
@@ -723,6 +823,7 @@ def measure_status_checks(
         return measure_tests(
             ["--cov=dexatlas", "-k", STATUS_CHECK],
             env=env,
+            what="the status page's self-checks",
         )
 
 
@@ -1049,6 +1150,74 @@ def apply_figures(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
         return f"<!--fig:{key}-->{values[key]}<!--/fig-->"
 
     return FIGURE.sub(replace, text), unknown
+
+
+def live_figures(text: str) -> list[str]:
+    """The figures a document really carries.
+
+    A marker inside a code block shows the reader what a marker looks like,
+    and a marker inside inline code says the same thing in a sentence. Neither
+    is a number to fill in, and rewriting one would turn an illustration into
+    a measurement nobody asked for.
+    """
+    outside = INLINE_CODE.sub("", CODE_BLOCK.sub("", text))
+    return [key for key, _ in FIGURE.findall(outside)]
+
+
+def markdown_documents(root: Path) -> list[Path]:
+    """The documents in the repository: the pages under ``docs/`` and the root.
+
+    The working state (``.scratch/``) and the version control metadata are
+    not documents, and a plain ``rglob`` would walk into both of them.
+    """
+    found = sorted(root.glob("*.md"))
+    docs = root / "docs"
+    if docs.is_dir():
+        found.extend(sorted(docs.rglob("*.md")))
+    return found
+
+
+def excluded_from_writing(path: Path) -> bool:
+    """Is this a document the script must not write its figures into?"""
+    return any(excluded in path.parents for excluded in FIGURE_EXCLUSIONS)
+
+
+def documents_with_figures(root: Path) -> list[Path]:
+    """The documents that carry generated figures, and that the script may write.
+
+    Every document is looked at and the ones that carry a figure marker are
+    found. The script writes them all from the one measurement, so a page
+    that states a number does not have to be remembered when the number
+    changes: the marker is the whole of the registration.
+    """
+    found: list[Path] = []
+    for path in markdown_documents(root):
+        if excluded_from_writing(path):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        if live_figures(text):
+            found.append(path)
+    return found
+
+
+def write_figures(path: Path, values: dict[str, str]) -> str:
+    """Write the measured figures into a document, or refuse to guess.
+
+    A figure this script does not know how to fill in is a figure nobody can
+    check, and guessing at one would put a number in the page that nothing
+    stands behind. Better to stop and say which one it is.
+    """
+    text = path.read_text(encoding="utf-8")
+    updated, unknown = apply_figures(text, values)
+    if unknown:
+        raise SystemExit(
+            f"{display_path(path)} refers to figures this script does not know how to fill in: "
+            + ", ".join(sorted(set(unknown)))
+        )
+    return updated
 
 
 #: The badge of the test count: ``.../badge/tests-444%20passing-brightgreen.svg``.
@@ -1404,13 +1573,12 @@ def converge(
     )
 
 
-def figure_changes(text: str, record: dict[str, Any]) -> list[tuple[str, str, str]]:
-    """The figures the report states that a fresh measurement would change.
+def figure_changes(text: str, values: dict[str, str]) -> list[tuple[str, str, str]]:
+    """The figures a document states that a fresh measurement would change.
 
     One line per figure, not per occurrence: the same figure is stated in
     several places, and the reader wants to know which ones moved.
     """
-    values = render_figures(record)
     changes: list[tuple[str, str, str]] = []
     seen: set[str] = set()
     for key, old in FIGURE.findall(text):
@@ -1426,6 +1594,40 @@ def report_failures(headline: str, failures: tuple[str, ...]) -> None:
     print(f"\n{headline}")
     for failure in failures:
         print(f"  {failure}")
+
+
+def abort(failure: SummaryUnreadable, ledger: Ledger) -> int:
+    """Say what the run measured and what it did not, and stop.
+
+    A measurement that could not be taken is not a measurement of zero, and a
+    reader who is told "zero" goes looking for a broken suite instead of a
+    broken reader. So the run says which of its facts it established and
+    which it did not, and leaves the report as it was: a report that still
+    describes the tree it was measured on is worth more than a report that
+    describes a run that never happened.
+    """
+    print()
+    print(f"pytest's summary line could not be read out of {failure.what}.")
+    print("A count read as zero would say that no test ran at all, which is not what happened.")
+    measured = ledger.measured()
+    missing = ledger.missing()
+    if measured:
+        print("\nWhat this run measured:")
+        for line in measured:
+            print(f"  - {line}")
+    if missing:
+        print("\nWhat this run did not measure:")
+        for line in missing:
+            print(f"  - {line}")
+    tail = failure.output.splitlines()[-15:]
+    if tail:
+        print("\nThe last lines of the output:")
+        for line in tail:
+            print(f"  {line}")
+    print(
+        "\nNothing was written. The report still carries the figures of the previous measurement."
+    )
+    return 1
 
 
 def display_path(path: Path) -> str:
@@ -1487,11 +1689,23 @@ def main(argv: list[str] | None = None) -> int:
 
     previous = read_record(text)
 
+    # What this run establishes, in the order it establishes it. A run that
+    # stops half way has still established some of these, and a number that
+    # was not measured is not a number of zero: the ledger is what lets the
+    # run say which is which.
+    ledger = Ledger()
+    ledger.expect("the fingerprint of the tree")
+    ledger.expect("the tests the suite collects")
+    ledger.expect("how many tests passed, failed, skipped or xfailed")
+    ledger.expect("which tests skipped or xfailed")
+    ledger.expect("the coverage of the tree")
+
     # The report's figures describe one tree. A tree that has changed since
     # they were measured makes them stale, whether or not this machine can
     # measure the new one.
     previous_fingerprint = previous.get("source_fingerprint")
     current_fingerprint = source_fingerprint()
+    ledger.note("the fingerprint of the tree", current_fingerprint)
     tree_changed = bool(previous_fingerprint) and previous_fingerprint != current_fingerprint
     if tree_changed:
         print(
@@ -1525,6 +1739,7 @@ def main(argv: list[str] | None = None) -> int:
     fast, total = collected_tests("not slow")
     slow, _ = collected_tests("slow")
     print(f"  {total} tests: {fast} fast, {slow} integration")
+    ledger.note("the tests the suite collects", f"{total} ({fast} fast, {slow} integration)")
 
     print("Measuring the test counts of the released versions...")
     history = history_figures(text, previous)
@@ -1548,8 +1763,17 @@ def main(argv: list[str] | None = None) -> int:
         atexit.register(slot.close)
     discard_stale_coverage()
     discard_stale_measurement_data()
-    code = measure_code_tests()
+    try:
+        code = measure_code_tests()
+    except SummaryUnreadable as failure:
+        return abort(failure, ledger)
     coverage = read_coverage()
+    ledger.note("the coverage of the tree", coverage.describe())
+    ledger.note("how many tests passed, failed, skipped or xfailed", code.describe())
+    ledger.note(
+        "which tests skipped or xfailed",
+        f"{len(code.skipped)} skipped, {len(code.xfailed)} xfailed",
+    )
     print(f"  {code.describe()} (the report's own self-checks are measured separately)")
 
     # The measurement has to describe the tree it ran on. A module the run
@@ -1613,18 +1837,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if complete:
         print("Measuring the report's self-checks against a candidate report...")
-        refresh = converge(
-            text,
-            report_path,
-            code,
-            coverage,
-            fast,
-            slow,
-            total,
-            history,
-            status_text,
-            status_path,
-        )
+        try:
+            refresh = converge(
+                text,
+                report_path,
+                code,
+                coverage,
+                fast,
+                slow,
+                total,
+                history,
+                status_text,
+                status_path,
+            )
+        except SummaryUnreadable as failure:
+            return abort(failure, ledger)
         record = refresh.record
         updated = refresh.text
         checks = refresh.checks
@@ -1707,6 +1934,11 @@ def main(argv: list[str] | None = None) -> int:
     comparable = complete and same_measurement(previous, record)
     comparison = record if comparable else comparable_record(previous, record)
 
+    # The figures this run writes, and the figures it compares the documents
+    # with: the ones that describe the tree when the run compares, the ones it
+    # measured when it writes.
+    figures = render_figures(comparison if args.check else record)
+
     if args.check:
         checked = render_or_fail(text, comparison)
         checked_status = render_status(comparison, status_text) if status_text is not None else None
@@ -1744,10 +1976,9 @@ def main(argv: list[str] | None = None) -> int:
         # describe the machine -- the coverage and the pass/skip split -- are
         # only compared when the two measurements are comparable, so the
         # badge is read against the figures the check is comparing.
-        measured_values = render_figures(comparison if args.check else record)
         badge_values = {
-            "tests.passing": measured_values.get("suite.passed", ""),
-            "coverage.pct": measured_values.get("coverage.pct", ""),
+            "tests.passing": figures.get("suite.passed", ""),
+            "coverage.pct": figures.get("coverage.pct", ""),
         }
         for readme in README_PATHS:
             if not readme.is_file():
@@ -1757,9 +1988,35 @@ def main(argv: list[str] | None = None) -> int:
             if refreshed != original:
                 readmes.append((readme, original, refreshed))
 
-    changes = figure_changes(text, comparison if args.check else record)
+    # Every other document that carries generated figures is written from this
+    # one measurement. The report and the status page were written above; the
+    # rest are found by looking for the markers, so a page that states a
+    # number does not have to be remembered when the number changes -- the
+    # marker is the whole of the registration.
+    #
+    # Only the project's own pages are written, and only when the real report
+    # is the one being refreshed: the suite runs this script against copies,
+    # with measurements it made up, and a script that wrote the project's
+    # pages in that case would put a made-up number into them.
+    others: list[tuple[Path, str, str]] = []
+    if report_path == REPORT_PATH:
+        already_written = {REPORT_PATH}
+        if status_path is not None:
+            already_written.add(status_path)
+        for path in documents_with_figures(REPO_ROOT):
+            if path in already_written:
+                continue
+            original = path.read_text(encoding="utf-8")
+            refreshed = write_figures(path, figures)
+            if refreshed != original:
+                others.append((path, original, refreshed))
+
+    changes = figure_changes(text, figures)
     if status_text is not None:
-        changes.extend(figure_changes(status_text, comparison if args.check else record))
+        changes.extend(figure_changes(status_text, figures))
+    for path, original, _refreshed in others:
+        for key, old, new in figure_changes(original, figures):
+            changes.append((f"{display_path(path)} {key}", old, new))
     for readme, original, refreshed in readmes:
         for badge in (BADGE_TESTS, BADGE_COVERAGE):
             before = badge.search(original)
@@ -1778,6 +2035,7 @@ def main(argv: list[str] | None = None) -> int:
 
     status_matched = checked_status is None or checked_status == status_text
     badges_matched = not readmes
+    others_matched = not others
     if args.check:
         if complete and not comparable:
             print(
@@ -1788,7 +2046,13 @@ def main(argv: list[str] | None = None) -> int:
             )
         if not complete:
             print("The report was not compared: this run did not measure this tree.")
-        elif checked == text and status_matched and badges_matched and not tree_changed:
+        elif (
+            checked == text
+            and status_matched
+            and badges_matched
+            and others_matched
+            and not tree_changed
+        ):
             print("The report matches a fresh measurement.")
         else:
             for key, old, new in changes:
@@ -1796,13 +2060,21 @@ def main(argv: list[str] | None = None) -> int:
             if tree_changed:
                 print(f"source fingerprint: {previous_fingerprint} -> {current_fingerprint}")
             print("The report does not match a fresh measurement.")
-        matched = checked == text and status_matched and badges_matched and not tree_changed
+        matched = (
+            checked == text
+            and status_matched
+            and badges_matched
+            and others_matched
+            and not tree_changed
+        )
     else:
         report_path.write_bytes(updated.encode("utf-8"))
         if status_path is not None and status_updated is not None:
             status_path.write_bytes(status_updated.encode("utf-8"))
         for readme, _original, refreshed in readmes:
             readme.write_bytes(refreshed.encode("utf-8"))
+        for path, _original, refreshed in others:
+            path.write_bytes(refreshed.encode("utf-8"))
         if changes:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")

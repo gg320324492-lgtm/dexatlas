@@ -255,6 +255,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_social_preview.py` | 首页 social preview 卡：图上的数与报告里的数必须一致；报告变了而图没重画（旁证的数对不上、图被手改过、徽章与卡片分家）都要判红 |
 | `test_platform_independent_gates.py` | 门禁的平台无关性：链接检查、指纹归一化、子进程输出解码等规则在脚本自身上钉死 |
 | `test_failure_wording.py` | 后端失败那条证据记录的文案：「这一步没跑完」与「它已经交出来的产物」必须分开说，否则同一份报告里的两条 `verified` 记录会被读成互相否定；等级与统计不得被顺手改掉 |
+| `test_figures_auto_write.py` | 测量数字随测量走的机制：带生成标记的文档由脚本统一写、写不出的标记要中止；pytest 汇总行读不出来时不许读成 0 项 |
 
 ### 2.2 几类值得注意的测试
 
