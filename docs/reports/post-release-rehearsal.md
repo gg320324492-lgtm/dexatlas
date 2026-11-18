@@ -83,7 +83,7 @@
   重测量，而这里**数字确实变了**（多一条测试 = 多一个 passed）—— 真正含糊的是它的**兄弟
   条目 R2**。
 - **漏过的后果**：报告与徽章描述的树不存在（CLAUDE.md 规则 3 的反面）。CI 的 `measurement`
-  job（`.github/workflows/ci.yml:658`，**仅 tag 触发**，跑
+  job（`.github/workflows/ci.yml:708`，**仅 tag 触发**，跑
   `refresh-report-figures.py --check`，`.github/workflows/ci.yml:705`）会红 —— 但那已经在
   重打 tag 的半路上了。
 
@@ -108,16 +108,16 @@
 - **触发条件**：第 4 步（改文档里的数字与引用）之后、第 6 步（重打 tag）之前跑
   `scripts/check-doc-citations.py`。
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
-  `scripts/check-doc-citations.py:166-179` 的 `TREE_DOCUMENTS` 把
+  `scripts/check-doc-citations.py:181-194` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
-  （`scripts/check-doc-citations.py:1117-1120`）按这个 ref 取树；本地 tag 还没动 →
+  （`scripts/check-doc-citations.py:1128-1131`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
   `check_declaration()`（`scripts/check-doc-citations.py:1127-1177`）还会把正文里引的测量
   指纹与**那棵树**的测量记录比对 —— 旧树的指纹，于是也判「不符」。
 - **该在哪一步被拦住**：**第 4 步与第 6 步之间**。清单第 4 条只说了「按内容重锚」，没说
   重锚的**基准是本地 tag 还是远端 tag**，也没说重锚完要**在 tag 移过之后再核一次**。
 - **现在的判据**：机制是齐的 —— `TREE_DOCUMENTS` + `Tree` + `tree_fingerprint()`
-  （`scripts/check-doc-citations.py:1123-1126`）+ `check_declaration()`；
+  （`scripts/check-doc-citations.py:1134-1137`）+ `check_declaration()`；
   `tests/test_doc_citations.py::test_the_release_body_is_read_out_of_the_release_tree`
   （`tests/test_doc_citations.py:687-701`）守住「Release 正文必须是从 release 树里读出来的」。
   **缺的只是清单里的顺序要求**。
