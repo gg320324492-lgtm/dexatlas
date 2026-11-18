@@ -141,6 +141,13 @@ DOCS: list[pathlib.Path] = [
     # of the paths module. A citation nobody checks is a citation nobody has
     # to keep true.
     REPO / "docs" / "reports" / "evidence-package-isolation.md",
+    # The three rehearsal reports of the release week. Each one quotes the
+    # line numbers of the tree it rehearsed against -- the invitation, the
+    # container image and the post-release procedure -- so their citations
+    # have to keep being true.
+    REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
+    REPO / "docs" / "reports" / "docker-examples-gap.md",
+    REPO / "docs" / "reports" / "post-release-rehearsal.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
@@ -1123,7 +1130,11 @@ def tree_fingerprint(tree: Tree) -> str | None:
         return None
     try:
         record = json.loads(match.group(1))
-    except json.JSONError:
+    except json.JSONDecodeError:
+        # ``json`` has no ``JSONError``: the name this used to catch does not
+        # exist, so the except clause itself raised ``AttributeError`` -- and a
+        # record that is not valid JSON took the checker down instead of being
+        # reported as unreadable.
         return None
     value = record.get("source_fingerprint")
     return value if isinstance(value, str) else None

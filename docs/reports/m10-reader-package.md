@@ -286,12 +286,40 @@ uv run --no-sync python -c \
   5 截断、6 跑完但没有可用的代码索引（`EXIT_NO_INDEX`，v1.0.0 新增；自动化脚本
   请用 `exit_code in (0, 6)` 或 `summary.index_complete` 区分）；至少实测
   0/1/2 各一次。语义见[公共契约表](../architecture/public-contracts.md)。
+  **0 / 1 / 2 三条现成命令**（照抄即可，退出码在后面）：
+
+  ```bash
+  uv run --no-sync dexatlas analyze examples/demo-app/demo.apk          # 0 成功
+  uv run --no-sync dexatlas search apk_80a8fe0e81204c9f __no_such_term__ # 1 空答案
+  uv run --no-sync dexatlas analyze README.md                          # 2 请求错误（非 APK）
+  ```
+
+  第 1 条要**先跑完 analyze**（第 2 条里的 project id 是它给的：`apk_80a8fe0e81204c9f`）；
+  第 2 条输出 `No matches for '__no_such_term__'.`；第 3 条输出
+  `Not a usable APK: README.md is not a ZIP archive; APKs are ZIP archives`。
 - **契约实测（F5–F6）**（可照抄的命令与三个退出码的含义见 [§9.2](#92-契约活检与本机配置)）：
 
   ```bash
   uv run --no-sync pytest tests/test_public_contracts.py -q
   uv run --no-sync python scripts/verify-public-contracts.py
   ```
+
+- **REST / MCP / 报告 schema（F2–F4）**：这三项的判据都在
+  [公共契约表](../architecture/public-contracts.md) 里，抽查用的命令：
+
+  ```bash
+  uv run --no-sync uvicorn dexatlas.api.app:app --port 8000   # 起 REST 服务
+  curl -s localhost:8000/health                               # 抽查一个端点的响应形状
+  curl -s localhost:8000/projects | head -c 400               # 项目列表
+  uv run --no-sync dexatlas-mcp                               # 起 MCP server（列工具清单）
+  curl -s "localhost:8000/projects/apk_80a8fe0e81204c9f/report?format=json" \
+    | python -c "import json,sys; print(sorted(json.load(sys.stdin)))"   # 报告的 10 个顶层字段
+  ```
+
+  预期：报告 JSON 的顶层字段是 `errors`、`evidence`、`generated_at`、
+  `latest_attempt_status`、`manifest`、`project`、`run`、`schema_version`、
+  `summary`、`tools` —— 10 个。MCP 工具清单与只读注解在契约表 §7；REST 路由表在
+  契约表 §2；报告 JSON 的 `schema_version` 与顶层字段在契约表 §4。
 
 - **服务回归集（E1–E5）**：读[服务回归集](../benchmarks/service-regression-set.md)
   与[层级 1 scripted 演练](../benchmarks/m6-level1-scripted.md)，确认你能区分
@@ -592,6 +620,17 @@ DEXATLAS_TOOL_TIMEOUT_SECONDS=1 uv run dexatlas analyze examples/demo-app/demo.a
 > `index_complete` 是 `true`——**这同样是正确行为**（没超时的后端不留 `timeout`
 > 记录）。判据是「后端失败时记 `timeout`、不抛异常、报告照常产出」，
 > 不是「一定有三条 `timeout`」。
+>
+> **`index_complete` / `index_gaps` 只跟索引后端有关。** `index_gaps` 只统计
+> **androguard**（索引后端）或分析级失败；**jadx 超时不构成 gap**。所以上面那段
+> 「`index_complete` 是 `false`、`index_gaps` 里有一条 `androguard` 的 `timeout`」
+> **只在 androguard 自己也超时**时才成立；只有 jadx 超时时，`index_complete` 是
+> `true`、`index_gaps` 是 `[]`——同样正确。
+>
+> **超时运行的证据条数与正常运行不同**：会**多出一条** `verified` 的「后端未完成」
+> 记录（`errors[]` 里每个超时后端一条），所以证据条数随后端配置变化
+> （干净 / 降级 / 超时各不相同）。**判据是「以报告自身为准」**：报告里写了几条
+> 就是几条，不要拿别次运行的条数来比。
 
 **G4 幂等（同一个 APK 连着分析两次）**
 

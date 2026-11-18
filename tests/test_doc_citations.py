@@ -824,3 +824,23 @@ def test_a_report_whose_declaration_quotes_another_tree_is_a_finding(
 
     kinds = [finding.kind for finding in report.findings]
     assert "wrong tree" in kinds, [finding.render() for finding in report.findings]
+
+
+def test_a_tree_whose_measurement_record_is_broken_is_read_as_unreadable() -> None:
+    """A record that is not valid JSON must not take the checker down.
+
+    ``tree_fingerprint`` reads the measurement record of a tree, and a record
+    that is not valid JSON has to be reported as unreadable. The name it used
+    to catch -- ``json.JSONError`` -- does not exist in the ``json`` module,
+    so the except clause itself raised ``AttributeError`` and a broken record
+    crashed the checker instead of being read as unreadable.
+    """
+    checker = _checker()
+
+    class BrokenTree:
+        """A tree whose measurement record is not valid JSON."""
+
+        def text(self, relative: str) -> str | None:
+            return '<!--report-figures:{"source_fingerprint": -->\n'
+
+    assert checker.tree_fingerprint(BrokenTree()) is None
