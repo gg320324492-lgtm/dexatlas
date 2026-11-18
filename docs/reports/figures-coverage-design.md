@@ -53,7 +53,7 @@ B7 条目（`docs/reports/v1.0.0-release-checklist.md:645`）已记录
 |---|---|---|
 | `docs/status.md:26` 与 `:50` 的 CI job 数（「9 个 workflow job、10 次并行运行」） | 数字来源是 `ci.yml` 的静态结构，可解析、可生成；且当前已与实况脱节（见 §2.7） | 新增 `fig:ci.jobs` / `fig:ci.runs` 由 refresh 脚本写入（解析 `ci.yml` 零成本、不需测量）；同时加独立核对测试（§3.1），双保险 |
 | `docs/how-to-verify.md:147` / `how-to-verify.zh-CN.md:120` 的「收集到的测试数……**1690**（**1541** 快 + **149** 集成）」 | 这句已是 `STATED_NUMBERS` 正则（`tests/test_how_to_verify.py:36`）的比对目标，但那是「核对」不是「写」。改成 fig 标记后与报告同源， prose 测试可简化 | 把三个粗体数换成 `<!--fig:tests.total-->` 等标记；`tests/test_how_to_verify.py:115` 的 prose 比对保留作第二道闸 |
-| `docs/how-to-verify.md:167`-`:168` / zh `:144`-`:145` skip 对照表（`1659 passed, 31 skipped` / `1690 passed、0 skipped`） | 「取了样本」行的 `1690 passed、0 skipped` 就是 `suite.passed`/`suite.skipped`，可直接标记化；「没取样本」行的 `1659/31` 是某次树状态的历史值，会随树漂移 | 「取了样本」行改用 `<!--fig:suite.passed-->`/`<!--fig:suite.skipped-->`（该行已部分引用这两个 fig 名）；「没取样本」行删去会过期的具体总数，只保留 skip 理由分类（25+2 条），并加核对测试（§3.3） |
+| `docs/how-to-verify.md:171`-`:168` / zh `:144`-`:145` skip 对照表（`1659 passed, 31 skipped` / `1690 passed、0 skipped`） | 「取了样本」行的 `1690 passed、0 skipped` 就是 `suite.passed`/`suite.skipped`，可直接标记化；「没取样本」行的 `1659/31` 是某次树状态的历史值，会随树漂移 | 「取了样本」行改用 `<!--fig:suite.passed-->`/`<!--fig:suite.skipped-->`（该行已部分引用这两个 fig 名）；「没取样本」行删去会过期的具体总数，只保留 skip 理由分类（25+2 条），并加核对测试（§3.3） |
 
 **不纳入自动写的 B 类边界**：`docs/how-to-verify.md:153`-`:154`（zh `:126`-`:127`）
 的 `pytest --collect-only` 期望输出行**不能**用 fig 标记——它们在代码块里，HTML
@@ -189,7 +189,7 @@ Version claims 步骤，`ci.yml:94`）。
 
 - **改哪个文件**：`tests/test_how_to_verify.py`。
 - **做什么**：现有两个测试盖住 prose 句（`:115`）与 collect 期望行（`:95`），
-  但 skip 对照表（`docs/how-to-verify.md:167`-`:168`、zh `:144`-`:145`）没人查。
+  但 skip 对照表（`docs/how-to-verify.md:171`-`:168`、zh `:144`-`:145`）没人查。
   新增一个测试：从执行报告的 record block（`<!--report-figures:{...}-->`，
   正则 `RECORD` 在 `scripts/refresh-report-figures.py:234`；测试侧可仿
   `tests/test_status_figures.py` 读 record 的方式）取 `suite.passed` /

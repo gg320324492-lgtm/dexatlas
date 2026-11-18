@@ -65,14 +65,14 @@ questions with cited evidence, or in a local web workbench.
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.
 - **Quality gates.** Strict mypy typing, ruff lint/format, 1,695 tests at
-  93.3% coverage on the first-party code, and twelve CI jobs (thirteen runs on a tag —
-  the test job is a 3.12/3.13 matrix): lint and format;
-  the test suite on Python 3.12 (all backends) and 3.13 (no Java backends);
-  the suite with Apktool only; the M3 comparison check; the Docker image; the
-  dependency audit; the live public-contract check; the M10 acceptance
-  self-check; a job that checks the social preview card's numbers against
-  the report; and a job that re-measures the report's figures against the
-  tagged tree.
+  93.3% coverage on the first-party code, and thirteen CI jobs (fourteen runs on a tag —
+  the test job is a 3.12/3.13 matrix): lint and format; the test suite on Python
+  3.12 (all backends) and 3.13 (no Java backends); the suite with Apktool only;
+  the M3 comparison check; the Docker image; the dependency audit; the live
+  public-contract check, and the same check without the Java backends; the M10
+  acceptance self-check; a job that checks every gate is run by something; two jobs
+  that check the social preview card and the outward texts against the report;
+  and a job that re-measures the report's figures against the tagged tree.
 
 ## Who it is for, and when
 
