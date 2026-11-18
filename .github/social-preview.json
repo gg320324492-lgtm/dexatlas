@@ -12,10 +12,10 @@
     "license": "Apache-2.0",
     "mcp.tools": "11",
     "suite.failed": "1",
-    "suite.passed": "1710",
-    "tests.fast": "1563",
+    "suite.passed": "1731",
+    "tests.fast": "1584",
     "tests.slow": "149",
-    "tests.total": "1712",
+    "tests.total": "1733",
     "version": "1.0.0"
   },
   "origins": {
@@ -40,15 +40,15 @@
       "headline": "From APK to Evidence",
       "positioning": "An open-source, evidence-first Android reverse engineering and mobile application analysis platform.",
       "image": ".github/social-preview.png",
-      "sha256": "b625944601ba6e3ac4a9c660ab80b339e2d36bdc833abb7a51cfd7a1fe64d62a",
-      "bytes": 54636
+      "sha256": "3e239f0caca2b42a34dd347d5c5001ce802ae8cb576f1071b83b4f2b12b55be0",
+      "bytes": 54859
     },
     "zh-CN": {
       "headline": "从 APK 到可核查的证据",
       "positioning": "开源、证据优先的 Android 逆向工程与移动应用分析平台。",
       "image": ".github/social-preview.zh-CN.png",
-      "sha256": "b685c3dcdb1dc03c81610739cc44fa700703bb944abe89ccc3ed47d3771a0ef7",
-      "bytes": 72513
+      "sha256": "ed4c74b0aa9aa5aa838b3a7954ff93e17dc780b5a5748203ceacc19bddbc7b66",
+      "bytes": 72715
     }
   }
 }

@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1731<!--/fig-->（<!--fig:tests.fast-->1582<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1733<!--/fig-->（<!--fig:tests.fast-->1584<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1582<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1584<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1731<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1733<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -878,10 +878,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1731<!--/fig--> 个：<!--fig:tests.fast-->1582<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1733<!--/fig--> 个：<!--fig:tests.fast-->1584<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1729<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1731<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1100,10 +1100,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:9f2b07e30c74ca0b7289d38476c34afe1e4a88bb8f819e83cfd0ed9ee4c95465",
+  "source_fingerprint": "sha256:beddd7c924b51d8667afea5911fc967a572f1529c4f6696330782f98d4f42d3e",
   "suite": {
     "failed": 1,
-    "passed": 1729,
+    "passed": 1731,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1113,8 +1113,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "xpassed": 0
   },
   "tests": {
-    "fast": 1582,
+    "fast": 1584,
     "slow": 149,
-    "total": 1731
+    "total": 1733
   }
 }-->

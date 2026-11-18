@@ -117,14 +117,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里四样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1731**（**1582** 快 + **149** 集成）。
+* **收集到的测试数** —— 当前这棵树上应当是 **1733**（**1584** 快 + **149** 集成）。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
   `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1582/1731 tests collected (149 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1731 tests collected (1582 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1584/1733 tests collected (149 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1733 tests collected (1584 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -146,7 +146,7 @@ bash scripts/fetch-fixtures.sh
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `1664 passed, 31 skipped`（退出码 0）。27 个 skip 全是 `fixture not present; run scripts/fetch-fixtures.sh` |
-| 三后端齐备，**拉了**第三方样本 | `1729 passed`、**1 skipped**、**0 xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->` / `<!--fig:suite.xfailed-->`） |
+| 三后端齐备，**拉了**第三方样本 | `1731 passed`、**1 skipped**、**0 xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->` / `<!--fig:suite.xfailed-->`） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
