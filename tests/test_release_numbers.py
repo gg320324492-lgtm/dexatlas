@@ -177,6 +177,46 @@ def _text_cn(numbers: dict[str, str]) -> str:
     )
 
 
+def _page(numbers: dict[str, str], illustrated: dict[str, str]) -> str:
+    """A how-to page: the numbers in prose, and two illustrations of a marker.
+
+    The illustrations are what the pages that teach the reader what a
+    generated marker looks like carry: one in a fenced code block, one in an
+    inline code span. Their numbers are not the numbers of this tree -- the
+    pages keep the marker they were written with -- and they are not claims.
+    """
+    return (
+        _text(numbers)
+        + "\n"
+        + "## Which numbers are generated\n"
+        + "\n"
+        + "They look like this in the source file:\n"
+        + "\n"
+        + "```text\n"
+        + f"<!--fig:tests.total-->{illustrated['total']}<!--/fig-->\n"
+        + "```\n"
+        + "\n"
+        + f"And inline: `<!--fig:tests.total-->{illustrated['total']}<!--/fig-->`.\n"
+    )
+
+
+def _page_cn(numbers: dict[str, str], illustrated: dict[str, str]) -> str:
+    """The same page, in Chinese."""
+    return (
+        _text_cn(numbers)
+        + "\n"
+        + "## 哪些数是生成物\n"
+        + "\n"
+        + "在源文件里长这样\uff1a\n"
+        + "\n"
+        + "```text\n"
+        + f"<!--fig:tests.total-->{illustrated['total']}<!--/fig-->\n"
+        + "```\n"
+        + "\n"
+        + f"行内的是\uff1a`<!--fig:tests.total-->{illustrated['total']}<!--/fig-->`。\n"
+    )
+
+
 def _body(numbers: dict[str, str]) -> str:
     """The source of a release body: the text, and the appendix that is not published."""
     return (
@@ -197,8 +237,8 @@ def _repository(tmp_path: Path) -> Path:
         repository / "docs" / "reports" / "phase1-execution-report.md",
         _report(TAG_FIGURES),
     )
-    _write(repository / "docs" / "how-to-verify.md", _text(TAG_NUMBERS))
-    _write(repository / "docs" / "how-to-verify.zh-CN.md", _text_cn(TAG_NUMBERS))
+    _write(repository / "docs" / "how-to-verify.md", _page(TAG_NUMBERS, TAG_NUMBERS))
+    _write(repository / "docs" / "how-to-verify.zh-CN.md", _page_cn(TAG_NUMBERS, TAG_NUMBERS))
     _write(repository / "docs" / "releases" / "v1.0.0.md", _text(TAG_NUMBERS))
     _write(
         repository / "docs" / "reports" / "v1.0.0-github-release-body.md",
@@ -210,16 +250,21 @@ def _repository(tmp_path: Path) -> Path:
     _git(repository, "tag", "v1.0.0")
 
     # The working copy is measured again, for the next version.
+    #
+    # The pages that describe the tree you are standing on are re-synced --
+    # they are about the working copy. The documents of the release that
+    # shipped are not: that release is frozen, its tag is not cut again,
+    # and their numbers belong to the tree it shipped with.
     _write(
         repository / "docs" / "reports" / "phase1-execution-report.md",
         _report(WORKING_FIGURES),
     )
-    _write(repository / "docs" / "how-to-verify.md", _text(WORKING_NUMBERS))
-    _write(repository / "docs" / "how-to-verify.zh-CN.md", _text_cn(WORKING_NUMBERS))
-    _write(repository / "docs" / "releases" / "v1.0.0.md", _text(WORKING_NUMBERS))
+    _write(repository / "docs" / "how-to-verify.md", _page(WORKING_NUMBERS, TAG_NUMBERS))
+    _write(repository / "docs" / "how-to-verify.zh-CN.md", _page_cn(WORKING_NUMBERS, TAG_NUMBERS))
+    _write(repository / "docs" / "releases" / "v1.0.0.md", _text(TAG_NUMBERS))
     _write(
         repository / "docs" / "reports" / "v1.0.0-github-release-body.md",
-        _body(WORKING_NUMBERS),
+        _body(TAG_NUMBERS),
     )
     _git(repository, "add", "-A")
     _commit(repository, "the next measurement")
@@ -296,6 +341,64 @@ def test_the_published_body_is_compared_against_the_tree_it_shipped(
     assert code == 0, f"the checker found a difference:\n{written}"
     assert "the v1.0.0 tree" in written
     assert "mismatches: 0" in written
+
+
+def test_a_number_illustrated_in_a_code_block_is_not_a_claim(
+    checker: tuple[object, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A marker that shows the reader what a marker looks like is not a claim.
+
+    The page that teaches the reader what a generated marker looks like
+    holds one, in a fenced code block and in an inline code span. Its
+    number is the one the page was written with; it is not a number about
+    this tree, and the measurement script will not write a number into it
+    either. Reading it as a claim turns the page red for a number nobody
+    wrote -- and the number goes stale every time the tree is measured
+    again.
+    """
+    module, repository = checker
+
+    page = (repository / "docs" / "how-to-verify.md").read_text(encoding="utf-8")
+    assert "<!--fig:tests.total-->100<!--/fig-->" in page, (
+        "the page has to carry the illustration for this to mean anything"
+    )
+
+    code = module.main([])
+    written = capsys.readouterr().out
+
+    assert code == 0, f"the checker found a difference:\n{written}"
+    assert "MISMATCH" not in written
+    # The illustration is a marker of the release's numbers, not of the
+    # working copy's: the working copy says 200.
+    assert "tests.total      200" in written
+
+
+def test_the_release_documents_are_compared_against_the_tag_tree(
+    checker: tuple[object, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The release notes and the release body belong to the release that shipped.
+
+    They say what v1.0.0 measured. v1.0.0 is frozen -- its tag is not cut
+    again -- so their numbers belong to the tree that tag points at, and to
+    nothing measured since. The working copy's report has moved on, and
+    comparing these two documents against it says they are wrong when they
+    are right.
+    """
+    module, repository = checker
+
+    notes = (repository / "docs" / "releases" / "v1.0.0.md").read_text(encoding="utf-8")
+    assert "100 tests" in notes, "the release notes state the numbers v1.0.0 shipped with"
+
+    code = module.main([])
+    written = capsys.readouterr().out
+
+    assert code == 0, f"the checker found a difference:\n{written}"
+    assert "MISMATCH" not in written
+    # Both documents are in the published segment, and that segment is
+    # compared against the tagged tree's report.
+    assert "segment: the published release v1.0.0" in written
+    assert "docs/releases/v1.0.0.md" in written
+    assert "docs/reports/v1.0.0-github-release-body.md" in written
 
 
 def test_a_mismatch_names_the_text_the_number_the_report_and_the_line(

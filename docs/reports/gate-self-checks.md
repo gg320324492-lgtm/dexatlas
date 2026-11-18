@@ -13,14 +13,18 @@
 
 这一轮把三件都做了，并且每一件都留了一条**红→绿**的证据。
 
+**然后主会话用真实的树跑出了两处不对**——都在这个窗口自己写的代码上，都在**这个门禁自己的
+立场上**：一处把「示意」当成了「声明」，一处把冻结的发布文档放进了会变的那一段。
+那两处的修法、红→绿，以及**一处需要主会话拍板的取舍**，在 §5。
+
 ## 基线
 
 | | |
 |---|---|
 | 仓库 | `E:\Dexatlas`（工作树 `E:\Dexatlas\.claude\worktrees\keen-dubinsky-ae6eb6`） |
 | 分支 | `claude/keen-dubinsky-ae6eb6` |
-| 基线提交 | `7a416bd` |
-| 日期 | 2026年11月18日 |
+| 基线提交 | `7a416bd`（第一轮）→ `92d8293`（第二轮，v1.0.0 合入之后） |
+| 日期 | 2026年11月18日（第一轮）、2026年11月19日（第二轮） |
 | 上一轮的报告 | [`outward-number-parity.md`](outward-number-parity.md) |
 
 **这份报告里的数只有一处需要重测后同步**：§4 说的那几项。其余都是可复现的命令与它的输出。
@@ -46,7 +50,7 @@
 
 ### 1.2 现在的两段
 
-改成两段，各比各的（段的数据结构是 `Segment`，见 `scripts/check-release-numbers.py:239`）：
+改成两段，各比各的（段的数据结构是 `Segment`，见 `scripts/check-release-numbers.py:254`）：
 
 | 段 | 比什么 | 权威来源 |
 |---|---|---|
@@ -112,13 +116,13 @@ the published release body could not be read: gh is not installed
 
 已发布的正文是**只读的**；重新发布它是发版动作，不是门禁的事。
 
-### 2.2 六条断言
+### 2.2 六条断言（第二轮又加了两条，见 §5.4）
 
 | 测试 | 钉住什么 |
 |---|---|
 | `test_the_checker_exists` | 脚本在 |
-| `test_the_published_body_is_compared_against_the_tree_it_shipped` | **本轮的核心**：已发布的正文跟 **tag 树**比，不是跟工作副本比（`tests/test_release_numbers.py:278`） |
-| `test_a_mismatch_names_the_text_the_number_the_report_and_the_line` | `outward-number-parity.md` §5.5 那条判据 C：哪一份、哪个数、权威是多少、那份写的是多少、**哪一行**——五样齐了（`tests/test_release_numbers.py:301`） |
+| `test_the_published_body_is_compared_against_the_tree_it_shipped` | **本轮的核心**：已发布的正文跟 **tag 树**比，不是跟工作副本比（`tests/test_release_numbers.py:323`） |
+| `test_a_mismatch_names_the_text_the_number_the_report_and_the_line` | `outward-number-parity.md` §5.5 那条判据 C：哪一份、哪个数、权威是多少、那份写的是多少、**哪一行**——五样齐了（`tests/test_release_numbers.py:404`） |
 | `test_the_two_comparisons_are_reported_separately` | 两段分开报，且各自的权威来源写清楚 |
 | `test_a_published_body_that_cannot_be_read_is_not_an_agreement` | 取不到 → 退出码 2 + **明说**取不到 |
 | `test_a_tag_that_is_not_in_the_checkout_is_not_an_agreement` | tag 不在 checkout 里 → 退出码 2 + **明说** |
@@ -137,15 +141,20 @@ mismatches
 
 ### 2.3 红→绿怎么证的
 
-把 `scripts/check-release-numbers.py` 换回 `7a416bd` 的那一版，跑同一份测试：
+把 `scripts/check-release-numbers.py` 换回 `7a416bd` 的那一版，跑同一份测试（**当前的**这份，
+第二轮加过两条，见 §5.4）：
 
 ```text
 FAILED tests/test_release_numbers.py::test_the_published_body_is_compared_against_the_tree_it_shipped
+FAILED tests/test_release_numbers.py::test_a_number_illustrated_in_a_code_block_is_not_a_claim
+FAILED tests/test_release_numbers.py::test_the_release_documents_are_compared_against_the_tag_tree
 FAILED tests/test_release_numbers.py::test_a_mismatch_names_the_text_the_number_the_report_and_the_line
 FAILED tests/test_release_numbers.py::test_the_two_comparisons_are_reported_separately
 FAILED tests/test_release_numbers.py::test_a_tag_that_is_not_in_the_checkout_is_not_an_agreement
-4 failed, 2 passed
+6 failed, 2 passed
 ```
+
+（第一轮量的时候是 4 红 2 绿——那时还没有第二轮加的两条。）
 
 第一条失败的现场，正是旧实现说错话的地方：
 
@@ -160,10 +169,10 @@ FAILED tests/test_release_numbers.py::test_a_tag_that_is_not_in_the_checkout_is_
 于是门禁红了。换成新实现：
 
 ```text
-6 passed
+8 passed
 ```
 
-**红的四条是行为上的红**（断言失败），不是 setup 里的 `AttributeError`：fixture 里那句
+**红的几条是行为上的红**（断言失败），不是 setup 里的 `AttributeError`：fixture 里那句
 `getattr(module, "citation_checker", None)` 是故意的，好让「把修复拿走」表现为**答案错了**，
 而不是表现为「少了一个属性」。
 
@@ -267,8 +276,9 @@ is missing, or take out the row that is stale.
 
 **在主会话重测之前，main 的 CI 会因为数字过期而红——这是预期的。**
 
-本地把整套测试跑了一遍（7 分 36 秒）：**11 failed, 1710 passed, 1 skipped**。
-11 条**全部**归因到「报告过期」这一件事上，本窗口**没有留下一条自己造的失败**：
+本地把整套测试跑了一遍（第二轮，7 分 48 秒）：**11 failed, 1721 passed, 1 skipped**。
+11 条**全部**归因到「报告过期」这一件事上，本窗口**没有留下一条自己造的失败**
+（第一轮量的时候是 11 failed / 1710 passed，失败的是同样这 11 条）：
 
 | 失败 | 几条 | 归因 | 加了 §4.0 那两行之后 |
 |---|---|---|---|
@@ -292,14 +302,137 @@ is missing, or take out the row that is stale.
 
 ---
 
-## 5. 留给主会话的事
+## 5. 第二轮：主会话用真实数据跑出来的两处不对
+
+v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的树被重新测量过，1731 个测试），
+跑出两处不对。**两处都在 `scripts/check-release-numbers.py` 里，都是这个窗口自己写的代码**。
+
+### 5.1 第一处：门禁把「示意」当成了「声明」
+
+`docs/how-to-verify.md` 有一节叫「哪些数字是生成物，不许手改」，它在教读者看标记长什么样，
+于是里面有一个**代码块**：
+
+```text
+<!--fig:tests.total-->1712<!--/fig-->
+```
+
+那是一个**示意**——它展示标记的形状，不是这个项目现在的数。门禁却把它读成了声明：
+
+```text
+=== docs/how-to-verify.md ===
+  tests.total      1712 / 1731 147, 460     MISMATCH (report: 1731)
+```
+
+散文里写的确实是 1731（对的）；报出来的是代码块里那个 1712。zh-CN 那页同理（`:432`）。
+
+**为什么**：门禁原来对 `<!--fig:键-->值<!--/fig-->` 有一条**例外**——「即使在围栏里也要比对，
+因为它是生成物的整份拷贝，会跟着测量一起漂」。这条例外是 `outward-number-parity.md` §6.1
+写的。它当时是个合理的判断，后来被证伪了：那个标记**不是**生成物的拷贝，是**示意**。
+而测量脚本自己**不写**围栏里的标记（`live_figures()` 把代码块与行内代码都剔掉，
+见 `scripts/refresh-report-figures.py:1155`），所以门禁跟测量脚本的尺子本来就不一致。
+
+**改法**：用**同一把尺子**——`scripts/refresh-report-figures.py` 的 `CODE_BLOCK` 与
+`INLINE_CODE` 两个正则，**直接引用**它（`scripts/check-release-numbers.py:470` 的
+`measurement_script()`，读法与 `scripts/remap-citations.py` 引用引文检查器同一个做法），
+不另写一套。围栏里的标记从此是示意，不是声明。
+
+> **一处需要主会话拍板的地方**：本窗口把「行内代码」这条规则用在了**标记**上，
+> **没有**用在散文里的数上。理由是具体的：`docs/how-to-verify.md` 的表格里那句
+> `` `1710 passed` `` 写在**行内代码**里，而**那一格正是这两页声明 suite.passed 的地方**
+> ——`outward-number-parity.md` §4.2 把 `suite.passed` 列在「写了」的数里，把
+> `suite.xfailed` 与 `coverage.pct` 列在「没写」里。把行内代码整个剔掉，
+> `suite.passed` 就会变成「没写」，门禁从此**看不见**那一栏漂了，`--strict` 还会永远红。
+> 那一格表格里的 `1710 passed`、**1 skipped**、**0 xfailed** 是同一句话：前一半在行内代码里，
+> 后一半在粗体里，按同一条规则读才对。
+>
+> 也就是说：**围栏 = 引用**（散文与标记都是），**行内代码 = 示意**（只对标记）。
+> 如果主会话要的是「行内代码里的数也不算数」，那是一行的改动
+> （`add()` 里把 `code_blocks` 换成 `quotations`），但它会丢掉上面这一栏——
+> 请主会话定。
+
+### 5.2 第二处：发布说明与 Release 正文放错了段
+
+`docs/releases/v1.0.0.md` 与 `docs/reports/v1.0.0-github-release-body.md` 说的是
+**v1.0.0 那次发布测到的数**。v1.0.0 已冻结（tag 不再重打），所以它们的数属于
+**v1.0.0 tag 树**，不属于之后测出来的任何东西。
+
+第一轮把这两份放进了「工作副本」那一段。于是主会话把工作副本重测一遍（1731 个测试）之后，
+这两处就红了——**而这正是这一扇窗口要解决的那个问题**：拿新数去比旧正文。
+
+**改法**：正确的切分是
+
+| 段 | 比什么 | 权威来源 |
+|---|---|---|
+| the working copy | `docs/how-to-verify.md`、`docs/how-to-verify.zh-CN.md`（描述当前树的两页） | 工作副本的报告 |
+| the published release v1.0.0 | `docs/releases/v1.0.0.md`、`docs/reports/v1.0.0-github-release-body.md`、GitHub 上已发布的正文 | **v1.0.0 tag 树里**的报告 |
+
+**这一轮没有动那两份文档里的任何数字**——它们是 v1.0.0 的历史记录。
+
+### 5.3 两处的红→绿，都是拿主会话那棵树量的
+
+把主会话 checkout 里那几份文件（报告 1731、散文 1731、围栏里 1712）原样搬进工作树，
+用**改之前**的实现跑：
+
+```text
+=== docs/how-to-verify.md ===
+  tests.total      1712 / 1731 147, 460     MISMATCH (report: 1731)
+=== docs/how-to-verify.zh-CN.md ===
+  tests.total      1712 / 1731 120, 432     MISMATCH (report: 1731)
+=== docs/releases/v1.0.0.md ===
+  tests.total      1712       94, 242      MISMATCH (report: 1731)
+=== docs/reports/v1.0.0-github-release-body.md ===
+  tests.total      1712       167, 267     MISMATCH (report: 1731)
+...
+  mismatches: 13
+```
+
+用**改之后**的实现跑**同一棵树**：
+
+```text
+=== segment: the working copy ===
+=== docs/how-to-verify.md ===
+  tests.total      1731       147          ok
+=== segment: the published release v1.0.0 ===
+=== docs/releases/v1.0.0.md ===
+  tests.total      1712       94, 242      ok
+=== docs/reports/v1.0.0-github-release-body.md ===
+  tests.total      1712       167, 267     ok
+...
+  mismatches: 0
+```
+
+**13 处不符 → 0 处不符，退出码 1 → 0。**
+复现完就把工作树里那几份文件换回来了，`git status` 干净。
+
+### 5.4 两条新的回归测试
+
+`tests/test_release_numbers.py` 从 6 条变成 8 条：
+
+| 测试 | 钉住什么 |
+|---|---|
+| `test_a_number_illustrated_in_a_code_block_is_not_a_claim`（`tests/test_release_numbers.py:346`） | 代码块里与行内代码里的**示意**不是声明 |
+| `test_the_release_documents_are_compared_against_the_tag_tree`（`tests/test_release_numbers.py:376`） | 发布说明与 Release 正文跟 **tag 树**的报告比，不跟工作副本的比 |
+
+**红→绿**：换回改之前的实现 → **3 红 5 绿**，红的是**行为上的红**：
+
+```text
+  tests.total      100 / 200  3, 16, 19    MISMATCH (report: 200)   ← 示意被读成了声明
+  tests.total      100        3            MISMATCH (report: 200)   ← 发布说明被拿工作副本的数比
+```
+
+换成改之后的实现 → 8 passed。
+
+---
+
+## 6. 留给主会话的事
 
 | # | 事情 | 为什么是主会话的 |
 |---|---|---|
-| 1 | **先往执行报告 §2.1 的测试文件表里加两行**（`test_docker_image_samples.py`、`test_release_numbers.py`）——**然后**才跑测量（§4.0） | 那张表的行是手写的，测量脚本不会替人写；不加，测量会**一个数也不写**就返回 1。`docs/` 下的一切是别的窗口在动的 |
-| 2 | **重测并同步四份文本里的数**（§4.1） | 测量是独占的，并发跑会互相污染覆盖率 |
-| 3 | **登记这份报告**：`docs/reports/README.md` 的索引（分组一览的份数 + 那一行）与 `scripts/check-doc-citations.py` 的 `DOCS` 名单 | 那两处由主会话统一登记。本窗口只写了报告本身 |
-| 4 | **把这份报告的 `file:line` 引文核一遍** | 登记进 `DOCS` 之后，引文检查器就会开始核它。本窗口写完后自查过，但别的窗口改动 `src/` 会让行号移动——那之后要跑 `uv run --no-sync python scripts/remap-citations.py` 再跑检查器 |
+| 1 | **拍板「行内代码里的数算不算声明」**（§5.1 末尾那个方框） | 本窗口把它用在了标记上，没有用在散文里的数上——理由写在 §5.1，但**这是主会话的判断**：改了会丢掉两页的 `suite.passed` 那一栏，改法是一行 |
+| 2 | **先往执行报告 §2.1 的测试文件表里加两行**（`test_docker_image_samples.py`、`test_release_numbers.py`）——**然后**才跑测量（§4.0） | 那张表的行是手写的，测量脚本不会替人写；不加，测量会**一个数也不写**就返回 1。`docs/` 下的一切是别的窗口在动的 |
+| 3 | **重测并同步四份文本里的数**（§4.1） | 测量是独占的，并发跑会互相污染覆盖率 |
+| 4 | **登记这份报告**：`docs/reports/README.md` 的索引（分组一览的份数 + 那一行）与 `scripts/check-doc-citations.py` 的 `DOCS` 名单 | 那两处由主会话统一登记。本窗口只写了报告本身 |
+| 5 | **把这份报告的 `file:line` 引文核一遍** | 登记进 `DOCS` 之后，引文检查器就会开始核它。本窗口写完后自查过，但别的窗口改动 `src/` 会让行号移动——那之后要跑 `uv run --no-sync python scripts/remap-citations.py` 再跑检查器 |
 
 **本窗口自己做的**（不在你给的文件名单里，但**必须**做，否则这一轮的改动在 CI 上不成立）：
 
@@ -313,15 +446,18 @@ is missing, or take out the row that is stale.
 
 ---
 
-## 6. 这一轮动了哪些文件
+## 7. 这一轮动了哪些文件
 
 | 文件 | 性质 |
 |---|---|
-| `scripts/check-release-numbers.py` | 改：分成两段 |
-| `tests/test_release_numbers.py` | 新：6 条 |
+| `scripts/check-release-numbers.py` | 改：分成两段；围栏与行内代码里的**标记**是示意；发布说明与 Release 正文归到已发布那一段 |
+| `tests/test_release_numbers.py` | 新：8 条 |
 | `tests/test_docker_image_samples.py` | 新：4 条 |
 | `.dockerignore` | 新 |
-| `.github/workflows/ci.yml` | 改：见 §5 |
+| `.github/workflows/ci.yml` | 改：见 §6 |
+| `docs/reports/gate-self-checks.md` | 新：本报告 |
 
-**没有动**：`scripts/refresh-report-figures.py`、`docs/` 下的一切、`docs/reports/README.md`、
-`scripts/check-doc-citations.py`、`Dockerfile`。
+**没有动**：`scripts/refresh-report-figures.py`（只**引用**它）、`docs/` 下的一切（除新增本报告）、
+`docs/reports/README.md`、`scripts/check-doc-citations.py`、`Dockerfile`、
+`docs/releases/v1.0.0.md`、`docs/reports/v1.0.0-github-release-body.md`、
+`docs/how-to-verify.md`、`docs/how-to-verify.zh-CN.md`。
