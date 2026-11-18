@@ -733,13 +733,20 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Install dependencies
         run: uv sync --extra dev --extra analysis --extra demo --extra mcp --frozen
-      - name: Run the self-check measurement and print what pytest said
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install analysis backends
+        run: bash scripts/install-backends.sh
+      - name: Fetch test fixtures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/fetch-fixtures.sh
+      - name: Run the script's own flow and print every subprocess
         run: |
           set -uo pipefail
           uv run --no-sync python - <<'PY'
           import importlib.util
           import sys
-          from pathlib import Path
 
           spec = importlib.util.spec_from_file_location(
               "rf", "scripts/refresh-report-figures.py"
@@ -748,52 +755,25 @@ jobs:
           sys.modules["rf"] = rf
           spec.loader.exec_module(rf)
 
-          captured = []
           original = rf.run
+          index = 0
 
           def spy(*args, env=None):
+              global index
+              index += 1
               result = original(*args, env=env)
-              captured.append(result)
+              print(f"### subprocess {index}: {' '.join(args[:6])}")
+              print(f"### exit code: {result.returncode}")
+              print(f"### env COVERAGE_FILE={env.get('COVERAGE_FILE') if env else None}")
+              print(f"### env COVERAGE_PROCESS_START={env.get('COVERAGE_PROCESS_START') if env else None}")
+              print(f"### env DEXATLAS_REPORT_PATH={env.get('DEXATLAS_REPORT_PATH') if env else None}")
+              print("### stdout tail:")
+              print("\n".join(result.stdout.splitlines()[-4:]))
+              print("### stderr tail:")
+              print("\n".join(result.stderr.splitlines()[-6:]))
               return result
 
           rf.run = spy
-
-          report = rf.REPORT_PATH
-          text = report.read_text(encoding="utf-8")
-          print("report:", report)
-          print("collected:", rf.collected_tests("not slow"))
-
-          for label, candidate in (
-              ("the report as it is", text),
-              (
-                  "a candidate with another machine's numbers",
-                  text.replace(
-                      "<!--fig:suite.passed-->1694<!--/fig-->",
-                      "<!--fig:suite.passed-->1678<!--/fig-->",
-                  ).replace(
-                      "<!--fig:coverage.pct-->93.3%<!--/fig-->",
-                      "<!--fig:coverage.pct-->92.9%<!--/fig-->",
-                  ),
-              ),
-          ):
-              captured.clear()
-              print("=" * 30, label, "=" * 30)
-              outcome = rf.measure_report_checks(candidate, report)
-              print("counts:", outcome.counts)
-              print("describe:", outcome.describe())
-              for result in captured:
-                  print("exit code:", result.returncode)
-                  print("--- stdout tail ---")
-                  print(result.stdout[-4000:])
-                  print("--- stderr tail ---")
-                  print(result.stderr[-4000:])
-          print("=" * 30, "status page", "=" * 30)
-          captured.clear()
-          outcome = rf.measure_status_checks(
-              text, text, report, rf.STATUS_PATH
-          )
-          print("counts:", outcome.counts)
-          for result in captured:
-              print("exit code:", result.returncode)
-              print(result.stdout[-1500:])
+          code = rf.main(["--check"])
+          print("### script exit:", code)
           PY
