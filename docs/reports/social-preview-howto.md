@@ -72,10 +72,10 @@ README 里用的是双引号，两种都合法。）
 | `93.3%` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.pct-->` |
 | `7135/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` 与 `<!--fig:coverage.total-->` |
 | `1644` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
-| `1497 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` || `28 REST` | `scripts/verify-public-contracts.py:105` | `_rest_requests()` 里的检查调用点数 |
-| `6 MCP` | `scripts/verify-public-contracts.py:355` | `mcp_checks()` 里的检查调用点数 |
-| `15 CLI` | `scripts/verify-public-contracts.py:429` | `cli_checks()` 里的检查调用点数 |
-| `49`（清单条数） | 上面三行之和 | 静态条数，不是任何一次实跑的通过数 |
+| `1497 快 + 147 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
+| `28 REST` | `scripts/verify-public-contracts.py:109` | `_rest_requests()` 里的检查调用点数 |
+| `6 MCP` | `scripts/verify-public-contracts.py:360` | `mcp_checks()` 里的检查调用点数 |
+| `15 CLI` | `scripts/verify-public-contracts.py:434` | `cli_checks()` 里的检查调用点数 || `49`（清单条数） | 上面三行之和 | 静态条数，不是任何一次实跑的通过数 |
 | `11`（MCP 只读工具） | `src/dexatlas/mcp/server.py:105-328` | `server.tool` 的注册处数 |
 | `Apache-2.0` | `pyproject.toml:10` | 许可证标识 |
 | `v1.0.0` | `src/dexatlas/__init__.py:11` | 版本号的唯一来源 |

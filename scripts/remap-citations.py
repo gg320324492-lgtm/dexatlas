@@ -44,15 +44,13 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 
-#: The documents the citation checker reads. The remapper works on the same
-#: ones, because a citation in a document the checker never reads is a
-#: citation nobody checks.
-DOCUMENTS = (
-    REPO / "docs" / "analysis-provenance.md",
-    REPO / "docs" / "architecture" / "public-contracts.md",
-    REPO / "docs" / "reports" / "phase1-execution-report.md",
-    REPO / "docs" / "benchmarks" / "large-apk.md",
-)
+#: The documents the citation checker reads are not written here: they are
+#: read from the checker, which is loaded as a module a few lines down.
+#: Writing a second copy of the list is how the two came to disagree -- the
+#: checker grew to twelve documents and the remapper stayed at four, so the
+#: remapper reported "0 citations moved" for a document whose citations had
+#: drifted, and the checker reported the drift. One list, read from the
+#: checker that enforces it.
 
 CITATION = re.compile(r"`([\w./-]+\.(?:py|sh|toml|yml)):(\d+)(?:-(\d+))?`")
 
@@ -193,7 +191,12 @@ def _rewrite(checker, document: Path) -> int:
             return f"`{rel}:{new_start}`"
         return f"`{rel}:{new_start}-{new_end}`"
 
-    document.write_text(CITATION.sub(replace, text), encoding="utf-8")
+    # The repository's line endings are LF on every platform -- that is
+    # what .gitattributes says -- so the file is written the way it is
+    # stored rather than the way the platform happens to spell it. Without
+    # the newline, a run on Windows rewrote every line of the document with
+    # CRLF, and the working copy stopped being the file the repository has.
+    document.write_text(CITATION.sub(replace, text), encoding="utf-8", newline="\n")
     return moved
 
 
@@ -231,8 +234,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
 
-    documents = arguments.documents or list(DOCUMENTS)
     checker = _checker()
+    documents = arguments.documents or list(checker.DOCS)
     for document in documents:
         if not document.is_file():
             print(f"{document}: not there")
