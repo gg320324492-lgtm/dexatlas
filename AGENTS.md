@@ -44,7 +44,7 @@ are one file, and a test in `tests/test_docs.py` keeps them that way.
 ## Running it
 
 ```bash
-uv sync --extra dev --extra analysis      # once, in your own worktree
+uv sync --frozen --all-extras             # once, in your own worktree
 uv run --no-sync pytest -q                # the suite
 uv run --no-sync ruff check . && uv run --no-sync ruff format --check .
 uv run --no-sync mypy                    # strict
@@ -56,6 +56,23 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 `uv sync` creates a `.venv` whose editable install points at *that* directory, so
 **every worktree needs its own**. Reusing another checkout's venv silently tests
 the wrong code.
+
+### Prerequisites the gates assume
+
+- **The clone is full-depth.** The version-claim check reads the tag list; a
+  shallow clone cannot answer it, and the check says so instead of guessing
+  (`git fetch --tags` is enough for a branch; CI checks out with
+  `fetch-depth: 0`).
+- **The third-party fixtures are fetched** (`bash scripts/fetch-fixtures.sh`).
+  The integration suites fail — not skip — without them: a skip would read as
+  "verified" on a machine that had simply not fetched them.
+- **ffmpeg is installed** for the demo-video deep check; without it that test
+  skips, and a measurement that counted on "0 skipped" would be counting on a
+  tool it had not declared.
+- **The analysis backends** (JADX, Apktool) are optional for the fast suite;
+  the tests that need them skip when they are absent. The measurement and the
+  contract check describe the configuration *with* them — run
+  `bash scripts/install-backends.sh` before trusting a coverage number.
 
 ### The gates
 
@@ -89,11 +106,14 @@ backends, the fixtures, Pillow, ffmpeg and the git tags.
   overwrites the Windows venv with a Linux one and leaves `cryptography`
   broken in a way `uv sync` refuses to repair because the version already
   matches.
-- **Everything this project writes lives in `G:\dexatlas\.scratch`** — the
-  analysis backends, the helper scripts, the temporary files, the uv cache. The
-  system drive is nearly full. `tests/conftest.py` redirects the temporary
-  directory there, so a plain `uv run pytest` writes nothing to the system
-  drive.
+- **Everything this project writes lives in a `.scratch/` beside the
+  repository** — the analysis backends, the helper scripts, the temporary
+  files, the uv cache. The system drive is nearly full. `tests/conftest.py`
+  redirects the temporary directory to `<repo>/.scratch/tmp`, so a plain
+  `uv run pytest` writes nothing to the system drive. On the main checkout
+  that directory is the same place the old note called `G:\dexatlas\.scratch`;
+  in a worktree it is the worktree's own `.scratch/`, which is why every
+  worktree needs its own venv and its own measurement.
 - **A backend that cannot be found makes its tests skip**, and a skip is not a
   pass. Read the skip count in the summary line, not just the exit code.
 - On Windows, `cat >> file <<'EOF'` mixes CRLF and LF line endings and

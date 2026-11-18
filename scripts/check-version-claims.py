@@ -76,6 +76,7 @@ import argparse
 import ast
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -459,6 +460,11 @@ def git(*args: str) -> str:
     document in this repository is UTF-8, and reading it as something else
     would fail on a machine whose default encoding is not UTF-8.
     """
+    if shutil.which("git") is None:
+        raise SystemExit(
+            "git is not available on PATH, so the repository's release state cannot be "
+            "read. Install Git and make sure it is on PATH, then run this again."
+        )
     result = subprocess.run(
         ["git", *args],
         cwd=REPO,
@@ -474,7 +480,16 @@ def git(*args: str) -> str:
 
 
 def git_succeeds(*args: str) -> bool:
-    """Whether a git command works. Used for the optional lookups."""
+    """Whether a git command works. Used for the optional lookups.
+
+    A machine without git on PATH -- common on Windows, where Git for Windows
+    ships its own shell and the system PATH often has neither -- answers
+    "no" here, which is what sends the caller down the fallback that needs
+    no git. Letting the subprocess call raise instead would end the check
+    with an exit code indistinguishable from a real finding.
+    """
+    if shutil.which("git") is None:
+        return False
     result = subprocess.run(
         ["git", *args],
         cwd=REPO,
@@ -505,7 +520,7 @@ def is_a_checkout() -> bool:
 
 def git_optional(*args: str) -> str | None:
     """The output of a git command, or None when the command does not work."""
-    if not is_a_checkout():
+    if not is_a_checkout() or shutil.which("git") is None:
         return None
     result = subprocess.run(
         ["git", *args],
@@ -1561,12 +1576,28 @@ _SKIP_DIRECTORIES = frozenset(
 
 
 def _markdown_files() -> list[str]:
-    """The markdown files of the tree, by git when there is one, else by walking."""
+    """The markdown files of the tree, by git when there is one, else by walking.
+
+    The fallback walks the tree with the suffix compared explicitly: a glob
+    pattern matches case-insensitively on Windows and case-sensitively on
+    Linux, so a ``README.MD`` written in upper case would be checked on one
+    platform and never read on the other. The paths are sorted as the POSIX
+    spellings they are written as -- sorting ``Path`` objects compares the
+    platform's normalisation, which on Windows folds case and orders the
+    same set differently.
+    """
     listed = git_optional("ls-files", "*.md")
     if listed is not None:
         return [name.strip() for name in listed.splitlines() if name.strip()]
     found: list[str] = []
-    for path in sorted(REPO.rglob("*.md")):
+    # The suffix is compared exactly, as git's own pathspec would: a glob
+    # pattern matches case-insensitively on Windows and case-sensitively on
+    # Linux, so the same ``STATUS.MD`` was a document one platform checked
+    # and the other never read. Both branches accept the same spelling, and
+    # both sort the same way, so the two platforms read the same set in the
+    # same order.
+    paths = (path for path in REPO.rglob("*") if path.suffix == ".md")
+    for path in sorted(paths, key=lambda path: path.relative_to(REPO).as_posix()):
         if _SKIP_DIRECTORIES & set(path.relative_to(REPO).parts):
             continue
         found.append(path.relative_to(REPO).as_posix())

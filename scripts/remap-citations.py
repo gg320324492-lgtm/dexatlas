@@ -46,20 +46,30 @@ REPO = Path(__file__).resolve().parent.parent
 
 #: The documents the citation checker reads. The remapper works on the same
 #: ones, because a citation in a document the checker never reads is a
-#: citation nobody checks.
-DOCUMENTS = (
-    REPO / "docs" / "analysis-provenance.md",
-    REPO / "docs" / "architecture" / "public-contracts.md",
-    REPO / "docs" / "reports" / "phase1-execution-report.md",
-    REPO / "docs" / "benchmarks" / "large-apk.md",
-)
+#: citation nobody checks. The checker's list is derived -- the release notes
+#: are a directory's worth, and the release body is a name pattern -- so this
+#: list asks the checker for its list instead of keeping a second copy that
+#: would drift from it.
+DOCUMENTS: tuple[Path, ...] = ()  # replaced by _checker()'s DOCS at load time
+
+#: The directories the remapper never walks. Kept separate from the checker's
+#: SKIP_DIRECTORIES only so that this file states none of the rules twice.
+SKIP_DIRECTORIES = {".git", ".venv", "build", ".claude", ".scratch", "node_modules"}
+
+
+def _document_list() -> tuple[Path, ...]:
+    """The documents the checker reads, in the order the checker reads them.
+
+    The remapper re-derives what the checker checks. A document the checker
+    reads but the remapper does not is a document whose citations drift and
+    are never moved back -- which is how the release appendix went stale for
+    a release -- so the one list is taken from the other.
+    """
+    checker = _checker()
+    return tuple(checker.DOCS)
+
 
 CITATION = re.compile(r"`([\w./-]+\.(?:py|sh|toml|yml)):(\d+)(?:-(\d+))?`")
-
-#: The directories the citation checker does not look in. The remapper has to
-#: find the same file the checker found, or it leaves the citation alone and
-#: the drift survives.
-SKIP_DIRECTORIES = {".git", ".venv", "build", ".claude", ".scratch", "node_modules"}
 
 
 def _checker():
@@ -193,7 +203,11 @@ def _rewrite(checker, document: Path) -> int:
             return f"`{rel}:{new_start}`"
         return f"`{rel}:{new_start}-{new_end}`"
 
-    document.write_text(CITATION.sub(replace, text), encoding="utf-8")
+    # newline="\n" keeps the document's line endings what git checks in: a
+    # text-mode write translates "\n" into "\r\n" on Windows, and a document
+    # rewritten in CRLF looks unchanged to a diff that normalises on commit --
+    # the developer would never see that the file was rewritten at all.
+    document.write_text(CITATION.sub(replace, text), encoding="utf-8", newline="\n")
     return moved
 
 
@@ -231,7 +245,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     arguments = parser.parse_args(argv)
 
-    documents = arguments.documents or list(DOCUMENTS)
+    documents = arguments.documents or list(_document_list())
     checker = _checker()
     for document in documents:
         if not document.is_file():

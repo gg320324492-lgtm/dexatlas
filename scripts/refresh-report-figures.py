@@ -72,7 +72,6 @@ import io
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -121,6 +120,69 @@ TEST_FILE_SECTION = "### 2.1"
 
 #: Coverage is measured on the package, so module paths are relative to it.
 SOURCE_PREFIX = "src/dexatlas/"
+
+#: The tool versions the provenance document states its outputs were produced
+#: with. A measurement taken with a different version records different
+#: numbers -- class counts, method counts, cross-references -- while the
+#: document keeps claiming the pinned ones, so the script asks before it
+#: writes. A backend that cannot be probed is not a mismatch: absence is
+#: dealt with by the completeness check, not here.
+DOCUMENTED_TOOL_VERSIONS = {
+    "jadx": "1.5.2",
+    "apktool": "2.11.1",
+    "androguard": "4.1.4",
+}
+
+
+def _probe_tool_version(tool: str) -> str | None:
+    """The version of one analysis backend, the way the code itself runs it.
+
+    The probing goes through the backend's own resolution, so the version
+    read here is the version an analysis would actually use -- not whatever
+    a ``PATH`` search happens to find first.
+    """
+    try:
+        if tool == "jadx":
+            from dexatlas.config.settings import Settings
+            from dexatlas.tools.jadx.adapter import JadxBackend
+
+            return JadxBackend(Settings()).version()
+        if tool == "apktool":
+            from dexatlas.config.settings import Settings
+            from dexatlas.tools.apktool.adapter import ApktoolBackend
+
+            return ApktoolBackend(Settings()).version()
+        if tool == "androguard":
+            import importlib.metadata
+
+            return importlib.metadata.version("androguard")
+    except Exception:  # any probe failure means "unknown", not "wrong"
+        return None
+    return None
+
+
+def documented_version_mismatches() -> list[str]:
+    """Where this machine's backends disagree with the documented versions.
+
+    The provenance document states that every output in it was produced with
+    three pinned tool versions. A measurement taken with another version
+    produces different numbers and the document would keep the old claim, so
+    the measurement refuses to describe a run the document does not describe.
+    """
+    from dexatlas import __version__  # noqa: F401 - presence check only
+
+    mismatches: list[str] = []
+    for tool, documented in DOCUMENTED_TOOL_VERSIONS.items():
+        found = _probe_tool_version(tool)
+        if found is None:
+            continue
+        # The probes can answer "1.5.2" or "1.5.2 (something)"; the leading
+        # version token is the comparison.
+        version = found.strip().split()[0] if found.strip() else ""
+        if version and version != documented:
+            mismatches.append(f"{tool}: documented {documented}, this machine has {version}")
+    return mismatches
+
 
 #: The coverage configuration that makes the measurement subprocess-aware.
 #:
@@ -259,8 +321,26 @@ class Refresh:
 
 
 def run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    """Run a command in the repository and capture what it says."""
-    return subprocess.run(args, cwd=REPO_ROOT, capture_output=True, text=True, check=False, env=env)
+    """Run a command in the repository and capture what it says.
+
+    The output is decoded as UTF-8 whatever the machine's locale is. In text
+    mode without an encoding, a subprocess decodes with the platform default
+    -- GBK here, UTF-8 on CI -- and a byte the decoding cannot read makes the
+    stream ``None`` instead of raising, so the failure surfaces later as a
+    type error about a value that was never a string. Every process this
+    script starts is also run under ``PYTHONUTF8`` (see
+    :func:`measurement_env`), so both sides of the pipe agree on the bytes.
+    """
+    return subprocess.run(
+        args,
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+        env=env,
+    )
 
 
 def collected_tests(marker: str) -> tuple[int, int]:
@@ -332,7 +412,21 @@ def discard_stale_coverage() -> None:
     if not stale:
         return
     for path in stale:
-        path.unlink()
+        try:
+            path.unlink()
+        except OSError as error:
+            # Windows refuses to delete a file another process has open, and
+            # an open .coverage file is another measurement running in this
+            # checkout. Two measurements would fight over the report, so the
+            # run stops here with a message instead of a traceback -- and on
+            # a platform that allows the delete, stopping is still right: a
+            # measurement whose data file is being deleted under it is not a
+            # measurement to add numbers to.
+            raise SystemExit(
+                f"could not remove {path}: {error}\n"
+                "another measurement may be running in this checkout; "
+                "wait for it to end and run this again."
+            ) from error
     print(f"  discarded stale coverage data: {', '.join(path.name for path in stale)}")
 
 
@@ -358,9 +452,16 @@ def measurement_env(base: dict[str, str] | None = None) -> dict[str, str]:
     ``COVERAGE_FILE`` names the data file this run owns, so every process
     the measurement starts -- the suite, the coverage tool, the workers the
     tests spawn -- writes into it and nowhere else.
+
+    ``PYTHONUTF8`` pins the child's text encoding: with it, both sides of the
+    pipe read the same bytes as UTF-8. Without it the child writes in the
+    platform's default -- GBK on a Chinese Windows, UTF-8 on CI -- and a
+    parent that decodes as the other encoding reads a value that was never
+    written.
     """
     env = dict(os.environ if base is None else base)
     env["COVERAGE_FILE"] = str(measurement_data_file())
+    env.setdefault("PYTHONUTF8", "1")
     return env
 
 
@@ -515,7 +616,11 @@ def measure_code_tests() -> Outcome:
     # way.
     rc_path = REPO_ROOT / ".scratch" / f"coveragerc-measure-{os.getpid()}.ini"
     rc_path.parent.mkdir(exist_ok=True)
-    rc_path.write_text(COVERAGE_RC, encoding="utf-8")
+    # newline="\n" keeps the bytes the same on every platform: a text-mode
+    # write translates "\n" into os.linesep on Windows, and a configuration
+    # file that differs per platform is one more way for two measurements of
+    # one tree to disagree.
+    rc_path.write_text(COVERAGE_RC, encoding="utf-8", newline="\n")
     env = measurement_env()
     env["COVERAGE_PROCESS_START"] = str(rc_path)
     outcome = measure_tests(
@@ -547,7 +652,9 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
     """
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / report_path.name
-        path.write_text(candidate, encoding="utf-8")
+        # newline="\n" keeps the candidate's bytes the same on every platform,
+        # so the self-checks measure one report, not one spelling of it.
+        path.write_text(candidate, encoding="utf-8", newline="\n")
         env = measurement_env()
         env[REPORT_PATH_ENV] = str(path)
         return measure_tests(
@@ -568,8 +675,9 @@ def measure_status_checks(
     with tempfile.TemporaryDirectory() as directory:
         report_copy = Path(directory) / report_path.name
         status_copy = Path(directory) / status_path.name
-        report_copy.write_text(report_candidate, encoding="utf-8")
-        status_copy.write_text(status_candidate, encoding="utf-8")
+        # newline="\n" keeps the candidates' bytes the same on every platform.
+        report_copy.write_text(report_candidate, encoding="utf-8", newline="\n")
+        status_copy.write_text(status_candidate, encoding="utf-8", newline="\n")
         env = measurement_env()
         env[REPORT_PATH_ENV] = str(report_copy)
         env[STATUS_PATH_ENV] = str(status_copy)
@@ -603,7 +711,11 @@ def fingerprint_files() -> list[Path]:
     files: list[Path] = []
     for root in (SOURCE_ROOT, TESTS_ROOT):
         if root.is_dir():
-            files.extend(root.rglob("*.py"))
+            # The suffix is compared explicitly: a glob pattern matches case-
+            # insensitively on Windows and case-sensitively on Linux, so a
+            # stray ``.PY`` file would enter the fingerprint here and make
+            # the two platforms disagree about what the tree contains.
+            files.extend(path for path in root.rglob("*") if path.suffix == ".py")
     for name in FINGERPRINT_FILES:
         path = REPO_ROOT / name
         if path.is_file():
@@ -653,7 +765,14 @@ def source_statements() -> dict[str, int]:
 
     settings = coverage.Coverage(config_file=True)
     counts: dict[str, int] = {}
-    paths = sorted(SOURCE_ROOT.rglob("*.py"), key=lambda path: path.as_posix())
+    # The suffix is compared explicitly: a glob pattern matches case-
+    # insensitively on Windows and case-sensitively on Linux, and a stray
+    # ``.PY`` file would enter one platform's statement count but not the
+    # other's.
+    paths = sorted(
+        (path for path in SOURCE_ROOT.rglob("*") if path.suffix == ".py"),
+        key=lambda path: path.as_posix(),
+    )
     for path in paths:
         relative = path.relative_to(SOURCE_ROOT).as_posix()
         counts[relative] = len(PythonFileReporter(str(path), coverage=settings).lines())
@@ -1052,11 +1171,22 @@ def missing_prerequisites() -> list[str]:
 
     Only used to explain a partial measurement. Whether the measurement was
     complete is decided by what the suite did, not by what is installed here.
+
+    The backends are looked up the way the code itself finds them -- through
+    the configured paths, then on ``PATH`` -- rather than by a bare ``PATH``
+    search: CI points the code at them with environment variables and never
+    puts their directories on ``PATH``, so a bare search reports a backend
+    as missing on the very machine that has it.
     """
     missing: list[str] = []
-    if not shutil.which("jadx") and not os.environ.get("DEXATLAS_JADX_PATH"):
+    from dexatlas.tools.base import which_or_none
+
+    if which_or_none([os.environ.get("DEXATLAS_JADX_PATH")], names=("jadx",)) is None:
         missing.append("JADX (bash scripts/install-backends.sh)")
-    if not shutil.which("apktool") and not os.environ.get("DEXATLAS_APKTOOL_JAR"):
+    if (
+        not os.environ.get("DEXATLAS_APKTOOL_JAR")
+        or not Path(os.environ["DEXATLAS_APKTOOL_JAR"]).is_file()
+    ):
         missing.append("Apktool (bash scripts/install-backends.sh)")
     if find_spec("androguard") is None:
         missing.append("androguard (uv sync --extra analysis)")
@@ -1252,6 +1382,20 @@ def main(argv: list[str] | None = None) -> int:
     # write to the real status page while it does so.
     status_path = STATUS_PATH if report_path == REPORT_PATH and STATUS_PATH.is_file() else None
     status_text = status_path.read_text(encoding="utf-8") if status_path else None
+
+    # The provenance document names the tool versions its outputs were made
+    # with. A measurement on other versions writes numbers the document does
+    # not describe, so the run says so and stops before it measures.
+    mismatches = documented_version_mismatches()
+    if mismatches:
+        print("The backends on this machine do not match the versions the report names:")
+        for mismatch in mismatches:
+            print(f"  {mismatch}")
+        print(
+            "\nNothing was written. Install the documented versions "
+            "(bash scripts/install-backends.sh) and run this again."
+        )
+        return 1
 
     print("Collecting the test suite...")
     fast, total = collected_tests("not slow")

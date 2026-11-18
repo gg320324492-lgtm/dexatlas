@@ -122,7 +122,10 @@ worker 进程的执行也并入统计，现在它记为
 CLI 参数组合。**不是**核心分析逻辑——`core/` 下的主要模块都在 90% 以上。
 
 **口径：** 覆盖率由 `uv run pytest --cov=dexatlas` 测得，测的是 `src/dexatlas` 一方代码
-（不含测试、示例与脚本）。**这个数字只有一次「完整测量」才有意义**：装齐 JADX /
+（不含测试、示例与脚本）。**这个数字是在 Windows 上、三个后端都在的那套配置下量出来的**：
+平台决定了哪几个平台分支会执行、哪些测试会跳过，所以在 Linux 上量同一棵树，
+得到的百分比与弱模块表会与这里不同——那是同一份代码在另一台机器上的事实，不是数字错了。
+**这个数字只有一次「完整测量」才有意义**：装齐 JADX /
 Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，于是每一个测试都
 真正跑过，一个都不跳过。少任何一样，套件就会跳过一部分测试——**跳过的测试不产生
 覆盖率**，同样的命令会得到更低的数字。刷新脚本只在完整测量下改写覆盖率那几行；
@@ -235,6 +238,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_agent_enumeration_contract.py` | 枚举完整性契约：问某类若干方法时逐方法成条，包括打破规律的第三个（M6 复测修复 3 新增） |
 | `test_agent_partial_subject_contract.py` | 问分析本身的问题（后端缺失是否被记录）允许引用过程记录作答；普通 APK 问题的进程注记仍降级（M6 复测修复 4 新增） |
 | `test_agent_no_manifest_closes.py` | no_manifest 失败视作完整读取：manifest 意图被失败事实闭合，模型基于错误作答而非空转耗尽预算（M6 复测修复 5 新增） |
+| `test_platform_independent_gates.py` | 门禁的平台无关判据：引用大小写、占位链接、指纹文件集合、UTF-8 输出、venv 判据、工具版本核对、CI 临时目录与安装命令（门禁差异审计处置新增） |
 | `test_agent_stop.py` | agent 收束停止策略：关键事实集齐→宽限读取→关工具→两次作答，不再等预算耗尽（M6-② 新增） |
 | `test_agent_budget_defaults.py` | agent 默认预算上调（120k tokens/16 迭代/40 步）与显式覆盖优先级（M6-② 新增） |
 | `test_resource_references.py` | 资源之间的引用边：解析、存储、检索、CLI 与 API（resource-references 新增） |

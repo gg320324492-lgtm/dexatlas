@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -251,14 +250,43 @@ def check_reader_package(report: Report) -> None:
 RELATIVE_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)\s]+)")
 
 
+def _resolves_literally(base: Path, target: str) -> bool:
+    """Whether ``target`` names something, checked component by component.
+
+    ``Path.resolve()`` normalises the way Windows does: there, three dots
+    mean "the parent directory", so a placeholder link written as ``...``
+    resolved to a directory that exists and passed the check on Windows --
+    while a link that means nothing is a broken link on every platform. The
+    names are checked literally instead, which is what a file system does on
+    every platform, and which is the same rule the document-wide link check
+    in ``tests/test_docs.py`` applies.
+    """
+    current = base
+    for part in target.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            current = current.parent
+            continue
+        try:
+            names = {entry.name for entry in current.iterdir()}
+        except OSError:
+            return False
+        if part not in names:
+            return False
+        current = current / part
+    return current.exists()
+
+
 def _check_relative_links(path: Path, report: Report, check_id: str, title: str) -> None:
     """Every relative markdown link in a document resolves to a file."""
     text = path.read_text(encoding="utf-8")
     broken: list[str] = []
     for match in RELATIVE_LINK.finditer(text):
-        target = match.group(1)
-        resolved = (path.parent / target).resolve()
-        if not resolved.exists():
+        target = match.group(1).split("#")[0]
+        if not target:
+            continue
+        if not _resolves_literally(path.parent, target):
             broken.append(target)
     report.add(
         outcome_of(
@@ -648,25 +676,57 @@ def check_demo_app_present(report: Report) -> None:
 
 
 def check_gate_commands(report: Report) -> None:
-    """每个门禁命令的入口存在——不执行全量门禁，只证明命令可被调用。"""
+    """每个门禁命令的入口存在——不执行全量门禁，只证明命令可被调用。
+
+    判据只看项目自己的 venv，不看 PATH：venv 是树的一部分，PATH 是环境的
+    一部分。机器上碰巧装了全局工具时，PATH 那一支会让一个还没有同步过
+    venv 的工作区判绿；而 CI 的 PATH 上只有 venv，于是同一棵树在两个平台
+    上得到不同的答案。venv 缺失时判「需人工」而不是「失败」——那说明环境
+    没建好，不是树有问题。
+    """
     venv_bin = REPO_ROOT / ".venv" / "Scripts"
     posix_bin = REPO_ROOT / ".venv" / "bin"
+    venv_present = venv_bin.is_dir() or posix_bin.is_dir()
     for check_id, binary, argv in GATE_COMMANDS:
-        found = shutil.which(binary)
-        in_venv = (venv_bin / f"{binary}.exe").is_file() or (posix_bin / binary).is_file()
         # Script gates are files in this repository, not PATH lookups.
         if binary == "python" and argv[1].endswith(".py"):
-            found = (REPO_ROOT / argv[1]).is_file() and found is not None
-            in_venv = True
-        ok = bool(found) or in_venv
-        report.add(
-            outcome_of(
-                check_id,
-                f"门禁可执行：{' '.join(argv[:2])}",
-                ok,
-                f"PATH={'有' if found else '无'}，venv={'有' if in_venv else '无'}",
+            script_exists = (REPO_ROOT / argv[1]).is_file()
+            report.add(
+                outcome_of(
+                    check_id,
+                    f"门禁可执行：{' '.join(argv[:2])}",
+                    script_exists,
+                    f"脚本在仓库中={script_exists}",
+                )
             )
-        )
+            continue
+        in_venv = (venv_bin / f"{binary}.exe").is_file() or (posix_bin / binary).is_file()
+        if in_venv:
+            report.add(
+                outcome_of(
+                    check_id,
+                    f"门禁可执行：{' '.join(argv[:2])}",
+                    True,
+                    "venv 中存在",
+                )
+            )
+        elif not venv_present:
+            report.add(
+                manual(
+                    check_id,
+                    f"门禁可执行：{' '.join(argv[:2])}",
+                    "工作区还没有 .venv（先 uv sync），无法判定；这属于环境未就绪，不是树的问题",
+                )
+            )
+        else:
+            report.add(
+                outcome_of(
+                    check_id,
+                    f"门禁可执行：{' '.join(argv[:2])}",
+                    False,
+                    "venv 中未找到该入口",
+                )
+            )
 
 
 def check_scripts_runnable(report: Report) -> None:
@@ -1082,6 +1142,23 @@ CHECKS: tuple[Callable[[Report], None], ...] = (
 
 
 def main(argv: list[str] | None = None) -> int:
+    # A failed check names what broke, and the name may carry any character
+    # the documents carry. A console that cannot encode it -- GBK on a
+    # Chinese Windows -- would kill the script halfway through its report,
+    # and the exit code a crash gives is the same 1 a real finding gives.
+    # The output is UTF-8 with replacement, so the report finishes on every
+    # machine and the exit code means one thing. ``--json`` redirects to a
+    # file in this project's own how-to, so the redirected case is the
+    # common one, not the exception.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            continue
+
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--json",

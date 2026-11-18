@@ -96,7 +96,14 @@ def backend(settings: Settings) -> AndroguardBackend:
 def fixture_apk(tmp_path: Path) -> Path:
     """A real APK, copied so that nothing can write to the fixture."""
     if not FIXTURE_APK.is_file():
-        pytest.skip("fixture not present; run scripts/fetch-fixtures.sh")
+        # A missing fixture is an environment that is not ready, not a test
+        # with nothing to say: the fetch is a declared prerequisite of this
+        # suite, and a skip would read as "verified" on a machine that had
+        # simply not fetched it.
+        pytest.fail(
+            f"{FIXTURE_APK} is missing; fetch the integration fixtures with "
+            "bash scripts/fetch-fixtures.sh before running this suite"
+        )
     target = tmp_path / FIXTURE_APK.name
     target.write_bytes(FIXTURE_APK.read_bytes())
     return target
