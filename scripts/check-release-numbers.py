@@ -8,11 +8,12 @@
 The execution report is the authority for the numbers of a release:
 ``scripts/refresh-report-figures.py`` writes them into
 ``docs/reports/phase1-execution-report.md`` between ``<!--fig:...-->`` markers,
-out of a complete measurement. Four documents repeat them by hand:
+out of a complete measurement. Five documents repeat them by hand:
 
 * ``docs/how-to-verify.md``,
 * ``docs/how-to-verify.zh-CN.md``,
 * ``docs/releases/<tag>.md``,
+* ``docs/reports/<tag>-github-release-body.md``,
 * the release body published on GitHub for the tag.
 
 Nobody compared them. A number that drifted in one copy left the other three
@@ -27,20 +28,32 @@ Which tree a number is about
 -----------------------------
 There are two comparisons here, and they are about two different trees.
 
-* The **working copy**: the four texts in this checkout, against the
-  execution report in this checkout.
-* The **published release**: the release body published on GitHub for the
-  tag, against the execution report **in the tagged tree** -- the tree the
-  release actually shipped. It is read with ``git show <tag>:<path>``, the
-  way the citation checker reads a file out of a tree.
+* The **working copy**: the pages that describe the tree you are standing on
+  -- ``docs/how-to-verify.md`` and ``docs/how-to-verify.zh-CN.md`` -- against
+  the execution report in this checkout.
+* The **published release**: the documents of a release that shipped -- the
+  release notes, the release body in the repository, and the release body
+  published on GitHub -- against the execution report **in the tagged tree**,
+  the tree that release actually shipped. It is read with
+  ``git show <tag>:<path>``, the way the citation checker reads a file out of
+  a tree.
 
 They have to be two comparisons, because they are two different claims. The
 working copy's report is re-measured as soon as the next version starts, and
 a report measured after the next version began says nothing about the
-release that shipped before it. Comparing the published body of v1.0.0
+release that shipped before it. Comparing the release notes of v1.0.0
 against that measurement would go red for a reason that has nothing to do
 with the release -- and a gate that goes red for the wrong reason is a gate
 that gets turned off.
+
+What a document asserts
+-----------------------
+A number in a fenced code block, or in an inline code span, is a quotation:
+the output of a command, or a sample of what a generated marker looks like.
+The measurement script already draws that line -- it does not write a figure
+that sits inside a code block -- and this script draws it with the same two
+patterns, so that a number illustrated in a document is never read as a
+number asserted by it.
 
 What it prints
 --------------
@@ -57,8 +70,8 @@ The exit codes
 * 1 -- a number disagrees, or one text says two things about it.
 * 2 -- the published release body, or the tagged tree it is compared
   against, could not be read, so the second comparison is incomplete. That
-  is not "the numbers agree": the fourth text was not checked. ``--offline``
-  skips it on purpose, and says so.
+  is not "the numbers agree": the published body was not checked.
+  ``--offline`` skips it on purpose, and says so.
 
 ``--strict`` also fails when a text does not state a number at all.
 """
@@ -96,7 +109,9 @@ BATCH = (
 DETAIL = ("coverage.covered", "coverage.total")
 FAMILIES = BATCH + DETAIL
 
-#: The documents that repeat the numbers by hand, and where they are.
+#: The pages that describe the tree the reader is standing on. They are
+#: compared against the working copy's report, because they are about the
+#: working copy.
 VERIFY_DOCUMENTS = (
     "docs/how-to-verify.md",
     "docs/how-to-verify.zh-CN.md",
@@ -269,26 +284,6 @@ def line_of(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
 
-def fenced_lines(lines: list[str]) -> list[tuple[int, int]]:
-    """The 0-based line ranges that are inside a fenced code block."""
-    spans: list[tuple[int, int]] = []
-    opened: int | None = None
-    marker = ""
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if opened is None:
-            if stripped.startswith("```") or stripped.startswith("~~~"):
-                opened = index
-                marker = stripped[:3]
-        elif stripped.startswith(marker):
-            spans.append((opened, index))
-            opened = None
-            marker = ""
-    if opened is not None:
-        spans.append((opened, len(lines) - 1))
-    return spans
-
-
 def block_of(text: str, offset: int) -> str:
     """The text unit that holds a claim: a table row, a list item, or a paragraph.
 
@@ -352,18 +347,27 @@ def extract(source: Source, authority: dict[str, str]) -> tuple[dict[str, list[C
     claims.
     """
     text = source.text
-    lines = text.split("\n")
-    fences = fenced_lines(lines)
+    code_blocks, inline_code = quoted_spans(text)
+    quotations = code_blocks + inline_code
     claims: dict[str, list[Claim]] = defaultdict(list)
     others: list[str] = []
 
-    def add(family: str, value: str, offset: int, shown: str, *, quoted: bool = False) -> None:
-        line = line_of(text, offset)
-        if not quoted and any(start <= line - 1 <= end for start, end in fences):
-            # A fenced block is a quotation: the output of a command, or a
+    def add(family: str, value: str, offset: int, shown: str, *, marker: bool = False) -> None:
+        spans = quotations if marker else code_blocks
+        if any(start <= offset < end for start, end in spans):
+            # A code block is a quotation: the output of a command, or a
             # sample of what a checker prints. It is not a claim about the
             # current tree.
+            #
+            # A *marker* in an inline code span is one too: it shows the
+            # reader what a marker looks like, and the measurement script
+            # will not write a number into it either.
+            #
+            # A number the page states in a sentence is a claim, though --
+            # the project's own pages write their summary that way, and a
+            # rule that read half a table cell would read the page wrongly.
             return
+        line = line_of(text, offset)
         claim = Claim(family, normalize(value), line, shown.strip())
         if not any(
             seen.family == claim.family and seen.value == claim.value and seen.line == claim.line
@@ -418,9 +422,11 @@ def extract(source: Source, authority: dict[str, str]) -> tuple[dict[str, list[C
     for match in _FIG.finditer(text):
         key = match["key"]
         if key in FAMILIES:
-            # A generated figure, quoted whole: a copy of a value the
-            # measurement writes, and it drifts when the measurement does.
-            add(key, match["value"], match.start(), match.group(0), quoted=True)
+            # A generated figure. It is a claim like any other -- unless it
+            # sits in a code block or an inline code span, where it shows
+            # the reader what a marker looks like, and there it is an
+            # illustration.
+            add(key, match["value"], match.start(), match.group(0), marker=True)
 
     return dict(claims), others
 
@@ -458,6 +464,43 @@ def citation_checker():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+@functools.cache
+def measurement_script():
+    """The measurement script, loaded as a module.
+
+    What a document *asserts* is one rule, and the measurement script has
+    already drawn that line: a marker inside a code block shows the reader
+    what a marker looks like, and a marker inside inline code says the same
+    thing in a sentence. Neither is a number to fill in. The same two
+    patterns decide here what they decide there -- a second copy of the
+    rule would be a second answer, and the two answers would drift.
+    """
+    script = Path(__file__).resolve().parent / "refresh-report-figures.py"
+    spec = importlib.util.spec_from_file_location("dexatlas_refresh_figures", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    # The module has to be in ``sys.modules`` before it runs: its annotations
+    # resolve through it.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def quoted_spans(text: str) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    """The spans of a text that are quotations: code blocks, and inline code.
+
+    The measurement script already draws this line, and the same two
+    patterns draw it here: a fenced code block shows the reader the output
+    of a command, and an inline code span says the same thing in a
+    sentence. A second copy of the rule would be a second answer to the
+    same question, and the two answers would drift.
+    """
+    ruler = measurement_script()
+    code_blocks = [match.span() for match in ruler.CODE_BLOCK.finditer(text)]
+    inline_code = [match.span() for match in ruler.INLINE_CODE.finditer(text)]
+    return code_blocks, inline_code
 
 
 def tagged_report(tag: str) -> tuple[str | None, str]:
@@ -662,7 +705,7 @@ def main(argv: list[str] | None = None) -> int:
     findings: list[Finding] = []
     incomplete = ""
 
-    # ---- the working copy: its texts against its own report -------------
+    # ---- the working copy: the pages that describe this tree -------------
     authority = read_authority()
 
     sources: list[Source] = []
@@ -673,24 +716,6 @@ def main(argv: list[str] | None = None) -> int:
             continue
         sources.append(Source(relative, path.read_text(encoding="utf-8")))
 
-    notes_relative = f"docs/releases/{args.tag}.md"
-    notes_path = REPO_ROOT / notes_relative
-    if notes_path.is_file():
-        sources.append(Source(notes_relative, notes_path.read_text(encoding="utf-8")))
-    else:
-        print(f"missing document: {notes_relative}", file=sys.stderr)
-
-    body_relative = f"docs/reports/{args.tag}-github-release-body.md"
-    body_path = REPO_ROOT / body_relative
-    body_source: Source | None = None
-    if body_path.is_file():
-        body_source = Source(
-            body_relative, release_body_portion(body_path.read_text(encoding="utf-8"))
-        )
-        sources.append(body_source)
-    else:
-        print(f"missing document: {body_relative}", file=sys.stderr)
-
     segments: list[Segment] = [
         Segment(
             name="the working copy",
@@ -700,32 +725,61 @@ def main(argv: list[str] | None = None) -> int:
         )
     ]
 
-    # ---- the published release: its body against the tree it shipped ----
+    # ---- the published release: its documents against the tree it shipped
+    #
+    # The release notes and the release body say what the release measured.
+    # That release is frozen -- its tag is not cut again -- so their numbers
+    # belong to the tree that tag points at, and to nothing measured since.
+    # The page that says "the tree you are standing on has N tests" is a
+    # different thing: it describes the working copy, and it is compared
+    # against the working copy's report.
     published: Source | None = None
-    if args.offline:
-        print("published release body: not checked (--offline)")
+    body_source: Source | None = None
+    tagged_text, tagged_reason = tagged_report(args.tag)
+    if tagged_text is None:
+        incomplete = f"the {args.tag} tree could not be read: {tagged_reason}"
+        print(f"the {args.tag} tree: NOT READ -- {tagged_reason}")
     else:
-        body, reason = published_body(args.tag, args.repo)
-        if body is None:
-            incomplete = f"the published release body could not be read: {reason}"
-            print(f"published release body: NOT READ -- {reason}")
+        print(f"the {args.tag} tree: read")
+        published_sources: list[Source] = []
+
+        notes_relative = f"docs/releases/{args.tag}.md"
+        notes_path = REPO_ROOT / notes_relative
+        if notes_path.is_file():
+            published_sources.append(Source(notes_relative, notes_path.read_text(encoding="utf-8")))
         else:
-            published = Source(f"GitHub release {args.tag} (published body)", body)
-            print("published release body: read")
-            tagged_text, tagged_reason = tagged_report(args.tag)
-            if tagged_text is None:
-                incomplete = f"the {args.tag} tree could not be read: {tagged_reason}"
-                print(f"the {args.tag} tree: NOT READ -- {tagged_reason}")
+            print(f"missing document: {notes_relative}", file=sys.stderr)
+
+        body_relative = f"docs/reports/{args.tag}-github-release-body.md"
+        body_path = REPO_ROOT / body_relative
+        if body_path.is_file():
+            body_source = Source(
+                body_relative, release_body_portion(body_path.read_text(encoding="utf-8"))
+            )
+            published_sources.append(body_source)
+        else:
+            print(f"missing document: {body_relative}", file=sys.stderr)
+
+        if args.offline:
+            print("published release body: not checked (--offline)")
+        else:
+            body, reason = published_body(args.tag, args.repo)
+            if body is None:
+                incomplete = f"the published release body could not be read: {reason}"
+                print(f"published release body: NOT READ -- {reason}")
             else:
-                print(f"the {args.tag} tree: read")
-                segments.append(
-                    Segment(
-                        name=f"the published release {args.tag}",
-                        authority_label=f"{REPORT_DOCUMENT} (the {args.tag} tree)",
-                        authority=figures_in(tagged_text),
-                        sources=(published,),
-                    )
-                )
+                published = Source(f"GitHub release {args.tag} (published body)", body)
+                published_sources.append(published)
+                print("published release body: read")
+
+        segments.append(
+            Segment(
+                name=f"the published release {args.tag}",
+                authority_label=f"{REPORT_DOCUMENT} (the {args.tag} tree)",
+                authority=figures_in(tagged_text),
+                sources=tuple(published_sources),
+            )
+        )
 
     for segment in segments:
         print()
@@ -750,11 +804,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(line)
 
     if published is not None and body_source is not None:
-        # The two texts are read against the same numbers, so that the
-        # difference between them is a difference between the two texts and
-        # not a difference between the two trees they are read against.
-        published_claims, _ = extract(published, authority)
-        body_claims, _ = extract(body_source, authority)
+        # The two texts are read against the same numbers -- the numbers of
+        # the tree they shipped with -- so that the difference between them
+        # is a difference between the two texts and not a difference between
+        # the two trees they are read against.
+        tagged_authority = segments[-1].authority
+        published_claims, _ = extract(published, tagged_authority)
+        body_claims, _ = extract(body_source, tagged_authority)
         drift = compare_texts(published, published_claims, body_source, body_claims)
         if drift:
             print()
