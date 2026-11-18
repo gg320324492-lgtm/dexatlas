@@ -17,6 +17,9 @@
 - **扫描基准**：本 worktree `E:\Dexatlas\.claude\worktrees\competent-dewdney-0895d1`，
   HEAD `9e1aa61`（"最终测量落定：1643 passed / 0 failed / 0 skipped，指纹
   d0e85b61，两张图重画"），工作区 clean，tag `v1.0.0` 已存在。
+  **本报告的行号锚在哪棵树：** 全部锚在提交 **`9e1aa61`** 上，那棵树的测量指纹是
+  `sha256:d0e85b61…`；**本报告里的 `file:line` 只在 `9e1aa61` 上成立**。这是本仓库
+  自己的规矩：读一份报告之前先看它锚在哪棵树上。
 - **扫描范围**：`docs/` 全部子目录（`reports/` 62 份 + `architecture/` + `roadmap/` +
   `releases/` + `outreach/` + `proposals/` + `benchmarks/` + `case-studies/` +
   `assets/` + `docs/` 根下 11 份）、`README.md`、`README.zh-CN.md`、`CHANGELOG.md`、
@@ -125,7 +128,7 @@
 
 | 文件:行 | 现在写的 | 真值 | 应改为 | 依据 |
 |---|---|---|---|---|
-| `docs/status.md:26` | `**9 个 workflow job、10 次并行运行**`，job 列表里没有 `Social preview card` | **10 个 job 定义 / 推 tag 时 11 次并行运行** | `**10 个 workflow job、推 tag 时 11 次并行运行**`（push/PR 是 10 次），并在列表里补 `social preview 图检查` | `ci.yml:500` `social-preview:`（`name: Social preview card`） |
+| `docs/status.md:26` | `**9 个 workflow job、10 次并行运行**`，job 列表里没有 `Social preview card` | **10 个 job 定义 / 推 tag 时 11 次并行运行** | `**10 个 workflow job、推 tag 时 11 次并行运行**`（push/PR 是 10 次），并在列表里补 `social preview 图检查` | `ci.yml:500-501` 的 `social-preview:`（name: Social preview card） |
 | `docs/status.md:50-51` | `**CI 的九个 workflow job** 各自覆盖一种配置……展开后是**十次并行运行**` | 十个 / 十一次 | `**CI 的十个 workflow job**……展开后是**十一次并行运行**` | 同上 |
 | `docs/status.md:55-64` | CI 表 10 行，**缺 `Social preview card` 一行** | 11 行 | 补一行（覆盖面：该 job 跑 `scripts/make-social-preview.py --check`，核对卡片上的数与报告一致） | `ci.yml:500-513` |
 | `docs/reports/v1.0.0-release-checklist.md:60` | `最终 commit 上 CI **9 个 job / 10 次并行运行**全绿` | 10 / 11 | `**10 个 job / 11 次并行运行**` | 同上 |
@@ -153,7 +156,7 @@
 
 | 文件:行 | 现在写的 | 真值 | 应改为 | 依据 |
 |---|---|---|---|---|
-| `docs/portfolio.md:67` | `1,632 tests at 93.3% coverage` | **1,643** | `1,643 tests` | `phase1-execution-report.md:76`；同文件 `:68` 的 CI 数**已经**是对的（ten/eleven），只有测试数没跟上 |
+| `docs/portfolio.md:67` | `1,632 tests at 93.3% coverage` | **1,643** | `1,643 tests` | `phase1-execution-report.md:76`；`docs/portfolio.md:68` 的 CI 数**已经**是对的（ten/eleven），只有测试数没跟上 |
 | `docs/reports/social-preview-howto.md:74` | `\| 1632 \|`（落盘出处写的是 `phase1-execution-report.md:76`） | **1643** | `\| 1643 \|` | 同上（`:76` 现在是 1643）；`.github/social-preview.json` 的 `tests.total` 已是 1643 |
 | `docs/reports/social-preview-howto.md:75` | `\| 1485 快 + 147 集成 \|` | **1496 快 + 147 集成** | `\| 1496 快 + 147 集成 \|` | 同上 |
 | `docs/reports/m10-reader-package.md:110` | `实测：三后端齐备但未取样本时汇总行是 1593 passed, 27 skipped` | **1616 passed, 27 skipped**（1643 − 27） | `1616 passed, 27 skipped` | `docs/how-to-verify.md:167` 写的是同一场景的 `1616 passed, 27 skipped`（正确）；本文件落后两轮 |
@@ -203,7 +206,7 @@
 | 文件:行 | 现在写的 | 真值 | 应改为 | 依据 |
 |---|---|---|---|---|
 | `docs/reports/README.md:3` | `这个目录里是 …… **61 份报告**` | **61**（= 实际文件数，**当前是对的**） | 本轮新增本报告后变 **62** | `git ls-files "docs/reports/*.md"` = 62，减索引页 = 61 |
-| `docs/reports/README.md:42` | `（2026-11-18 复核：目录里 61 个 .md **全部被点名，无遗漏**。）` | **假**：`round-two-fresh-read.md` **全篇未被点名**（`grep 'round-two-fresh-read' docs/reports/README.md` 无命中） | 补进 §6 并把 `无遗漏` 改成真话 | `git ls-files "docs/reports/*.md"` 含该文件；`:190-195` 自己也写着「**新增报告时，请把它加进来**」 |
+| `docs/reports/README.md:42` | `（2026-11-18 复核：目录里 61 个 .md **全部被点名，无遗漏**。）` | **假**：`round-two-fresh-read.md` **全篇未被点名**（`grep 'round-two-fresh-read' docs/reports/README.md` 无命中） | 补进 §6 并把 `无遗漏` 改成真话 | `git ls-files "docs/reports/*.md"` 含该文件；`:190-192` 自己也写着「**新增报告时，请把它加进来**」 |
 | `docs/reports/README.md:42` | `§1–§6 加起来是 68 行而不是 61——其中 8 份在两节里各列了一次……**去重后 §1–§6 点名 60 份，第 61 份在 §7**` | §1–§6 自己的表行合计是 **60**（7+5+6+10+8+**24**）；跨小节重复点名的是 **15** 份（不是 8）；**§7 那张表点名的 8 份全部已在 §1–§6 里出现过，它一份新的都没加** | 整句重写 | 逐节数表行：§1 `:59-65` 7 行、§2 5、§3 6、§4 10、§5 8、§6 `:135-158` **24** |
 | `docs/reports/README.md:28`、`:29`、`:31-32` | 表里 §6 写 **32**、合计写 **68**；同页 `:31-32` 又说「§7「历史记录」是横切视角，点名的文件都已计在上面的分组里，**不另计份数**」 | §6 那 32 = §6 自己的表（24 行）+ §7 那张表的 8 行（`:165-174`）。**§7 没有 `## 7.` 标题**，它的表仍在 §6 的标题之下（`:124` 是 §6，`:160` 起是 §7 的内容），所以「§6 的份数」按页首那句「每个『份数』就是该节表格的行数」算，就等于把 §7 又数了一遍 | 两条路选一条：① 给 §7 加 `## 7.` 标题，让 §6 = 24、合计 = 60；② 保留现状但在 `:31-32` 改成「§6 的 32 含 §7 那张表」 | `:19-32` 分组一览表；`:124`、`:160`、`:165` 的实际结构 |
 | `docs/reports/README.md:3` vs `:29` | 页首 **61**（文件数）与表里 **68**（行数）**用同一个词「份」** | 两个分母 | 页首改成「61 份报告文件」，表里合计列注明「68 行（61 份文件）」 | 同上 |
@@ -232,13 +235,13 @@
 | `docs/reports/final-outward-consistency.md:45` | `\| 测试总数 **1,588**（1,441 快 + 147 集成） \| …… \| 一致（5 处） \|` | **1,643**（1,496 快 + 147 集成）；且那 5 处现在**已经彼此不一致** | 整行改，并说明"现在哪几处不一致" | `phase1-execution-report.md:76` |
 | `docs/reports/github-repo-metadata-proposal.md:78` | `徽章：Tests \| README.md:12 → tests-1588 passing …… \| 数字与落盘报告一致 ✓` | 徽章现在是 **tests-1643** | 数字不动那句改成"数字由脚本写入，脚本会跟着重测量更新" | `README.md:12` |
 | `docs/reports/github-repo-metadata-proposal.md:80` | `徽章数值与落盘报告是否一致 \| **一致 ✓**：……1588 与……的 1588（1441 快 + 147 集成）相符` | 徽章 **1643**、报告 **1643（1496 快 + 147 集成）** | 整行改 | `README.md:12`；`phase1-execution-report.md:76` |
-| `docs/reports/outreach-first-read.md:182` vs `:193` | `:182` 的小节标题写「仓库里其实是**十个 job**」，`:193` 的正文写「`.github/workflows/ci.yml` 有 **9 个 job 定义**（列 9 个名字，漏了 `social-preview`）」 | **10** | `:193` 改成 10 并把 `social-preview` 补进去 | `ci.yml:38-519`；同文件 `:602` 已经写「已改：十个 job（tag 上十一次并行运行）」——**同一份文件里三处两种说法** |
+| `docs/reports/outreach-first-read.md:182` vs `:193` | `:182` 的小节标题写「仓库里其实是**十个 job**」，`:193` 的正文写「`.github/workflows/ci.yml` 有 **9 个 job 定义**（列 9 个名字，漏了 `social-preview`）」 | **10** | `:193` 改成 10 并把 `social-preview` 补进去 | `ci.yml:38-519`；同文件文末处置表（`9e1aa61` 树上的 `docs/reports/outreach-first-read.md:602`）已经写「已改：十个 job（tag 上十一次并行运行）」——**同一份文件里三处两种说法** |
 
 ### F 组 —— 流程数字与"最新/现状"声明（5 处）
 
 | 文件:行 | 现在写的 | 真值 | 应改为 | 依据 |
 |---|---|---|---|---|
-| `docs/reports/ci-gate-coverage.md:7-8`、`:49` | 摘要用**现在时**写：「CI 只在 `main` 上触发（`.github/workflows/ci.yml:3-7`）」「**tag 推送不触发 workflow**（`on.push` 只收 `main` 分支，`ci.yml:4-5`）」；§1 写「CI 一共 6 个 job、7 次并行运行」 | 现在 `on.push` 是 `branches: [main, 'release/**']` + `tags: ['v*']`（**tag 推送会触发**）；现行 workflow **10** 个 job 定义 | 三处都改成现行事实，或在摘要里加一句「以下结论属于 `062c4b5` 那棵树」 | `ci.yml:4-22`、`:38-519`；该报告的复核树是 `062c4b5`（`:2`） |
+| `docs/reports/ci-gate-coverage.md:7-8`、`:49` | 摘要用**现在时**写：「CI 只在 `main` 上触发（`.github/workflows/ci.yml:3-7`）」「**tag 推送不触发 workflow**（`on.push` 只收 `main` 分支，`ci.yml:4-5`）」；§1 写「CI 一共 6 个 job、7 次并行运行」 | 现在 `on.push` 是 `branches: [main, 'release/**']` + `tags: ['v*']`（**tag 推送会触发**）；现行 workflow **10** 个 job 定义 | 三处都改成现行事实，或在摘要里加一句「以下结论属于 `062c4b5` 那棵树」 | `ci.yml:4-22`、`:38-519`；该报告的复核树是 `062c4b5` |
 | `docs/reports/v1.0.0-release-checklist.md:645` | `（2026-11-18 实测：徽章已是 1632，那两处还写着 1612）` | 徽章现在是 **1643** | 改成 1643（并确认那两处现在是什么状态） | `README.md:12` |
 | `docs/service-commitments.md:3` | `最新实测基准：[m6-level2-retest2.md]（2026-11-16）` | retest2 **不是**最新——`m6-level2-retest4.md`（三轮 15/16/18 = 49/60 = 81.7%）更晚 | 改指 retest4，或把"最新"改成"本文 §2 引用的是 retest2 那一次" | `docs/benchmarks/m6-level2-retest4.md`；`docs/status.md:137` 引用的是 retest4 |
 | `docs/reports/next-engagements.md:411` | `材料已齐：…… + 40 项检查表 + 发起人发送前清单 + **自查脚本 40/40**` | 自查是 **43 条**自动化判定 | `自查脚本 43/43` | `scripts/m10_selfcheck.py`；`docs/reports/m10-selfcheck.md:25`、`:88` |
@@ -269,7 +272,7 @@
 | `docs/reports/v1.1.0-candidates.md:44` | `**3 项已做完**（C1、C3、C7）、**1 项主体做完剩最后一段**（C4）、**11 项未开始**` | **5 项已做完**（C1、C3、C4、C7、C14）、**0 项主体完成**、**10 项未开始** | 3/1/11 → **5/0/10** | C4 已闭合（`:380`「已闭合（2026-11-18）」）；C14 的 `scripts/make-social-preview.py`、`tests/test_social_preview.py`、`ci.yml:500 social-preview` 三件都在树里（`92053b0`/`cb24417`/`5c097fe`/`a5c3365`） |
 | `docs/reports/v1.1.0-candidates.md:45` | `现在就能做的有几项？ **4 项**（C5、C6、C14、C15）` | **3 项**（C5、C6、C15） | 去掉 C14 | 同上 |
 | `docs/reports/v1.1.0-candidates.md:49` | `**候选总数怎么对得上** **15 = 3（已完成）+ 1（主体完成）+ 4（未开始·仓库内可做）+ 2（未开始·要作者的真值）+ 5（未开始·等外部条件）**` | **15 = 5 + 0 + 3 + 2 + 5** | 换桶 | 同上；**`:55` 自称「这张表是 §0 各项数字的唯一出处」，所以 §0 全表、§2 排序、§4 触发表全部跟着歪** |
-| `docs/reports/v1.1.0-candidates.md:57` | 桶表 `🟡 **主体完成，剩最后一段** \| 1 \| C4 \| 文档侧已收口；**第三个包的附件还在入库**` | C4 **已闭合**，四个包已入库 | 该行删掉（C4 移到已完成桶） | `docs/case-studies/attachments/` 现在 16 个文件（4 zip + 12 散装）；`git show cb24417 --stat` |
+| `docs/reports/v1.1.0-candidates.md:61` | 桶表 `🟡 **主体完成，剩最后一段** \| 1 \| C4 \| 文档侧已收口；**第三个包的附件还在入库**` | C4 **已闭合**，四个包已入库 | 该行删掉（C4 移到已完成桶） | `docs/case-studies/attachments/` 现在 16 个文件（4 zip + 12 散装）；`git show cb24417 --stat` |
 | `docs/reports/v1.1.0-candidates.md:61` | 桶表 `⬜ **未开始·仓库内可做** \| 4 \| C5、C6、C14、C15` | **3**（C5、C6、C15） | 去掉 C14 | 同上 |
 | `docs/reports/v1.1.0-candidates.md:146` | `**P0** \| C4 证据包与分析的对应关系 \| **文档侧已完成，附件待入库**` | **已闭合** | 状态改成「已闭合」 | 同 `:380` |
 | `docs/reports/v1.1.0-candidates.md:148`、`:518`、`:526` | `**P1** \| C14 social preview 图的自动化守护 \| **未开始（新增）**`；`:518` `**状态**：⬜ **未开始**。`；`:526` 的缺口段仍写「**绘图脚本不入库**、CI 零命中」，并带着 `测试数 1632（1485 快 + 147 集成）` | C14 **已落地**；测试数现值 **1643（1496 快 + 147 集成）** | 三处都改成现状 | `scripts/make-social-preview.py`、`tests/test_social_preview.py`、`ci.yml:500`；`phase1-execution-report.md:76` |
@@ -435,7 +438,8 @@
 基线一走就失效——E 组 10 处全是这一类。
 
 **更危险的是"处方"**（G 组 7 处）：审计报告里写着"该怎么改"的段落，
-基线一变，处方本身就错了。`round-two-fresh-read.md:585` 的处方会把
+基线一变，处方本身就错了。`round-two-fresh-read.md` 处方一节（本报告锚定的
+`9e1aa61` 树上的 `:585`，以及工作副本的对应行）的处方会把
 `CLAUDE.md` 已经改对的 CI job 数**改回错的**；`denominator-and-tree-pass.md:154`
 的处方会让人把 `docs/status.md` 写成 9 个 job——而真相是 10 个。
 **处方比数字更该定期复核**：数字错了读者能发现，照着错的处方改则不会。
@@ -459,7 +463,7 @@
 
 | 文件:行 | 当前值 | 类型 | 有守卫测试吗 |
 |---|---|---|---|
-| `docs/releases/v1.0.0.md:90-91` | 1643 / **1642 passed** | 手写 | ❌ 无（`test_public_contracts.py` 只钉契约数 49） |
+| `docs/releases/v1.0.0.md:90-91` | 1643 / **1642 passed** | 手写 | ❌ 无（`tests/test_public_contracts.py` 只钉契约数 49） |
 | `docs/releases/v1.0.0.md:94` | 93.3%（7135 / 7650 行） | 手写 | ❌ |
 | `docs/reports/v1.0.0-github-release-body.md:164-167`、`:172`、`:264-266`、`:296`、`:301` | 1643 / **1642 passed** / 93.3% / 7,135·7,650 / `d0e85b61` | 手写 | ❌ |
 | `docs/portfolio.md:67` | **1,632** tests | 手写 | ❌ |
@@ -483,10 +487,10 @@
 | `docs/outreach/publish-review.md:23-24` | 1,643 / 93.3%（7,135/7,650） | 手写 | ❌ |
 | `docs/how-to-verify.md:147`、`:153-154` | 1643 / 1496 / 147 | 手写 | ✅ `tests/test_how_to_verify.py` 拿 `pytest --collect-only` 比对 |
 | `docs/how-to-verify.zh-CN.md:120`、`:126-127` | 同上 | 手写 | ✅ 同上 |
-| `docs/how-to-verify.md:167` / `.zh-CN.md:144` | 1616 passed, 27 skipped | 手写 | ❌ **不在**上面那个测试的覆盖范围内（它只查收集数，不查 passed/skipped） |
-| `docs/how-to-verify.md:168` / `.zh-CN.md:145` | 1643 passed、0 skipped | 手写 | ❌ |
-| `docs/how-to-verify.md:216` / `.zh-CN.md:193` | **documents read: 115 / 110**（真值 140） | 手写 | ❌ |
-| `docs/how-to-verify.md:433` / `.zh-CN.md:405` | `<!--fig:tests.total-->1643<!--/fig-->` | 手写（**装饰性标记**） | ❌ |
+| `docs/how-to-verify.md:167` / `docs/how-to-verify.zh-CN.md:144` | 1616 passed, 27 skipped | 手写 | ❌ **不在**上面那个测试的覆盖范围内（它只查收集数，不查 passed/skipped） |
+| `docs/how-to-verify.md:168` / `docs/how-to-verify.zh-CN.md:145` | 1643 passed、0 skipped | 手写 | ❌ |
+| `docs/how-to-verify.md:216` / `docs/how-to-verify.zh-CN.md:193` | **documents read: 115 / 110**（真值 140） | 手写 | ❌ |
+| `docs/how-to-verify.md:433` / `docs/how-to-verify.zh-CN.md:405` | `<!--fig:tests.total-->1643<!--/fig-->` | 手写（**装饰性标记**） | ❌ |
 
 **另有三个数不是测量值、但同样手写**（不受重测量影响、但会随代码长）：
 CI 的 job 定义数与并行运行数（B 组 6 处）、
@@ -533,7 +537,7 @@ CI 的 job 定义数与并行运行数（B 组 6 处）、
 | **契约数字**（11 工具 / 13 命令 / 23 端点 / 0–6 退出码 / 49 活检 / 10 报告顶层键 / schema 3） | 不会自动变 | 但 `scripts/verify-public-contracts.py` 一改，`tests/test_public_contracts.py:765` 的 6 份材料清单之外的地方仍会漏（上一轮漏过 4 处 MCP 工具数） |
 | **CI 数字**（10 job / 11 runs） | 不会自动变 | **B 组 6 处** |
 | **流程数字**（61 份报告 / 各项清单条目数） | 不会自动变 | **D 组 6 处** + F 组 4 处 + C 组 2 处（候选数 15、自查 43/43） |
-| **样例输出里的活数**（`documents read`） | 不会自动变，**每加一份文档就变** | `how-to-verify.md:216` / `.zh-CN.md:193` |
+| **样例输出里的活数**（`documents read`） | 不会自动变，**每加一份文档就变** | `how-to-verify.md:216` / `docs/how-to-verify.zh-CN.md:193` |
 | **审计报告里的"已改 / 已同步 / 处方"** | 不会自动变 | **G 组 7 处**——这类最容易被漏，因为它们看起来是"已完成的结论" |
 | **新合并报告的"状态桶"** | 不会自动变 | **H 组 11 处**——文件在自己的 §3 里打了"已闭合"，摘要桶却没跟上 |
 
@@ -564,14 +568,14 @@ CI 的 job 定义数与并行运行数（B 组 6 处）、
    告诉一位外部独立读者「报告里记录的那次完整测量是 `1620 passed`」**——那是两轮
    之前的数（现值 1643），同一句里的 `1593 passed, 27 skipped` 也同样过期。
    M10 独立验收**尚未开始**，这两份正是要交出去的那份。
-   同一批里还有 `docs/how-to-verify.md:216` 与 `.zh-CN.md:193` 的
+   同一批里还有 `docs/how-to-verify.md:216` 与 `docs/how-to-verify.zh-CN.md:193` 的
    `documents read: 115` / `110`（真值 **140**）——而该页自己写着
    「**`documents read` 那行是活的**」。
 
 **此外两条不在前三、但同样要处理**：
 
 - **G 组（7 处）：审计报告里的"处方"照做会写错。**
-  `docs/reports/round-two-fresh-read.md:585`/`:607` 的处方会把 `CLAUDE.md`
+  `docs/reports/round-two-fresh-read.md:583-588` 的处方会把 `CLAUDE.md`
   已经改对的 CI job 数**改回错的**；`denominator-and-tree-pass.md:154` 的处方
   会让人把 `docs/status.md` 写成 9 个 job。**数字错了读者能发现，照着错的处方改则不会。**
 - **H 组（11 处）：三份新合并报告的"状态桶"已经过期。**
