@@ -222,10 +222,13 @@ FAILED tests/test_failure_wording.py::test_the_report_and_the_json_report_carry_
 | 未通过的测试 | 为什么 |
 |---|---|
 | `tests/test_androguard_integration.py`、`tests/test_androguard_isolation.py`（9 errors + 2 failed） | 需要 `scripts/fetch-fixtures.sh` 抓的第三方 fixture，本机无网。CLAUDE.md 写了：fixture 缺失时集成套件**失败**而不是跳过 |
-| `tests/test_docs.py` 5 条 | 执行报告里的数字（测试数、覆盖率指纹、语句计数）与树不符 → 正是留给主会话重测的那件事 |
+| `tests/test_docs.py` 4 条 | 执行报告里的数字（测试数、覆盖率指纹、语句计数）与树不符 → 正是留给主会话重测的那件事。原先还有第 5 条（测试文件清单缺 `test_failure_wording.py`），本窗口补上那一行后已转绿 |
 | `tests/test_platform_independent_gates.py::test_every_ci_job_redirects_its_temporary_directory` | CI job 数 10 ≠ 期望 9（别的会话往 CI 里加了本地门禁 job，没同步这个期望值）。与本改动无关 |
 | `tests/test_evidence_package.py::test_the_cli_counts_the_files_the_reader_finds_in_the_zip` | 本机控制台宽度把输出折了行（期望串 `1 source fragment` 被拆成 `1 source \nfragment`）。与本改动无关 |
 | `tests/test_how_to_verify.py` 6 条 | 文档里手写的数字过期 → **本窗口已全部更新**，现 6 条全绿（见 §7.1） |
+
+本窗口最后一次全量测试：**1597 passed / 88 skipped / 8 failed / 17 errors**。那 8 条
+failed 与 17 条 errors 全部是上表里的既存项——**本改动引入的失败为 0**。
 
 ### 7.2 留给主会话
 
