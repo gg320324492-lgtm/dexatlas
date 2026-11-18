@@ -94,7 +94,7 @@
 | tag 对象 | `git rev-parse v1.0.0` | 40 位 hash，**每次重打 tag 都变**——现查现填，本表不写死 |
 | tag 指向的提交 | `git rev-parse "v1.0.0^{commit}"` | 另一串 40 位 hash，**同上**；它才是填进邀请函 §2 的那一串 |
 | tag 指向的树与本轮树的关系 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- src/ tests/` | 空（代码与测量数字不受材料修正影响） |
-| M10 材料的差异 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/m10-*.md` | tag 重打到材料定稿提交后应为**空**；不为空就是「读者读到旧稿」 |
+| M10 材料的差异 | `git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/m10-*.md` | tag 重打到材料定稿提交后应只剩**填 hash 这一步动过的文件**（邀请函 §2、记录模板 §1，以及随之改判据的两份清单）；除此以外还有差异就是「读者读到旧稿」 |
 | 案例与证据包在验收树上 | `git ls-tree -r --name-only "v1.0.0^{commit}" docs/case-studies/` | 材料定稿时是 20 个文件（4 篇 markdown + 4 个证据包 zip + 12 份报告）；**个数随附件集增删变化**，要核的是结构 |
 | 凭据形状扫描 | `git grep -nEI "(api[_-]?key\|secret\|access[_-]?token\|password)\s*[:=]\s*['\"][A-Za-z0-9_\-]{12,}"` | 命中 2 处，都是仓库内一方测试里的占位常量（`tests/test_search_substring_fallback.py`、`tests/test_workbench_agent.py`），不是真凭据 |
 | 作者侧自查 | `python scripts/m10_selfcheck.py`（本机**未装** dev extras） | `通过 42，失败 1，需人工 40`，唯一失败项 `G.vulture`（判的是 vulture 在不在 PATH/venv 里）；装齐依赖后应为 `通过 43，失败 0，需人工 40` |

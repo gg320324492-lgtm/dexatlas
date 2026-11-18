@@ -14,7 +14,7 @@
 | 姓名或代号 |  |
 | 是否参与实现 | 是 / 否（必须如实） |
 | 验收日期 |  |
-| commit hash | 照抄[邀请函成稿 §2](m10-invitation-final.md)钉定的那一串完整 hash（40 位） |
+| commit hash | `2715aefda06c3cbbc055a9edf795535e71464068`（40 位；与[邀请函成稿 §2](m10-invitation-final.md)钉定的那一串**逐字相同**。核对方式：`git rev-parse v1.0.0^{commit}`） |
 | 副本来源 |  |
 | 操作系统与版本 |  |
 | Python / uv / JDK / Docker |  |
