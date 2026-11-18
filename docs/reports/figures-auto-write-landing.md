@@ -185,7 +185,33 @@ outcome_counts -> {'passed': 0, 'failed': 0, 'skipped': 0, 'xfailed': 0, 'xpasse
 
 ---
 
-## 4. 这一轮改了哪些文件
+## 4. 这一轮整套套件的状态
+
+带着第三方 fixture（`bash scripts/fetch-fixtures.sh`）跑完整套：
+
+```
+9 failed, 1624 passed, 88 skipped in 306.02s (0:05:06)
+```
+
+**9 条红全部是预期的「数字过期」**，没有一条是本轮改动造成的回归：
+
+| 红在哪 | 为什么红 |
+|---|---|
+| `tests/test_docs.py::test_execution_report_numbers_match_the_code` | `tests.total: the report says ['1712'], the code has 1721` |
+| `tests/test_docs.py::test_execution_report_coverage_figures_describe_the_current_code` | 覆盖率是另一棵树测的（`sha256:18f3ab15…` → `sha256:fbe76910…`） |
+| `tests/test_docs.py::test_execution_report_suite_figures_add_up_to_the_tests_that_exist` | 报告说 1712，树里有 1721 |
+| `tests/test_how_to_verify.py`（6 条） | 页面散文里的 1712/1563/149 与当场收集的 1721/1572/149 不一致 |
+
+这 9 条要等合入后那一轮重测 + 页面同步（§6）才会消失——**在合入之前它们就该是红的**：
+`scripts/` 与 `tests/` 都在指纹里，代码一变，报告里的数就过期。
+
+**88 条 skip 要读清楚**：这个 worktree 里没装 Apktool 与 JADX（可选后端），跳过的正是那些要真调
+后端的用例。按 CLAUDE.md 的规矩，skip 不是 pass——这一轮的数字属于「没装后端」的配置，
+完整配置下的数字由合入后那一轮重测给出。
+
+---
+
+## 5. 这一轮改了哪些文件
 
 | 文件 | 改了什么 | 为什么 |
 |---|---|---|
@@ -200,12 +226,12 @@ outcome_counts -> {'passed': 0, 'failed': 0, 'skipped': 0, 'xfailed': 0, 'xpasse
 
 ---
 
-## 5. 哪些数字需要重测后同步
+## 6. 哪些数字需要重测后同步
 
 **本轮没有跑 `scripts/refresh-report-figures.py`**（并发测量会互相污染覆盖率），也**没有手改任何
 数字**。以下清单是合入后那一轮重测要处理的：
 
-### 5.1 脚本会自己写的（重测后自动同步）
+### 6.1 脚本会自己写的（重测后自动同步）
 
 | 位置 | 现在的值 |
 |---|---|
@@ -216,21 +242,21 @@ outcome_counts -> {'passed': 0, 'failed': 0, 'skipped': 0, 'xfailed': 0, 'xpasse
 这一轮新增的测试文件让**收集数变了**：现在 `pytest --collect-only` 报
 **1572/1721 tests collected (149 deselected)**（改之前是 1563/1712）。所以上面三处一定会动。
 
-### 5.2 要人手同步的（脚本不碰，因为它们是散文里的数字）
+### 6.2 要人手同步的（脚本不碰，因为它们是散文里的数字）
 
 | 位置 | 现在写的 | 该是多少 | 谁来改 |
 |---|---|---|---|
 | `docs/how-to-verify.md:147` 的散文三数（**1712** / **1563** / **149**）与 `:153-154` 的两条 collect 期望输出 | 1712 / 1563 / 149 | 1721 / 1572 / 149 | 主会话（合入后） |
 | `docs/how-to-verify.zh-CN.md:120` 同上、`:126-127` 两条期望输出 | 同上 | 同上 | 主会话 |
 | `docs/portfolio.md:67` | `1,695 tests at 93.3% coverage` | 记录里是 1712 —— **这一条在本轮之前就已经过期**（调研 §0 实测抓到的盲区：portfolio 不在 `OUTWARD_DIRECTORIES` 里） | 主会话（连同调研 §3.2 把 portfolio 纳入 outward 核对） |
-| `docs/status.md:26` / `:50`、`CLAUDE.md:79` / `AGENTS.md:79` 的 CI job 数 | 9 个 job / 10 次并行（status）、twelve jobs（CLAUDE.md） | `ci.yml` 现在是 **13 个 job**（tag 上 14 次并行） | 主会话（调研 §3.1 + §3.5） |
+| `docs/status.md:26` / `:50`、`CLAUDE.md:79` / `AGENTS.md:79`、`docs/portfolio.md:68` 的 CI job 数 | 9 个 job / 10 次并行（status）、twelve jobs（CLAUDE.md、portfolio） | `ci.yml` 现在是 **13 个 job**（tag 上 14 次并行） | 主会话（调研 §3.1 + §3.5） |
 
 `docs/how-to-verify.md` 那两页的散文数字由 `tests/test_how_to_verify.py` 盯着，它拿**当场收集**
 的数与页面比对，所以新增测试文件之后它会红——这是预期的，直到页面被重新同步。
 
 ---
 
-## 6. 剩下什么留给主会话
+## 7. 剩下什么留给主会话
 
 按调研 §3.7 的顺序，本轮没落的：
 
@@ -238,19 +264,19 @@ outcome_counts -> {'passed': 0, 'failed': 0, 'skipped': 0, 'xfailed': 0, 'xpasse
    数字（`docs/status.md:26`/`:50`、`CLAUDE.md:79`、`docs/portfolio.md:68`），本轮不动文档。
 2. **§3.2 把 `docs/portfolio.md` 纳入 outward 核对**：改 `scripts/check-version-claims.py` 一处
    判断即可，但 `docs/portfolio.md:67` 现在写的是 1,695、记录里是 1712 → 加进去当场红 → 必须先
-   同步页面（见 §5.2）。
+   同步页面（见 §6.2）。
 3. **§3.3 how-to-verify 的 skip 表格核对**：要改那两页的表格行。
 4. **§3.5 `fig:ci.jobs` / `fig:ci.runs`**：`docs/status.md` 的 CI 行改由标记供给。机制已经就位
    （脚本会写任何带标记的文档），剩下的是把那两个数字变成标记 + 在 `build_record()` 里解析
    `ci.yml`。
 5. **本轮新增报告的登记**：`docs/reports/README.md` 的索引与 `scripts/check-doc-citations.py`
    的 `DOCS` 清单由主会话统一登记（文件名：`docs/reports/figures-auto-write-landing.md`）。
-6. **合入后重测一轮**：见 §5。测量脚本与 `tests/` 都在指纹里，所以**合入前 main 的 CI 会因为
+6. **合入后重测一轮**：见 §6。测量脚本与 `tests/` 都在指纹里，所以**合入前 main 的 CI 会因为
    数字过期而红**，这是预期的。
 
 ---
 
-## 7. 本窗口做的 / 留给主会话
+## 8. 本窗口做的 / 留给主会话
 
 **本窗口（`claude/exciting-gauss-35fa92`）做的：**
 
@@ -261,12 +287,16 @@ outcome_counts -> {'passed': 0, 'failed': 0, 'skipped': 0, 'xfailed': 0, 'xpasse
 - 红→绿：新增 9 个测试，旧实现下 8 红 1 绿（新保险不许误伤能数的运行），新实现下 9 绿；并当场
   打印了旧实现把读不出汇总行的输出读成全 0 的实况。
 - 报告的测试文件表加一行（不含数字，仓库自身的门禁要求）；两份文档的引用行号按规矩重新推导。
+- 整套套件带 fixture 跑完：**9 红 1624 绿 88 跳过**，9 条红全是预期的数字过期（§4），没有一条
+  是本轮改动造成的回归；门禁（ruff / format / mypy / vulture / 引用 drifted: 0 / 版本 claims
+  退出 0）全绿。
 
 **留给主会话：**
 
 - 合入后**重测一轮**（`scripts/refresh-report-figures.py`），让报告、状态页与两份 README 徽章
-  重新落数。
-- 同步 §5.2 里那三处人手数字：how-to-verify 两页的散文三数与 collect 期望输出、portfolio 的
+  重新落数——**这是本窗口唯一没做的事，也是合入前必须做的事**（`scripts/` 与 `tests/` 都在指纹里，
+  合入前 main 的 CI 会因为数字过期而红，这是预期的）。
+- 同步 §6.2 里那三处人手数字：how-to-verify 两页的散文三数与 collect 期望输出、portfolio 的
   1,695、status 与 CLAUDE.md 的 CI job 数。
 - 调研 §3.1–§3.3、§3.5 四步核对，以及本报告在 `docs/reports/README.md` 与
   `scripts/check-doc-citations.py` 里的登记。
