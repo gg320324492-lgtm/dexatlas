@@ -148,6 +148,10 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
     REPO / "docs" / "reports" / "docker-examples-gap.md",
     REPO / "docs" / "reports" / "post-release-rehearsal.md",
+    # The report on the wording of a backend-failure record. It quotes the
+    # line numbers of the builder that writes those records, so its citations
+    # have to keep being true.
+    REPO / "docs" / "reports" / "evidence-incomplete-backend-wording.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
