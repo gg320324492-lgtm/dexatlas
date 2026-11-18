@@ -94,16 +94,21 @@ git status --porcelain                  # 组七：工作区必须干净
   git cat-file -t v1.0.0                # 应为 tag（附注 tag）
   ```
 
-  **查过是什么样：** 本清单编写时（2026年11月18日）：
+  **查过是什么样：** 命令的**形状**如下——**下面的 hash 是示意，必须现查现填**：
+  tag 每重打一次就换一次串，写死在这里的串发出时一定是错的。
 
   ```text
   $ git rev-parse v1.0.0
-  2453b7d15ccac391ac15af10fd8049edfd46f094      ← tag 对象，不是它
+  <40 位 tag 对象 hash>              ← tag 对象，不是它
   $ git rev-parse "v1.0.0^{commit}"
-  b71bf309b870d92c805629b53900a4a8f9ae98db      ← 这才是要填进函里的
+  <40 位提交 hash>                  ← 这才是要填进函里的
   $ git cat-file -t v1.0.0
   tag
   ```
+
+  自查的判据是**形状不是数值**：`git cat-file -t v1.0.0` 打印 `tag`，且两条
+  `rev-parse` 的输出**互不相同**（附注 tag 时必然如此——这一点在第三轮走查里
+  被写成过一次「卡死第 1 步」的缺陷）。
 
   **不通过怎么办：** 先看 `git cat-file -t v1.0.0`：若不是 `tag`，说明这是轻量
   tag，两条命令本来就相等，按上面第一行填即可。填错的代价是：读者
@@ -119,8 +124,10 @@ git status --porcelain                  # 组七：工作区必须干净
   git ls-remote origin 'refs/tags/v1.0.0^{}'       # 它指向的提交——要核的是这一行
   ```
 
-  **查过是什么样：** 本清单编写时两行分别返回 `2453b7d…` 与 `b71bf309…`，
-  与上一条一致。（本清单编写环境不联网，这一组**未实测**，请你自己跑。）
+  **查过是什么样：** 两行应当**分别**对应上一条的「tag 对象」与「提交」——
+  `refs/tags/v1.0.0` 那行是 tag 对象，`refs/tags/v1.0.0^{}` 那行是它指向的提交，
+  **要核的是第二行**，且它必须与函里填的那一串逐字相同。
+  （本清单编写环境不联网，这一组**未实测**，请你自己跑。）
 
   **不通过怎么办：** `git push origin v1.0.0` 再核一遍。读者 clone 后拿不到
   这个 hash，函里的一切都作废。
@@ -131,14 +138,15 @@ git status --porcelain                  # 组七：工作区必须干净
   **怎么查：**
 
   ```bash
-  git diff --name-only "v1.0.0^{commit}"..HEAD -- src/ tests/   # 期望为空
-  git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/ # 材料目录的差异
-  git log --oneline "v1.0.0^{commit}"..HEAD | wc -l             # tag 落后几个提交
+  git diff --name-only "v1.0.0^{commit}"..HEAD -- docs/reports/m10-*.md  # 期望为空
+  git diff --name-only "v1.0.0^{commit}"..HEAD -- src/ tests/            # 期望为空
+  git log --oneline "v1.0.0^{commit}"..HEAD | wc -l                     # tag 落后几个提交
   ```
 
-  **查过是什么样：** 本清单编写时：`src/` 与 `tests/` **一行没改**（发出去的代码
-  和它的测量数字不受材料修正影响），材料目录只差 1 个提交，且那一个改的是
-  `docs/reports/v1.0.0-github-release-body.md`（发版正文，不是 M10 材料）。
+  **查过是什么样：** 第一条**必须为空**——M10 材料（`m10-*.md`）在 tag 指向的
+  树里与你手上的是同一份，读者读到的是定稿。第二条期望为空：材料修正不该动
+  `src/` 与 `tests/`，发出去的代码和它的测量数字不受影响。第三条告诉你 tag
+  落后几个提交。
 
   **不通过怎么办：** 材料有改动而 tag 没跟上 = **N1 未关闭**，此时**不能发信**。
   往下走「重打 tag」那一条。
@@ -406,7 +414,8 @@ git status --porcelain                  # 组七：工作区必须干净
   uv run --no-sync python scripts/check-version-claims.py --base auto
   ```
 
-  **查过是什么样：** 本清单编写时：引用检查 286 条引用、0 漂移、退出码 0；
+  **查过是什么样：** 本清单编写时：引用检查**0 漂移**、退出码 0（引用条数随材料
+  增删变化，本清单**不写死条数**——写死的条数在你重打 tag 之后必然对不上）；
   版本声明检查退出码 0，2 条 finding 已在基线内。
 
   **不通过怎么办：** 引用漂移先跑 `scripts/remap-citations.py` 再跑检查器；
@@ -424,14 +433,14 @@ git status --porcelain                  # 组七：工作区必须干净
   git ls-tree -r --name-only "<验收 commit>" docs/case-studies/
   ```
 
-  **查过是什么样：** 本清单编写时在 `v1.0.0^{commit}` 上是 13 个文件——4 篇
-  markdown（[案例集说明](../case-studies/README.md) 与三篇走查：
+  **查过是什么样：** 在**验收 commit 那棵树**上，材料定稿时是 **20 个文件**——
+  4 篇 markdown（[案例集说明](../case-studies/README.md) 与三篇走查：
   `demo-app-walkthrough.md`、`obfuscated-app.md`、`api-integration.md`）、
-  3 个证据包 zip（`demo-`、`obfuscated-`、`api-integration-evidence-package.zip`）、
-  以及 demo 与 obfuscated 各自的报告三份（`.md` / `.json` / `.html`）。
-  **附件集后来换过一轮**（四个包、各自带报告三件套，共 16 个文件），
-  上面那组数字是当时的，不是现在的——以你验收 commit 上的
-  `git ls-tree` 输出为准。
+  **4 个证据包 zip**（`demo-`、`obfuscated-`、`api-integration-`、
+  `multidex-evidence-package.zip`），以及每个包各带的报告三件套
+  （`.md` / `.json` / `.html`，共 12 个）。
+  **个数随附件集增删变化**——以你验收 commit 上的 `git ls-tree` 输出为准；
+  要核的是「四个 zip + 各自的报告三件套 + 四篇正文」这个**结构**，不是个数。
 
   **不通过怎么办：** 换成你最终的验收 commit 再跑一次，结果应当一致；对不上
   说明附件没进那棵树——先解决树的问题（组二），再谈附件。
@@ -522,10 +531,11 @@ git status --porcelain                  # 组七：工作区必须干净
   git grep -nEI "(api[_-]?key|secret|access[_-]?token|password)\s*[:=]\s*['\"][A-Za-z0-9_\-]{12,}"
   ```
 
-  **查过是什么样：** 本清单编写时命中**两处**，都在第一方 demo 样例的**源码
-  常量**里（`tests/test_search_substring_fallback.py`、
-  `tests/test_workbench_agent.py`）——随样例源码刻意提交的，不是真凭据。
-  除此之外没有命中。
+  **查过是什么样：** 本清单编写时命中**两处**，都在仓库内的**一方测试常量**里
+  （`tests/test_search_substring_fallback.py`、`tests/test_workbench_agent.py`）——
+  是刻意写下的假值，不是真凭据。
+  除此之外没有命中。（第一方 demo APK 的源码里也有一个同形状的字符串常量，
+  但那条不是凭据，也不在这个 grep 的命中里。）
 
   **不通过怎么办：** 你要确认的是：**除这两处已知占位符之外，没有真实凭据**；
   而邀请函、附件、你写的邮件正文里，一个 key 形状的字符串都不该出现。
