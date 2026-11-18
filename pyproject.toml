@@ -215,6 +215,12 @@ files = ["src/dexatlas"]
 strict = true
 warn_unreachable = true
 disallow_any_generics = true
+# The platform is named so that the check is one check: mypy's default is
+# the host's platform, and with unreachable warnings on, a ``sys.platform``
+# branch for the other system is dead code on one machine and live on
+# another. The code itself branches on ``os.name`` -- which mypy does not
+# narrow -- so this names the platform CI checks and leaves the code free.
+platform = "linux"
 
 [[tool.mypy.overrides]]
 # Androguard depends on loguru; it ships no type information.

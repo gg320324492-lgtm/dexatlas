@@ -6,6 +6,8 @@ surface of turning a caller-supplied class name into a filesystem path.
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -277,6 +279,38 @@ def test_absolute_path_as_class_name_cannot_read_an_absolute_path(
     assert apktool.read_smali(str(secret), tmp_path) is None
 
 
+def _link_out_of_the_tree(link: Path, target: Path) -> bool:
+    """Point ``link`` at ``target`` from outside the tree, by any means.
+
+    A symbolic link is the shape the check exists for, and a Windows
+    directory junction is the same attack without the privilege a symlink
+    needs there: ``mklink /J`` works unprivileged, the linked path reads as
+    a file of the tree, and its content lives outside it. ``False`` means
+    this platform offers neither, and the caller skips.
+    """
+    try:
+        link.symlink_to(target)
+        return True
+    except (OSError, NotImplementedError):
+        pass
+    if os.name != "nt":
+        return False
+    # The junction mounts a directory, so the target has to be a directory
+    # that holds the file under the name the tree expects.
+    mounted = target.parent / f"{target.name}.junction"
+    mounted.mkdir(exist_ok=True)
+    copy = mounted / link.name
+    copy.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+    result = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(link.parent), str(mounted)],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return False
+    return link.is_file()
+
+
 def test_a_link_out_of_the_tree_is_not_followed(apktool: ApktoolBackend, tmp_path: Path) -> None:
     """The name was checked; the file could still be a link out of the tree.
 
@@ -289,9 +323,7 @@ def test_a_link_out_of_the_tree_is_not_followed(apktool: ApktoolBackend, tmp_pat
     smali_dir = tmp_path / "smali" / "com" / "foobar" / "foo"
     smali_dir.mkdir(parents=True)
     link = smali_dir / "Foobar.smali"
-    try:
-        link.symlink_to(secret)
-    except (OSError, NotImplementedError):
+    if not _link_out_of_the_tree(link, secret):
         pytest.skip("this platform cannot make a symbolic link")
 
     assert apktool.smali_path("com.foobar.foo.Foobar", tmp_path) is None

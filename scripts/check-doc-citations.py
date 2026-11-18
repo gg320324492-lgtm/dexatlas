@@ -77,6 +77,35 @@ from dataclasses import dataclass
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
+
+def release_documents(root: pathlib.Path) -> list[pathlib.Path]:
+    """The release notes and the release body, wherever the tree has them.
+
+    The suffixes are compared explicitly: a glob pattern matches
+    case-insensitively on Windows and case-sensitively on Linux, so a
+    ``V1.0.0.MD`` written in upper case would be checked on one platform and
+    never read on the other.
+    """
+    releases = root / "docs" / "releases"
+    reports = root / "docs" / "reports"
+    return [
+        *(
+            sorted(path for path in releases.iterdir() if path.suffix == ".md")
+            if releases.is_dir()
+            else []
+        ),
+        *(
+            sorted(
+                path
+                for path in reports.iterdir()
+                if path.suffix == ".md" and path.name.endswith("-github-release-body.md")
+            )
+            if reports.is_dir()
+            else []
+        ),
+    ]
+
+
 #: The documents whose citations are checked.
 #:
 #: Every document that states a ``file:line`` belongs here. A citation in a
@@ -84,7 +113,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 #: release notes and the release body carry the appendix that says where each
 #: number of a release came from: those line numbers drifted for a long time
 #: because the documents were not on this list.
-DOCS = [
+DOCS: list[pathlib.Path] = [
     REPO / "docs" / "analysis-provenance.md",
     REPO / "docs" / "architecture" / "public-contracts.md",
     REPO / "docs" / "reports" / "phase1-execution-report.md",
@@ -94,8 +123,7 @@ DOCS = [
     # were wrong for a long time, because the document was not on this list:
     # a citation nobody checks is a citation nobody has to keep true.
     REPO / "docs" / "reports" / "social-preview-howto.md",
-    *sorted((REPO / "docs" / "releases").glob("*.md")),
-    *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
+    *release_documents(REPO),
 ]
 
 #: The trees some documents describe, and the ref each one names.
@@ -318,8 +346,24 @@ NOT_SYMBOLS = {
 #: Directories that are never part of a citation's target.
 #: The project's local state: the backends, the helper scripts, the temporary
 #: files and the packages uv has fetched. A citation that resolved to a copy
-#: of a file in there would be a citation to the wrong tree.
-SKIP_DIRECTORIES = {".git", ".venv", "build", ".claude", ".scratch", "node_modules"}
+#: of a file in there would be a citation to the wrong tree. ``fixtures`` is
+#: fetched, not committed: a bare name that resolved to a downloaded sample
+#: would make the verdict depend on what the machine happens to have fetched.
+#: The caches and ``dist`` are the tools' own outputs, never citation targets.
+SKIP_DIRECTORIES = {
+    ".git",
+    ".venv",
+    "build",
+    ".claude",
+    ".scratch",
+    "node_modules",
+    "fixtures",
+    "dist",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "__pycache__",
+}
 
 
 @dataclass(frozen=True)
@@ -435,23 +479,63 @@ def _files_by_name() -> dict[str, list[pathlib.Path]]:
     return index
 
 
+def _exists_by_path(root: pathlib.Path, rel: str) -> pathlib.Path | None:
+    """The file a relative path names, matched component by component.
+
+    The file system on Windows answers ``is_file()`` for any spelling of a
+    name, so a citation that said ``SRC/CORE/MODELS.PY`` found
+    ``src/core/models.py`` and passed on Windows, while a Linux checker
+    reported it. The names are matched against each directory's real
+    entries, which is what a file system does on a case-sensitive platform,
+    so a wrong-case citation fails the same way everywhere.
+    """
+    current = root
+    for part in rel.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            current = current.parent
+            continue
+        try:
+            names = {entry.name for entry in current.iterdir()}
+        except OSError:
+            return None
+        if part not in names:
+            return None
+        current = current / part
+    return current if current.is_file() else None
+
+
 def candidates(rel: str) -> list[pathlib.Path]:
     """Every file in the repository a citation could mean.
 
     The documents sometimes abbreviate a path to a bare file name. Those are
     found by name, and only when the name is unambiguous — a citation that
     could mean two files is a finding, not a guess.
+
+    A path with directories in it is matched component by component, not by
+    asking a file system whose case rules differ per platform: a citation
+    whose path is spelled wrong has to fail the same way everywhere. Only a
+    bare file name falls back to the folded index, which is the one place a
+    case-insensitive match is the point.
     """
-    for candidate in (
-        REPO / rel,
-        REPO / "src" / "dexatlas" / rel,
-        REPO / "scripts" / rel,
-        REPO / "tests" / rel,
-        REPO / "examples" / rel,
+    for root in (
+        REPO,
+        REPO / "src" / "dexatlas",
+        REPO / "scripts",
+        REPO / "tests",
+        REPO / "examples",
     ):
-        if candidate.is_file():
-            return [candidate]
+        found = _exists_by_path(root, rel)
+        if found is not None:
+            return [found]
     name = rel.rsplit("/", 1)[-1]
+    if name != rel:
+        # A path that went unresolved is a miss, not a bare name: falling
+        # back to the folded index would find whatever file happens to have
+        # that name, and the citation's directories were part of what it
+        # claimed.
+        return []
     return list(_files_by_name().get(name.lower(), []))
 
 
@@ -1081,7 +1165,11 @@ def subject_digest(documents: list[pathlib.Path], trees: dict[str, Tree]) -> str
             continue
         digest.update(relative_path(document).encode("utf-8"))
         digest.update(b"\0")
-        digest.update(hashlib.sha256(document.read_bytes()).hexdigest().encode("utf-8"))
+        # The bytes are normalised to LF first: git checks the documents out
+        # with CRLF on Windows and LF on Linux, and a digest of the raw bytes
+        # would make the same document two subjects -- one per platform.
+        content = document.read_bytes().replace(b"\r\n", b"\n")
+        digest.update(hashlib.sha256(content).hexdigest().encode("utf-8"))
         digest.update(b"\0")
     for label, tree in sorted(trees.items()):
         digest.update(label.encode("utf-8"))

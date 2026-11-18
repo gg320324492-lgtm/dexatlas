@@ -46,9 +46,36 @@ def test_jadx_finds_a_shell_launcher_when_it_is_the_only_one(
     assert jadx.resolve() == launcher
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows launcher preference")
-def test_jadx_prefers_a_windows_launcher(jadx: JadxBackend, tmp_path: Path) -> None:
-    """Pointing at the shell script on Windows must resolve to the .bat beside it."""
+@pytest.mark.parametrize("platform", ["nt", "posix"])
+def test_the_launcher_choice_is_a_rule_about_the_platform(
+    jadx: JadxBackend, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, platform: str
+) -> None:
+    """The launcher rule is about the platform it names, not the one it runs on.
+
+    A shell script resolves to the batch file beside it on Windows and to
+    itself elsewhere -- whichever platform the test happens to run on. Both
+    branches run on both platforms, so neither platform's behaviour is only
+    ever checked on the machine that happens to have it.
+    """
+    monkeypatch.setattr("dexatlas.tools.jadx.adapter.os.name", platform)
+    shell_script = _write_launcher(tmp_path / "bin" / "jadx")
+    batch = tmp_path / "bin" / "jadx.bat"
+    batch.write_text("@echo off\r\necho jadx 1.5.2\r\n", encoding="utf-8")
+
+    chosen = jadx._platform_launcher(shell_script)
+
+    assert chosen == (batch if platform == "nt" else shell_script)
+
+
+def test_jadx_prefers_the_launcher_this_platform_executes(
+    jadx: JadxBackend, tmp_path: Path
+) -> None:
+    """Pointing at the shell script resolves to the launcher this platform runs.
+
+    On Windows the shell script cannot be executed, so the ``.bat`` beside it
+    is the one that runs; on POSIX the shell script *is* the launcher. One
+    rule, checked end to end on whichever platform runs the suite.
+    """
     bin_dir = tmp_path / "bin"
     shell_script = _write_launcher(bin_dir / "jadx")
     batch = bin_dir / "jadx.bat"
@@ -56,11 +83,10 @@ def test_jadx_prefers_a_windows_launcher(jadx: JadxBackend, tmp_path: Path) -> N
 
     jadx._settings.jadx_path = str(shell_script)
 
-    assert jadx.resolve() == batch
+    assert jadx.resolve() == (batch if os.name == "nt" else shell_script)
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows launcher preference")
-def test_jadx_falls_back_when_no_windows_launcher_exists(jadx: JadxBackend, tmp_path: Path) -> None:
+def test_jadx_falls_back_when_no_better_launcher_exists(jadx: JadxBackend, tmp_path: Path) -> None:
     shell_script = _write_launcher(tmp_path / "bin" / "jadx")
     jadx._settings.jadx_path = str(shell_script)
 

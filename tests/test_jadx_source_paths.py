@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import urllib.parse
 from collections.abc import Iterator
 from pathlib import Path
@@ -268,6 +269,38 @@ def test_a_nested_class_still_resolves_to_its_outer_file(jadx: JadxBackend, tmp_
     assert found == java
 
 
+def _link_out_of_the_tree(link: Path, target: Path) -> bool:
+    """Point ``link`` at ``target`` from outside the tree, by any means.
+
+    A symbolic link is the shape the check exists for, and a Windows
+    directory junction is the same attack without the privilege a symlink
+    needs there: ``mklink /J`` works unprivileged, the linked path reads as
+    a file of the tree, and its content lives outside it. ``False`` means
+    this platform offers neither, and the caller skips.
+    """
+    try:
+        link.symlink_to(target)
+        return True
+    except (OSError, NotImplementedError):
+        pass
+    if os.name != "nt":
+        return False
+    # The junction mounts a directory, so the target has to be a directory
+    # that holds the file under the name the tree expects.
+    mounted = target.parent / f"{target.name}.junction"
+    mounted.mkdir(exist_ok=True)
+    copy = mounted / link.name
+    copy.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+    result = subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(link.parent), str(mounted)],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return False
+    return link.is_file()
+
+
 def test_a_link_out_of_the_tree_is_not_followed(jadx: JadxBackend, tmp_path: Path) -> None:
     """The name was checked; the file could still be a link out of the tree.
 
@@ -280,9 +313,7 @@ def test_a_link_out_of_the_tree_is_not_followed(jadx: JadxBackend, tmp_path: Pat
     sources = tmp_path / "jadx" / "sources" / "com" / "example" / "demo"
     sources.mkdir(parents=True)
     link = sources / "Crypto.java"
-    try:
-        link.symlink_to(secret)
-    except (OSError, NotImplementedError):
+    if not _link_out_of_the_tree(link, secret):
         pytest.skip("this platform cannot make a symbolic link")
 
     assert jadx.class_source_path(CLASS_NAME, tmp_path / "jadx") is None

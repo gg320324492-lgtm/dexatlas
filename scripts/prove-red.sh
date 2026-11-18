@@ -55,7 +55,9 @@ cd "$SCRATCH" || exit 1
 # The scratch worktree needs its own environment. The main checkout's venv
 # holds an editable install that points at *its* src, so reusing it would
 # measure the wrong code -- the very mistake this project is trying to catch.
-uv sync --extra dev --extra analysis > /dev/null 2>&1 || {
+# --frozen keeps the lockfile as it is: a proof that quietly rewrote the
+# lockfile would change the dependency set the red run measured.
+uv sync --frozen --extra dev --extra analysis > /dev/null 2>&1 || {
   echo "could not build the scratch environment"
   exit 1
 }

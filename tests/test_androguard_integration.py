@@ -45,7 +45,16 @@ def analysis() -> dict[str, Any]:
     """
     fixture = FIXTURE_DIR / "TestActivity.apk"
     if not fixture.is_file():
-        pytest.skip("fixture not present; run scripts/fetch-fixtures.sh")
+        # A missing fixture used to be a skip, which read as "nothing to see
+        # here" on a machine that had simply not fetched it: the integration
+        # tests were green because they had never run. The fetch is a
+        # declared prerequisite of this suite (CI fetches before it runs), so
+        # their absence is an environment that is not ready, and saying so
+        # is the test's answer.
+        pytest.fail(
+            f"{fixture} is missing; fetch the integration fixtures with "
+            "bash scripts/fetch-fixtures.sh before running this suite"
+        )
 
     workspace = Path(tempfile.mkdtemp(prefix="dexatlas-it-"))
     extracted = AndroguardBackend(Settings(workspace=workspace)).extract(fixture, FIXTURE_APK)
@@ -69,7 +78,12 @@ def _copy_fixture(name: str, tmp_path: Path) -> Path:
     """
     candidate = FIXTURE_DIR / name
     if not candidate.is_file():
-        pytest.skip(f"fixture {name} not present; run scripts/fetch-fixtures.sh")
+        # A missing fixture is an environment that is not ready, not a test
+        # with nothing to say: see the module fixture above.
+        pytest.fail(
+            f"fixture {name} is missing; fetch the integration fixtures with "
+            "bash scripts/fetch-fixtures.sh before running this suite"
+        )
     target = tmp_path / name
     target.write_bytes(candidate.read_bytes())
     return target

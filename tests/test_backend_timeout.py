@@ -93,6 +93,7 @@ def test_a_timeout_takes_the_whole_tree_down(settings, tmp_path: Path) -> None:
     assert not marker.exists(), "the process the launcher started was still running"
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(os.name != "nt", reason="a batch file is a Windows launcher")
 def test_a_windows_launcher_is_stopped_with_its_work(settings, tmp_path: Path) -> None:
     """The shape ``jadx.bat`` has: a ``cmd.exe`` whose child is the work.
@@ -106,6 +107,42 @@ def test_a_windows_launcher_is_stopped_with_its_work(settings, tmp_path: Path) -
         WINDOWS_LAUNCHER.format(python=sys.executable, marker=marker),
         encoding="utf-8",
     )
+
+    started = time.monotonic()
+    outcome = _StubBackend(settings).run(ToolInvocation(argv=[str(launcher)], timeout=1))
+    elapsed = time.monotonic() - started
+
+    assert not outcome.ok
+    assert outcome.error is not None
+    assert outcome.error.code is ToolErrorCode.TIMEOUT
+    assert elapsed < 3.0, f"the call took {elapsed:.1f}s to give up on a 1s timeout"
+
+    time.sleep(5.2)
+    assert not marker.exists(), "the work the launcher started was still running"
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(os.name == "nt", reason="the launcher tree is exercised natively above")
+def test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work(
+    settings, tmp_path: Path
+) -> None:
+    """The same launcher shape where a shell exists: a script that spawns the work.
+
+    The Windows test above runs the batch file natively; this one runs the
+    POSIX equivalent -- a shell script that starts the work in the
+    background and waits -- so the tree kill is exercised on both sides of
+    the platform split instead of only where a batch file happens to exist.
+    """
+    marker = tmp_path / "grandchild-ran"
+    launcher = tmp_path / "launcher.sh"
+    launcher.write_text(
+        "#!/bin/sh\n"
+        f'"{sys.executable}" -c "import pathlib, sys, time; time.sleep(5); '
+        f'pathlib.Path(sys.argv[1]).write_text(\'alive\')" "{marker}" &\n'
+        "sleep 60\n",
+        encoding="utf-8",
+    )
+    launcher.chmod(launcher.stat().st_mode | 0o111)
 
     started = time.monotonic()
     outcome = _StubBackend(settings).run(ToolInvocation(argv=[str(launcher)], timeout=1))

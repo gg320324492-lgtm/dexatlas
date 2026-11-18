@@ -23,21 +23,46 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import os
+import shutil
+import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest.mock
 from pathlib import Path
 from typing import Any
 
 import httpx
-from mcp.client import Client
 from typer.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCRATCH = REPO_ROOT / ".scratch" / "verify-contracts"
+# The scratch workspace lives in the system temporary directory, not in the
+# repository: a workspace under the checkout is one deep path away from
+# Windows' 260-character limit -- the workspace holds the unpacked APK and
+# the decompiled tree, and a deeper checkout root would push it over. The
+# temporary directory is short on every platform, and the run clears it
+# before it starts (see ``main``), so nothing survives to be reused.
+SCRATCH = Path(tempfile.gettempdir()) / "dexatlas-verify-contracts"
 DEMO_APK = REPO_ROOT / "examples" / "demo-app" / "demo.apk"
-PORT = 8977
+#: Where the server's output lands. A server that never answers has to say
+#: why, and DEVNULL is where explanations go to be lost.
+SERVER_LOG = SCRATCH / "uvicorn.log"
+
+
+def _free_port() -> int:
+    """A port the operating system is not using right now.
+
+    A fixed port collides with whatever else is running -- and worse, a
+    server left over from an earlier run answers the health check meant for
+    this one. An ephemeral port makes both impossible.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
+
+
+PORT = _free_port()
 BASE = f"http://127.0.0.1:{PORT}"
 
 FAILURES: list[str] = []
@@ -70,21 +95,35 @@ def rest_checks() -> None:
     env["DEXATLAS_WORKSPACE"] = str(workspace)
     env["TMP"] = str(SCRATCH)
     env["TEMP"] = str(SCRATCH)
-    server = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "dexatlas.api.app:app", "--port", str(PORT)],
-        env=env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        _rest_requests()
-    finally:
-        server.terminate()
-        server.wait(timeout=15)
+    # The child's output is the only record of a server that failed to come
+    # up, so it is kept in a file the failure handler can print, instead of
+    # being discarded.
+    with SERVER_LOG.open("wb") as log:
+        server = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "dexatlas.api.app:app", "--port", str(PORT)],
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
+        try:
+            _rest_requests()
+        finally:
+            # ``terminate`` asks politely; on POSIX that is SIGTERM and
+            # uvicorn shuts its listeners down cleanly, but on Windows it is
+            # TerminateProcess, which stops the server without letting it
+            # close its database handles. Asking the process to stop and
+            # waiting for it before falling back to a kill gives the clean
+            # path a chance on every platform.
+            server.terminate()
+            try:
+                server.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=15)
 
 
-def wait_for_analysis(client, pid, attempts: int = 240, pause: float = 0.5) -> dict[str, Any]:
-    """The project row, once it has stopped changing.
+def wait_for_analysis(client, pid, attempts: int | None = None, pause: float = 0.5) -> str:
+    """The status of a project, once it has stopped changing.
 
     The REST API answers ``202`` and creates the project a moment later.
     Until that row exists, the answer carries no ``status`` field at all --
@@ -92,18 +131,32 @@ def wait_for_analysis(client, pid, attempts: int = 240, pause: float = 0.5) -> d
     into a failed contract check: the loop broke on the first empty answer
     and reported ``status=`` instead of waiting for the work to finish.
 
-    The row is returned, not only its status. The checks that follow read
-    the project's fields, and the row used to be a leftover of this loop:
-    when the wait became a function of its own, the leftover stopped being
-    bound and the section died on a name it had never defined.
+    The budget follows the configuration: a run with the Java backends
+    decompiles as well as indexes, and the CI runner that does that is
+    slower than the machine this script was written on. A budget that only
+    fits the smallest configuration fails the run that does the most work.
     """
-    project: dict[str, Any] = {}
+    if attempts is None:
+        attempts = 1200 if _backends_installed() else 240
+    status = ""
     for _ in range(attempts):
         project = client.get(f"/projects/{pid}").json()
         if project.get("status", "") in {"completed", "failed"}:
             break
         time.sleep(pause)
     return project
+
+
+def _backends_installed() -> bool:
+    """Whether the source backends are configured to take part.
+
+    A configured path counts as present even before the tool is probed: the
+    point of the budget is to wait for the work the configuration promises,
+    not to second-guess it.
+    """
+    return bool(os.environ.get("DEXATLAS_JADX_PATH")) or bool(
+        os.environ.get("DEXATLAS_APKTOOL_JAR")
+    )
 
 
 def _rest_requests() -> None:
@@ -119,7 +172,12 @@ def _rest_requests() -> None:
             except httpx.HTTPError:
                 time.sleep(0.5)
         else:
-            check("server comes up", False, "uvicorn did not answer /health")
+            log = SERVER_LOG.read_text(encoding="utf-8", errors="replace")[-2000:]
+            check(
+                "server comes up",
+                False,
+                f"uvicorn did not answer /health; its output ends with:\n{log}",
+            )
             return
 
         body = client.get("/health").json()
@@ -151,6 +209,7 @@ def _rest_requests() -> None:
         project = wait_for_analysis(client, pid)
         status = project.get("status", "")
         check("analysis completes", status == "completed", f"status={status}")
+        project = client.get(f"/projects/{pid}").json()
 
         project_keys = {
             "id",
@@ -359,6 +418,20 @@ EXPECTED_TOOLS = {
 
 def mcp_checks() -> None:
     section("MCP server over the protocol")
+    # The MCP SDK is imported where it is used, not at the top of the file:
+    # an environment without it -- the one the project's own setup
+    # instructions describe -- used to die on the import before a single
+    # check ran, and a missing SDK looked like a broken contract. The check
+    # count the materials state is pinned (28 REST + 6 MCP + 15 CLI), so the
+    # absence is not a check of its own: it is the same "one section did not
+    # run" the REST section already reports when a source backend is absent.
+    try:
+        from mcp.client import Client
+    except ImportError as error:
+        raise SystemExit(
+            "the MCP SDK is not installed, so the MCP contracts cannot be "
+            "checked; install it with: uv sync --extra mcp"
+        ) from error
     from dexatlas.config.settings import Settings
     from dexatlas.core.pipeline import Analyzer
     from dexatlas.mcp.server import build_server
@@ -664,6 +737,28 @@ def cli_checks() -> None:
 
 
 def main() -> int:
+    # A failed check names the contract it broke, and the name may carry any
+    # character the documents carry. A console that cannot encode it -- GBK,
+    # cp1252 -- would kill the script halfway through its report, and the
+    # exit code a crash gives is the same 1 a real finding gives. The output
+    # is UTF-8 with replacement, so the report finishes on every machine and
+    # the exit code means one thing.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            continue
+
+    # The workspace of the last run holds the project rows of the last run:
+    # an upload is answered by the hash the APK has, so a workspace that is
+    # still there answers the upload with the *previous* run's analysis and
+    # every check after it reads a snapshot nobody took today. The run
+    # starts from nothing.
+    if SCRATCH.exists():
+        shutil.rmtree(SCRATCH, ignore_errors=True)
     SCRATCH.mkdir(parents=True, exist_ok=True)
     rest_checks()
     mcp_checks()
