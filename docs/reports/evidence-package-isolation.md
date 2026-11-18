@@ -50,7 +50,7 @@
 规则只有三条：
 
 1. 只有 **`jadx:` 前缀**的定位符才可能被收（`evidence_package.py:215`）；
-2. 定位符的相对位置必须是一条**安全相对路径**（`evidence_package.py:218` →
+2. 定位符的相对位置必须是一条**安全相对路径**（`evidence_package.py:436` →
    `_is_a_safe_relative_path`，`evidence_package.py:436-450`）；
 3. 文件从 **`<workspace>/jadx/<相对位置>`** 读出来（`evidence_package.py:232`），
    复制成 `sources/<去掉 sources/ 或 resources/ 前缀后的路径>`（`evidence_package.py:250`）。

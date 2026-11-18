@@ -1337,7 +1337,11 @@ def _record_decompilation(
 
     ``decompiler_failed`` says whether the decompiler itself failed. A decompiler that
     failed is already recorded as a failure, and a report that says "jadx did
-    not complete" needs nothing more. A decompiler that ran and produced
+    not complete" needs nothing more. That failure record is about the step, not
+    about the output of the step: a decompiler that was stopped part-way had
+    already handed over what it had produced, and that output is recorded on
+    its own, so the two records are about different things rather than in
+    conflict. A decompiler that ran and produced
     nothing at all is a different fact, and it was the one that went missing:
     the report listed the decompiler's version as though it had read the APK,
     and said nothing about the fact that it had not.

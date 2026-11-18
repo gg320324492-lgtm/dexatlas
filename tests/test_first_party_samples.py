@@ -804,7 +804,10 @@ def test_the_analysis_records_the_decompilation_coverage(
     failure = _missing_backend_evidence(without_evidence, "jadx")
     assert failure is not None, "the analysis did not record that JADX never ran"
     assert failure.kind == EvidenceKind.OBSERVATION
-    assert failure.summary == "jadx did not complete: jadx is not installed or not on PATH"
+    assert failure.summary == (
+        "jadx did not complete in this run: jadx is not installed or not on PATH. "
+        "It never ran, so it produced nothing."
+    )
 
     provenance = failure.provenance[0]
     assert provenance.tool == "jadx"
