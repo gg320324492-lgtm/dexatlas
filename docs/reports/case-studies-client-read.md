@@ -25,7 +25,9 @@
 > `docs/reports/phase1-execution-report.md`。
 >
 > **行号口径**：本文引用的 `file:line` 一律指**基线 `9e1aa61`**（本轮只新增本文，
-> 未动任何既有文件，行号不移动）。
+> 未动任何既有文件，行号不移动）。**本报告的行号锚在哪棵树：** 全部锚在提交
+> **`9e1aa61`** 上，那棵树的测量指纹是 `sha256:d0e85b61…`；**本报告里的 `file:line`
+> 只在 `9e1aa61` 上成立**。这是本仓库自己的规矩：读一份报告之前先看它锚在哪棵树上。
 >
 > **临时文件**：`.scratch/client-read/`（解包出来的四个包），已被 `.gitignore` 忽略。
 
@@ -196,12 +198,17 @@ JADX 的反编译类视图**合并去重**，`pipeline.py:311` 之后 `save_symb
 attached package is a later run of the same APK (`run_e8e49384ab5246ab`, 4.5 s)
 ```
 
-`docs/case-studies/demo-app-walkthrough.md:60-61`（§3.1 引用的输出）：
+| | 抬头引文完 |
+|---|---|
+
+§3.1 引用的输出是下面这段（`docs/case-studies/demo-app-walkthrough.md:60-61`）：
 
 ```
 ✓ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges,
   1 resource string (5.0s)
 ```
+
+（上行号仍指 `docs/case-studies/demo-app-walkthrough.md:60-61`。）
 
 **实测（git 历史可证）**
 
@@ -637,7 +644,7 @@ once. Both definitions stay in the symbol index, each with its own locator.
   与 `server.py:76-85` 的 `ToolAnnotations(read_only_hint=True)` 相符 ✓；
 - `api-integration.md:342` 的「`POST /analyze` returns 202 with a job body」与
   `src/dexatlas/api/app.py:359-362`（`status_code=status.HTTP_202_ACCEPTED`）、
-  `app.py:223-226`（`AnalyzeJobResponse` 的 `project_id` / `status` / `detail`）相符 ✓；
+  `src/dexatlas/api/app.py:223-226`（`AnalyzeJobResponse` 的 `project_id` / `status` / `detail`）相符 ✓；
 - `api-integration.md:259` 的「schema 3」与四份 `report.json` 的
   `"schema_version": 3` 相符 ✓。
 

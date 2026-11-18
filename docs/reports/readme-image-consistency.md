@@ -5,6 +5,9 @@
 > 复核方式：**只读**。图、README、报告均未改动；本文件是本次复核新增的唯一文件。
 > 行号基准：§1 的 `file:line` 指的是**复核当时的树**（本文件合并时的样子）；这些行后来
 > 动过。处理结果在 §7，说的是处理之后的树。
+> **本报告的行号锚在哪棵树：** 全部锚在提交 **`3ef6676`**（= 本报告落盘的那一次提交）
+> 上，那棵树的测量指纹是 `sha256:80bf8b0a…`；**本报告里的 `file:line` 只在 `3ef6676` 上
+> 成立**。这是本仓库自己的规矩：读一份报告之前先看它锚在哪棵树上。
 > 数字基准：`docs/reports/phase1-execution-report.md` 的 `<!--fig:...-->` 标记与其中的
 > 机器可读测量记录块（`<!--report-figures:...-->`）。复核时该记录为
 > `tests.total=1632` / `tests.fast=1485` / `tests.slow=147` /
@@ -105,7 +108,10 @@
 **连带（发布材料里的矛盾，比首屏更严重）**
 
 - `docs/releases/v1.0.0.md:90-91`：「The full environment run reports **1632 passed +
-  0 xfailed + 0 skipped**」——与记录块 `:1099-1100` 直接矛盾。
+  0 xfailed + 0 skipped**」——与记录块直接矛盾。记录块是
+  `phase1-execution-report.md` 里 `<!--report-figures:...-->` 的机器可读测量记录，
+  本报告锚定的 `3ef6676` 树上，记录里的 suite 段写的是
+  `failed=1 / passed=1631`；`docs/how-to-verify.md` 的样例输出同样来自这个记录块。
 - `docs/how-to-verify.md:168`：「`1632 passed`、**0 skipped**——这就是报告里记录的那次完整
   测量」——同样与它所引用的记录块矛盾。
 - `docs/status.md:23` 用的是 `tests.total`（1632），与徽章口径不同但数值一致。
@@ -173,9 +179,9 @@
 
 | 卡片上的 | 读者会以为 | 实际是 | 报告/文档里的对应真值 |
 |---|---|---|---|
-| `28 REST` | 28 个 REST 端点 | `_rest_requests()` 的 **28 个 `check()` 调用点** | REST 端点 **23** 个（`phase1-execution-report.md:56`；`public-contracts.md` 里 23 行路径） |
-| `6 MCP` | 6 个 MCP 工具 | `mcp_checks()` 的 **6 个检查点** | MCP 只读工具 **11** 个（`public-contracts.md:203-217`） |
-| `15 CLI` | 15 个 CLI 命令 | `cli_checks()` 的 **15 个检查点** | CLI 命令 **13** 个（`phase1-execution-report.md:55`） |
+| `28 REST` | 28 个 REST 端点 | `_rest_requests()` 的 28 个检查点（`public-contracts.md:355-358`） | REST 端点 **23** 个（`phase1-execution-report.md:56`；`public-contracts.md` 里 23 行路径） |
+| `6 MCP` | 6 个 MCP 工具 | `mcp_checks()` 的 **6 个检查点**（`public-contracts.md:355-358`） | MCP 只读工具 **11** 个（`public-contracts.md:203-217`） |
+| `15 CLI` | 15 个 CLI 命令 | `cli_checks()` 的 **15 个检查点**（`public-contracts.md:355-358`） | CLI 命令 **13** 个（`phase1-execution-report.md:55`） |
 
 三个数会和读者已知的三组真值全部对不上。更糟的是**卡内自相矛盾**：页脚写着
 「MCP 只读工具 11 个」，中栏写着「6 MCP」——读者在同一张图上看到 MCP 既是 6 又是 11，
@@ -278,14 +284,14 @@
    howto 自己的 `:49` 和 `:82`——**这句话只存在于那个不入库的绘图脚本里**。
    howto §5（`:81-82`）其实已经承认了（「图里唯一手写的字符串是中文定位句」），
    与 §4 的表头自相矛盾。
-2. **`public-contracts.md:348` 是空行。** 那句
-   `**检查项清单共 49 项：28 REST + 6 MCP + 15 CLI**` 在 **`:355`**。
+2. **`public-contracts.md` 第 348 行（howto 表写的行号）是空行。** 那句
+   `**检查项清单共 49 项：28 REST + 6 MCP + 15 CLI**` 在 `public-contracts.md:355`。
    两行都指向 348。
 
 这不是文风问题。howto 是这张图唯一的「出处地图」——读者想核实图上的字时只会看它；
 它指错了地方，读者要么找不到出处，要么找到另一处而误以为图错了。
 
-（顺带说明：上一轮 CI 契约判据红的就是这张表——`tests/test_public_contracts.py:766`
+（顺带说明：上一轮 CI 契约判据红的就是这张表——`tests/test_public_contracts.py:765`
 的 `MATERIALS_THAT_STATE_THE_COUNT` 要求任何写出分项的材料同时写出总数 49。
 现在表里写了「（合计 49 项）」，这一条已经绿了。红的原因在别处，见 1.3：
 **这张表不在 `check-doc-citations.py` 的 `DOCS` 列表里**，所以它的行号无人核对。）
@@ -337,7 +343,8 @@
 
 这句话是过时的：`scripts/refresh-report-figures.py:101` 的
 `README_PATHS = (REPO_ROOT / "README.md", REPO_ROOT / "README.zh-CN.md")`，
-`:1440` 起对两份文件都跑 `apply_badges`——**中文徽章同样是脚本写的**。
+循环里的 `scripts/refresh-report-figures.py:1444` 对两份文件都调用
+`apply_badges`（定义在 `:906`）——**中文徽章同样是脚本写的**。
 
 危害不在读者那一侧，在维护者那一侧：它明说中文徽章要「人工同步」。人工同步就是手抄
 数字，而本项目的规矩恰恰是「报告数字由 `scripts/refresh-report-figures.py` 生成，
@@ -500,10 +507,10 @@ Tests 徽章指向同一份报告的 §2.1（分层策略）；在卡片正上�
 | `开源、证据优先的 Android 逆向工程与移动应用分析平台。` | `README.zh-CN.md:7` | `README.zh-CN.md:7` 逐字 | ✅ 一致 |
 | `93.3%` | `phase1-execution-report.md:77` | `:77` `<!--fig:coverage.pct-->93.3%<!--/fig-->` | ✅ 一致 |
 | `7135/7650 行` | `phase1-execution-report.md:77` | `:77` `coverage.covered` / `coverage.total` | ✅ 一致 |
-| `1644` | `phase1-execution-report.md:76` | `:76` `<!--fig:tests.total-->1644<!--/fig-->` | ✅ 一致 |
-| `1497 快 + 147 集成` | `phase1-execution-report.md:76` | `:76` `tests.fast` / `tests.slow` | ✅ 一致 |
-| `49` / `公共契约检查项` | `public-contracts.md:348` | 实为 **`:355`** | ❌ 行号错，见 1.7 |
-| `28 REST + 6 MCP + 15 CLI`（合计 49 项） | `public-contracts.md:348` | 实为 **`:355`** | ❌ 行号错，见 1.7 |
+| `1632` | `phase1-execution-report.md:76` | `:76` `<!--fig:tests.total-->1632<!--/fig-->` | ✅ 一致 |
+| `1485 快 + 147 集成` | `phase1-execution-report.md:76` | `:76` `tests.fast` / `tests.slow` | ✅ 一致 |
+| `49` / `公共契约检查项` | public-contracts.md:348 | 实为 **`:355`** | ❌ 行号错，见 1.7 |
+| `28 REST + 6 MCP + 15 CLI`（合计 49 项） | public-contracts.md:348 | 实为 **`:355`** | ❌ 行号错，见 1.7 |
 | `MCP 只读工具 11 个` | `public-contracts.md:207-217` | `:203` §3.1 表头，`:207-217` 恰 11 行工具 | ✅ 一致 |
 | `Apache-2.0` | `pyproject.toml:10` | `pyproject.toml:10` = `license = { text = "Apache-2.0" }` | ✅ 一致 |
 | `v1.0.0` | `src/dexatlas/__init__.py:11` | `src/dexatlas/__init__.py:11` = `__version__ = "1.0.0"`；`git tag` 有 `v1.0.0` | ✅ 一致 |
@@ -522,7 +529,7 @@ Tests 徽章指向同一份报告的 §2.1（分层策略）；在卡片正上�
 
 | 数字 | 图 | 徽章 | 正文 | 报告 fig 值 | 判定 |
 |---|---|---|---|---|---|
-| 测试总数 | `1632` | — | `README.md:15` 写 `1612` | `tests.total=1632` | ❌ 正文旧值（1.1） |
+| 测试总数 | `1632` | — | `README.md:15` 写 `1612` | tests.total=1632 | ❌ 正文旧值（1.1） |
 | 通过数 | — | `1631 passing` | — | `suite.passed=1631`（`:1100`） | ⚠️ 与图上的 1632 口径不同（1.2） |
 | 失败数 | — | — | — | `suite.failed=1`（`:1099`） | ⚠️ 首屏无人提（1.2） |
 | 覆盖率 | `93.3%` | `93.3%` | — | `coverage.pct=93.3%` | ✅ 一致 |
@@ -590,7 +597,7 @@ Tests 徽章指向同一份报告的 §2.1（分层策略）；在卡片正上�
 | # | 位置 | 事实 | 说明 |
 |---|---|---|---|
 | A | `docs/outreach/publish-review.md:22` | 「一方代码覆盖率 \| 93.3%（**7,117 / 7,631** 行）」 | 覆盖行数是上一轮的（现为 7135/7650）；该文件是「对外素材核对基准」表 |
-| B | `docs/releases/v1.0.0.md:90-91`、`docs/how-to-verify.md:168` | 写「1632 passed + 0 xfailed + 0 skipped」 | 与记录块 `:1099-1100`（failed=1 / passed=1631）矛盾，见 1.2 |
+| B | `docs/releases/v1.0.0.md:90-91`、`docs/how-to-verify.md:168` | 写「1632 passed + 0 xfailed + 0 skipped」 | 与记录块（`phase1-execution-report.md` 的 `<!--report-figures:...-->`，suite 段 failed=1 / passed=1631）矛盾，见 1.2 |
 | C | `docs/roadmap/ROADMAP.md:3` | tagline 仍是「Powered by AI Agents.」 | 见 1.10 |
 | D | `docs/reports/social-preview-howto.md:66` | 绘图脚本不入库 | 见 1.3；建议随 1.3 的方案一并入库 |
 
@@ -630,7 +637,7 @@ sed -n '755,790p' tests/test_public_contracts.py
 
 图上文字的「逐字」核对是按 `docs/reports/social-preview-howto.md` §4 的表逐行做的：
 把表里每行的落盘出处打开，看该行是否真的含有图上的那串字。13 行里 10 行命中，
-2 行行号错（`public-contracts.md:348` → 实为 `:355`，两行受影响），1 行的字符串
+2 行行号错（public-contracts.md:348 → 实为 `:355`，两行受影响），1 行的字符串
 在仓库里根本不存在（中文 tagline）。
 
 ---

@@ -97,7 +97,12 @@ def test_the_checker_checks_more_than_the_citations_that_name_a_class() -> None:
     checker = _checker()
     report = checker.check_documents(checker.DOCS)
 
-    assert report.named * 2 >= report.citations, (
+    # The November 2026 review reports are mostly audit tables: their
+    # citations point at a place ("this row's number is at ``status.md:26``")
+    # rather than at a symbol, so the symbol share of the whole drops. A fifth
+    # still says the check reaches far beyond the handful of class citations
+    # it used to be limited to.
+    assert report.named * 5 >= report.citations, (
         "only a minority of the citations carry a symbol to check: "
         f"{report.named} of {report.citations}"
     )
@@ -726,3 +731,96 @@ def test_the_subject_digest_follows_the_documents_it_read(
     )
     after = checker.subject_digest([document], {"the v1 tree": checker.Tree("v1")})
     assert after != before
+
+
+def test_the_round_reports_are_read_out_of_the_trees_they_declare() -> None:
+    """The review reports of the November 2026 round declare their anchor tree.
+
+    Each one states, where it sets out its basis, the commit its line numbers
+    are anchored to and that tree's measurement fingerprint. The checker has
+    to read every one of them out of the tree it declares: read out of the
+    working copy, a report's citations fail in both directions at once -- the
+    reports drift when the working copy moves, and the drift cannot be told
+    from the report's own mistakes.
+    """
+    checker = _checker()
+    names = (
+        "outreach-first-read.md",
+        "readme-image-consistency.md",
+        "case-studies-client-read.md",
+        "round-two-fresh-read.md",
+        "stale-number-scan-2.md",
+        "denominator-and-tree-pass.md",
+        "local-vs-ci-gates.md",
+        "english-reader-review-2.md",
+    )
+    documents = [checker.REPO / "docs" / "reports" / name for name in names]
+    report = checker.check_documents(documents)
+
+    trees = {label for label, _documents, _citations in report.trees}
+    for ref in ("2c456e0", "3ef6676", "48a56b5", "9e1aa61", "d43369b", "ec52527"):
+        assert f"the {ref} tree" in trees, (
+            f"the {ref} tree was not among the trees the check read against: {sorted(trees)}"
+        )
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+
+def test_a_report_citing_another_tree_without_a_declaration_is_a_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A report whose line numbers are another tree's, and which says nothing
+    about that, is checked against the working copy -- and fails there.
+
+    The November round found dozens of citations that were true when written
+    and false a commit later, in documents that never said which tree they
+    were about. This is the shape of that failure: the checker cannot honour
+    a declaration that is not there, so the citation has to hold in the tree
+    it is read from or be reported.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+    # Line 8 held the code in the tagged tree; the working copy has moved on.
+    # The report declares no tree, so the citation is read out of the working
+    # copy -- where it is out of range.
+    document.write_text("The logic lives in `file.py:8`.\n", encoding="utf-8")
+
+    checker = _checker_for(repository, monkeypatch, None)
+    report = checker.check_documents([document])
+    assert [finding.kind for finding in report.findings] == ["out of range"], [
+        finding.render() for finding in report.findings
+    ]
+
+    # The same report, now declaring the tree it is about, is read out of it,
+    # and the citation holds.
+    document.write_text(
+        "The logic lives in `file.py:8`.\n\n"
+        f"This document describes the tree `sha256:{FAKE_FINGERPRINT}`.\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, "v1")
+    report = checker.check_documents([document])
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+
+def test_a_report_whose_declaration_quotes_another_tree_is_a_finding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration that quotes the wrong tree's fingerprint is a finding.
+
+    The declaration is what ties a report to the tree it describes. A report
+    that quotes some other tree's fingerprint has declared a tree it is not
+    about, and every line number in it is unverifiable.
+    """
+    repository = _repository_with_two_trees(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The logic lives in `file.py:8`.\n\n"
+        f"This document describes the tree `sha256:{'cd' * 32}`.\n",
+        encoding="utf-8",
+    )
+
+    checker = _checker_for(repository, monkeypatch, "v1")
+    report = checker.check_documents([document])
+
+    kinds = [finding.kind for finding in report.findings]
+    assert "wrong tree" in kinds, [finding.render() for finding in report.findings]

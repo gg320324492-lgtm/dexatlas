@@ -216,7 +216,7 @@ $ .venv/Scripts/python.exe -m pytest tests/ -m "not slow" --collect-only -q
 指向当前树**；一个读者按 `docs/glossary.md:38` 去 `docs/reports/release-process-dry-run.md:62`
 找「源指纹」，会落在「## 1. 演练环境、边界与代价」这一行标题上。而
 `scripts/check-doc-citations.py` 的 `DOCS` 名单里**没有 `docs/glossary.md`**——
-`glossary-pass.md:198` 自己承认「这张表不在检查器的 `DOCS` 名单里……改动多时得自己重算——
+`glossary-pass.md:207` 自己承认「这张表不在检查器的 `DOCS` 名单里……改动多时得自己重算——
 这是这张表已知的软肋」。这条软肋在它落盘后的 10 个提交里被踩实了。
 
 **三个可复算的例子**：
@@ -224,7 +224,7 @@ $ .venv/Scripts/python.exe -m pytest tests/ -m "not slow" --collect-only -q
 | 词 | 表里指的 | 现在那一行是 | 词的真正位置 |
 |---|---|---|---|
 | 源指纹 / 源码指纹（`docs/glossary.md:38`） | `docs/reports/release-process-dry-run.md:62` | `## 1. 演练环境、边界与代价` | **:80** |
-| 独占测量（`docs/glossary.md:40`） | `docs/reports/v1.0.0-release-checklist.md:353` | 空行 | **:370**（`### N1 测量必须独占`） |
+| 独占测量（`docs/glossary.md:40`） | `docs/reports/v1.0.0-release-checklist.md` 第 353 行（按本报告锚定的 `ec52527` 树） | 空行 | **:370**（`### N1 测量必须独占`；术语表写 353 行时那行还不是空行） |
 | 两棵树（`docs/glossary.md:59`） | `docs/reports/release-process-dry-run.md:257` | `\| C11 \| 「静态 49 条」加断言 \| …` | **:287** |
 
 **建议改法**：
@@ -590,9 +590,9 @@ $ .venv/Scripts/python.exe -m pytest tests/test_docs.py -q
 
 ---
 
-### M-9｜`portfolio.md` 把「10 次并行运行」说成了「ten CI jobs」
+### M-9｜portfolio.md 把「10 次并行运行」说成了「ten CI jobs」
 
-**原文（`docs/portfolio.md:68`，逐字）：**
+**原文（`docs/portfolio.md:67`，逐字）：**
 
 > `  93.3% coverage on the first-party code, and ten CI jobs: lint and format;`
 
@@ -650,11 +650,12 @@ PR (the `test` job runs twice, on 3.12 and 3.13)」，与 `docs/status.md` 与�
 
 ## 3. 低（4 条）
 
-### L-1｜`docs/status.md:129` 是空行，两处引用指向它
+### L-1｜`docs/status.md` 的 129 行是空行，两处引用指向它
 
 `docs/reports/m10-invitation-readiness.md:131` 与 `docs/reports/outreach-first-read.md:330`
-都引 `docs/status.md:129` 去取「`v1.0.0`（tag 2026-11-17）已发布／独立验收尚未开始」那一句，
-而那一行现在是**空行**，正文在 **`:132`**。
+都引 `docs/status.md` 第 129 行（指它当时的那一行）去取「`v1.0.0`（tag 2026-11-17）已发布／
+独立验收尚未开始」那一句，而那一行**按本报告锚定的 `ec52527` 树**是**空行**，正文在
+**`:132`**（后来的树又动过，现查现核）。
 
 **建议改法**：两处改指 `:132`。**注意 `docs/status.md` 由测量脚本写**，主会话重测量落盘后
 行号可能再动一次——改前重查。
@@ -832,7 +833,7 @@ M10 那三份（`m10-invitation-final.md`、`m10-invitation-sender-checklist.md`
 `readme-image-consistency.md` 的 14 条里，**§1.3–§1.14 这 12 条仍然开着**（我逐条核过，
 这一轮一条都没动）：图零自动重生成路径、`28+6+15` 会被读成接口数、`49` 没说是静态条数、
 英文 README 上挂中文标签与中文注释、`howto §4` 那张出处表的两处错（`README.md:5` 不是中文
-tagline 的出处；`docs/architecture/public-contracts.md:348` 是空行，正文在 **:355**）、中文 README 说自己的
+tagline 的出处；`docs/architecture/public-contracts.md` 第 348 行按本报告锚定的 `ec52527` 树是空行，正文在 `public-contracts.md:355`）、中文 README 说自己的
 徽章要「人工同步」（脚本 `README_PATHS` **两个 README 都写**，`scripts/refresh-report-figures.py:101`）、
 中英 tagline 不一致、中文 README 没有这张图、徽章链接落点不对、版式与「可核查 / 可核验」。
 
