@@ -22,6 +22,8 @@ measured apart from the code tests, and this file is one of them.
 
 from __future__ import annotations
 
+import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -34,11 +36,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "refresh-report-figures.py"
 
 
-def _figure_script() -> Any:
+def _figure_script(path: Path = SCRIPT) -> Any:
     """The refresh script, loaded as a module for direct inspection."""
     import importlib.util
 
-    spec = importlib.util.spec_from_file_location("dexatlas_figures_auto_write", SCRIPT)
+    spec = importlib.util.spec_from_file_location("dexatlas_figures_auto_write", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
@@ -227,3 +229,204 @@ def test_the_documents_the_measurement_writes_are_the_ones_that_carry_figures() 
 
     assert script.REPORT_PATH in found, found
     assert script.STATUS_PATH in found, found
+
+
+# -- the card on the front page --------------------------------------------
+
+
+#: A card script that draws nothing and writes down what it was asked to draw.
+#: The measurement runs the card script it finds, so a tree that holds this
+#: one records the call instead of making an image.
+CARD_STUB = '''\
+"""A card script that writes down the report it was asked to draw."""
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[sys.argv.index("--repo-root") + 1])
+report = root / "docs" / "reports" / "phase1-execution-report.md"
+(root / "card-was-drawn.txt").write_text(report.read_text(encoding="utf-8"), encoding="utf-8")
+print("  wrote a card")
+'''
+
+
+def _tree(root: Path) -> Path:
+    """A tree the measurement can run against without touching the repository.
+
+    The measurement is run against a tree of its own, so the run cannot
+    repaint the repository's own card: the card script here writes down the
+    report it was asked to draw instead of drawing anything. The measurement
+    script is the real one, copied in, because the tree it measures is the
+    tree it believes it is in -- that is what makes the card belong to it.
+    """
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "docs" / "reports").mkdir(parents=True, exist_ok=True)
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "src" / "dexatlas" / "cli").mkdir(parents=True, exist_ok=True)
+    (root / "src" / "dexatlas" / "api").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(SCRIPT, root / "scripts" / "refresh-report-figures.py")
+    shutil.copy2(REPO_ROOT / "pyproject.toml", root / "pyproject.toml")
+    (root / "scripts" / "make-social-preview.py").write_text(CARD_STUB, encoding="utf-8")
+    (root / "src" / "dexatlas" / "cli" / "main.py").write_text(
+        "import typer\n\napp = typer.Typer()\n\n\n@app.command()\ndef command() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+    (root / "src" / "dexatlas" / "api" / "app.py").write_text(
+        'from fastapi import FastAPI\n\napp = FastAPI()\n\n\n@app.get("/")\n'
+        "def read_root() -> None:\n    pass\n",
+        encoding="utf-8",
+    )
+    return root
+
+
+def _fake_report(root: Path) -> str:
+    """A report small enough to read, with the figures the refresh script owns.
+
+    The record it carries describes an earlier measurement, so the script has
+    something to keep when a new measurement turns out to be partial.
+    """
+    record = {
+        "schema": 4,
+        "code": {"api_endpoints": 1, "cli_commands": 1, "sample_apks": 0},
+        "coverage": {"files": {"cli/main.py": [100, 45]}, "missing": 45, "statements": 100},
+        "source_fingerprint": "sha256:stale",
+        "suite": {
+            "passed": 1,
+            "skipped": 0,
+            "xfailed": 0,
+            "failed": 0,
+            "xpassed": 0,
+            "skipped_tests": [],
+            "xfailed_tests": [],
+        },
+        "tests": {"fast": 1, "slow": 1, "total": 1},
+    }
+    rows = "\n".join(f"| `{path.name}` | |" for path in sorted((root / "tests").glob("test_*.py")))
+    return (
+        "# A report\n\n"
+        "Tests: <!--fig:tests.total-->1<!--/fig--> "
+        "(<!--fig:tests.fast-->1<!--/fig--> fast + <!--fig:tests.slow-->1<!--/fig--> slow)\n\n"
+        "Suite: <!--fig:suite.passed-->1<!--/fig--> passed, "
+        "<!--fig:suite.skipped-->0<!--/fig--> skipped, "
+        "<!--fig:suite.xfailed-->0<!--/fig--> xfailed\n\n"
+        "Coverage: <!--fig:coverage.pct-->55.0%<!--/fig--> "
+        "(<!--fig:coverage.covered-->55<!--/fig-->/<!--fig:coverage.total-->100<!--/fig-->)\n\n"
+        "### 2.1 分层策略\n\n"
+        "| 文件 | 覆盖内容 |\n|------|----------|\n"
+        f"{rows}\n"
+        "\n<!--report-figures:" + json.dumps(record) + "-->\n"
+    )
+
+
+def _install_fake_measurements(script: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replace the script's slow measurements with instant ones.
+
+    The tree is measured as if it held 354 tests and all of them passed. The
+    report's own self-checks are measured apart from them, the way the real
+    measurement measures them, and they fail while the report states a number
+    the tree does not have -- which is what the refresh has to straighten out.
+    """
+    total = 354
+    checks = 2
+
+    def collected_tests(marker: str) -> tuple[int, int]:
+        return (total, total) if marker == "not slow" else (0, total)
+
+    def measure_code_tests() -> Any:
+        return script.Outcome(
+            counts={
+                "passed": total - checks,
+                "failed": 0,
+                "skipped": 0,
+                "xfailed": 0,
+                "deselected": checks,
+            },
+            failures=(),
+            skipped=(),
+        )
+
+    def measure_report_checks(candidate: str, report_path: Path) -> Any:
+        stated = dict(script.FIGURE.findall(candidate))
+        if stated.get("tests.total") != str(total):
+            return script.Outcome(
+                counts={"passed": checks - 1, "failed": 1, "skipped": 0, "xfailed": 0},
+                failures=(
+                    "tests/test_docs.py::test_execution_report_numbers_match_the_code"
+                    " - AssertionError: the report disagrees with the code",
+                ),
+            )
+        return script.Outcome(
+            counts={"passed": checks, "failed": 0, "skipped": 0, "xfailed": 0},
+            failures=(),
+        )
+
+    def read_coverage() -> Any:
+        return script.Coverage(files={"cli/main.py": [100, 10]}, statements=100, missing=10)
+
+    def collected_at_tag(tag: str) -> int | None:
+        return 100
+
+    monkeypatch.setattr(script, "collected_tests", collected_tests)
+    monkeypatch.setattr(script, "measure_code_tests", measure_code_tests)
+    monkeypatch.setattr(script, "measure_report_checks", measure_report_checks)
+    monkeypatch.setattr(script, "read_coverage", read_coverage)
+    monkeypatch.setattr(script, "collected_at_tag", collected_at_tag)
+    monkeypatch.setattr(script, "missing_prerequisites", list)
+
+
+def test_the_measurement_draws_the_card_from_the_report_it_wrote(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The card is drawn from the report that was written, not from the candidate.
+
+    The card on the front page shows the numbers in the report. It used to be
+    drawn by whoever remembered to draw it, after the measurement, which meant
+    a measurement that wrote new numbers left the card showing the old ones
+    -- and the next measurement refused to write, because its own suite found
+    the card disagreeing with the report. The card is now part of what the
+    measurement writes.
+
+    The order is the whole of it. The convergence loop holds a candidate that
+    is not on the disk yet; a card drawn from the candidate would show
+    numbers the report does not have yet, and the card and the report would
+    be two facts about two different trees. So the card is drawn after the
+    report is written, from the report that is on the disk.
+    """
+    root = _tree(tmp_path)
+    report = root / "docs" / "reports" / "phase1-execution-report.md"
+    report.write_text(_fake_report(root), encoding="utf-8")
+    script = _figure_script(root / "scripts" / "refresh-report-figures.py")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 0
+
+    drawn = root / "card-was-drawn.txt"
+    assert drawn.is_file(), "the measurement wrote the report and left the card alone"
+    seen = drawn.read_text(encoding="utf-8")
+    assert seen == report.read_text(encoding="utf-8"), (
+        "the card was drawn from something other than the report on the disk"
+    )
+    assert "<!--fig:tests.total-->354<!--/fig-->" in seen, seen
+
+
+def test_a_run_against_a_copy_of_the_report_leaves_the_card_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The card belongs to the repository, not to every document with figures.
+
+    The suite refreshes copies of the report, with measurements it made up. A
+    card drawn for one of those would show the numbers of the report that is
+    really there, which is the misalignment this step exists to prevent: the
+    card and the report would be two facts about two different trees, and the
+    gate that compares them would fail on a tree nobody broke.
+    """
+    root = _tree(tmp_path)
+    report = root / "docs" / "reports" / "phase1-execution-report.md"
+    report.write_text(_fake_report(root), encoding="utf-8")
+    copy = root / "a-copy-of-the-report.md"
+    copy.write_text(_fake_report(root), encoding="utf-8")
+    script = _figure_script(root / "scripts" / "refresh-report-figures.py")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(copy)]) == 0
+
+    assert not (root / "card-was-drawn.txt").exists(), "the card was drawn for a copy of the report"

@@ -2075,6 +2075,21 @@ def main(argv: list[str] | None = None) -> int:
             readme.write_bytes(refreshed.encode("utf-8"))
         for path, _original, refreshed in others:
             path.write_bytes(refreshed.encode("utf-8"))
+
+        # The card on the front page shows the numbers in the report, so it is
+        # drawn from the report that is on disk now -- the one this run has
+        # just written -- and not from the candidate the convergence loop was
+        # holding, which is a document that does not exist yet. It is drawn
+        # after the READMEs, because the badge the card is checked against is
+        # written there.
+        #
+        # The card belongs to the repository, so a run that refreshes a copy
+        # of the report -- what the test suite does -- leaves it alone: the
+        # card of a copy would show the numbers of the report that is really
+        # there, which is the misalignment this step exists to prevent.
+        card_drawn = True
+        if report_path == REPORT_PATH:
+            card_drawn = draw_social_preview(REPO_ROOT)
         if changes:
             for key, old, new in changes:
                 print(f"{key}: {old} -> {new}")
@@ -2086,7 +2101,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Updated {display_path(status_path)}.")
         for readme, _original, _refreshed in readmes:
             print(f"Updated the badge in {display_path(readme)}.")
-        matched = True
+        # A card that could not be drawn is a card that no longer says what the
+        # report says, and the next measurement would refuse to write because
+        # of it. The run says so instead of reporting a success it did not
+        # have.
+        matched = card_drawn
 
     if checks.failures:
         report_failures(
@@ -2128,6 +2147,45 @@ def warn_partial(code: Outcome, because: str) -> None:
         + "\nThe report's figures were not verified against a complete measurement of "
         "this tree, so this run reports failure."
     )
+
+
+def draw_social_preview(repo_root: Path) -> bool:
+    """Draw the front page's card from the report that is on disk now.
+
+    The card shows the numbers in the report, so it is drawn from the report
+    this run has written -- the one on the disk -- and not from the candidate
+    the convergence loop was holding, which is a document that does not exist
+    yet.
+
+    The script that draws the card is run as a program rather than imported:
+    it owns the fonts, the layout and the record of what it drew, so running
+    it here keeps one definition of how a card is drawn instead of two. It
+    runs with the interpreter that runs the measurement, so the card does not
+    depend on which python happens to be first on the path.
+
+    A card that could not be drawn is reported as a failure. It is a card that
+    no longer says what the report says, and the measurement that comes after
+    this one would refuse to write because of it -- so the run that caused it
+    is the run that says so.
+    """
+    script = repo_root / "scripts" / "make-social-preview.py"
+    if not script.is_file():
+        print(f"  the card script is missing: {script}")
+        return False
+    result = run(sys.executable, str(script), "--repo-root", str(repo_root))
+    if result.returncode == 0:
+        print("  the card was drawn from the report that was just written")
+        return True
+    print(f"  the card was not drawn: the script exited with {result.returncode}")
+    for line in result.stderr.splitlines():
+        if line.strip():
+            print(f"    {line.strip()}")
+    print(
+        "  the card is a picture of the report, so it has to be drawn by the same "
+        "script that checks it:\n"
+        "    uv run --no-sync python scripts/make-social-preview.py"
+    )
+    return False
 
 
 if __name__ == "__main__":
