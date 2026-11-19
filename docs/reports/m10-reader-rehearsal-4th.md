@@ -26,7 +26,7 @@
 | 项 | 值 |
 |---|---|
 | 预演日期 | 2026-11-19（第四轮） |
-| **修复后的树**（本轮真正验证修复内容的那棵） | `main` = `be593fac93f57d6e9ed458dc64844d89409da48c` |
+| **修复后的树**（本轮真正验证修复内容的那棵） | `main` = `be593fac93f57d6e9ed458dc64844d89409da48c`（**预演时**的 `main`；预演结束后本分支已把 `main` 的新 tip `a785d01` 合进来，见 §8.2 的门禁对照） |
 | **tag 树**（读者照材料走会读到的那棵） | `v1.0.0` → `2715aefda06c3cbbc055a9edf795535e71464068`（**未重打**） |
 | 副本来源 | 本地克隆 `E:/Dexatlas` → `.scratch/reader-rehearsal-4th/dexatlas`（**离线**；见 §8） |
 | OS | Windows 11 Pro 10.0.26300 |
@@ -205,9 +205,9 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 > **第 56 步那三条 `!` 行的措辞与材料 §9.1 给的「三条示例」不完全一样**——
 > 材料的三条示例里 jadx 那条写的是 `and was terminated`，本机是
 > `its launcher had already exited`。这三种措辞在源码里是**三种不同的运行结果**
-> （[base.py:331](../../src/dexatlas/tools/base.py#L331)、
-> [base.py:333](../../src/dexatlas/tools/base.py#L333)、
-> [base.py:334](../../src/dexatlas/tools/base.py#L334)）。判据是行为不是措辞，
+> （[`src/dexatlas/tools/base.py:331`](../../src/dexatlas/tools/base.py#L331) `anchor: and was terminated`、
+> [`src/dexatlas/tools/base.py:333`](../../src/dexatlas/tools/base.py#L333) `anchor: its launcher had already exited`、
+> [`src/dexatlas/tools/base.py:334`](../../src/dexatlas/tools/base.py#L334) `anchor: could not be terminated`）。判据是行为不是措辞，
 > **不影响判定**，但见 §5 的 X-4。
 
 ### 2.9 其余各组（验收项 D1、D2、C3、C4、E、F4）
@@ -267,7 +267,7 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 ### S-7 【验收项 C2 ★】上一轮新给的那条解析命令是**启动竞态** —— 输不出来时，退出码是 0，日志是空的
 
 **材料怎么说**：上一轮的 S-5 补了「**一条可照抄的解析命令**」（读者包 §3.4，
-[m10-reader-package.md:264](m10-reader-package.md)），命令末尾是
+[`docs/reports/m10-reader-package.md:264`](m10-reader-package.md) `anchor: 一条可照抄的命令`），命令末尾是
 
 ```bash
   ; sleep 3; } \
@@ -289,7 +289,7 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 写完 6 行请求后**关闭 stdin**；MCP server 一读到 EOF 就退出，**还没回的请求丢掉**——
 材料在 §3.8 写这句的时候其实已经知道这个机制（「末尾的 `sleep 3` 是让 server 有
 时间回话（stdin 一闭合，它会把还没回的请求丢掉）」，
-[m10-reader-package.md:500](m10-reader-package.md)）。
+[`docs/reports/m10-reader-package.md:500`](m10-reader-package.md) `anchor: sleep 3`）。
 **问题在于那个 `3` 是一个没有保证的常数**：它必须**大于** server 的启动时间，
 而 server 的启动时间 = uv 解析工程 + 装 Python 进程 + 导入 MCP 栈，**随机器、
 随 uv 缓存冷热、随机器上别的进程有多少而变**。这台机器上它是 **2.17–2.91 秒**，
@@ -331,11 +331,11 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 
 > 「uvicorn 会**先**打印 `Application startup complete.`（这句不作数）**再**打印
 > `[WinError 10048] error while attempting to bind`，然后自己退出」
-> —— [m10-reader-package.md:425](m10-reader-package.md)
+> —— [`docs/reports/m10-reader-package.md:425`](m10-reader-package.md) `anchor: error while attempting to bind`
 
 > 「**判断依据是 uvicorn 的日志**：里面有 `[WinError 10048] error while attempting to bind`
 > 就是**你的服务没起来**」
-> —— [m10-reader-package.md:446](m10-reader-package.md)
+> —— [`docs/reports/m10-reader-package.md:446`](m10-reader-package.md) `anchor: error while attempting to bind`
 
 **实测**：本机 8000 与 8011 都被占着（§2.5），照材料走，uvicorn 的日志**原文**是：
 
@@ -382,7 +382,7 @@ uvicorn 打印的是 **`[Errno 10048]`**，不是 `[WinError 10048]`；`winerror
 
 > 「（`report.json` 由 §3.5 的导出命令生成；还没导出就先跑那一条，或者把下面命令里的
 > 路径换成证据包里的 `evidence/reports/report.json`）」
-> —— [m10-reader-package.md:243](m10-reader-package.md)
+> —— [`docs/reports/m10-reader-package.md:243`](m10-reader-package.md) `anchor: 还没导出就先跑那一条`
 
 **实测**：§3.4 的小节顺序在 §3.5 **之前**。一个照小节顺序走的读者**先跑这条**：
 
@@ -414,10 +414,10 @@ FileNotFoundError: [Errno 2] No such file or directory: 'report.json'
 读者包 §9.1 的 G3 下面给了两段标着「实测」的示例：
 
 ```text
-（单条示例，m10-reader-package.md:881）
+（单条示例，[`docs/reports/m10-reader-package.md:881`](m10-reader-package.md) `anchor: its launcher had already exited`）
 !  jadx exceeded its 1s timeout; its launcher had already exited
 
-（三条示例，m10-reader-package.md:887-889）
+（三条示例，[`docs/reports/m10-reader-package.md:887-889`](m10-reader-package.md) `anchor: and was terminated`）
 !  apktool exceeded its 1s timeout; its launcher had already exited
 !  androguard exceeded its 1s timeout; its launcher had already exited
 !  jadx exceeded its 1s timeout and was terminated
@@ -428,9 +428,9 @@ FileNotFoundError: [Errno 2] No such file or directory: 'report.json'
 
 | 措辞 | 源码 | 含义 |
 |---|---|---|
-| `and was terminated` | [base.py:331](../../src/dexatlas/tools/base.py#L331) | 进程树被**杀掉**了 |
-| `its launcher had already exited` | [base.py:333](../../src/dexatlas/tools/base.py#L333) | launcher **自己先退了** |
-| `and could not be terminated` | [base.py:334](../../src/dexatlas/tools/base.py#L334) | 杀不掉，**可能还在跑** |
+| `and was terminated` | [`src/dexatlas/tools/base.py:331`](../../src/dexatlas/tools/base.py#L331) `anchor: and was terminated` | 进程树被**杀掉**了 |
+| `its launcher had already exited` | [`src/dexatlas/tools/base.py:333`](../../src/dexatlas/tools/base.py#L333) `anchor: its launcher had already exited` | launcher **自己先退了** |
+| `and could not be terminated` | [`src/dexatlas/tools/base.py:334`](../../src/dexatlas/tools/base.py#L334) `anchor: could not be terminated` | 杀不掉，**可能还在跑** |
 
 **本机这一次的实测**（§2.8 第 56 步）三条全是 `its launcher had already exited`，
 **连 jadx 也是**——也就是说，材料的三条示例里那一条 `and was terminated`，
@@ -462,9 +462,9 @@ FileNotFoundError: [Errno 2] No such file or directory: 'report.json'
 | 上一轮的 | 内容 | 在修复后的树（`main` = `be593fa`）里 | 在 tag 树（`v1.0.0` = `2715aef`）里 | 本轮去向 |
 |---|---|---|---|---|
 | **S-5** ★ | C2 的判据要求「在分析工作区内解析到真实文件」，材料没给可照抄的命令 | ⚠ **基本堵住** —— §3.4 新增的那条命令**照抄能跑**，5 行输出与材料预期**逐行相符**（§2.7 第 45 步），还给了 PowerShell 写法；**但它自己带来两条新缺口**：**S-7**（`sleep 3` 是启动竞态，输不出来时退出码 0、stderr 空）与 **S-8**（判据用的 `text`/`bytes` 字段**这条命令不打印**，见下） | ✗ **没有**（特征串 `一条可照抄的命令` 命中 **0**、`REST 侧没有 locator 解析端点` 命中 **0**） | **修复有效，但没进 tag** → 归入 **S-4**；并新引出 **S-7**、**S-8** |
-| **M-8** ★ | evidence 的「工具、版本、locator」三个字段**不在 JSON 顶层** | ✓ **堵住** —— 四份材料口径一致（顶层六键、`level` 在顶层、工具/版本/locator 在 `provenance[]`、一条记录可能不止一条 provenance、MCP 侧是只含 locator 的字符串数组）；**那条打印命令实跑逐字相符**（§2.2 第 18 步）；E-0004–E-0006 各 2 条 provenance 已核；MCP `get_evidence` 实测 `provenance` 确为**字符串数组**（[evidence.py:34](../../src/dexatlas/mcp/tools/evidence.py#L34)） | ✗ **没有**（`没有可读的文件内容` 命中 **0**；M-8 的四段说明在 tag 树里一段也没有） | **修复有效，但没进 tag** → 归入 **S-4** |
-| **M-9** ★ | C2 判据用的词「`path=None` 是设计」与 API 实际返回的字段对不上 | ✓ **堵住** —— 判据一律改用 API 里真实存在的字段（`resolved` / `reason` / `kind` / `text` / `provenance`，[schemas.py:406](../../src/dexatlas/mcp/schemas.py#L406)）；内部 Python API 的 `path` 保留在括号里（[locators.py:161](../../src/dexatlas/core/locators.py#L161)），三份材料口径一致 | ✗ **没有** | **修复有效，但没进 tag** → 归入 **S-4** |
-| **G5** ★ | 「证据包不含未引用字符串」在包里**无法判定** | ✓ **堵住** —— 判据改成包里能判的两条 + `manifest.json` 的声明核对（[acceptance-pack.md:167](m10-acceptance-pack.md)）；**实跑逐条核过**：包内 `.apk` **0** 个、`sources/` 目录 **0** 个、`not_included` 三键齐全、`files` 三条全是报告 | ✗ **没有**（`包里能直接判的是两条` 命中 **0**） | **修复有效，但没进 tag** → 归入 **S-4** |
+| **M-8** ★ | evidence 的「工具、版本、locator」三个字段**不在 JSON 顶层** | ✓ **堵住** —— 四份材料口径一致（顶层六键、`level` 在顶层、工具/版本/locator 在 `provenance[]`、一条记录可能不止一条 provenance、MCP 侧是只含 locator 的字符串数组）；**那条打印命令实跑逐字相符**（§2.2 第 18 步）；E-0004–E-0006 各 2 条 provenance 已核；MCP `get_evidence` 实测 `provenance` 确为**字符串数组**（[`src/dexatlas/mcp/tools/evidence.py:34`](../../src/dexatlas/mcp/tools/evidence.py#L34) `anchor: entry.locator for entry in record.provenance`） | ✗ **没有**（`没有可读的文件内容` 命中 **0**；M-8 的四段说明在 tag 树里一段也没有） | **修复有效，但没进 tag** → 归入 **S-4** |
+| **M-9** ★ | C2 判据用的词「`path=None` 是设计」与 API 实际返回的字段对不上 | ✓ **堵住** —— 判据一律改用 API 里真实存在的字段（`resolved` / `reason` / `kind` / `text` / `provenance`，[`src/dexatlas/mcp/schemas.py:406`](../../src/dexatlas/mcp/schemas.py#L406) `anchor: class LocatorResolution`）；内部 Python API 的 `path` 保留在括号里（[`src/dexatlas/core/locators.py:161`](../../src/dexatlas/core/locators.py#L161) `anchor: path: Path | None = None`），三份材料口径一致 | ✗ **没有** | **修复有效，但没进 tag** → 归入 **S-4** |
+| **G5** ★ | 「证据包不含未引用字符串」在包里**无法判定** | ✓ **堵住** —— 判据改成包里能判的两条 + `manifest.json` 的声明核对（[`docs/reports/m10-acceptance-pack.md:167`](m10-acceptance-pack.md) `anchor: 包里能直接判的两条`）；**实跑逐条核过**：包内 `.apk` **0** 个、`sources/` 目录 **0** 个、`not_included` 三键齐全、`files` 三条全是报告 | ✗ **没有**（`包里能直接判的是两条` 命中 **0**） | **修复有效，但没进 tag** → 归入 **S-4** |
 | **F2** ★ | REST 端口 8000 被占时材料**没有退路**，而且那判据会**假通过** | ⚠ **基本堵住** —— 退路（换端口）与「用 uvicorn 日志判断身份」都写进去了，**本机 8000 与 8011 恰好都被占着**（8000 是别的 FastAPI、8011 是另一个 DexAtlas），**两次都按材料走**，全程没有假卡点，§2.5 第 33–42 步全部对上；**但退路的判据引用的日志字面串是错的**（`[WinError 10048] …` → 真日志是 `[Errno 10048] …`） | ✗ **没有**（`Uvicorn running on` 命中 **0**） | **修复有效，但没进 tag** → 归入 **S-4**；并新引出 **M-10** |
 
 ### 汇总
@@ -498,7 +498,7 @@ FileNotFoundError: [Errno 2] No such file or directory: 'report.json'
 
 **第三轮的 C2 是「没有命令」；这一轮的 C2 是「命令有了，判据要的两个字段没被打印出来」。**
 
-C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md)）：
+C2 的判据要区分三件事（[`docs/reports/m10-acceptance-pack.md:117`](m10-acceptance-pack.md) `anchor: 按构造解析`）：
 
 | `resolved` | 是什么 | C2 怎么判 |
 |---|---|---|
@@ -507,7 +507,7 @@ C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md
 | `false` | 解析不出来 | 单独列出来 |
 
 **而 §3.4 给的那条命令只打印 `resolved` / `kind` / `locator` / `reason`
-（[m10-reader-package.md:280](m10-reader-package.md)）。**`text` 与 `bytes`
+（[`docs/reports/m10-reader-package.md:280`](m10-reader-package.md) `anchor: resolved=%s kind=%s locator=%s reason=%s`）。**`text` 与 `bytes`
 **一个都没打印**。本轮把整条响应打出来看过，差别是**实在的**：
 
 | locator | 命令打印出来的 | 命令**没**打印但真实存在的 |
@@ -591,10 +591,42 @@ C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md
 | # | 事项 | 本窗口的证据 | 性质 |
 |---|---|---|---|
 | 1 | **重打 `v1.0.0` tag** —— 这是把 5 条修复送到读者手里的**唯一**途径 | §3 的 S-4：tag 仍指 `2715aef`，`main` 已到 `be593fa`，中间 60 个提交；5 条修复的特征串在 tag 树里**命中全为 0** | **发版那一步**（不是读者那一步） |
-| 2 | **重打 tag 之前要重锚 release body** —— 上一轮 §8.1 已经给过完整分析 | 本轮补一条**新事实**：`v1.0.0..main` 之间 **`src/` 一行未改**，但 **`scripts/` 与 `tests/` 变了**（`check-doc-citations.py` +1055 行、`check-platform-gates.py` 新增、`refresh-report-figures.py` +332 行，等 12 个文件）；而文档里**确实有**指向这些文件的行号引用（如 `docs/reports/ci-gate-coverage.md` 里的 `scripts/refresh-report-figures.py:111`、`tests/test_doc_citations.py:49`、`scripts/check-doc-citations.py:57`）——**tag 一换，这些引用要按新树重锚** | **重打 tag 的前置条件** |
-| 3 | **`docs/reports/m10-reader-rehearsal-4th.md` 登记进 `scripts/check-doc-citations.py` 的文档清单** | 本文件里有 12 处 `file:line` 引用，**逐条手工核过**（§9 列了核对方法），但**不在检查器的覆盖范围内** | 按分工留给主会话统一登记 |
+| 2 | **重打 tag 之前要重锚 release body** —— 上一轮 §8.1 已经给过完整分析 | 本轮补两条**新事实**：<br>（a）`v1.0.0..main` 之间 **`src/` 一行未改**，但 **`scripts/` 与 `tests/` 变了**（`check-doc-citations.py` **+1055 行**、`check-platform-gates.py` 新增、`refresh-report-figures.py` +332 行，等 12 个文件）；而文档里**确实有**指向这些文件的行号引用（如 `docs/reports/ci-gate-coverage.md` 里的 [`scripts/refresh-report-figures.py:111`](../../scripts/refresh-report-figures.py#L111) `anchor: The files that decide how the measurement comes out`、[`scripts/verify-public-contracts.py:453`](../../scripts/verify-public-contracts.py#L453) `anchor: get_project_status`）——**tag 一换，这些引用要按新树重锚**。<br>（b）**基线提交 `a785d01` 上的引用检查器就已经是红的**：本窗口在基线上跑了一次作对照，`12 citation(s) no longer say what they say`、退出码 **1**——**9 条在 release body（它绑在 `v1.0.0` 那棵树上）、3 条在刚被 `check-doc-citations.py` 涨了 1055 行挪了位的文档里**。**这一条不是本窗口造成的**（见 §8.2） | **重打 tag 的前置条件** |
+| 3 | **`docs/reports/m10-reader-rehearsal-4th.md` 登记进 `scripts/check-doc-citations.py` 的文档清单** | 本文件里 **40 处** `file:line` 引用（正文 16 处、§8 交接表 3 处、§9.3 核法表 21 处），**逐条手工核过**（§9.3 列了核法），并且**每一处都带了 `anchor:` 声明**——本窗口用检查器自己的 `resolve_citations` + `check_anchor` 跑了一遍：**40/40 通过、0 条孤立声明**（核法见 §9.3）。但文件**不在**检查器的文档清单里，所以那些引用**目前不被机器检查** | 按分工留给主会话统一登记 |
 | 4 | **五条新缺口的修**（S-7 / S-8 / M-10 / M-11 / X-4） | §3、§4、§5 各自给了**具体的改法**（都是一行以内的改动） | 材料侧 |
 | 5 | **F2 那两个「占着 8000 / 8011 的服务」** | §2.5 的端口表 | 机器环境，与材料无关；读者换机器会遇到别的端口 |
+| 6 | **基线上那 12 条漂移的引用**（§8.2） | §8.2 的对照实验 | 引用工作那一扇的范围 |
+
+### 8.2 【门禁】本窗口的门禁状态：**除引用检查器外全绿，引用检查器在基线上就已经是红的**
+
+| 门禁 | 结果 |
+|---|---|
+| `ruff check .` | ✅ `All checks passed!` |
+| `ruff format --check .` | ⚠️ **2 个文件要重排**：`scripts/check-doc-citations.py` 与 `tests/test_doc_citations.py`（各差一个空行）。**这两个文件是本窗口合并进来的 `a785d01` 带来的**——**在基线 `a785d01` 上跑，同样是这 2 个文件**（对照实验）。**本窗口没有改 `scripts/` 与 `tests/`**（那是任务里的硬约束），所以没跑 `ruff format`；**修法是 `ruff format scripts/check-doc-citations.py tests/test_doc_citations.py`**，一条命令，交给那两扇窗口的属主 |
+| `mypy` | ✅ `Success: no issues found in 68 source files` |
+| `vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80` | ✅ 退出码 **0**，无输出 |
+| `scripts/remap-citations.py` | ✅ 跑过，**0 条移动**（本窗口没让任何引用漂走） |
+| `scripts/check-doc-citations.py` | ❌ **退出码 1，12 条漂移** —— **但这 12 条在基线提交 `a785d01` 上就已经存在**（对照实验：在 `.scratch/` 的副本里 checkout `a785d01` 跑同一个检查器，**同样是 12 条、退出码 1**）。**本窗口的文件一条都没在里面**（它不在检查器的文档清单里，而它自己的 19 条引用本窗口逐条核过、全部带 `anchor:` 声明、19/19 通过） |
+| `scripts/check-version-claims.py --base auto` | ✅ 退出码 0（见 §10） |
+
+**那 12 条是谁的**：
+
+- **9 条在 `docs/reports/v1.0.0-github-release-body.md`** —— 那份 release body
+  **绑在 `v1.0.0` 那棵树上**（`TREE_DOCUMENTS`），它里面的数字
+  （`1694 passed` / `sha256:18f3ab15…` / `49 live` / `28 REST` …）是**那棵树
+  当时的测量**，而工作区已经往前走了。**这正是上一轮 S-6 说的那件事**：
+  **重打 tag 之前要重锚 release body，重锚要排在重测之后**——
+  本轮把它量化了：**这 9 条现在就是红的**。
+- **3 条在别的文档**（`post-release-rehearsal.md`、`citation-anchor-declarations.md`、
+  `handwritten-numbers-audit.md`）—— 它们引用的 `scripts/check-doc-citations.py`
+  的行号，因为那个脚本在提交 `61a2700` 里**长了 1055 行**而挪了位
+  （检查器报「`TREE_DOCUMENTS` is at line 261」这类）。
+  **`scripts/remap-citations.py` 对这三份文档移动了 0 条**——
+  按 CLAUDE.md 的说法，「只指位置」的引用留给检查器报、给人判；
+  **这三条是别人的文件，本窗口没有改**。
+
+**本窗口没有动别人的文件**（§10）。**引用检查器的红不在本窗口的责任范围里，
+但它会挡住整条门禁**——这一点留给主会话统一处理。
 
 ### 8.1 【S-7】把上一轮那条命令改成「等够行数再走」—— 顺便把 F3 那两条一起改
 
@@ -643,12 +675,19 @@ C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md
 
 | 引用 | 核法 |
 |---|---|
-| `src/dexatlas/tools/base.py:331` / `:333` / `:334` | `sed -n '325,336p'` 逐行看，三行分别就是 `and was terminated` / `its launcher had already exited` / `could not be terminated` |
-| `src/dexatlas/mcp/tools/evidence.py:34` | `sed -n '30,38p'`，第 5 行是 `provenance=[entry.locator for entry in record.provenance],` |
-| `src/dexatlas/mcp/schemas.py:406` | `sed -n '400,412p'`，第 7 行是 `class LocatorResolution(BaseModel):` |
-| `src/dexatlas/core/locators.py:161` | `sed -n '155,165p'`，第 7 行是 `path: Path | None = None` |
-| `docs/reports/m10-reader-package.md:243 / 264 / 280 / 318 / 425 / 446 / 500 / 881 / 887-889` | `grep -n` 逐条取行号，再 `sed -n` 看该行原文与材料里引用的一致 |
-| `docs/reports/m10-acceptance-pack.md:117 / 167` | `sed -n '112,168p'` 看 C2 与 G5 两行 |
+| [`src/dexatlas/tools/base.py:331`](../../src/dexatlas/tools/base.py#L331) `anchor: and was terminated` / [`:333`](../../src/dexatlas/tools/base.py#L333) `anchor: its launcher had already exited` / [`:334`](../../src/dexatlas/tools/base.py#L334) `anchor: could not be terminated` | `sed -n '325,336p'` 逐行看，三行分别就是那三句 |
+| [`src/dexatlas/mcp/tools/evidence.py:34`](../../src/dexatlas/mcp/tools/evidence.py#L34) `anchor: entry.locator for entry in record.provenance` | `sed -n '30,38p'`，第 5 行是 `provenance=[entry.locator for entry in record.provenance],` |
+| [`src/dexatlas/mcp/schemas.py:406`](../../src/dexatlas/mcp/schemas.py#L406) `anchor: class LocatorResolution` | `sed -n '400,412p'`，第 7 行是 `class LocatorResolution(BaseModel):` |
+| [`src/dexatlas/core/locators.py:161`](../../src/dexatlas/core/locators.py#L161) `anchor: path: Path | None = None` | `sed -n '155,165p'`，第 7 行是 `path: Path | None = None` |
+| [`docs/reports/m10-reader-package.md:243`](m10-reader-package.md) `anchor: 还没导出就先跑那一条` / [`:264`](m10-reader-package.md) `anchor: 一条可照抄的命令` / [`:280`](m10-reader-package.md) `anchor: resolved=%s kind=%s locator=%s reason=%s` / [`:318`](m10-reader-package.md) `anchor: text.text` / [`:425`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:446`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:500`](m10-reader-package.md) `anchor: sleep 3` / [`:881`](m10-reader-package.md) `anchor: its launcher had already exited` / [`:887-889`](m10-reader-package.md) `anchor: and was terminated` | `grep -n` 逐条取行号，再 `sed -n` 看该行原文与材料里引用的一致 |
+| [`docs/reports/m10-acceptance-pack.md:117`](m10-acceptance-pack.md) `anchor: 按构造解析` / [`:167`](m10-acceptance-pack.md) `anchor: 包里能直接判的两条` | `sed -n '112,168p'` 看 C2 与 G5 两行 |
+| [`scripts/refresh-report-figures.py:111`](../../scripts/refresh-report-figures.py#L111) `anchor: The files that decide how the measurement comes out` / [`scripts/verify-public-contracts.py:453`](../../scripts/verify-public-contracts.py#L453) `anchor: get_project_status` | §8 交接表第 2 行里的两处示例引用；`sed -n` 核该行原文 |
+
+**机器核过**：本窗口把检查器自己的两个函数调起来，对**本文件**跑了一遍
+（`resolve_citations` + `check_anchor`）——**识别到 19 条引用、19 条全部带声明、
+19/19 锚点命中、0 条孤立声明**。这段脚本在
+`.scratch/reader-rehearsal-4th/verify-my-citations.py`（**不入库**），
+它只**读** `scripts/check-doc-citations.py`，**没有改**。
 
 ---
 
@@ -663,6 +702,12 @@ C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md
 - 预演的产物全在 `.scratch/reader-rehearsal-4th/`（副本、脚本、日志），
   **不在仓库里**；`fixtures/apk/` 里的两个第三方 fixture 是从主检出复制进去的，
   **没有提交**（它们本来就不在版本控制里）。
+- **把 `main` 的新 tip（`a785d01`）合进了本分支**——因为预演结束时基线已经往前
+  走了，而门禁要在这棵树上跑。**这一个合并提交带进来的是别人的东西**
+  （`docs/reports/` 下四份文件与 `scripts/check-doc-citations.py`、
+  `tests/test_doc_citations.py` 的改动，见 §8.2），**本窗口没有改它们**。
+- 本文件里的 **40 处 `file:line` 引用**全部带 `anchor:` 声明，
+  并用检查器自己的函数核过：**40/40 命中、0 条孤立声明**（§9.3）。
 - 提交在**本窗口自己的分支**上，**没有推 main、没有合并到 main**。
 
 **留给主会话的**：
@@ -674,6 +719,10 @@ C2 的判据要区分三件事（[acceptance-pack.md:117](m10-acceptance-pack.md
    M-10（换那串日志字面量）、M-11（改半句措辞）、X-4（统一 G3 的示例）。
 4. **重测与对外文本同步**——按 CLAUDE.md 的顺序：先改代码 → `ruff format` → 再测；
    本轮**没有碰源码**，所以**没有动过任何测量数字**。
+5. **基线上那 12 条漂移的引用**（§8.2）——**9 条在 release body**（它绑在旧 tag 树上，
+   **要等重测之后随重打 tag 一起重锚**），**3 条在别的文档**（`check-doc-citations.py`
+   涨了 1055 行把行号带偏了，`remap-citations.py` 对它们移动 0 条，要人判）。
+   **本窗口一条都没碰**——但它们**让整条引用门禁是红的**。
 
 ---
 
