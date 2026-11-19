@@ -792,7 +792,7 @@ def check(repo: Path) -> int:
         "the measurement was complete",
         total > 0 and accounted == total,
         f"the tree has {total} tests; the record accounts for {accounted} "
-        f"({skipped} skipped, each with a recorded reason); re-run the measurement",
+        f"({skipped} skipped and {facts.suite.get('deselected', 0)} deselected, each accounted); re-run the measurement",
     )
 
     print("\n== the cards are on the front page ==")
