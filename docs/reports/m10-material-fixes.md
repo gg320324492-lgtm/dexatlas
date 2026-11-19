@@ -47,7 +47,7 @@
 「您不需要写代码」直接冲突，读者须知第 4 条（凡靠作者口头补充才走通的步骤判不通过）
 会让 F3 只能落进「未验证」。
 
-**改成了什么**（[读者包 §3.8](m10-reader-package.md:396)）：
+**改成了什么**（[读者包 §3.8](m10-reader-package.md)）：
 
 - **第一步**：明说「`dexatlas-mcp` 是 stdio 传输，**直接起它看不到工具清单**」，
   并给出**协议级**的做法：用 MCP 的 JSON-RPC 问它一次。
@@ -60,7 +60,7 @@
   `get_project_status`），打印返回对象的 `structuredContent`。**实测两行**
   （`id=3` / `id=4`；两行先后顺序不固定——两个调用并发执行，实测两种顺序都出现过，
   已写进材料）。
-- [准备包 F3](m10-acceptance-pack.md:154) 的判据**一个字没动**，只在后面补了一句
+- [准备包 F3](m10-acceptance-pack.md) 的判据**一个字没动**，只在后面补了一句
   指路：两条可照抄的命令在读者包 §3.8。
 
 **依据**：契约表 §3.1（11 个工具清单）、§3（`_read_only` 的四个注解值）；
@@ -81,11 +81,11 @@ checkout 到的那棵树里，邀请函 §2 与记录模板 §1 都是**占位�
 
 | 文件 | 改成 |
 |---|---|
-| [邀请函 §2](m10-invitation-final.md:93) | 新增一段：**这一串以「随函发出的这一份」为准**；仓库里同名文件在 tag 指向的那棵树上仍是「填入前」的版本（填 hash 发生在打 tag 之后），那是**同一份材料的两个副本，不是两份不同的材料**；核 hash 的方式不变（`git rev-parse v1.0.0^{commit}`） |
-| [邀请函 抬头说明](m10-invitation-final.md:7) | 「正文里只留一处内容占位」改为说明：仓库这一份**已填**，填入动作在打 tag 之后，所以树内那份仍是填入前的版本，以随函发出的那一份为准 |
-| [记录模板 §1](m10-review-record-template.md:17) | 提示语改成同一口径：照**随函发出的那份邀请函 §2**；树内那份是填入前的版本；核对方式 `git rev-parse v1.0.0^{commit}` |
-| [读者包 §1.6](m10-reader-package.md:56) / 抬头 / §3.1 | 三处「hash 在邀请函成稿 §2」的指针改成「**随函发出的那份邀请函**」，并说明树内那份是填 hash 之前的版本 |
-| [准备包 §0 抬头](m10-acceptance-pack.md:13) / §3.1 | 同上 |
+| [邀请函 §2](m10-invitation-final.md) | 新增一段：**这一串以「随函发出的这一份」为准**；仓库里同名文件在 tag 指向的那棵树上仍是「填入前」的版本（填 hash 发生在打 tag 之后），那是**同一份材料的两个副本，不是两份不同的材料**；核 hash 的方式不变（`git rev-parse v1.0.0^{commit}`） |
+| [邀请函 抬头说明](m10-invitation-final.md) | 「正文里只留一处内容占位」改为说明：仓库这一份**已填**，填入动作在打 tag 之后，所以树内那份仍是填入前的版本，以随函发出的那一份为准 |
+| [记录模板 §1](m10-review-record-template.md) | 提示语改成同一口径：照**随函发出的那份邀请函 §2**；树内那份是填入前的版本；核对方式 `git rev-parse v1.0.0^{commit}` |
+| [读者包 §1.6](m10-reader-package.md) / 抬头 / §3.1 | 三处「hash 在邀请函成稿 §2」的指针改成「**随函发出的那份邀请函**」，并说明树内那份是填 hash 之前的版本 |
+| [准备包 §0 抬头](m10-acceptance-pack.md) / §3.1 | 同上 |
 
 **依据**：预演的实测（`git show 2715aef:docs/reports/m10-invitation-final.md` 里
 §2 仍是「【待填：…】」）+ 邀请函 §2 本来就写着「由验收发起人在发出本函之前填入」
@@ -98,7 +98,7 @@ checkout 到的那棵树里，邀请函 §2 与记录模板 §1 都是**占位�
 应用**的响应（`{"status":"healthy"}` / `{"detail":"Not Found"}`）。读者会把它写成
 一条 F2 的假卡点。
 
-**改成了什么**（[读者包 §3.8](m10-reader-package.md:331)）：
+**改成了什么**（[读者包 §3.8](m10-reader-package.md)）：
 
 - **先讲怎么认出成功**：服务真的起来时日志里有这一行——
   `INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)`——
@@ -127,7 +127,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 
 **改成了什么**：
 
-- [读者包 §9.1 G3](m10-reader-package.md:773)：开头改成「**至少一条后端记 `timeout`，
+- [读者包 §9.1 G3](m10-reader-package.md)：开头改成「**至少一条后端记 `timeout`，
   且报告照常产出**。**权威判据见准备包 §2.7 G3**——那里是这条判据的唯一出处，
   **条数与本机速度有关，不是固定值**」；原来那段三行「实测」输出改标为
   **示例**，并另给**本机实测（一条：androguard 与 apktool 都在 1 秒内跑完，
@@ -137,7 +137,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
   原来先说「`index_complete` 是 false、`index_gaps` 里有一条 androguard 的 timeout」，
   后面又说「只在 androguard 自己也超时时才成立」；现在合成一段并写明
   **`index_gaps` 只统计 androguard，jadx 超时不构成 gap**。
-- [准备包 G3](m10-acceptance-pack.md:165) 末尾加一句「**本项是 G3 判据的唯一权威
+- [准备包 G3](m10-acceptance-pack.md) 末尾加一句「**本项是 G3 判据的唯一权威
   出处**——读者包 §9.1 给的是可照抄的命令与**示例**输出，以本行为准」。
 
 **依据**：预演的实测（本机 1 秒超时下只有 jadx 超时，`errors[]` 一条、
@@ -156,11 +156,11 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 
 **改成了什么**（两个文件各一处，都在本窗口拥有的文件里）：
 
-- [准备包 G3](m10-acceptance-pack.md:165)：「本项只需核对 M8-4 的退出码语义」改成
+- [准备包 G3](m10-acceptance-pack.md)：「本项只需核对 M8-4 的退出码语义」改成
   「本项只需**核对退出码 6 的语义**（[公共契约表 §1.2](../architecture/public-contracts.md)；
   **M8-4 是提出该缺口的历史记录，已由退出码 6 关闭**，见读者包 §4.4）」；
   证据记录栏的「M8-4 结论」也改成「退出码 6 的结论」。
-- [读者包 §4.4](m10-reader-package.md:559)：M8-4 那一条后面加一段提示——
+- [读者包 §4.4](m10-reader-package.md)：M8-4 那一条后面加一段提示——
   **[M8 演练 §6] 记的是「当时（修复前）的实况」**，是提出缺口的历史记录，
   那份记录里没有前向指针，**以本条与契约表 §8.1 为准**。
 
@@ -175,7 +175,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 在主工作区跑 `projects` **列着 A4 的项目**，不是空的——照 §9.1 走的读者会记一条
 假卡点。（这一条与上一轮的 M-5 是同一个问题，两轮未改。）
 
-**改成了什么**（[读者包 §9.1 G1](m10-reader-package.md:709)）：
+**改成了什么**（[读者包 §9.1 G1](m10-reader-package.md)）：
 
 - 开头加一段说明：**这条要在「一个空工作区」里跑**，并解释为什么（§9.1 排在
   §3.3 之后，主工作区里已有 A4 的项目）。
@@ -197,7 +197,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 东西」是反的——邀请函是发给读者的那一份正文，读者照它读自查脚本的输出，会看到
 一堆和自己清单一模一样的编号，却被告知「不是同一组」。
 
-**改成了什么**（[邀请函 §五](m10-invitation-final.md:190)）：
+**改成了什么**（[邀请函 §五](m10-invitation-final.md)）：
 
 > **那 40 项就是您要判的这 40 项**——编号 A1–G5 与本函第五节那份清单**一一对应**，
 > 不是另一组东西；其中 13 项（A4、A6、D1、D3、D5、E1、E5、F1、F2、F3、F4、F5、
@@ -218,13 +218,13 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 
 **改成了什么**（作者已决定：**补齐六类端点的命令，判据本身不动**）：
 
-- [读者包 §3.8](m10-reader-package.md:351) 给出**六类关键端点各一条命令**：
+- [读者包 §3.8](m10-reader-package.md) 给出**六类关键端点各一条命令**：
   上传（`POST /analyze`）、项目（`/projects`）、运行（`/projects/{pid}/runs`）、
   符号（`/projects/{pid}/classes`）、源码（`/projects/{pid}/classes/{cls}/source`）、
   报告（`/projects/{pid}/report?format=json`）。每条带 `-w "\n[%{http_code}]\n"`
   ——**状态码是 F2 判据的一部分**。
 - 端口用变量 `B=localhost:8011` 承载（被占时换一处即可）；`P` 承载 project id。
-- [准备包 F2](m10-acceptance-pack.md:153) 的判据**一个字没动**（「抽查 3 个端点」），
+- [准备包 F2](m10-acceptance-pack.md) 的判据**一个字没动**（「抽查 3 个端点」），
   只在后面补一句：六类端点各有一条可照抄的命令（见读者包 §3.8），**判据仍是
   「抽查 3 个」——自选其中 3 个记录即可**。
 
@@ -250,7 +250,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 `verify_citations` 说的「**按构造解析**（`path=None` 是设计，不是失败）」。
 照邀请函的字面判，**★ 阻断项 C3 会被判成不通过**。
 
-**改成了什么**（[邀请函 §四 第 4 步](m10-invitation-final.md:149)）：
+**改成了什么**（[邀请函 §四 第 4 步](m10-invitation-final.md)）：
 
 > **`locator` 按[准备包 §2.3 C2](m10-acceptance-pack.md)的规则核**：**文件级**
 > locator 要在分析工作区里解析到真实文件；**DEX 成员 locator 与裸树 locator**
@@ -282,13 +282,13 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 
 **改成了什么**（两边都补，**以读者包为准**）：
 
-- [准备包 §3 开头](m10-acceptance-pack.md:183) 加一段：**这一段路径在读者包 §3 里
+- [准备包 §3 开头](m10-acceptance-pack.md) 加一段：**这一段路径在读者包 §3 里
   还有一份发给读者的完整版**；两份讲的是同一条路径，**执行时以读者包 §3 为准**
   （它是随函发出的那一份），本节保留准备侧的说明与判据；两者若有出入，以读者包为准，
   并在记录里写下差异。
-- [准备包 §3.1 环境表](m10-acceptance-pack.md:197) 补上 **`gh` CLI** 一行
+- [准备包 §3.1 环境表](m10-acceptance-pack.md) 补上 **`gh` CLI** 一行
   （仅第三方 fixtures 需要）。
-- [准备包 §3.2](m10-acceptance-pack.md:221) 补上 **`bash scripts/fetch-fixtures.sh`**
+- [准备包 §3.2](m10-acceptance-pack.md) 补上 **`bash scripts/fetch-fixtures.sh`**
   这一步，并写明「为什么这一步不能跳」（集成用例要读两个不在仓库里的 APK）、
   前置条件（能上网 + 已登录的 GitHub CLI）、不抓的后果（**27 个集成用例 skip**，
   退出码 0 只说明没有失败）与详细口径的去处。
@@ -301,7 +301,7 @@ uvicorn 日志先打 `Application startup complete.` 再打 `[WinError 10048]`�
 
 ## 4. 顺手改掉的一处指针错误（预演没记）
 
-[读者包 §3.8](m10-reader-package.md:480) 原来写「报告 JSON 的 `schema_version` 与
+[读者包 §3.8](m10-reader-package.md) 原来写「报告 JSON 的 `schema_version` 与
 顶层字段在契约表 **§4**」——契约表 §4 是「计数含义」，报告 schema 在 **§5**
 （§5.1「JSON 报告顶层字段」）。已改正为 §5.1。
 

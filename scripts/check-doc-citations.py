@@ -240,6 +240,9 @@ DOCS: list[pathlib.Path] = [
     # mechanism does not cover.
     REPO / "docs" / "reports" / "citation-anchor-declarations.md",
     REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
+    # The report of the batch that taught the checker to compare the values a
+    # citation states with the values on the lines it names.
+    REPO / "docs" / "reports" / "citation-value-comparison.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
