@@ -116,6 +116,15 @@ execution, no model dependency in the tool layer.
   that with the recorded evidence and we decide together: adjust scope,
   adjust budget, or stop.
 
+## Availability and contact
+
+I work in the `Asia/Shanghai` time zone and am available on weekdays,
+10:00-18:00 (`UTC+8`). During those hours I aim to reply within one business
+day; messages sent outside them are answered on the next working day.
+Contact: <hello@dexatlas.example> or the platform's message thread.
+*(Placeholder contact during the development phase - replace with a live
+mailbox before publishing.)*
+
 ## A concrete example from my own work (DexAtlas)
 
 Input: a completed APK analysis stored in a local workspace. Integration: a

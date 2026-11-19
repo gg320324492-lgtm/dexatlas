@@ -134,6 +134,15 @@ captured as values and surfaced in the report instead of aborting the run.
   timing. They are not client cases: this is my own
   open-source work on first-party samples.
 
+## Availability and contact
+
+I work in the `Asia/Shanghai` time zone and am available on weekdays,
+10:00-18:00 (`UTC+8`). During those hours I aim to reply within one business
+day; messages sent outside them are answered on the next working day.
+Contact: <hello@dexatlas.example> or the platform's message thread.
+*(Placeholder contact during the development phase - replace with a live
+mailbox before publishing.)*
+
 ---
 
 *Draft for review — not published. Personal project; no client engagement is

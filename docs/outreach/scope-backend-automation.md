@@ -90,6 +90,15 @@ CI across Python 3.12/3.13 and multiple engine configurations.
 - If a technical discovery invalidates an assumption, I stop, report it with
   evidence, and we re-plan together.
 
+## Availability and contact
+
+I work in the `Asia/Shanghai` time zone and am available on weekdays,
+10:00-18:00 (`UTC+8`). During those hours I aim to reply within one business
+day; messages sent outside them are answered on the next working day.
+Contact: <hello@dexatlas.example> or the platform's message thread.
+*(Placeholder contact during the development phase - replace with a live
+mailbox before publishing.)*
+
 ## A concrete example from my own work (DexAtlas)
 
 Input: an Android APK file. Pipeline: hashing and validation → manifest
