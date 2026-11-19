@@ -113,9 +113,9 @@
 
 | ID | 验收项与判定标准 | 阻断 | 状态 | 证据记录 |
 |---|---|:---:|---|---|
-| C1 | 任选 3 条 evidence 记录，逐条写出工具、版本、locator 和 level；字段不得为空或臆造。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 记录编号：；字段： |
-| C2 | locator 解析：文件级 locator 在分析工作区内解析到真实文件；DEX 成员 locator 与裸树 locator（如 `jadx:sources`）按构造解析（`path=None` 是设计，不是失败）；无法解析的 locator 要单独列出。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | locator：；解析结果： |
-| C3 | 三级语义：`verified` 必须是确定性工具产出且 citation 可解析；模型文本不得为 `verified`；`lead` 是线索不是结论；`insufficient` 表示证据不足。读者能准确复述三级定义与硬边界，并在文档中找到定义出处（如 [公共契约表 §证据三级](../architecture/public-contracts.md)）；不要求在 demo 案例中各找一个 `lead`/`insufficient` 实例——静态分析管线只产生 `verified`，`lead`/`insufficient` 由模型 claim 与人工复核产生，demo 报告中计数为 0 是设计而非缺失。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 复述：；出处： |
+| C1 | 任选 3 条 evidence 记录，逐条写出工具、版本、locator 和 level；字段不得为空或臆造。**这四个字段各在哪**：JSON 报告（`report.json`）与 REST `/projects/{pid}/evidence` 的每条记录，顶层只有六个键 `id / kind / level / summary / detail / provenance`——**`level` 在顶层**，而**工具、版本、locator 在 `provenance[]` 数组里**（每个元素含 `tool` / `tool_version` / `apk_sha256` / `locator`）；**一条记录可能有不止一条 provenance**（demo 的 E-0004–E-0006 各有两条），逐条列出即可。MCP 的 `get_evidence` 返回的 `provenance` 是**只含 locator 的字符串数组**（那一侧没有工具与版本），工具与版本看 JSON 报告那一侧。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 记录编号：；字段： |
+| C2 | locator 解析：文件级 locator 在分析工作区内解析到真实文件；DEX 成员 locator 与裸树 locator（如 `jadx:sources`）按构造解析（`resolve_locator` 返回 `resolved=true` 而**没有可读的文件内容**——DEX 成员 locator 的 `text` 是 `null`，裸树 locator 的是空文本（`text.text` 为空串、`bytes` 为 0）——这是按构造解析，不是失败；内部 Python API 里对应的是 `path=None`）；无法解析的 locator（`resolved=false`）要单独列出。**可照抄的解析命令在[读者包 §3.4](m10-reader-package.md)**——REST 侧**没有** locator 解析端点，只能走 MCP 的 `resolve_locator`。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | locator：；解析结果： |
+| C3 | 三级语义：`verified` 必须是确定性工具产出且 citation 可解析；模型文本不得为 `verified`；`lead` 是线索不是结论；`insufficient` 表示证据不足。读者能准确复述三级定义与硬边界，并在文档中找到定义出处（如 [公共契约表 §证据三级](../architecture/public-contracts.md)）；**`level` 字段就在 evidence 记录的顶层**（工具、版本、locator 在 `provenance[]` 里，见 C1）；不要求在 demo 案例中各找一个 `lead`/`insufficient` 实例——静态分析管线只产生 `verified`，`lead`/`insufficient` 由模型 claim 与人工复核产生，demo 报告中计数为 0 是设计而非缺失。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 复述：；出处： |
 | C4 | 计数一致：报告中的计数与证据记录/索引一致，没有无法追溯来源的数字；抽查 2 个计数复算。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 抽查：；复算： |
 | C5 | 证据包结构：`verify_package` 通过（schema、路径穿越、SHA-256、项目/APK 绑定）；失败时记录异常原文。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；结果： |
 | C6 | 引用迁移：`verify_citations` 返回 `citations_resolved=true`；把包复制到另一个目录后复验仍通过；包内路径不指向生成它的机器。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；复制路径：；结果： |
@@ -164,7 +164,7 @@
 | G2 | 后端缺失：清空后端环境变量后分析继续，错误记录 `not_installed`，报告照常产出；不得把失败当异常抛出。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；errors： |
 | G3 | 超时：设置极短超时后**至少一条后端记 `timeout` 且报告照常产出**（条数与本机速度有关：没超时的后端不留记录，不是「一定有三条」）；退出码 **6**（`EXIT_NO_INDEX`）**不由超时变量触发**——它由 `scripts/verify-public-contracts.py` 的 `an analysis with no index exits 6` 一条覆盖，本项只需**核对退出码 6 的语义**（[公共契约表 §1.2](../architecture/public-contracts.md)；**M8-4 是提出该缺口的历史记录，已由退出码 6 关闭**，见[读者包 §4.4](m10-reader-package.md)）并记录实际退出码。**本项是 G3 判据的唯一权威出处**——[读者包 §9.1](m10-reader-package.md)给的是可照抄的命令与**示例**输出，条数随后端速度变化，以本行为准。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；timeout 条数：；退出码 6 的结论： |
 | G4 | 幂等：同一 APK 连续分析两次，project id 相同，`projects` 只有一条，计数一致。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 两次 id：；项目数： |
-| G5 | 数据隔离：证据包不含 APK、全量源码、未引用字符串；记录 SHA-256 绑定但没有把 APK 打进包。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 包内容：；not_included： |
+| G5 | 数据隔离：**包里能直接判的两条**——证据包**不含 APK**（zip 的条目里没有 `.apk`，`manifest.json` 的 `files` 清单里也没有）、**不含全量源码**（包内没有 `sources/` 目录，`files` 清单里只有报告）；**「未引用字符串」按 manifest 的声明核对**：`manifest.json` 的 `not_included.unrelated_strings` 声明「未被证据引用的字符串常量不进包」——包里**没有** APK 的完整字符串表可供比对，读者核的是**这条声明与包内实际内容一致**（这是本项的判据，不是「与全量字符串表比对」）。记录 SHA-256 绑定（`apk_sha256`）但 APK 本身没进包。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 包内容：；manifest.not_included： |
 
 ### 2.8 判定规则与阻断项
 
@@ -328,7 +328,10 @@ uv run --no-sync python -c \
 ```
 
 预期：`citations_resolved` 为 `True`，`citations_unresolved` 为空；
-`manifest.json` 的 `not_included` 明示 APK、全量源码、未被证据引用的字符串不在包内。
+`manifest.json` 的 `not_included` 有三个键——`apk` / `full_sources` /
+`unrelated_strings`——明示 APK、全量源码、未被证据引用的字符串不在包内。
+**判据是「声明与包内实际内容是否一致」**（其中「未引用字符串」核的是这条声明，
+包里没有全量字符串表可比对，见 §2.7 的 G5）。
 
 ### 3.5 离线阅读（不安装 DexAtlas 的读者）
 
@@ -340,7 +343,9 @@ uv run --no-sync python -c \
    ```
 
 3. 打开 `evidence/reports/report.html`，再打开 `evidence/manifest.json`；
-   对照 `not_included` 检查包内实际文件。
+   对照 `not_included` 的三个键（`apk` / `full_sources` / `unrelated_strings`）
+   检查包内实际文件——其中「未引用字符串」核的是**这条声明**
+   （包里没有全量字符串表可比对，见 §2.7 的 G5）。
 4. 打开 `evidence/reports/report.json`，看 evidence 记录的 locator 类型：
    - 若是 file-level `jadx:sources/...`，在 `evidence/` 下按同名相对路径找到源码片段；
    - 若只有 DEX 成员 locator 或裸树 `jadx:sources`（demo 示例包就是这种），
