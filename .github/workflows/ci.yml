@@ -820,4 +820,20 @@ jobs:
         run: >-
           uv run --no-sync python scripts/check-release-numbers.py
           --repo "${{ github.repository }}"
+      # Some numbers are written by hand, in a sentence: the CI job count, the
+      # number of MCP tools, the test count the portfolio quotes. Nothing
+      # rewrites those, so a number that goes stale is a number nobody
+      # notices -- the tree stays green while the page lies. This check reads
+      # the truth out of the tree and compares it with what the sentence says.
+      # It compares; it does not count. No number is written down twice, so
+      # adding a job, a tool or a test turns this red without anybody editing
+      # a number.
+      #
+      # It lives in this job, and not in the lint job above, because a step
+      # added there moves every line of this file below it -- and several
+      # reports cite those lines. The reports that record what a previous
+      # remap moved are records of what happened then; rewriting their
+      # numbers to fit a tree they do not describe is not a remap.
+      - name: The hand-written numbers in the documents agree with the tree
+        run: uv run --no-sync python scripts/check-unguarded-numbers.py
 
