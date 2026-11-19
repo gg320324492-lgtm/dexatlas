@@ -172,6 +172,10 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "c6-build-time-from-ci.md",
     REPO / "docs" / "reports" / "gate-self-checks.md",
     REPO / "docs" / "reports" / "figures-auto-write-landing.md",
+    # The reports of the batch that fixed the materials the second reader
+    # rehearsal found, and the note that closes M8-4 in the history.
+    REPO / "docs" / "reports" / "m10-material-fixes.md",
+    REPO / "docs" / "reports" / "m8-4-note-and-c17.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
