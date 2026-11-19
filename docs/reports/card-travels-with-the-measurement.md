@@ -15,7 +15,7 @@
 - 原来的做法是**两件事靠顺序连起来**：先重画卡片，再测量，测完再重画一遍。
   谁忘了中间那步，测量就会把整个仓库锁死（§1）。
 - 现在测量自己会画：**报告落盘之后，测量顺手把卡片按新数重画**
-  （`scripts/refresh-report-figures.py:2090-2092` 的 `draw_social_preview` 调用，
+  （`scripts/refresh-report-figures.py:2152-2154` 的 `draw_social_preview` 调用，
   函数在 `:2152`）。于是「测量 → 卡片」不再是一段要人记得的顺序，
   而是一次测量里的一个步骤。
 - 时序只有一条规矩：**卡片画的是落盘后的报告**，不是收敛循环手里那份还没落盘的候选（§3）。
@@ -51,7 +51,7 @@
 ### 2.1 机制：从「两段顺序」变成「一个步骤」
 
 测量脚本在写盘分支里多了一步：在报告、状态页、README 徽章和其它带标记的文档
-都写完之后，重画卡片（`scripts/refresh-report-figures.py:2090-2092`）。
+都写完之后，重画卡片（`scripts/refresh-report-figures.py:2152-2154`）。
 
 ```python
         card_drawn = True

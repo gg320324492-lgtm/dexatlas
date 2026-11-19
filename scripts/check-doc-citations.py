@@ -243,6 +243,12 @@ DOCS: list[pathlib.Path] = [
     # The report of the batch that taught the checker to compare the values a
     # citation states with the values on the lines it names.
     REPO / "docs" / "reports" / "citation-value-comparison.md",
+    REPO / "docs" / "reports" / "citation-anchor-declarations.md",
+    REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
+    REPO / "docs" / "reports" / "card-travels-with-the-measurement.md",
+    REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
+    REPO / "docs" / "reports" / "m10-round3-fixes.md",
+    REPO / "docs" / "reports" / "declarations-outward.md",
     # The report of the fourth reader rehearsal: the one that proved the
     # five material fixes had never reached the tagged tree, and that the
     # F2 fallback really falls back when both ports are taken.
