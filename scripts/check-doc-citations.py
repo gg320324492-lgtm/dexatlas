@@ -260,6 +260,10 @@ DOCS: list[pathlib.Path] = [
     # test-file table's rows, the card's sidecar) are written or audited by
     # the mechanism.
     REPO / "docs" / "reports" / "c17-markers-everywhere.md",
+    # The C9 outward-info report cites the outreach files it edited and the
+    # candidate list it updated. A citation nobody checks is a citation nobody
+    # has to keep true.
+    REPO / "docs" / "reports" / "c9-outward-info.md",
     # The report of the fourth reader rehearsal: the one that proved the
     # five material fixes had never reached the tagged tree, and that the
     # F2 fallback really falls back when both ports are taken.
