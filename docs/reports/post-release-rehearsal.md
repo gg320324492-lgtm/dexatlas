@@ -405,7 +405,7 @@
 | 2 | 改 `docs/` 下的文件**不进**指纹，所以改文档本身不需要重测量 | `fingerprint_files()`（`scripts/refresh-report-figures.py:840-863`）只收 `src/`、`tests/`、`pyproject.toml` 与测量脚本 —— R1 |
 | 3 | 已开始的 CI run **不会**被后来的 tag push 打断 | `.github/workflows/ci.yml:23-32`，`cancel-in-progress: false` —— R5 |
 | 4 | 第四份对外文本（GitHub 上已发布的那一份）确实**没有**自动比对，清单已如实标出 | §7 N6（`docs/reports/v1.0.0-release-checklist.md:448-464`）—— R8 |
-| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:866-893`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`:1339`）—— 这条**不是**重打 tag 路径的坑 |
+| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:866-893`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`tests/test_docs.py:1339`）—— 这条**不是**重打 tag 路径的坑 |
 
 ---
 

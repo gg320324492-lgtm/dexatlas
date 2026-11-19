@@ -144,20 +144,20 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里四样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 **1733**（**1584** 快 + **149** 集成）。
+* **收集到的测试数** —— 当前这棵树上应当是 <!--fig:tests.trio-->**1738**（**1589** 快 + **149** 集成）<!--/fig-->。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
-  `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是报告里 `<!--fig:tests.total-->` / `<!--fig:tests.fast-->` /
-  `<!--fig:tests.slow-->` 的值，由脚本生成，不由人手抄；你可以这样自己数一遍：
+  `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是上面那个标记的值，由
+  `scripts/refresh-report-figures.py` 写出来（§4），不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1584/1733 tests collected (149 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1733 tests collected (1584 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1589/1738 tests collected (149 deselected)
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1738 tests collected (1589 deselected)
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
 * **skipped 的数量** —— **skip 只允许来自未抓取的第三方 fixture，且每一条都要能说出是哪一类。skip 不是通过。**
   别的来源的 skip（后端不在 PATH 上、缺可选依赖）都说明**环境没配好**，不是通过。
-* **xfailed 的数量** —— 报告里 `<!--fig:suite.xfailed-->` 记的那个数。xfail 是「已知失败、
+* **xfailed 的数量** —— 报告里 `fig:suite.xfailed` 记的那个数。xfail 是「已知失败、
   按预期不通过」的用例：不计入 passed，汇总行里单独列一条。**这个项目现在没有预期失败的用例**
   （`tests/test_large_apk_scale.py` 里那几条曾经是 `xfail(strict=True)`，后来修好了，标记已经摘掉），
   所以看到 xfailed 非零，先怀疑跑的是别的分支或环境不对，别把它读成「已知问题」。
@@ -168,8 +168,8 @@ uv run --no-sync pytest -q
 
 | 环境 | 汇总行 |
 |---|---|
-| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `1664 passed, 31 skipped`（退出码 0）。27 个 skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh`（25 条）与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`（2 条） |
-| 三后端齐备，**取了**第三方样本 | `1731 passed`、**1 skipped**、**0 xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->` / `<!--fig:suite.xfailed-->`） |
+| 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `<N> passed, <M> skipped`（退出码 0）。skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh` 与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`。这一行量的是**另一种跑法**，具体条数随这棵树的测试数变，所以这里不写死 |
+| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1736<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -198,9 +198,10 @@ Every citation still says what it says.
 **退出码 0。** 意思是：文档里 `file:line` 形式的引用，指的还是它说的那个符号。
 `drifted: 0` 是关键那一行——非零就说明有引用漂了。
 
-**这条门禁只扫四份文件**（`scripts/check-doc-citations.py` 里的 `DOCS` 清单）：
-`docs/analysis-provenance.md`、`docs/architecture/public-contracts.md`、
-`docs/reports/phase1-execution-report.md`、`docs/benchmarks/large-apk.md`。
+**这条门禁扫的是 `scripts/check-doc-citations.py` 里 `DOCS` 清单上的文档**
+（清单在变，以脚本里的为准）：`docs/analysis-provenance.md`、
+`docs/architecture/public-contracts.md`、`docs/reports/phase1-execution-report.md`、
+`docs/benchmarks/large-apk.md` 只是其中几份。
 **本页不在其中**——`docs/` 下其它文档的行号引用没有自动门禁，评审时值得自己抽查。
 
 ### 2.5 门禁二：对外的版本声明与仓库对得上吗
@@ -217,7 +218,7 @@ facts:
   package version: 1.0.0
   changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.0
-documents read: 142
+documents read: 161
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
@@ -451,13 +452,22 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 ## 4. 哪些数字是生成物，不许手改
 
-**报告里的测试数、覆盖率、命令数、端点数、样本数，以及两份 README 顶部的徽章，
-全部由 `scripts/refresh-report-figures.py` 写出来。**
+**报告里的测试数、覆盖率、命令数、端点数、样本数，两份 README 顶部的徽章，
+以及任何写着 `<!--fig:…-->` 标记的页面上的数——全部由
+`scripts/refresh-report-figures.py` 写出来。**
+
+它**按标记发现**要写的页面：带标记的页面它就写，没带标记的页面它不碰。所以本页
+§2.3 里那三个数也是它写的，不是人抄的；改代码 → 重跑脚本 → 这一页自己就更新了。
+
+**标记必须成对。** `<!--fig:键-->` 与 `<!--/fig-->` 之间才是它要写的那个数；
+只写一半（只提一句键名、不给 `<!--/fig-->`）会被它当成「从这里到下一个
+`<!--/fig-->` 都是这一格的数」，那一段文字就没了。所以正文里提到某个键名时，
+写 `fig:键` 就够，别写半个标记。
 
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:tests.total-->1712<!--/fig-->
+<!--fig:tests.total-->1733<!--/fig-->
 ```
 
 **改了会怎样？**
@@ -475,7 +485,8 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 **同一类规矩还落在别处：**
 
-* `docs/status.md` 的快照表里也有同样的 `<!--fig:…-->` 标记，同样由这个脚本写。
+* `docs/status.md` 的快照表、`docs/portfolio.md` 的质量门禁那一行、本页 §2.3 的三个数，
+  用的都是同一套 `<!--fig:…-->` 标记，同样由这个脚本写。
 * M6 层级 2 各份报告的数字由 `scripts/m6_level2_*_report.py` 从 trace 重算（§2.7），
   同样不许手改；缺 trace 时脚本拒绝出报告。
 * 各历史版本（v0.1.0 ~ v0.1.3）的测试数由脚本把那个 tag `git archive` 出来、

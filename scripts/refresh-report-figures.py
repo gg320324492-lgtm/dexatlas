@@ -1120,6 +1120,14 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "tests.total": str(tests["total"]),
         "tests.fast": str(tests["fast"]),
         "tests.slow": str(tests["slow"]),
+        # The three counts as one phrase, because that is how the pages read
+        # them: the total, then the fast half and the integration half. The
+        # fullwidth punctuation is written as escapes: ``ruff``'s RUF001 reads
+        # it as ASCII punctuation, and a phrase a reader reads is not an
+        # identifier where a lookalike could hide a bug.
+        "tests.trio": (
+            f"**{tests['total']}**\uff08**{tests['fast']}** 快 + **{tests['slow']}** 集成\uff09"
+        ),
         "suite.passed": str(suite["passed"]),
         "suite.skipped": str(suite["skipped"]),
         "suite.xfailed": str(suite["xfailed"]),
@@ -1138,18 +1146,99 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
     return values
 
 
-def apply_figures(text: str, values: dict[str, str]) -> tuple[str, list[str]]:
-    """Write the values into the markers. Returns the text and the unknown keys."""
-    unknown: list[str] = []
+def quoted_spans(text: str) -> list[tuple[int, int]]:
+    """The spans of a text that are quotations: fenced code blocks and inline code.
 
-    def replace(match: re.Match[str]) -> str:
+    A fenced code block shows the reader the output of a command, and an inline
+    code span says the same thing in a sentence. A marker inside one shows the
+    reader what a marker looks like -- it is an illustration, not a number --
+    and rewriting one would turn an illustration into a measurement nobody
+    asked for. In a document that describes a released tree, it would edit a
+    historical record.
+    """
+    spans: list[tuple[int, int]] = []
+    for pattern in (CODE_BLOCK, INLINE_CODE):
+        spans.extend(match.span() for match in pattern.finditer(text))
+    return sorted(spans)
+
+
+def live_spans(text: str) -> list[tuple[int, int]]:
+    """The spans of a text that are not quotations.
+
+    This is the one ruler: what the writer fills in and what the writer
+    discovers have to agree, or a document that carries an illustration
+    inside a code block gets a number written into that illustration the
+    moment the document also carries a figure of its own.
+    """
+    spans: list[tuple[int, int]] = []
+    cursor = 0
+    for start, end in quoted_spans(text):
+        if start > cursor:
+            spans.append((cursor, start))
+        cursor = max(cursor, end)
+    if cursor < len(text):
+        spans.append((cursor, len(text)))
+    return spans
+
+
+def apply_figures(
+    text: str, values: dict[str, str], copies: bool = False
+) -> tuple[str, list[str], list[str]]:
+    """Write the values into the markers.
+
+    Returns the text, the keys this script does not know how to fill in, and
+    the cells that are not figures.
+
+    A figure is ``<!--fig:key-->value<!--/fig-->``. An opening tag whose
+    closing tag is somewhere else -- in another paragraph, in another table,
+    several pages away -- is not a figure: filling it in would delete
+    everything in between. Those are left alone and reported, because a
+    number nobody can place is a number nobody can check, and deleting the
+    reader's text to write it is worse than leaving it.
+
+    ``copies`` says whether the figures inside code blocks and inline code
+    are copies of the figures the document states in prose. In the
+    execution report they are: the report shows what its commands print,
+    and that copy has to move with the numbers. Everywhere else a marker
+    inside a code block shows the reader what a marker looks like, and
+    writing a number into it would turn an illustration into a measurement
+    nobody asked for -- and in a document that describes a released tree,
+    it would edit a historical record.
+    """
+    unknown: list[str] = []
+    malformed: list[str] = []
+    pieces: list[str] = []
+    cursor = 0
+    spans = [(0, len(text))] if copies else live_spans(text)
+    for start, end in spans:
+        pieces.append(text[cursor:start])
+        pieces.append(_fill_figures(text[start:end], values, unknown, malformed))
+        cursor = end
+    pieces.append(text[cursor:])
+    return "".join(pieces), unknown, malformed
+
+
+def _fill_figures(
+    chunk: str, values: dict[str, str], unknown: list[str], malformed: list[str]
+) -> str:
+    """Write the values into the markers of one live span."""
+    pieces: list[str] = []
+    cursor = 0
+    for match in FIGURE.finditer(chunk):
         key = match.group(1)
+        content = match.group(2)
+        if "\n\n" in content or "<!--fig:" in content:
+            # Not a figure: the opening tag's closing tag is somewhere else.
+            malformed.append(key)
+            continue
         if key not in values:
             unknown.append(key)
-            return match.group(0)
-        return f"<!--fig:{key}-->{values[key]}<!--/fig-->"
-
-    return FIGURE.sub(replace, text), unknown
+            continue
+        pieces.append(chunk[cursor : match.start()])
+        pieces.append(f"<!--fig:{key}-->{values[key]}<!--/fig-->")
+        cursor = match.end()
+    pieces.append(chunk[cursor:])
+    return "".join(pieces)
 
 
 def live_figures(text: str) -> list[str]:
@@ -1160,8 +1249,10 @@ def live_figures(text: str) -> list[str]:
     is a number to fill in, and rewriting one would turn an illustration into
     a measurement nobody asked for.
     """
-    outside = INLINE_CODE.sub("", CODE_BLOCK.sub("", text))
-    return [key for key, _ in FIGURE.findall(outside)]
+    keys: list[str] = []
+    for start, end in live_spans(text):
+        keys.extend(key for key, _ in FIGURE.findall(text[start:end]))
+    return keys
 
 
 def markdown_documents(root: Path) -> list[Path]:
@@ -1203,6 +1294,21 @@ def documents_with_figures(root: Path) -> list[Path]:
     return found
 
 
+def report_malformed(where: str, malformed: list[str]) -> None:
+    """Say which cells are not figures, and that they were left alone.
+
+    A cell that is not a figure is one whose opening tag's closing tag is
+    somewhere else. Filling it in would delete the text in between, so it is
+    left alone -- and said out loud, because a figure nobody can place is a
+    figure nobody can check.
+    """
+    for key in sorted(set(malformed)):
+        print(
+            f"  {where} {key}: not a figure (its opening tag's closing tag is "
+            "elsewhere) -- left alone"
+        )
+
+
 def write_figures(path: Path, values: dict[str, str]) -> str:
     """Write the measured figures into a document, or refuse to guess.
 
@@ -1211,12 +1317,13 @@ def write_figures(path: Path, values: dict[str, str]) -> str:
     stands behind. Better to stop and say which one it is.
     """
     text = path.read_text(encoding="utf-8")
-    updated, unknown = apply_figures(text, values)
+    updated, unknown, malformed = apply_figures(text, values)
     if unknown:
         raise SystemExit(
             f"{display_path(path)} refers to figures this script does not know how to fill in: "
             + ", ".join(sorted(set(unknown)))
         )
+    report_malformed(display_path(path), malformed)
     return updated
 
 
@@ -1276,12 +1383,13 @@ def render_status(record: dict[str, Any], text: str) -> str:
     check, and guessing at one would put a number in the page that nothing
     stands behind. Better to stop and say which one it is.
     """
-    updated, unknown = apply_figures(text, render_figures(record))
+    updated, unknown, malformed = apply_figures(text, render_figures(record))
     if unknown:
         raise SystemExit(
             "the status page refers to figures this script does not know how to fill in: "
             + ", ".join(sorted(set(unknown)))
         )
+    report_malformed("the status page", malformed)
     return updated
 
 
@@ -1293,10 +1401,15 @@ def apply_record(text: str, record: dict[str, Any]) -> str:
     return text.rstrip("\n") + "\n\n" + block + "\n"
 
 
-def render_report(text: str, record: dict[str, Any]) -> tuple[str, list[str]]:
-    """Write a record into the report: the figures, and the record itself."""
-    updated, unknown = apply_figures(text, render_figures(record))
-    return apply_record(updated, record), unknown
+def render_report(text: str, record: dict[str, Any]) -> tuple[str, list[str], list[str]]:
+    """Write a record into the report: the figures, and the record itself.
+
+    The report's figures inside its code blocks are copies of the ones it
+    states in prose -- it shows what its commands print -- so they are
+    written too.
+    """
+    updated, unknown, malformed = apply_figures(text, render_figures(record), copies=True)
+    return apply_record(updated, record), unknown, malformed
 
 
 def render_or_fail(text: str, record: dict[str, Any]) -> str:
@@ -1306,12 +1419,13 @@ def render_or_fail(text: str, record: dict[str, Any]) -> str:
     check, and guessing at one would put a number in the report that nothing
     stands behind. Better to stop and say which one it is.
     """
-    updated, unknown = render_report(text, record)
+    updated, unknown, malformed = render_report(text, record)
     if unknown:
         raise SystemExit(
             "the report refers to figures this script does not know how to fill in: "
             + ", ".join(sorted(set(unknown)))
         )
+    report_malformed("the report", malformed)
     return updated
 
 
