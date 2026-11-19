@@ -137,6 +137,13 @@ Docker 构建每次都走完整下载并在构建期验证后端可运行，其�
 
 ### M8-4（重要，涉及退出码契约，留主会话决策）全部后端超时后 run 仍 completed、退出码 0
 
+> **此后已如何解决（2026年11月19日补记）**：**本节正文记的是 v1.0.0 之前的实况，
+> 不是现在的状态。** M8-4 提出的「退出码仍是 0」这个缺口**已在 v1.0.0 关闭**——
+> 新增退出码 **6（`EXIT_NO_INDEX`：分析跑完了，但无可用的代码索引）**，
+> 0–5 的语义不变。语义见[公共契约表 §1.2](../architecture/public-contracts.md)，
+> 方案与理由见[退出码提案](../proposals/exit-code-partial-read.md)，
+> 闭合记录见[`docs/status.md`](../status.md) 的 M8 行。
+
 - **现象**：`DEXATLAS_TOOL_TIMEOUT_SECONDS=1` 下三后端全部超时，报告含三条
   `timeout` 错误、classes/methods 计数为 0，但 project status 仍是 `completed`，
   CLI 退出码 0。
