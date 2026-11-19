@@ -847,6 +847,53 @@ uv run --no-sync python scripts/check-doc-citations.py   # 期望 drifted: 0
 本轮的建议是**先覆盖对外文本**（读者照着它核对发布 ✓，而它恰好是**唯一一份
 会随 tag 换树**的文档 ✓，也就是本轮唯一实测到漂移的那一类 ✓）。
 
+#### 8.1.3 顺带查到的：对外的 how-to-verify 两页说「门禁只扫四份文件」，实际已扫 35 份
+
+主会话说下一批要先在「对外文本」上开值比对（release body ✓、两页
+how-to-verify ✓、发版说明 ✓）。本轮把这三份的现状查了一遍，**有两处与那个
+计划的前提对不上**：
+
+**（一）两页 how-to-verify 与发版说明里没有 `file:line` 形式的引用。**
+
+用检查器自己的模块数（`document_clauses()`）：
+
+| 文档 | 检查器认出的引用 | 只指位置 |
+|---|---:|---:|
+| `docs/reports/v1.0.0-github-release-body.md` | **64** | 60 |
+| `docs/architecture/public-contracts.md` | **125** | 59 |
+| `docs/how-to-verify.md` | **0** | 0 |
+| `docs/how-to-verify.zh-CN.md` | **0** | 0 |
+| `docs/status.md` | **0** | 0 |
+| `docs/releases/v1.0.0.md` | **0** | 0 |
+| `README.md` / `README.zh-CN.md` | **0** | 0 |
+
+那两页 how-to-verify 里确实出现过 `docs/releases/v0.2.0.md:326` 这种写法 ——
+但那是**把版本检查器的输出引述进正文**，不是文档自己的行号引用
+（引述的是**别的文档的输出**，不是指向代码）。
+
+**所以「在三份对外文本上开值比对」这个收口点，在其中两份上没有对象** ——
+它们没有可比的引用。**值比对真正有对象的对外文本是 release body 与契约表** ✓。
+
+**（二）两页 how-to-verify 里有一句已经陈旧的说法，而它正对着读者。**
+
+`docs/how-to-verify.md:201` 与 `docs/how-to-verify.zh-CN.md:178` 都写着：
+
+> **这条门禁只扫四份文件**（`scripts/check-doc-citations.py` 里的 `DOCS` 清单）：
+> `docs/analysis-provenance.md`、`docs/architecture/public-contracts.md`、
+> `docs/reports/phase1-execution-report.md`、`docs/benchmarks/large-apk.md`。
+> **本页不在其中**——`docs/` 下其它文档的行号引用没有自动门禁，评审时值得自己抽查。
+
+**实测：`DOCS` 清单现在是 35 份**，不是 4 份（扩容发生在 `1fe7c30`
+「CI 门禁两个盲区收口」之后 ✓）。这句写于 2026-11-17 ✓，到本轮已陈旧 ✓。
+
+**为什么这一条值得记**：这两页是**README 直接链出去的对外文档** ✓
+（`README.md:510` / `README.zh-CN.md:413` ✓），它对读者说「只有四份有门禁、
+其余要自己抽查」—— **这句话今天会让读者低估仓库的核对能力** ✓，
+也会让下一批的人以为「对外文本没人管」✓。**它属于下一批收口的同一片地方** ✓：
+要么把名单更新成实际清单（35 份里与对外相关的部分 ✓），要么改成
+「本门禁扫 `DOCS` 清单里的 N 份（见脚本）✓，本页不在其中 ✓」—— **不要写死一个
+会过期的数** ✓，这正是本轮那份报告自己说的「**手写的数会陈旧**」✓。
+
 ### 本窗口**做的**
 
 - 只读预演：克隆到 `.scratch/reader-rehearsal-3rd/dexatlas`、`git checkout v1.0.0`、
