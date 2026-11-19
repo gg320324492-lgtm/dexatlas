@@ -30,12 +30,38 @@ What it does not check
 A citation that only points at a location — "this logic lives in
 ``core/pipeline.py:296``" — cannot say whether the code there is still the
 code that was meant. There is nothing in the sentence to check the lines
-against. Those citations get the *where* check and nothing more.
+against. Those citations get the *where* check and nothing more, unless the
+document declares what the location holds.
 
 A citation that names a symbol is checked for that symbol being *named* in
 the lines, not for the lines being where the symbol is *defined*: a document
 that cites the place a class is used is not caught by pointing at another
 place it is used.
+
+What a declaration says
+-----------------------
+
+A citation that only points at a location can declare what that location
+holds, in the citation itself::
+
+    `src/dexatlas/cli/main.py:289-291` `anchor: def version(`
+
+The declaration is a piece of the source that has to be inside the cited
+range. The range points at a place; the declaration says what is there. A
+range that has drifted to somewhere else no longer holds the declared
+fragment, and the citation is reported.
+
+The declaration names no line and no number, so it does not go stale the way
+a line number does. It is checked against the source, not against the
+document, so a measurement that rewrites a figure cannot invalidate it, and
+the only thing that can move it is the code it quotes.
+
+The declaration is checked the way the strongest reading allows. An anchor
+that is a bare name — ``version`` — is checked the way a named symbol is
+checked: the file has to define it in the range, or the range has to be
+inside the body it opens. Any other anchor is a fragment of the source —
+``def version(``, ``@app.get("/projects"`` — and has to appear in the range
+verbatim, whitespace aside.
 
 Which tree a citation is about
 ------------------------------
@@ -73,7 +99,7 @@ import pathlib
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
@@ -336,6 +362,35 @@ BARE_LINE = re.compile(r"^:(\d+)(?:-(\d+))?$")
 #: The dashes that join two citations into one range.
 DASHES = "-–—"  # noqa: RUF001
 
+#: A declaration of what a citation's range holds: ``anchor: def version(``.
+#:
+#: A citation that only points at a location has nothing to check the lines
+#: against. The declaration gives it something: a piece of the source that
+#: has to be inside the range. It names no line and no number, so it does
+#: not go stale when the code moves or when a measurement rewrites a
+#: figure; the line number does, and the declaration is what says whether
+#: the line number still points at the right thing.
+DECLARATION = re.compile(r"^anchor:\s*(\S.*?)\s*$")
+
+#: An anchor that is a bare name: ``version``. A name is checked the way a
+#: named symbol is checked — defined in the range, or the range inside the
+#: body it opens. Any other anchor is a fragment of the source and has to
+#: appear in the range verbatim.
+ANCHOR_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+#: The documents in which every citation has to say what it points at.
+#:
+#: A citation that names a symbol says what it points at on its own. A
+#: citation that only points at a location says nothing, and the checker can
+#: only ask whether the location holds something. In these documents it
+#: asks more: the citation has to carry a declaration, and a citation that
+#: does not is reported as declaring nothing.
+DECLARING_DOCUMENTS: frozenset[str] = frozenset(
+    {
+        "docs/architecture/public-contracts.md",
+    }
+)
+
 #: A backticked span that names a symbol: ``ApkMetadata``, ``ManifestComponent.kind``,
 #: ``read_resources()``, ``Project.tool_versions``, ``DEFAULT_METHOD_LIMIT = 200_000``.
 #: A span that is a sentence, a path or a value is not a name.
@@ -457,6 +512,9 @@ class Citation:
     #: The tree the document describes. The cited lines are read out of it,
     #: not out of the working copy, when the document says which tree it means.
     tree: Tree = WORKING_COPY
+    #: What the cited range is declared to hold. Empty when the citation
+    #: declares nothing.
+    anchors: tuple[str, ...] = ()
 
     @property
     def where(self) -> str:
@@ -482,6 +540,21 @@ class Resolved:
     rel: str
     start: int
     end: int
+    #: The declarations that belong to this citation.
+    anchors: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class Declaration:
+    """A declaration that names no citation.
+
+    It says what some range holds, and there is no range: the declaration
+    sits where no citation can be bound to it. It is reported rather than
+    ignored, because a declaration nobody reads is a claim nobody checks.
+    """
+
+    line: int
+    text: str
 
 
 @dataclass(frozen=True)
@@ -517,6 +590,8 @@ class Report:
     named: int
     road_sign: int
     findings: tuple[Finding, ...]
+    #: The citations that declare what their range holds.
+    declared: int = 0
     #: For every tree a document was read against: its name, how many
     #: documents it described and how many citations it answered for.
     trees: tuple[tuple[str, int, int], ...] = ()
@@ -781,7 +856,13 @@ def span_names(text: str) -> list[tuple[str, int, int]]:
     """
     found: list[tuple[str, int, int]] = []
     for match in SPAN.finditer(text):
-        name = NAME.match(match.group(1))
+        inner = match.group(1)
+        if DECLARATION.match(inner):
+            # A declaration is a claim of its own, not a name the prose
+            # mentions: it is checked against the source, not inferred from
+            # the sentence around it.
+            continue
+        name = NAME.match(inner)
         if name is None:
             continue
         symbol = name.group(1)
@@ -911,16 +992,28 @@ def joins_range(previous: re.Match[str], match: re.Match[str]) -> bool:
 
 
 def resolve_citations(text: str) -> list[Resolved]:
-    """Every citation of a text, with the file and the range each one names.
+    """Every citation of a text, with the file and the range each one names."""
+    return _resolve(text)[0]
+
+
+def _resolve(text: str) -> tuple[list[Resolved], list[Declaration]]:
+    """Every citation of a text, and the declarations that name no citation.
 
     Two forms are read. A full citation names its file: ``core/pipeline.py:296``.
     A bare one names only a line: ``:143``. The bare form is the same file as
     the citation before it — that is how the release appendix cites one file
     in several places — and it is the same file only as long as both sit in
     the same block of the text.
+
+    A declaration — ``anchor: def version(`` — is bound to the citation
+    before it, the way a bare line number is, and only as long as no block
+    boundary lies between them. A declaration that names no citation is
+    returned as an orphan: it says something about nothing, and a reader who
+    believes it is checking the code is not.
     """
     ends = block_ends(text)
     resolved: list[Resolved] = []
+    orphans: list[Declaration] = []
     previous: Resolved | None = None
     for match in SPAN.finditer(text):
         inner = match.group(1)
@@ -929,6 +1022,21 @@ def resolve_citations(text: str) -> list[Resolved]:
             start = int(citation.group(2))
             previous = Resolved(match, citation.group(1), start, int(citation.group(3) or start))
             resolved.append(previous)
+            continue
+        declaration = DECLARATION.match(inner)
+        if declaration is not None:
+            line = text[: match.start()].count("\n") + 1
+            if previous is None:
+                orphans.append(Declaration(line, declaration.group(1)))
+                continue
+            if any(previous.match.start() < end <= match.start() for end in ends):
+                # A block boundary lies between them: the declaration would
+                # belong to a citation in another block, and reading it as
+                # this one's would check the wrong lines.
+                orphans.append(Declaration(line, declaration.group(1)))
+                continue
+            previous = replace(previous, anchors=(*previous.anchors, declaration.group(1)))
+            resolved[-1] = previous
             continue
         bare = BARE_LINE.match(inner)
         if bare is None or previous is None:
@@ -940,12 +1048,12 @@ def resolve_citations(text: str) -> list[Resolved]:
         start = int(bare.group(1))
         end = int(bare.group(2) or start)
         if joins_range(previous.match, match):
-            previous = Resolved(previous.match, previous.rel, previous.start, end)
+            previous = replace(previous, end=end)
             resolved[-1] = previous
             continue
         previous = Resolved(match, previous.rel, start, end)
         resolved.append(previous)
-    return resolved
+    return resolved, orphans
 
 
 def document_clauses(document: pathlib.Path, tree: Tree = WORKING_COPY) -> list[Clause]:
@@ -975,6 +1083,7 @@ def document_clauses(document: pathlib.Path, tree: Tree = WORKING_COPY) -> list[
                     ambiguous=len(options) > 1,
                     text=clause.strip()[:100],
                     tree=tree,
+                    anchors=item.anchors,
                 )
             )
             citation_spans.append((item.match.start() - start, item.match.end() - start))
@@ -1073,11 +1182,132 @@ def check_citation(citation: Citation) -> list[Finding]:
     return []
 
 
+def check_anchor(citation: Citation) -> list[Finding]:
+    """Whether the cited range still holds what the citation declares.
+
+    A declaration is a claim about the content of the range, and it is
+    checked against the source rather than against the sentence around it.
+    An anchor that is a bare name is checked the way a named symbol is
+    checked; any other anchor is a fragment of the source and has to be in
+    the range verbatim.
+
+    The finding says what the declaration claims and where the claim holds,
+    so that a reader can see the drift without reading the file.
+    """
+    if not citation.anchors:
+        return []
+    lines = citation.lines()
+    if lines is None:
+        # The location check has already reported that the file is not there.
+        return []
+    findings: list[Finding] = []
+    for anchor in citation.anchors:
+        if ANCHOR_NAME.match(anchor):
+            findings.extend(check_anchor_name(citation, lines, anchor))
+        else:
+            findings.extend(check_anchor_fragment(citation, lines, anchor))
+    return findings
+
+
+def check_anchor_name(citation: Citation, lines: tuple[str, ...], anchor: str) -> list[Finding]:
+    """Whether a bare-name anchor is inside the cited range.
+
+    A name is checked the way a named symbol is checked: the file has to
+    define it in the range, or the range has to be inside the body it
+    opens. A name the file does not mention at all cannot be in the range
+    either.
+    """
+    is_python = citation.target is not None and citation.target.suffix == ".py"
+    verdict = symbol_is_in_range(lines, anchor, citation.start, citation.end, is_python)
+    if verdict is True:
+        return []
+    if verdict is None:
+        return [
+            Finding(
+                citation.where,
+                "anchor missing",
+                f"the anchor `{anchor}` is not in the file at all",
+                citation.text,
+            )
+        ]
+    defined = definition_line(lines, anchor, is_python)
+    if defined is not None:
+        detail = f"the anchor `{anchor}` is at line {defined}"
+    else:
+        where = symbol_lines(lines, anchor)
+        detail = f"the anchor `{anchor}` is not in the range"
+        if where:
+            detail = f"the anchor `{anchor}` is at line {min(where)}"
+    return [Finding(citation.where, "anchor missing", detail, citation.text)]
+
+
+def check_anchor_fragment(citation: Citation, lines: tuple[str, ...], anchor: str) -> list[Finding]:
+    """Whether a fragment of the source is inside the cited range.
+
+    Whitespace is normalised on both sides: the anchor quotes a piece of
+    code, and re-indenting the code does not change what it says.
+    """
+    quoted = " ".join(anchor.split())
+    where = [number for number, line in enumerate(lines, 1) if quoted in " ".join(line.split())]
+    if any(citation.start <= number <= citation.end for number in where):
+        return []
+    detail = f"the anchor `{anchor}` is not in the range"
+    if where:
+        detail = f"the anchor `{anchor}` is at line {min(where)}"
+    return [Finding(citation.where, "anchor missing", detail, citation.text)]
+
+
+def check_declaration_of_content(clause: Clause) -> list[Finding]:
+    """Whether a citation that says nothing about its lines says so out loud.
+
+    In a document that declares what its citations point at, a citation
+    that names no symbol and carries no declaration is a citation that says
+    nothing: the checker can ask whether the range holds something, but not
+    whether it holds what the document meant. It is reported, so that the
+    silence is a decision and not an oversight.
+    """
+    if relative_path(clause.document) not in DECLARING_DOCUMENTS:
+        return []
+    findings: list[Finding] = []
+    for citation, names in zip(clause.citations, clause.claims, strict=True):
+        if citation.anchors or is_compared(citation, names):
+            continue
+        findings.append(
+            Finding(
+                citation.where,
+                "declares nothing",
+                "the citation names no symbol and declares no anchor",
+                citation.text,
+            )
+        )
+    return findings
+
+
+def document_orphan_declarations(document: pathlib.Path) -> list[Finding]:
+    """The declarations of a document that name no citation.
+
+    A declaration says what a range holds. Without a range it says nothing,
+    and a reader who takes it for a check is not getting one.
+    """
+    text = document.read_text(encoding="utf-8")
+    orphans = _resolve(text)[1]
+    return [
+        Finding(
+            f"{document.name}:{orphan.line}",
+            "orphaned declaration",
+            f"the declaration `{orphan.text}` names no citation",
+        )
+        for orphan in orphans
+    ]
+
+
 def check_clause(clause: Clause) -> list[Finding]:
     """The findings of one clause."""
     findings: list[Finding] = []
     for citation in clause.citations:
         findings.extend(check_citation(citation))
+        findings.extend(check_anchor(citation))
+    findings.extend(check_declaration_of_content(clause))
 
     located: set[str] = set()
     missing: dict[str, Citation] = {}
@@ -1273,6 +1503,7 @@ def check_documents(documents: list[pathlib.Path]) -> Report:
         trees[tree.label] = tree
         found = document_clauses(document, tree)
         clauses_found.extend(found)
+        findings.extend(document_orphan_declarations(document))
         entry = counts.setdefault(tree.label, [0, 0])
         entry[0] += 1
         entry[1] += sum(len(clause.citations) for clause in found)
@@ -1289,10 +1520,14 @@ def check_documents(documents: list[pathlib.Path]) -> Report:
         for citation, names in zip(clause.citations, clause.claims, strict=True)
         if is_compared(citation, names)
     )
+    declared = sum(
+        1 for clause in clauses_found for citation in clause.citations if citation.anchors
+    )
     return Report(
         citations=citations,
         named=named,
         road_sign=citations - named,
+        declared=declared,
         findings=tuple(findings),
         trees=tuple((label, counts[label][0], counts[label][1]) for label in sorted(counts)),
         subject=subject_digest(documents, trees),
@@ -1306,6 +1541,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"citations: {report.citations}")
     print(f"  naming a symbol: {report.named}")
     print(f"  pointing only at a location: {report.road_sign}")
+    print(f"  declaring what they point at: {report.declared}")
     print("trees:")
     for label, documents, citations in report.trees:
         print(f"  {label}: {documents} document(s), {citations} citation(s)")
