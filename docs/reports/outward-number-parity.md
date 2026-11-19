@@ -337,7 +337,7 @@ All 10 gates are run by something.
 
 **例外**：`<!--fig:键-->值<!--/fig-->` 这样的**闭合标记**，即使在围栏里，也要比对。它是
 生成物的**整份拷贝**，会跟着测量一起漂（本轮它就在 `docs/how-to-verify.md:460` 与
-`docs/how-to-verify.zh-CN.md:432`）。
+`docs/how-to-verify.zh-CN.md:433`）。
 
 ### 6.2 「另一套环境」的汇总不算数
 

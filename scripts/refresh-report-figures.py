@@ -72,6 +72,7 @@ from __future__ import annotations
 import argparse
 import atexit
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -275,6 +276,14 @@ REPORT_CHECK = "test_execution_report"
 #: than a broken tree.
 STATUS_CHECK = "test_status_page"
 
+#: The self-checks of the two how-to-verify pages live in this file, for the
+#: same reason the report's and the status page's do: they read the pages'
+#: generated figures -- the collect sentences among them -- so a page that
+#: has gone stale makes them fail, and that is the refresh's own problem
+#: rather than a broken tree. They are named by file rather than by a
+#: keyword, because their names are shared with half the suite.
+PAGE_CHECKS_FILE = "tests/test_how_to_verify.py"
+
 #: How many times the refresh may re-measure the self-checks before it gives up.
 #:
 #: The first candidate carries the code tests' counts alone, so a self-check
@@ -291,6 +300,23 @@ REPORT_PATH_ENV = "DEXATLAS_REPORT_PATH"
 #: The environment variable the status page's self-checks read the page from.
 #: The refresh points it at a candidate copy, for the same reason.
 STATUS_PATH_ENV = "DEXATLAS_STATUS_PATH"
+
+#: The environment variable the how-to-verify pages' self-checks read the
+#: pages from. The refresh points it at the directory that holds the
+#: candidate copies, for the same reason.
+PAGE_PATH_ENV = "DEXATLAS_HOW_TO_VERIFY_PATH"
+
+#: The two how-to-verify pages, which state the report's figures and the
+#: output their collection commands print. They are refreshed with the
+#: report, from the same measurement.
+PAGE_DOCUMENTS = ("docs/how-to-verify.md", "docs/how-to-verify.zh-CN.md")
+
+#: The figures that live inside fenced blocks, and that the collect writer
+#: reaches into a fence for. A fence is a quotation, and a quotation is not
+#: rewritten -- but each of these is a sentence whose text *is* the
+#: measurement (what a collection command prints, how many documents the
+#: checker read), so it is written from its own marker, and nowhere else.
+FENCED_KEYS = frozenset({"tests.collect.fast", "tests.collect.slow", "documents.count"})
 
 #: pytest's short summary: "FAILED tests/test_x.py::test_y - AssertionError: ...".
 #:
@@ -354,6 +380,7 @@ class Refresh:
     rounds: int
     status_text: str | None = None
     status_checks: Outcome = Outcome(counts={})
+    page_checks: Outcome = Outcome(counts={})
 
 
 class SummaryUnreadable(Exception):
@@ -762,6 +789,12 @@ def measure_code_tests() -> Outcome:
             f"--rcfile={rc_path}",
             "-m",
             "pytest",
+            # The two how-to-verify pages' checks are measured on their own,
+            # against a candidate page (``measure_page_checks``): they read
+            # the figures the measurement is about to write, so a page that
+            # is out of date is the refresh's problem, not the code's.
+            "--ignore",
+            PAGE_CHECKS_FILE,
             "-k",
             f"not {REPORT_CHECK} and not {STATUS_CHECK}",
         ],
@@ -824,6 +857,41 @@ def measure_status_checks(
             ["--cov=dexatlas", "-k", STATUS_CHECK],
             env=env,
             what="the status page's self-checks",
+        )
+
+
+def measure_page_checks(report_candidate: str, page_candidates: dict[str, str]) -> Outcome:
+    """Measure the how-to-verify pages' self-checks against the candidates.
+
+    The two pages state the output their collection commands print, between
+    the ``tests.collect.*`` markers the refresh writes. A page that is out of
+    date fails its check -- which used to fail the *code* run, and a failure
+    there stopped the refresh from writing anything, including the numbers
+    that would have made the page right. So the pages' checks are measured
+    here, against candidate copies of both pages, the way the report's and
+    the status page's checks are.
+
+    The coverage data file is private to this run, for the same reason the
+    report checks' is.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        report_copy = Path(directory) / "phase1-execution-report.md"
+        # newline="\n" keeps the candidates' bytes the same on every platform.
+        report_copy.write_text(report_candidate, encoding="utf-8", newline="\n")
+        env = measurement_env()
+        env["COVERAGE_FILE"] = str(Path(directory) / ".coverage")
+        env[REPORT_PATH_ENV] = str(report_copy)
+        for name, candidate in page_candidates.items():
+            path = Path(name)
+            copy = Path(directory) / path.name
+            copy.write_text(candidate, encoding="utf-8", newline="\n")
+        # One directory holds both candidates, and the pages' checks read the
+        # pair through it: the redirect is the directory, not one page.
+        env[PAGE_PATH_ENV] = str(directory)
+        return measure_tests(
+            ["--cov=dexatlas", PAGE_CHECKS_FILE],
+            env=env,
+            what="the how-to-verify pages' self-checks",
         )
 
 
@@ -920,14 +988,57 @@ def source_statements() -> dict[str, int]:
 
 
 def code_facts() -> dict[str, int]:
-    """Counts that come from reading the code rather than running it."""
+    """Counts that come from reading the code rather than running it.
+
+    ``documents`` is what the version-claim checker prints as
+    ``documents read``: the markdown files of the tree, with the checker's
+    own history directory left out. The count comes from here so the two
+    tools cannot disagree -- a second way to count the documents is a
+    second answer to one question, and the page states one of it. A tree
+    that does not carry the checker (a measurement run against a copy)
+    counts nothing: the figure is left unwritten rather than guessed.
+    """
     cli = (REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
     api = (REPO_ROOT / "src" / "dexatlas" / "api" / "app.py").read_text(encoding="utf-8")
-    return {
+    documents = document_count()
+    facts = {
         "cli_commands": cli.count("@app.command()"),
         "api_endpoints": len(re.findall(r"@app\.(get|post|delete|put)\(", api)),
         "sample_apks": len(list(EXAMPLES_ROOT.rglob("*.apk"))),
     }
+    if documents is not None:
+        facts["documents"] = documents
+    return facts
+
+
+def document_count() -> int | None:
+    """How many markdown documents the version-claim checker reads.
+
+    The checker counts the files git lists, minus its history directory --
+    the closed issue checklists that are records, not the project's
+    documents. The count is computed the same way here, from the same
+    listing, so a document added or removed moves the page's number at the
+    next measurement instead of waiting for a hand that remembers to.
+
+    ``None`` means the checker is not on this tree -- a measurement run
+    against a copy of the report does not carry the whole repository -- and
+    the caller leaves the figure alone rather than guessing at it.
+    """
+    checker_script = REPO_ROOT / "scripts" / "check-version-claims.py"
+    if not checker_script.is_file():
+        return None
+    checker = importlib.util.spec_from_file_location(
+        "dexatlas_version_claims_for_count", checker_script
+    )
+    assert checker is not None and checker.loader is not None
+    module = importlib.util.module_from_spec(checker)
+    sys.modules[checker.name] = module
+    try:
+        checker.loader.exec_module(module)
+        files = module._markdown_files()
+    finally:
+        sys.modules.pop(checker.name, None)
+    return sum(1 for name in files if not name.startswith(module.HISTORY))
 
 
 def collected_at_tag(tag: str) -> int | None:
@@ -1023,8 +1134,16 @@ def build_record(
     history: dict[str, Any] | None = None,
     skipped_tests: tuple[str, ...] = (),
     xfailed_tests: tuple[str, ...] = (),
+    table: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The record of one measurement: everything the report can state."""
+    """The record of one measurement: everything the report can state.
+
+    ``table`` carries the test-file table's audit -- the rows it is missing
+    and the rows it names that are gone. It is a fact about the report the
+    measurement was about to write, and the record is where facts about the
+    measurement live; an empty audit is stated as two empty lists, because a
+    key a reader cannot find is a check nobody can run.
+    """
     return {
         "schema": 4,
         "code": code_facts(),
@@ -1051,6 +1170,7 @@ def build_record(
             "skipped_tests": list(skipped_tests),
             "xfailed_tests": list(xfailed_tests),
         },
+        "table": table or {"missing_rows": [], "stale_rows": []},
         "tests": {"fast": fast, "slow": slow, "total": total},
     }
 
@@ -1128,6 +1248,18 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "tests.trio": (
             f"**{tests['total']}**\uff08**{tests['fast']}** 快 + **{tests['slow']}** 集成\uff09"
         ),
+        # What the two collection commands print, one per marker. The pages show
+        # them inside a fenced block, where a marker the writer fills in would
+        # be visible markup rather than the number it stands for -- so the
+        # value carries the whole sentence, the way ``tests.trio`` does, and
+        # the marker that holds it is written from outside the fence by the
+        # one writer allowed to put a figure there (``render_report``).
+        "tests.collect.fast": (
+            f"{tests['fast']}/{tests['total']} tests collected ({tests['slow']} deselected)"
+        ),
+        "tests.collect.slow": (
+            f"{tests['slow']}/{tests['total']} tests collected ({tests['fast']} deselected)"
+        ),
         "suite.passed": str(suite["passed"]),
         "suite.skipped": str(suite["skipped"]),
         "suite.xfailed": str(suite["xfailed"]),
@@ -1136,6 +1268,13 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "coverage.total": str(coverage["statements"]),
         "coverage.missed": str(coverage["missing"]),
         "coverage.weak_modules": render_weak_modules(coverage["files"]),
+        # What the version-claim checker prints as "documents read": the
+        # count of the tree's markdown documents. The pages show it inside a
+        # fenced block, so it is written from its own marker, like the
+        # collect sentences. A record from before the count was kept does
+        # not have it, and a figure the record does not carry is not
+        # written: the count stays whatever the page already says.
+        "documents.count": str(code.get("documents", "")),
     }
     for module, (statements, missing) in coverage["files"].items():
         values[f"coverage.file.{module}.pct"] = percent(statements - missing, statements)
@@ -1182,7 +1321,10 @@ def live_spans(text: str) -> list[tuple[int, int]]:
 
 
 def apply_figures(
-    text: str, values: dict[str, str], copies: bool = False
+    text: str,
+    values: dict[str, str],
+    copies: bool = False,
+    collect: bool = False,
 ) -> tuple[str, list[str], list[str]]:
     """Write the values into the markers.
 
@@ -1204,6 +1346,14 @@ def apply_figures(
     writing a number into it would turn an illustration into a measurement
     nobody asked for -- and in a document that describes a released tree,
     it would edit a historical record.
+
+    ``collect`` says whether the ``tests.collect.*`` figures -- the sentences
+    a collection command prints, which sit inside fenced blocks on the two
+    pages that teach a reader to run it -- are written from the fences they
+    live in. A fence is a quotation, and a quotation is not rewritten; a
+    collection summary is the one quotation whose text is a measurement, so
+    it is written from its own marker, and only where the writer that holds
+    the whole sentence put it. Everywhere else it stays whatever it was.
     """
     unknown: list[str] = []
     malformed: list[str] = []
@@ -1215,18 +1365,48 @@ def apply_figures(
         pieces.append(_fill_figures(text[start:end], values, unknown, malformed))
         cursor = end
     pieces.append(text[cursor:])
+    # The fence writer is offered the whole value set, and it writes only the
+    # fenced sentences (``_fill_figures`` sorts by key): a marker in a fence
+    # whose key the measurement carries -- the report's own copies, for
+    # instance -- is an illustration that stays as it is, and one whose key
+    # nothing carries is a figure nobody will ever fill, which is reported.
+    if collect and any(key in values for key in FENCED_KEYS):
+        tail = _fill_figures("".join(pieces), values, unknown, malformed, collect=True)
+        pieces = [tail]
     return "".join(pieces), unknown, malformed
 
 
 def _fill_figures(
-    chunk: str, values: dict[str, str], unknown: list[str], malformed: list[str]
+    chunk: str,
+    values: dict[str, str],
+    unknown: list[str],
+    malformed: list[str],
+    collect: bool = False,
 ) -> str:
-    """Write the values into the markers of one live span."""
+    """Write the values into the markers of one live span.
+
+    ``collect`` offers only the ``tests.collect.*`` sentences -- the ones
+    that live inside the fences a quotation rule keeps the ordinary writer
+    out of. The other rules are the same: a mispaired opening tag is left
+    alone and reported, whoever its key belongs to.
+    """
     pieces: list[str] = []
     cursor = 0
     for match in FIGURE.finditer(chunk):
         key = match.group(1)
         content = match.group(2)
+        if collect and key not in FENCED_KEYS:
+            # The fence writer offers only the fenced sentences. A marker
+            # inside a fence that is not one of them is an illustration --
+            # unless its key is one nobody knows, which is a figure nothing
+            # will ever fill: report it, the way the ordinary writer
+            # reports one it cannot place.
+            if key not in values:
+                unknown.append(key)
+            continue
+        if not collect and key in FENCED_KEYS:
+            # Not this writer's kind: the fence writer fills it.
+            continue
         if "\n\n" in content or "<!--fig:" in content:
             # Not a figure: the opening tag's closing tag is somewhere else.
             malformed.append(key)
@@ -1279,7 +1459,11 @@ def documents_with_figures(root: Path) -> list[Path]:
     Every document is looked at and the ones that carry a figure marker are
     found. The script writes them all from the one measurement, so a page
     that states a number does not have to be remembered when the number
-    changes: the marker is the whole of the registration.
+    changes: the marker is the whole of the registration. A collect
+    sentence -- the output a collection command prints, held in a marker
+    inside the fence that shows the command -- counts too, even though the
+    fence keeps the ordinary writer out: the collect writer reaches into
+    the fences for that one sentence and nothing else.
     """
     found: list[Path] = []
     for path in markdown_documents(root):
@@ -1289,9 +1473,24 @@ def documents_with_figures(root: Path) -> list[Path]:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if live_figures(text):
+        if live_figures(text) or collect_figures(text):
             found.append(path)
     return found
+
+
+def collect_figures(text: str) -> list[str]:
+    """The ``tests.collect.*`` figures a document holds, fences included.
+
+    These are the only figures the writer reaches into a fence for: the
+    fence is a quotation, and the sentence it quotes is a measurement. A
+    collect marker outside a fence -- if somebody ever writes one there --
+    is written by the ordinary writer like any other figure, so only the
+    fenced ones are counted here.
+    """
+    keys: list[str] = []
+    for start, end in quoted_spans(text):
+        keys.extend(key for key, _ in FIGURE.findall(text[start:end]) if key in FENCED_KEYS)
+    return keys
 
 
 def report_malformed(where: str, malformed: list[str]) -> None:
@@ -1317,7 +1516,7 @@ def write_figures(path: Path, values: dict[str, str]) -> str:
     stands behind. Better to stop and say which one it is.
     """
     text = path.read_text(encoding="utf-8")
-    updated, unknown, malformed = apply_figures(text, values)
+    updated, unknown, malformed = apply_figures(text, values, collect=True)
     if unknown:
         raise SystemExit(
             f"{display_path(path)} refers to figures this script does not know how to fill in: "
@@ -1406,9 +1605,13 @@ def render_report(text: str, record: dict[str, Any]) -> tuple[str, list[str], li
 
     The report's figures inside its code blocks are copies of the ones it
     states in prose -- it shows what its commands print -- so they are
-    written too.
+    written too. The collect sentences the report's fences hold are written
+    as well: a collection summary is a measurement, and the fence is where
+    the two pages show what their commands print.
     """
-    updated, unknown, malformed = apply_figures(text, render_figures(record), copies=True)
+    updated, unknown, malformed = apply_figures(
+        text, render_figures(record), copies=True, collect=True
+    )
     return apply_record(updated, record), unknown, malformed
 
 
@@ -1462,6 +1665,14 @@ def test_file_table(text: str) -> tuple[list[str], list[str]] | None:
 
     So the two sets are compared here, before anything is written.
 
+    The missing rows are also written into the record as
+    ``table.missing_rows`` -- and the stale ones as ``table.stale_rows`` --
+    so a table that does not describe the suite is a fact the measurement
+    carries, not only a line somebody has to read in the output of a run
+    that has already refused to write. An empty list means the table named
+    every file: the key is there either way, because a count nobody can
+    find is a count nobody can check.
+
     None means the document has no table at all. A document that never
     claimed to hold one has nothing to compare with the suite, and whether
     the report has to have one is the report's own test's business
@@ -1474,6 +1685,21 @@ def test_file_table(text: str) -> tuple[list[str], list[str]] | None:
     listed = set(TEST_FILE_ROW.findall(section))
     on_disk = {path.name for path in TESTS_ROOT.glob("test_*.py")}
     return sorted(on_disk - listed), sorted(listed - on_disk)
+
+
+def table_rows_record(mismatch: tuple[list[str], list[str]] | None) -> dict[str, Any]:
+    """The test-file table's audit, as the record's ``table`` key states it.
+
+    ``None`` -- the document has no table section -- records nothing: the
+    keys describe a table, and a document without one is not stating a
+    table that could be wrong. The main() refusal spells the value out for
+    that case (``{"missing_rows": [...], "stale_rows": [...]}``), because a
+    refusal has to say what it refused about.
+    """
+    if mismatch is None:
+        return {}
+    missing, stale = mismatch
+    return {"missing_rows": missing, "stale_rows": stale}
 
 
 def undisclosed_modules(record: dict[str, Any], text: str) -> list[str]:
@@ -1616,6 +1842,7 @@ def converge(
     history: dict[str, Any] | None = None,
     status_text: str | None = None,
     status_path: Path | None = None,
+    page_texts: dict[str, str] | None = None,
 ) -> Refresh:
     """Bring the report and its self-checks into agreement, within one run.
 
@@ -1628,7 +1855,10 @@ def converge(
 
     The status page is measured the same way, against candidates of both
     documents: its checks compare it with the report, so they need the report
-    the page is being compared to.
+    the page is being compared to. The two how-to-verify pages are measured
+    the same way again, against candidates of themselves: they state the
+    output their collection commands print, and those sentences are written
+    by this refresh.
 
     The loop ends when a candidate is measured and nothing about it changes the
     measurement — at that point the report the refresh leaves behind is one the
@@ -1637,20 +1867,37 @@ def converge(
     suite = dict(code.counts)
     skipped_tests = code.skipped
     xfailed_tests = code.xfailed
-    record = build_record(coverage, suite, fast, slow, total, history, skipped_tests, xfailed_tests)
+    record = build_record(
+        coverage,
+        suite,
+        fast,
+        slow,
+        total,
+        history,
+        skipped_tests,
+        xfailed_tests,
+        table_rows_record(test_file_table(text)),
+    )
     candidate = render_or_fail(text, record)
     status_candidate = render_status(record, status_text) if status_text is not None else None
+    page_candidates = {name: render_page(record, page) for name, page in (page_texts or {}).items()}
 
     checks = Outcome(counts={})
     status_checks = Outcome(counts={})
+    page_checks = Outcome(counts={})
     for round_number in range(1, MAX_ROUNDS + 1):
         checks = measure_report_checks(candidate, report_path)
         if status_candidate is not None and status_path is not None:
             status_checks = measure_status_checks(
                 candidate, status_candidate, report_path, status_path
             )
+        if page_candidates:
+            page_checks = measure_page_checks(candidate, page_candidates)
         new_coverage = read_coverage()
-        new_suite = add_counts(add_counts(code.counts, checks.counts), status_checks.counts)
+        new_suite = add_counts(
+            add_counts(add_counts(code.counts, checks.counts), status_checks.counts),
+            page_checks.counts,
+        )
         new_skipped = union_ids(code.skipped, checks.skipped, status_checks.skipped)
         new_xfailed = union_ids(code.xfailed, checks.xfailed, status_checks.xfailed)
         if (
@@ -1667,14 +1914,26 @@ def converge(
                 rounds=round_number,
                 status_text=status_candidate,
                 status_checks=status_checks,
+                page_checks=page_checks,
             )
         suite, coverage = new_suite, new_coverage
         skipped_tests, xfailed_tests = new_skipped, new_xfailed
         record = build_record(
-            coverage, suite, fast, slow, total, history, skipped_tests, xfailed_tests
+            coverage,
+            suite,
+            fast,
+            slow,
+            total,
+            history,
+            skipped_tests,
+            xfailed_tests,
+            table_rows_record(test_file_table(text)),
         )
         candidate = render_or_fail(text, record)
         status_candidate = render_status(record, status_text) if status_text is not None else None
+        page_candidates = {
+            name: render_page(record, page) for name, page in (page_texts or {}).items()
+        }
 
     return Refresh(
         text=candidate,
@@ -1684,7 +1943,28 @@ def converge(
         rounds=MAX_ROUNDS,
         status_text=status_candidate,
         status_checks=status_checks,
+        page_checks=page_checks,
     )
+
+
+def render_page(record: dict[str, Any], text: str) -> str:
+    """Write the measured figures into a how-to-verify page.
+
+    The pages carry the same figures as the report, and one more kind: the
+    sentences their collection commands print. Those live inside the fenced
+    blocks that show the commands, so they are written from their own
+    markers (``tests.collect.*``) by the one writer allowed to reach into a
+    fence for a sentence. A figure this script does not know how to fill in
+    stops the write, the way it does everywhere else.
+    """
+    updated, unknown, malformed = apply_figures(text, render_figures(record), collect=True)
+    if unknown:
+        raise SystemExit(
+            "a how-to-verify page refers to figures this script does not know how to "
+            "fill in: " + ", ".join(sorted(set(unknown)))
+        )
+    report_malformed("a how-to-verify page", malformed)
+    return updated
 
 
 def figure_changes(text: str, values: dict[str, str]) -> list[tuple[str, str, str]]:
@@ -1781,6 +2061,12 @@ def main(argv: list[str] | None = None) -> int:
     # The two sets are compared before anything is measured, so a table that
     # does not describe the suite is a two-second error rather than a
     # two-minute measurement that ends in a report nobody should read.
+    #
+    # The audit is written into the record even when the run refuses: a fact
+    # about the report is a fact about the report, and a reader who opens the
+    # report after a refused run should be able to see *why* it was refused
+    # without rerunning the comparison. The figures are not written -- the
+    # refusal still means nothing was measured into this document.
     mismatch = test_file_table(text)
     if mismatch is None:
         print(
@@ -1795,6 +2081,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  the suite has {name}; the table does not list it")
             for name in stale:
                 print(f"  the table lists {name}; the suite does not have it")
+            record = read_record(text)
+            if record:
+                record["table"] = {"missing_rows": missing, "stale_rows": stale}
+                report_path.write_bytes(apply_record(text, record).encode("utf-8"))
+                print(
+                    "\nThe table's audit was written into the report's record; the "
+                    "figures were not."
+                )
             print(
                 "\nNothing was written. The table's rows are written by hand: "
                 "add the row that is missing, or take out the row that is stale."
@@ -1834,6 +2128,19 @@ def main(argv: list[str] | None = None) -> int:
     # write to the real status page while it does so.
     status_path = STATUS_PATH if report_path == REPORT_PATH and STATUS_PATH.is_file() else None
     status_text = status_path.read_text(encoding="utf-8") if status_path else None
+
+    # The two how-to-verify pages state the same figures and the output their
+    # collection commands print; they are refreshed with the report, from the
+    # same measurement, and their checks are measured against candidate
+    # copies the same way the report's and the status page's are. They are
+    # the project's own pages, so only a run that writes the real report
+    # touches them.
+    page_texts: dict[str, str] = {}
+    if report_path == REPORT_PATH:
+        for name in PAGE_DOCUMENTS:
+            path = REPO_ROOT / name
+            if path.is_file():
+                page_texts[name] = path.read_text(encoding="utf-8")
 
     # The provenance document names the tool versions its outputs were made
     # with. A measurement on other versions writes numbers the document does
@@ -1963,6 +2270,7 @@ def main(argv: list[str] | None = None) -> int:
                 history,
                 status_text,
                 status_path,
+                page_texts,
             )
         except SummaryUnreadable as failure:
             return abort(failure, ledger)
@@ -1971,6 +2279,7 @@ def main(argv: list[str] | None = None) -> int:
         checks = refresh.checks
         status_updated = refresh.status_text
         status_checks = refresh.status_checks
+        page_checks = refresh.page_checks
         if refresh.converged:
             print(
                 f"  the self-checks agree with the refreshed report "
@@ -1983,6 +2292,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         if status_path is not None:
             print(f"  the status page's self-checks: {status_checks.describe()}")
+        if page_texts:
+            print(f"  the how-to-verify pages' self-checks: {page_checks.describe()}")
 
         # Every test in the tree has to have an outcome for the run to describe
         # the tree. A test that neither passed, failed, skipped nor was
@@ -2026,17 +2337,31 @@ def main(argv: list[str] | None = None) -> int:
                 + "\n  ".join(missing_prerequisites() or ["(nothing obvious is missing)"])
             )
         # The coverage and the pass/skip split of a partial run describe a
-        # different tree, so the previous measurement of them is kept.
+        # different tree, so the previous measurement of them is kept. The
+        # table's audit describes this tree's files against the report's
+        # table, which is the report this run was about to write, so it is
+        # this run's fact and is not kept from the previous record.
         record = build_record(
-            coverage, code.counts, fast, slow, total, history, code.skipped, code.xfailed
+            coverage,
+            code.counts,
+            fast,
+            slow,
+            total,
+            history,
+            code.skipped,
+            code.xfailed,
+            table_rows_record(test_file_table(text)),
         )
         record["coverage"] = previous["coverage"]
         record["suite"] = previous["suite"]
         record["source_fingerprint"] = previous["source_fingerprint"]
         updated = render_or_fail(text, record)
         status_updated = render_status(record, status_text) if status_text is not None else None
+        for _name, page_text in page_texts.items():
+            render_page(record, page_text)
         checks = Outcome(counts={})
         status_checks = Outcome(counts={})
+        page_checks = Outcome(counts={})
 
     # The figures that describe the machine a measurement was taken on are not
     # the same on two machines: the same tree measures a different coverage on
@@ -2113,10 +2438,15 @@ def main(argv: list[str] | None = None) -> int:
     # with measurements it made up, and a script that wrote the project's
     # pages in that case would put a made-up number into them.
     others: list[tuple[Path, str, str]] = []
+    page_refreshed: dict[str, str] = {}
     if report_path == REPORT_PATH:
         already_written = {REPORT_PATH}
         if status_path is not None:
             already_written.add(status_path)
+        for name, _original in page_texts.items():
+            refreshed = write_figures(REPO_ROOT / name, figures)
+            page_refreshed[name] = refreshed
+            already_written.add(REPO_ROOT / name)
         for path in documents_with_figures(REPO_ROOT):
             if path in already_written:
                 continue
@@ -2128,6 +2458,9 @@ def main(argv: list[str] | None = None) -> int:
     changes = figure_changes(text, figures)
     if status_text is not None:
         changes.extend(figure_changes(status_text, figures))
+    for name, original in page_texts.items():
+        for key, old, new in figure_changes(original, figures):
+            changes.append((f"{name} {key}", old, new))
     for path, original, _refreshed in others:
         for key, old, new in figure_changes(original, figures):
             changes.append((f"{display_path(path)} {key}", old, new))
@@ -2150,6 +2483,9 @@ def main(argv: list[str] | None = None) -> int:
     status_matched = checked_status is None or checked_status == status_text
     badges_matched = not readmes
     others_matched = not others
+    pages_matched = all(
+        page_refreshed.get(name, original) == original for name, original in page_texts.items()
+    )
     if args.check:
         if complete and not comparable:
             print(
@@ -2165,6 +2501,7 @@ def main(argv: list[str] | None = None) -> int:
             and status_matched
             and badges_matched
             and others_matched
+            and pages_matched
             and not tree_changed
         ):
             print("The report matches a fresh measurement.")
@@ -2179,12 +2516,15 @@ def main(argv: list[str] | None = None) -> int:
             and status_matched
             and badges_matched
             and others_matched
+            and pages_matched
             and not tree_changed
         )
     else:
         report_path.write_bytes(updated.encode("utf-8"))
         if status_path is not None and status_updated is not None:
             status_path.write_bytes(status_updated.encode("utf-8"))
+        for name, refreshed in page_refreshed.items():
+            (REPO_ROOT / name).write_bytes(refreshed.encode("utf-8"))
         for readme, _original, refreshed in readmes:
             readme.write_bytes(refreshed.encode("utf-8"))
         for path, _original, refreshed in others:
@@ -2233,6 +2573,13 @@ def main(argv: list[str] | None = None) -> int:
             "The status page's self-checks still fail against the refreshed documents, "
             "so this one needs a hand rather than another refresh:",
             status_checks.failures,
+        )
+        return 1
+    if page_checks.failures:
+        report_failures(
+            "The how-to-verify pages' self-checks still fail against the refreshed pages, "
+            "so this one needs a hand rather than another refresh:",
+            page_checks.failures,
         )
         return 1
     if not complete:

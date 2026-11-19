@@ -257,7 +257,7 @@ tool count: 11
 
 邀请函 §2 里那一串 hash 已经填好了（工作区里是
 `docs/reports/m10-invitation-final.md:81`：
-`commit 2715aefda06c3cbbc055a9edf795535e71464068`）。但**填 hash 的那个提交
+`commit 2715aefda06c3cbbc055a9edf795535e71464068`；该行在 `522c712` 之后已是 `commit 2edaed92d3c835bf202c0ccc84a10ba4e1eaeb9b`——tag 重打让这一格跟着换了，本节记的是当时看到的值）。但**填 hash 的那个提交
 `7a416bd` 在 tag 之后**——`v1.0.0` 指的是 `2715aef`，而 `2715aef` 的树里：
 
 ```text

@@ -150,8 +150,8 @@ uv run --no-sync pytest -q
   `scripts/refresh-report-figures.py` 写出来（§4），不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → 1626/1775 tests collected (149 deselected)
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1775 tests collected (1626 deselected)
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → <!--fig:tests.collect.fast-->1626/1775 tests collected (149 deselected)<!--/fig-->
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → <!--fig:tests.collect.slow-->149/1775 tests collected (1626 deselected)<!--/fig-->
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -218,7 +218,7 @@ facts:
   package version: 1.0.0
   changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.0
-documents read: 161
+documents read: <!--fig:documents.count-->161<!--/fig-->
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
@@ -235,8 +235,9 @@ Every version claim matches the repository.
 增删一份文档，这个数就变）里出现的版本号、发布日期、覆盖率和 tag 跟 git 事实
 （tag 列表、`pyproject.toml` 的版本、CHANGELOG）逐条比对。
 
-**`documents read` 那行是活的。** 它数的是**当前这棵树里 Markdown 的份数**——本文件
-也是被数的之一，所以改完任何一份文档都要重跑一遍门禁，确认这个数还对得上。
+**`documents read` 那行是活的。** 它数的是**当前这棵树里 Markdown 的份数**（`fig:documents.count`
+标记，由测量脚本按 §4 写出）——本文件也是被数的之一，所以仓库每增删一份 Markdown，
+下次测量这个数就自己变。
 
 `findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 9e1aa616`）：
 两份文档在描述**已发布的历史版本**时引用了当时的覆盖率，而门禁用当前树的覆盖率
@@ -485,8 +486,8 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 
 **同一类规矩还落在别处：**
 
-* `docs/status.md` 的快照表、`docs/portfolio.md` 的质量门禁那一行、本页 §2.3 的三个数，
-  用的都是同一套 `<!--fig:…-->` 标记，同样由这个脚本写。
+* `docs/status.md` 的快照表、`docs/portfolio.md` 的质量门禁那一行、本页 §2.3 的三个数
+  与 §2.3 那两条 collect 期望输出，用的都是同一套 `<!--fig:…-->` 标记，同样由这个脚本写。
 * M6 层级 2 各份报告的数字由 `scripts/m6_level2_*_report.py` 从 trace 重算（§2.7），
   同样不许手改；缺 trace 时脚本拒绝出报告。
 * 各历史版本（v0.1.0 ~ v0.1.3）的测试数由脚本把那个 tag `git archive` 出来、

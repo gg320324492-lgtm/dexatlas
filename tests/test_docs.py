@@ -1508,7 +1508,19 @@ def test_the_refresh_script_refuses_a_report_whose_table_misses_a_test_file(
     assert "does not describe the suite" in out
     assert "test_docs.py" in out
     assert "Nothing was written" in out
-    assert report.read_text(encoding="utf-8") == original
+    # The refusal writes the table's audit into the record -- the fact the
+    # run refused about -- and nothing else: the figures are not written.
+    refreshed = report.read_text(encoding="utf-8")
+    script_figures = _figure_script().FIGURE
+    original_figures = list(script_figures.findall(original))
+    refreshed_figures = list(script_figures.findall(refreshed))
+    assert refreshed_figures == original_figures
+    record = script.read_record(refreshed)
+    assert record["table"]["missing_rows"] == ["test_docs.py"]
+    assert record["table"]["stale_rows"] == []
+    # The record's other facts are the previous measurement's, untouched.
+    assert record["source_fingerprint"] == "sha256:stale"
+    assert record["tests"] == {"fast": 1, "slow": 1, "total": 1}
 
 
 def test_the_refresh_script_refuses_a_report_whose_table_names_a_file_that_is_gone(
@@ -1530,7 +1542,96 @@ def test_the_refresh_script_refuses_a_report_whose_table_names_a_file_that_is_go
     out = capsys.readouterr().out
     assert "does not describe the suite" in out
     assert "test_gone.py" in out
-    assert report.read_text(encoding="utf-8") == original
+    record = script.read_record(report.read_text(encoding="utf-8"))
+    assert record["table"]["stale_rows"] == ["test_gone.py"]
+    # The table names one file fewer than the suite has, too: the row that
+    # was replaced was the row for a file the suite really has.
+    assert record["table"]["missing_rows"] == ["test_docs.py"]
+    # The refusal wrote the audit into the record and nothing else: the
+    # figures the document states are the ones it stated before.
+    refreshed = report.read_text(encoding="utf-8")
+    script_figures = _figure_script().FIGURE
+    assert list(script_figures.findall(refreshed)) == list(script_figures.findall(original))
+
+
+def test_the_record_names_the_rows_the_table_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A table the refresh refused is a fact the measurement carries.
+
+    The refusal prints the missing rows and stops -- and before this, that
+    print was the only trace: the report on disk still described a table
+    that was short, and nothing beside it said so. The record the report
+    carries now states the audit -- which rows the table is missing, which
+    rows it names that are gone -- so a reader (and a check) can see the
+    disagreement without rerunning the two-second comparison. The audit is
+    written even though the run refuses: a fact about the report is a fact
+    about the report, whether or not the numbers got written.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report().replace("| `test_docs.py` | |\n", "")
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 1
+    capsys.readouterr()
+
+    record = script.read_record(report.read_text(encoding="utf-8"))
+    audit = record.get("table", {})
+    assert audit.get("missing_rows") == ["test_docs.py"], audit
+    assert audit.get("stale_rows") == [], audit
+
+
+def test_the_record_reports_a_complete_table_with_empty_lists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A table that names every file is recorded as naming every file.
+
+    The audit is stated either way. A key that only appears when something
+    is wrong is a key a reader cannot check the absence of: an empty
+    ``missing_rows`` is the claim that the table is complete, and it is
+    checkable precisely because it is always there.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_fake_report(), encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 0
+
+    record = script.read_record(report.read_text(encoding="utf-8"))
+    audit = record.get("table", {})
+    assert audit.get("missing_rows") == [], audit
+    assert audit.get("stale_rows") == [], audit
+
+
+def test_the_table_audit_counts_as_a_generated_figure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stale row named in the record is caught by the record's own reader.
+
+    The audit lives in the record; a record that says the table is missing
+    a file, beside a table that still misses it, is a report nobody should
+    trust. This check reads the audit and the table and compares them, the
+    way the refresh's refusal does -- so a table fixed by hand while the
+    record still names it (or the other way round) is a red test, not a
+    quiet disagreement between two facts.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    original = _fake_report().replace("| `test_docs.py` | |\n", "")
+    report.write_text(original, encoding="utf-8")
+    _install_fake_measurements(script, monkeypatch)
+
+    assert script.main(["--report", str(report)]) == 1
+
+    record = script.read_record(report.read_text(encoding="utf-8"))
+    mismatch = script.test_file_table(report.read_text(encoding="utf-8"))
+    assert mismatch is not None
+    missing, stale = mismatch
+    assert record["table"]["missing_rows"] == missing
+    assert record["table"]["stale_rows"] == stale
 
 
 def test_the_refresh_script_does_not_write_the_readme_when_it_is_pointed_elsewhere(

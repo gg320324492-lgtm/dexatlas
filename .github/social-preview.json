@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "note": "The figures the social preview cards draw, and the images that carry them. Written by scripts/make-social-preview.py; checked by the same script's --check mode. The numbers are compared, never the image bytes: a PNG drawn on one machine has different bytes on another.",
+  "note": "The figures the social preview cards draw, and the images that carry them. Written by scripts/make-social-preview.py; checked by the same script's --check mode. The numbers are compared, never the image bytes: a PNG drawn on one machine has different bytes on another. The suite block holds every outcome the measuring script accounts for (its SUITE_NAMES), so a measurement that gains an outcome is a sidecar that has to be redrawn, not one that passes in silence.",
   "figures": {
     "contract.checks.cli": "15",
     "contract.checks.mcp": "6",
@@ -34,6 +34,14 @@
     "tests.slow": "docs/reports/phase1-execution-report.md (<!--fig:tests.slow-->)",
     "tests.total": "docs/reports/phase1-execution-report.md (<!--fig:tests.total-->)",
     "version": "src/dexatlas/__init__.py (__version__)"
+  },
+  "suite": {
+    "deselected": "",
+    "failed": "0",
+    "passed": "1774",
+    "skipped": "1",
+    "xfailed": "0",
+    "xpassed": "0"
   },
   "cards": {
     "en": {

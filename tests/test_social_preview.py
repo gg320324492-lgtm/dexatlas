@@ -240,3 +240,52 @@ def test_the_side_car_file_holds_the_figures_the_cards_draw() -> None:
     for key, origin in facts.origins.items():
         assert recorded["origins"][key] == origin
         assert origin, f"{key} has no origin"
+
+
+def test_the_side_car_records_the_suite_the_measurement_accounts_for() -> None:
+    """The sidecar's suite block has an entry for every outcome the measurement keeps.
+
+    A measurement is complete when every test in the tree has an outcome:
+    it ran, it sat out with a recorded reason, it failed, or it was expected
+    to fail -- and the record beside the report carries one count per
+    outcome. The card's check used to add up a hard-wired list of them; when
+    the measuring script began keeping one the card's list did not name,
+    the two lists disagreed about whether a complete measurement was
+    complete, and a card whose numbers were right failed the gate that was
+    there to protect it. The sidecar now carries the whole block, and the
+    gate checks the block against the same names the measuring script
+    accounts for.
+    """
+    script = _script()
+    facts = script.collect_facts(REPO_ROOT)
+    recorded = json.loads((REPO_ROOT / script.ASIDE).read_text(encoding="utf-8"))
+    assert recorded.get("suite") == dict(sorted(facts.suite.items()))
+    for name in script.SUITE_NAMES:
+        assert name in recorded.get("suite", {}), (
+            f"the sidecar has no suite.{name}; the measurement's record has it"
+        )
+
+
+def test_the_gate_refuses_a_sidecar_that_misses_a_suite_outcome(tmp_path: Path) -> None:
+    """A sidecar that lacks an outcome the measurement keeps is refused.
+
+    The names the measurement accounts for are read out of the measuring
+    script, so a measurement that gains an outcome makes a stale sidecar
+    fail here -- without anybody writing the new outcome down twice.
+    """
+    root = _copy_tree(tmp_path)
+    script = _script()
+    side_car = root / ".github" / "social-preview.json"
+    recorded = json.loads(side_car.read_text(encoding="utf-8"))
+    measured = script.collect_facts(REPO_ROOT).suite
+    # Drop the last outcome the measuring script keeps, whatever it is: the
+    # test must not name it, or the two lists would be coupled again.
+    stale = {name: value for name, value in measured.items() if name != sorted(measured)[-1]}
+    recorded["suite"] = dict(sorted(stale.items()))
+    side_car.write_text(json.dumps(recorded, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    result = _check(root)
+    assert result.returncode != 0, "the gate passed a sidecar that lost an outcome"
+    missing = sorted(set(measured) - set(stale))
+    for name in missing:
+        assert f"suite.{name}" in result.stdout, f"the gate did not name the missing {name}"
