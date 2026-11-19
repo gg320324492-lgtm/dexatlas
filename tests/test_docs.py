@@ -776,7 +776,10 @@ def test_execution_report_suite_figures_add_up_to_the_tests_that_exist(
     Every test that ran has exactly one outcome, so the outcomes add up to
     the number of tests. The failures are counted too: a measurement in
     which a test failed still ran that test, and leaving the failure out of
-    the sum would make the sum smaller than the suite.
+    the sum would make the sum smaller than the suite. A measurement may
+    also deselect tests (a marker expression that does not match every
+    test), and the deselected count is part of the record: ran + deselected
+    is the whole suite.
     """
     record = _recorded_measurement()
     assert record, "the report carries no measurement record"
@@ -789,12 +792,14 @@ def test_execution_report_suite_figures_add_up_to_the_tests_that_exist(
         + suite["xfailed"]
         + suite.get("failed", 0)
         + suite.get("xpassed", 0)
+        + suite.get("deselected", 0)
     )
 
     assert ran == total, (
         f"the report says {suite['passed']} passed, {suite['skipped']} skipped, "
-        f"{suite['xfailed']} xfailed, {suite['failed']} failed and "
-        f"{suite['xpassed']} xpassed, which is {ran} of the {total} tests in the tree"
+        f"{suite['xfailed']} xfailed, {suite['failed']} failed, "
+        f"{suite['xpassed']} xpassed and {suite.get('deselected', 0)} deselected, "
+        f"which is {ran} of the {total} tests in the tree"
     )
 
 

@@ -156,8 +156,8 @@ FAILED tests/test_figures_auto_write.py::test_the_measurement_draws_the_card_fro
 | `tests/test_figures_auto_write.py:535` `test_a_run_against_a_copy_of_the_report_leaves_the_card_alone` | 刷副本时不碰卡片（§2.3 的闸门） |
 
 测试用的不是真画图：画图脚本被换成一个只会记下「你要我画哪份报告」的桩
-（`tests/test_figures_auto_write.py:240` 的 `CARD_STUB`），测量脚本在**自己的一棵树**里跑
-（`_tree()`，`:252`）。这样测试不依赖字体、不依赖 Pillow、在任何机器上都能跑，
+（`tests/test_figures_auto_write.py:364` 的 `CARD_STUB`），测量脚本在**自己的一棵树**里跑
+（`_tree()`，`:376`）。这样测试不依赖字体、不依赖 Pillow、在任何机器上都能跑，
 而且不会在跑测试的时候把仓库自己的卡片重画一遍。
 
 ---

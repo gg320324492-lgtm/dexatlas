@@ -51,8 +51,8 @@
 
 裸名字走结构化查法（强），片段走字面查法（覆盖非标识符的东西：路由、装饰器、
 JSON 键、docstring 里的一句话）。规则落在 `DECLARATION`
-（`scripts/check-doc-citations.py:378`）、`ANCHOR_NAME`（`:384`）、
-`check_anchor_name`（`:1217`）、`check_anchor_fragment`（`:1249`）。
+（`scripts/check-doc-citations.py:415`）、`ANCHOR_NAME`（`:421`）、
+`check_anchor_name`（`:1893`）、`check_anchor_fragment`（`:1925`）。
 
 > **一个词的三个意思。** 本报告说的「锚点」是**引用声明的内容**；仓库里还有两个
 > 同名的旧东西：Markdown 的**标题锚点**（`#fragment` 链接，`scripts/` 之外的
@@ -109,9 +109,9 @@ public-contracts.md:22  src/dexatlas/cli/main.py:289-291  anchor missing:
    `anchor: version` 这一条：声明里写的那个名字不是句子里被提到的名字，它是对源码的
    声明 —— 两条通道分开，不互相污染。
 3. **在「声明型文档」里，不声明就报错。** `DECLARING_DOCUMENTS`
-   （`scripts/check-doc-citations.py:393`）列出的文档里，任何「既没有名了符号、又
+   （`scripts/check-doc-citations.py:430` 的 `DECLARING_DOCUMENTS`）列出的文档里，任何「既没有名了符号、又
    没有声明」的引用都报成 `declares nothing`。契约表在名单里，所以它的沉默是
-   决定，不是疏忽。见 `check_declaration_of_content`（`:1265`）。
+   决定，不是疏忽。见 `check_declaration_of_content`（`:1941`）。
 
 ### 2.4 摘要多了一行
 
@@ -165,7 +165,7 @@ citations: 1375
 
 ## 4. 红 → 绿怎么证的
 
-新增 6 条测试（`tests/test_doc_citations.py:854` 起）。**在旧实现下**（把
+新增 6 条测试（`tests/test_doc_citations.py:860` 起）。**在旧实现下**（把
 `scripts/check-doc-citations.py` 换回 `HEAD` 的版本）：
 
 ```

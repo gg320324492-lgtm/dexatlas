@@ -134,7 +134,7 @@ findings**（怎么验的见 §6）。
 
 > 这一条对主会话有直接影响：`docs/glossary.md` 现在**可以**被登记进
 > `scripts/check-doc-citations.py` 的 `DOCS` 名单（该名单见
-> `scripts/check-doc-citations.py:142` `anchor: DOCS`）。
+> `scripts/check-doc-citations.py:164` `anchor: DOCS`）。
 > 登记之前它不在名单里，所以它一条引用都没被检查过。
 
 ### 5.2 术语表的 59 条引用，指着的行上已经没有那个词了
@@ -216,7 +216,7 @@ findings**（怎么验的见 §6）。
 ## 6. 怎么验的
 
 **这台机器上没有第二个检查器**：`scripts/check-doc-citations.py` 的 `DOCS`
-名单是主会话统一登记的（`scripts/check-doc-citations.py:142`
+名单是主会话统一登记的（`scripts/check-doc-citations.py:164`
 `anchor: DOCS`），本批**不能动那个文件**。
 所以本批借了检查器自己的机器，写了一个只读脚本（放在 `.scratch/`，
 不进仓库）：它 `import` 检查器、用**同一套判据**跑这 7 份文档。

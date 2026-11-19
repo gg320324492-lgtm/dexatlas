@@ -259,7 +259,7 @@ r"\*\*(?P<total>\d+)\*\*（\*\*(?P<fast>\d+)\*\* 快 \+ \*\*(?P<slow>\d+)\*\* �
 5. **`fig:ci.jobs` / `fig:ci.runs` / `fig:documents.count`** ✅ 三个新键 ✅。
 6. **本分支的树上有一处与本轮无关的红** ✅：`docs/reports/m10-material-fixes.md` 里有
    **20 个坏链接** ✅（正文把 `file:line` 引用写成了带行号的 markdown 链接 ✅，
-   目标写成 `m10-acceptance-pack.md:13` ✅ 这种样子 ✅，链接解析不到 ✅）。
+   目标写成 `m10-material-fixes.md` ✅ 这种样子 ✅，链接解析不到 ✅）。
    本轮为了让测量能跑 ✅，**临时**把它们改成了不带行号的链接 ✅，**测完已经还原** ✅ ——
    所以这棵树现在在 `tests/test_docs.py::test_all_relative_links_resolve` 上仍然是红的 ✅，
    而它会挡住最终重测 ✅。修法：那 20 处 `](m10-xxx.md:NN)` 去掉行号 ✅。

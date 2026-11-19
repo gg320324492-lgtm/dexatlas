@@ -108,7 +108,7 @@
 - **触发条件**：第 4 步（改文档里的数字与引用）之后、第 6 步（重打 tag）之前跑
   `scripts/check-doc-citations.py`。
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
-  `scripts/check-doc-citations.py:236-249` 的 `TREE_DOCUMENTS` 把
+  `scripts/check-doc-citations.py:273-273` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
   （`scripts/check-doc-citations.py:2143-2146`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
@@ -204,7 +204,7 @@
   | 位置 | 有没有东西在比 | 比的是什么 |
   |---|---|---|
   | `docs/reports/phase1-execution-report.md` | **有** | `<!--fig:...-->` 标记，由测量脚本写 |
-  | `README.md:12` / `README.zh-CN.md:12` 徽章 URL | **有** | 徽章由测量脚本写；`tests/test_docs.py::test_the_readme_badge_states_the_measured_numbers`（`tests/test_docs.py:1377`） |
+  | `README.md:12` / `README.zh-CN.md:12` 徽章 URL | **有** | 徽章由测量脚本写；`tests/test_docs.py::test_the_readme_badge_states_the_measured_numbers`（`tests/test_docs.py:1382`） |
   | `.github/social-preview*.png` 两张卡片 | **有** | `scripts/make-social-preview.py --check`（CI job + pytest） |
   | `docs/status.md:24` 覆盖率 | **有** | `<!--fig:coverage.pct-->` 标记 |
   | `docs/how-to-verify.md:172`、`docs/how-to-verify.zh-CN.md:149` | **无** | `tests/test_how_to_verify.py` 比的是该页的 **collect 汇总数**（总数/快测/集成，见 `tests/test_how_to_verify.py:114-132`），**不比对这一行的 passed/skipped** |
@@ -336,7 +336,7 @@
 
   > **第 2 步与第 6 步之间有一个顺序要求**：引用检查器对
   > `docs/reports/v1.0.0-github-release-body.md` 读的是**本地 `v1.0.0` ref 指向的树**
-  > （`scripts/check-doc-citations.py:236-249`、`:1387-1390`）。所以顺序是
+  > （`scripts/check-doc-citations.py:273-273`、`:1387-1390`）。所以顺序是
   > **先重打本地 tag → 再跑 `check-doc-citations.py` → 若漂了则改正文 → 再提交 →
   > 再重打一次 tag → 再跑一次检查器**。在 tag 移过之前跑的那一次结论，与将发布的树无关。
   >

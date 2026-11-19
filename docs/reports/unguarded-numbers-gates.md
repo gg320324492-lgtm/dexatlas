@@ -46,11 +46,11 @@
 | **B2** ★★★ | 「另一个环境」那一行的 passed/skipped 与 skip 理由拆分 | `docs/how-to-verify.md:171`、`docs/how-to-verify.zh-CN.md:148` | **不归自动管** | 那一行量的是「**没取第三方样本**」那一次运行。现有测量键里没有它：`suite.*` 记的是「取了样本」那一次。要守它得先有那一次测量（另一次完整运行，成本与理由要单独立项）。**处置：那一行降级成「不写具体数」，只留 skip 的理由分类**——散文改标记那一扇窗口正在做。本窗口不碰那两页 |
 | **B3** ★★ | 汇总列的 `1,695 / 93.3%`（6 处） | `docs/outreach/publish-review.md:50`–`:53`、`:342`、`:406` | **门禁** | outward 规则只认带单位的写法（`N tests` / `N 个测试` / 带 `coverage` 字样的百分数），`N / P%` 两种都不满足。门禁语句：`outreach-summary`（最右列与两处正文）、`outreach-quoted-texts`（表格「修正后」列那四个反引号里的数——**反引号让 outward 规则把它当引文放过**，而它是**将要发出去的文案**，所以单列一条）。**现在是红的** |
 | **B4** ★★ | CI job 数与并行 run 数（tag 上 / push 上） | `CLAUDE.md:79`、`AGENTS.md:79`、`docs/portfolio.md:68`、`docs/status.md:26`、`:50`、`docs/HANDOVER.md:148` | **门禁** | 真值 = `.github/workflows/ci.yml`：job 键的个数、矩阵展开后的 run 数（tag 上）、以及只在 tag 上跑的 job 减掉之后的 run 数（push/PR 上）。门禁语句：`ci-jobs-*`（6 条）、`ci-tag-runs-*`（5 条）、`ci-push-runs-*`（2 条）。**现在绿的** |
-| **B5** ★★ | MCP 工具数（11） | `docs/portfolio.md:48`、`docs/HANDOVER.md:29`、`docs/status.md:256`、`docs/architecture/README.md:288` | **门禁** | 真值 = `src/dexatlas/mcp/server.py` 里 `@server.tool` 的注册数（AST 数，与 `check-version-claims.py` 的 `mcp_tool_count()` 同一个函数）。门禁语句：`mcp-tools-*`（4 条）。**现在是绿的** |
+| **B5** ★★ | MCP 工具数（11） | `docs/portfolio.md:48`、`docs/HANDOVER.md:29`、`docs/status.md:256`、`docs/architecture/README.md:288` | **门禁** | 真值 = `src/dexatlas/mcp/server.py` 里 `@server.tool`；`mcp_tool_count()` 的定义在 `scripts/check-version-claims.py:1337` 的注册数（AST 数，与 `check-version-claims.py` 的 `mcp_tool_count()` 同一个函数）。门禁语句：`mcp-tools-*`（4 条）。**现在是绿的** |
 | **B6** ★ | 契约检查项数：静态 49 / 实跑 48 或 47 | `docs/glossary.md:186` | **一半门禁，一半不归** | **静态条数（49）配门禁**：它等于 `docs/architecture/public-contracts.md` §7 记录里的数，而 §7 由 `check-contract-records.py` 实跑守着——守的是「glossary 与权威一致」，权威自己有人守。**实跑条数（「48 或 47，依可用后端而定」）不归**：它依**可用后端**而定，一个静态数守不住它；页面自己已经把这个依赖写明了。门禁语句：`contract-static-checks` |
 | **B7** ★ | 分析产出条数（类/方法/交叉引用/证据/字符串/资源） | `docs/analysis-provenance.md:398`–`:402`、`:411`、`:850` | **不归自动管** | 它是**一次管线运行的记录**：五个自建样本上跑一遍分析得到的结果，重算要跑分析与后端，而读者要复核它也得跑一遍。把它写成「当前的数」就会变成下一个手抄的数。**处置：标明它是一次运行的记录（跑的是哪棵树 / 哪次测量），不要当现状读** |
 | **B8** ★ | 基准对比（真模型那次）的断言条数 | `docs/status.md:293`、`docs/benchmarks/comparison-real.md`、`comparison-stronger.md` | **门禁** | 真值 = 落盘的 `comparison-real-traces.json` 的 `assertions` 字段（非空断言、带 grounded + locator 的、A/B 的、不带 locator 的、百分比），算法与报告的 metrics 同一个分母。**两份报告另由测试守住**：`comparison-real.md` 与 `comparison-stronger.md` 各自从自己的 trace 重算并**逐字比对**——CI 的 `m3-comparison` job 只重算 `comparison.md`，那两份是「由脚本重算、却没有人跑」的数。门禁语句：`status-trace-assertions`；测试：`test_the_real_model_reports_regenerate_from_their_committed_traces` |
-| **B9** ★ | M10 自查条数（43/43） | `docs/status.md:145` | **门禁** | 真值 = `docs/reports/m10-selfcheck.md` 记录的条数，而那份记录由 `check-m10-snapshot.py` 对着真脚本核过（43 通过 / 0 失败 / 40 留人工）。门禁语句：`status-m10-selfcheck` |
+| **B9** ★ | M10 自查条数（43/43） | `docs/status.md:145`（键定义在 `scripts/check-unguarded-numbers.py:274-275` ✓） | **门禁** | 真值 = `docs/reports/m10-selfcheck.md` 记录的条数，而那份记录由 `check-m10-snapshot.py` 对着真脚本核过（43 通过 / 0 失败 / 40 留人工）。门禁语句：`status-m10-selfcheck` |
 | **B10** ★ | 测试文件表右列的「说明」 | `docs/reports/phase1-execution-report.md` 的测试文件表 | **不归自动管** | 那不是数，是一句「这个测试文件覆盖什么」——**脚本判不了**，那是人的判断，而人的判断不该由一个正则来守。表里的**行**已经有人守（`test_execution_report_lists_every_test_file` 比文件名集合，缺一行就红）。本窗口不碰那个文件 |
 
 ---
@@ -113,9 +113,9 @@
 | `report_tests_total` / `report_coverage_pct` | `outreach-summary` | `docs/outreach/publish-review.md`（6 处） |
 | `report_tests_total` | `outreach-quoted-texts` | `docs/outreach/publish-review.md`（表格「修正后」列 4 处） |
 | `report_tests_total` | `outreach-truth-column` | `docs/outreach/publish-review.md`（表格最右「落盘真值」列那一个不带百分数的格子，`:51`） |
-| `m10_automated_passed` / `m10_automated_total` | `status-m10-selfcheck` | `docs/status.md:145` |
+| 自查通过数 / 自查总数（两个键） | `status-m10-selfcheck` | `docs/status.md:145`；键定义在 `scripts/check-unguarded-numbers.py:274-275` |
 | `trace_*`（5 个） | `status-trace-assertions` | `docs/status.md:293` |
-| `contract_static_checks` | `contract-static-checks` | `docs/glossary.md:186` |
+| 静态契约检查数 | `contract-static-checks` | `docs/glossary.md:186`；`scripts/check-unguarded-numbers.py:312` |
 
 ---
 

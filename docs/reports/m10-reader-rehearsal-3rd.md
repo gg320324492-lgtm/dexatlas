@@ -343,7 +343,7 @@ locator 解析端点」这件事写明（读者不必去找）。
 1. **指纹声明**：release body 写「release tree: source fingerprint
    `sha256:18f3ab15…`, suite 1710 passed / 0 failed」（`:175`、`:290`、`:304`）
    —— 那是**旧 tag 树**的指纹与测试数；新树里是 `sha256:beddd7c9…` / `1733`；
-2. **一条引用指空**：`docs/reports/phase1-execution-report.md:879` 在旧树里是
+2. **一条引用指空**：`docs/reports/phase1-execution-report.md` 的 :879（旧树里）是
    「1694 passed + 0 xfailed + 1 skipped」那一行，新树里那一行挪了位。
 
 **为什么算卡住**：这一条**卡住的不是读者，是发版那一步** —— 主会话已经决定
@@ -702,7 +702,7 @@ drifted: 2
     sha256:beddd7c924b51d8667afea5911fc967a572f1529c4f6696330782f98d4f42d3e
   v1.0.0-github-release-body.md:299  docs/reports/phase1-execution-report.md:879-879
     points at nothing: the range holds nothing
-    |  | 1694 passed + 0 xfailed + 1 skipped | `docs/reports/phase1-execution-report.md:879` |
+    |  | 1694 passed + 0 xfailed + 1 skipped | `docs/reports/phase1-execution-report.md`（旧树 :879 ✓）|
 ```
 
 **两条各是什么**：
@@ -710,7 +710,7 @@ drifted: 2
 | # | 漂移 | 原因 | 怎么解 |
 |---|---|---|---|
 | a | **指纹声明** | release body 声明「release tree: source fingerprint `sha256:18f3ab15…`, suite 1710 passed / 0 failed」（`:175`、`:290`、`:304`）—— 那是**旧 tag 树**的指纹与测试数；新 tag 树（HEAD）的报告里是 `sha256:beddd7c9…` / `1733` 个测试 | **重测之后**（指纹与测试数都会变），release body 的这几处要跟着改成新树的指纹与测试数 |
-| b | **一条引用指空** | `docs/reports/phase1-execution-report.md:879` 在新树里落在**空行**上 | 手工重锚（`scripts/remap-citations.py` 对「指向位置而非符号」的引用**按规则不动**，要人来锚）—— 但**不是简单挪行号**，见 §8.1.1 |
+| b | **一条引用指空** | `docs/reports/phase1-execution-report.md` 那条引用在新树里落在**空行**上（旧树 :879 ✓）| 手工重锚（`scripts/remap-citations.py` 对「指向位置而非符号」的引用**按规则不动**，要人来锚）—— 但**不是简单挪行号**，见 §8.1.1 |
 
 #### 8.1.1 重锚不能照搬行号差 —— 检查器只查「范围非空」，查不出语义错位
 
