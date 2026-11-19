@@ -82,7 +82,7 @@ JSON 键、docstring 里的一句话）。规则落在 `DECLARATION`
 
 声明**绑定到它前面最近的那条引用**，且两者之间不能隔着一个块边界 —— 与裸行号
 ``:143`` 的绑定规则完全一样（表格的一行是一个块，一个段落是一个块）。
-实现见 `_resolve`（`scripts/check-doc-citations.py:1061`）。
+实现见 `_resolve`（`scripts/check-doc-citations.py:1063`）。
 
 这样写的好处是：声明与引用**分成两个跨度**，声明在文档里读起来是「这里，以及这里
 说的是什么」，而不是一串挤在一起的代码。
@@ -98,13 +98,13 @@ public-contracts.md:22  src/dexatlas/cli/main.py:289-291  anchor missing:
 
 裸名字的报法与既有的「符号漂移」一致（`` `X` is at line N ``）；片段的报法是
 `` the anchor `X` is at line N ``，找不到就说「不在范围里」。
-见 `check_anchor`（`scripts/check-doc-citations.py:1864`）。
+见 `check_anchor`（`scripts/check-doc-citations.py:1866`）。
 
 ### 2.3 三条防呆
 
 1. **孤立的声明要报。** 声明绑定不到任何引用（写在了引用前面、或者隔了一个块），
    它就什么也没说。报出来，不当它不存在。见 `document_orphan_declarations`
-   （`scripts/check-doc-citations.py:1965`）。
+   （`scripts/check-doc-citations.py:1967`）。
 2. **声明跨度不参与「名了符号」的推断。** 契约表里 `src/dexatlas/cli/main.py:289-291`
    `anchor: version` 这一条：声明里写的那个名字不是句子里被提到的名字，它是对源码的
    声明 —— 两条通道分开，不互相污染。
