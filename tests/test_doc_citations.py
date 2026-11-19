@@ -989,6 +989,8 @@ def test_a_declaration_that_names_no_citation_is_reported(
     monkeypatch.setattr(checker, "DOCS", [document])
 
     assert checker.main() == 1
+
+
 #: The report the release body quotes, as the v1.0.0 tree holds it.
 #:
 #: The three lines a claim points at are the ones the release body's

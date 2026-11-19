@@ -243,6 +243,10 @@ DOCS: list[pathlib.Path] = [
     # The report of the batch that taught the checker to compare the values a
     # citation states with the values on the lines it names.
     REPO / "docs" / "reports" / "citation-value-comparison.md",
+    # The report of the fourth reader rehearsal: the one that proved the
+    # five material fixes had never reached the tagged tree, and that the
+    # F2 fallback really falls back when both ports are taken.
+    REPO / "docs" / "reports" / "m10-reader-rehearsal-4th.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
@@ -1968,6 +1972,8 @@ def document_orphan_declarations(document: pathlib.Path) -> list[Finding]:
         )
         for orphan in orphans
     ]
+
+
 def check_values(citation: Citation, values: tuple[StatedValue, ...]) -> list[Finding]:
     """The findings of one citation's values.
 
