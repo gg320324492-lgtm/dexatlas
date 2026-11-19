@@ -248,6 +248,9 @@ DOCS: list[pathlib.Path] = [
     # The report of the batch that gave the unguarded hand-written
     # numbers their gates (or an explicit reason not to).
     REPO / "docs" / "reports" / "unguarded-numbers-gates.md",
+    # The report of the batch that turned the prose numbers into markers,
+    # so adding a test no longer means hand-editing any number.
+    REPO / "docs" / "reports" / "prose-to-markers.md",
     # The report of the fourth reader rehearsal: the one that proved the
     # five material fixes had never reached the tagged tree, and that the
     # F2 fallback really falls back when both ports are taken.
