@@ -27,6 +27,9 @@ REFRESH = REPO_ROOT / "scripts" / "refresh-report-figures.py"
 VERSION_CLAIMS = REPO_ROOT / "scripts" / "check-version-claims.py"
 VERIFY_CONTRACTS = REPO_ROOT / "scripts" / "verify-public-contracts.py"
 SELFCHECK = REPO_ROOT / "scripts" / "m10_selfcheck.py"
+PLATFORM_GATES = REPO_ROOT / "scripts" / "check-platform-gates.py"
+PLATFORM_GATES_INVENTORY = REPO_ROOT / "scripts" / "platform-gates.json"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _load(path: Path, name: str) -> ModuleType:
@@ -815,14 +818,35 @@ def test_every_ci_job_redirects_its_temporary_directory() -> None:
 
     The system drive is nearly full on the machine this project is developed
     on, and the runner's is the workspace -- so every job that runs ``uv``
-    gets the same redirection the test suite applies. The YAML is read as
-    text so the check does not need PyYAML; the step count is what matters.
+    gets the same redirection the test suite applies.
+
+    This used to count: "exactly ten jobs redirect their temporary
+    directory" and "exactly twelve steps install dependencies".  Adding a
+    job turned the test red and the repair was to edit the number, twice in
+    two days -- and a number that has to be edited when a correct job is
+    added stops describing anything.  The rule is a property now: a job
+    that installs with ``uv`` either moves its temporary directory into the
+    workspace or says, in the platform-gate inventory, why it does not have
+    to.  The inventory and the workflow are compared in both directions, so
+    neither can drift from the other quietly.
     """
-    text = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    tmp_steps = text.count("Keep generated files in .scratch")
-    sync_steps = text.count("uv sync")
-    assert tmp_steps == 10, f"{tmp_steps} jobs redirect their temporary directory"
-    assert sync_steps == 12, f"{sync_steps} steps install dependencies"
+    module = _load(PLATFORM_GATES, "check_platform_gates")
+    inventory = module.load_inventory(PLATFORM_GATES_INVENTORY)
+    jobs = module.read_ci_jobs(CI_WORKFLOW)
+
+    offenders: list[str] = []
+    for name, job in jobs.items():
+        if not job.runs_uv or job.redirects_temp:
+            continue
+        entry = inventory.ci_jobs.get(name, {})
+        claim = entry.get("temp_redirect")
+        if claim not in {"exempt", "defect"} or not str(entry.get("reason", "")).strip():
+            offenders.append(name)
+
+    assert not offenders, (
+        "these CI jobs install with uv and neither redirect their temporary directory "
+        f"nor say why they do not have to: {offenders}"
+    )
 
 
 # ---------------------------------------------------------------------------
