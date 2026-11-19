@@ -143,6 +143,12 @@
       "pattern": "\\| `(?P<tests>[\\d,]+) (?:automated )?tests",
       "groups": {"tests": "report_tests_total"}
     },
+    {
+      "id": "outreach-truth-column",
+      "path": "docs/outreach/publish-review.md",
+      "pattern": "\\| (?P<tests>[\\d,]+) \\|\\s*$",
+      "groups": {"tests": "report_tests_total"}
+    },
 
     {
       "id": "status-m10-selfcheck",

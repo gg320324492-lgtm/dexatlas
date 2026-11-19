@@ -12,7 +12,7 @@
 新门禁是 `scripts/check-unguarded-numbers.py`：
 它**守性质，不守写死的数**——真值每次从树上算出来，文档里那句话被读出来比。
 
-**门禁现在是红的**：10 条 finding，全部落在审计查出的那几处**真过期**的数上
+**门禁现在是红的**：11 条 finding，全部落在审计查出的那几处**真过期**的数上
 （`1,695` vs 树上的 `1,733`）。这是它该有的样子，§4 有红→绿的实测。
 
 ---
@@ -64,7 +64,7 @@
 | `scripts/check-unguarded-numbers.py` | 门禁本体：从树上把真值算出来，从文档里把那句话读出来，比 |
 | `scripts/unguarded-numbers.json` | **清单**：门禁守着的每一处（哪个文件、哪句话、正则、数是什么）。改写一句话就改这里 |
 
-清单里现在是 **24 条语句**。每条语句点名一个文件、一条正则和「这个数是什么」。
+清单里现在是 **25 条语句**。每条语句点名一个文件、一条正则和「这个数是什么」。
 正则里的命名组对应事实：`{"number": "ci_jobs"}`。
 
 ### 2.2 真值从哪来（**没有一个是抄下来的**）
@@ -112,6 +112,7 @@
 | `report_tests_total` / `report_coverage_pct` | `portfolio-tests-total` / `portfolio-coverage` | `docs/portfolio.md` |
 | `report_tests_total` / `report_coverage_pct` | `outreach-summary` | `docs/outreach/publish-review.md`（6 处） |
 | `report_tests_total` | `outreach-quoted-texts` | `docs/outreach/publish-review.md`（表格「修正后」列 4 处） |
+| `report_tests_total` | `outreach-truth-column` | `docs/outreach/publish-review.md`（表格最右「落盘真值」列那一个不带百分数的格子，`:51`） |
 | `m10_automated_passed` / `m10_automated_total` | `status-m10-selfcheck` | `docs/status.md:145` |
 | `trace_*`（5 个） | `status-trace-assertions` | `docs/status.md:293` |
 | `contract_static_checks` | `contract-static-checks` | `docs/glossary.md:186` |
@@ -126,15 +127,15 @@
 $ uv run --no-sync python scripts/check-unguarded-numbers.py
 FAIL docs/portfolio.md:67  [portfolio-tests-total]  it says 1695, and the report_tests_total is 1733
 FAIL docs/outreach/publish-review.md:50  [outreach-summary]  it says 1695, and the report_tests_total is 1733
-…（共 10 条，全部是 1,695 vs 1,733）
-10 finding(s) in 24 watched statements.
+…（共 11 条，全部是 1,695 vs 1,733）
+11 finding(s) in 25 watched statements.
 $ echo $?
 1
 ```
 
-这 10 条落在三处：`docs/portfolio.md:67`（B1）、`docs/outreach/publish-review.md`
-的汇总列与「修正后」列（B3）。**这正是审计 §2 B1/B3 说的「已经陈旧且静默」**——
-现在它不静默了。
+这 11 条落在三处：`docs/portfolio.md:67`（B1）、`docs/outreach/publish-review.md`
+的最右「落盘真值」列与「修正后」列（B3）。**这正是审计 §2 B1/B3 说的
+「已经陈旧且静默」**——现在它不静默了。逐行清单在 §9。
 
 ### 4.2 绿：同一个门禁、同棵树，数字改对之后
 
@@ -143,7 +144,7 @@ $ echo $?
 
 ```
 $ uv run --no-sync python scripts/check-unguarded-numbers.py
-PASS 24 watched statements agree with the tree.
+PASS 25 watched statements agree with the tree.
 $ echo $?
 0
 ```
@@ -230,7 +231,7 @@ FAIL docs/HANDOVER.md:148    [ci-jobs-handover]  it says 13, and the ci_jobs is 
 | 文件 | 改动 |
 |---|---|
 | `scripts/check-unguarded-numbers.py` | **新增**：门禁本体 |
-| `scripts/unguarded-numbers.json` | **新增**：清单（24 条语句） |
+| `scripts/unguarded-numbers.json` | **新增**：清单（25 条语句） |
 | `tests/test_unguarded_numbers.py` | **新增**：11 条测试（红→绿、清单不烂、真值算得出来、两份真模型报告从 trace 重算） |
 | `.github/workflows/ci.yml` | **加一个步骤**（在文件最后一个 job 的末尾）：跑新门禁。**没有加 job**——job 数变了，六处散文会跟着变，而那六处本窗口不碰 |
 | `scripts/check-gate-coverage.py` | 清单里登了新门禁（加在字典的最后，`GATES` 那一行仍在第 48 行，引用它的文档不受影响） |
@@ -261,10 +262,10 @@ C17（散文里的手写数）那一族最合适——C17 治的是「让散文�
    `scripts/refresh-report-figures.py` **本窗口没有跑**（按指示留给主会话）。
    **测试文件表那一行本窗口已经补好了**（§7），所以重测不会被「The table's rows
    are written by hand」挡住——但表里的**数**要等这一轮重测来写。
-2. **把那 10 条 finding 改对。** 门禁现在是红的，红的地方就是审计说的那几处真过期：
+2. **把那 11 条 finding 改对。** 门禁现在是红的，红的地方就是审计说的那几处真过期：
    `docs/portfolio.md:67` 的 `1,695`，以及 `docs/outreach/publish-review.md` 的
-   汇总列（6 处）与「修正后」列（4 处）。改的是**数**，不是门禁。
-   改完之后门禁会绿（§4.2 实测过）。
+   最右列与「修正后」列。改的是**数**，不是门禁。改完之后门禁会绿（§4.2 实测过）。
+   **逐行清单（文件、行、现在写的、应改成、依据）在 §9。**
 3. **把这份报告登记进索引。** `docs/reports/README.md` 的分组与份数，
    以及 `scripts/check-doc-citations.py` 的 `DOCS` 白名单（登记之后本文的
    `file:line` 引用才会被检查）——这两处归主会话统一登记。
@@ -294,3 +295,64 @@ C17（散文里的手写数）那一族最合适——C17 治的是「让散文�
    解开它的是把那些数变成 `<!--fig:…-->`（散文改标记那一扇在做的），或者主会话
    在重测时一并处理。
 
+---
+
+## 9. 逐行同步清单（给最终那次统一同步用）
+
+**这一节是给「把数字改对」这件事的输入**：每一处写清「文件、行、现在写的、
+应改成、依据是哪次测量或哪个标记」。**依据是标记与命令，不是本文的断言**——
+主会话同步时逐条核，不要照抄。
+
+### 9.0 两个符号
+
+| 符号 | 是什么 | 现在是多少（占位） | 当场怎么核 |
+|---|---|---|---|
+| `N` | 测试总数 | 报告 `<!--fig:tests.total-->` 现在记 **1733**（上一轮测量的落盘值）。本分支此刻 `pytest --collect-only -q` 收集到 **1768** | 重测后：`grep -o '<!--fig:tests.total-->[^<]*' docs/reports/phase1-execution-report.md`；或 `uv run --no-sync pytest --collect-only -q` 的最后一行 |
+| `P` | 一方代码覆盖率 | 报告 `<!--fig:coverage.pct-->` 现在记 **93.3%** | 重测后：`grep -o '<!--fig:coverage.pct-->[^<]*' docs/reports/phase1-execution-report.md` |
+
+**两个都是占位**：最终以主会话那一轮重测写进报告的值为准。**重测之前不要按
+本文的数去改**——本文记的是「现在写的」和「依据在哪」，不是「最终是多少」。
+
+### 9.1 表 A：现在就是错的（门禁报出来的 11 条，必须改）
+
+| # | 文件 | 行 | 现在写的 | 应改成 | 依据 |
+|---|---|---|---|---|---|
+| A1 | `docs/portfolio.md` | 67 | `1,695 tests at` | `N tests at` | `<!--fig:tests.total-->` |
+| A2 | `docs/outreach/publish-review.md` | 50 | 最右「落盘真值」列 `1,695 / 93.3%` | `N / P%` | `<!--fig:tests.total-->` + `<!--fig:coverage.pct-->` |
+| A3 | `docs/outreach/publish-review.md` | 51 | 最右列 `1,695`（这一格没有百分数） | `N` | `<!--fig:tests.total-->` |
+| A4 | `docs/outreach/publish-review.md` | 52 | 最右列 `1,695 / 93.3%` | `N / P%` | 同 A2 |
+| A5 | `docs/outreach/publish-review.md` | 53 | 最右列 `1,695 / 93.3%` | `N / P%` | 同 A2 |
+| A6 | `docs/outreach/publish-review.md` | 342 | `本轮的 1,695 / 93.3%` | `本轮的 N / P%` | 同 A2 |
+| A7 | `docs/outreach/publish-review.md` | 406 | `（1,695 / 93.3%）` | `（N / P%）` | 同 A2 |
+| A8 | `docs/outreach/publish-review.md` | 50 | 「修正后」列 `1,695 automated tests, 93.3% coverage` | `N automated tests, P% coverage` | 同 A2 |
+| A9 | `docs/outreach/publish-review.md` | 51 | 「修正后」列 `1,695 tests, coverage and dead-code gates` | `N tests, coverage and dead-code gates` | `<!--fig:tests.total-->` |
+| A10 | `docs/outreach/publish-review.md` | 52 | 「修正后」列 `1,695 tests at 93.3% coverage` | `N tests at P% coverage` | 同 A2 |
+| A11 | `docs/outreach/publish-review.md` | 53 | 「修正后」列 `1,695 automated tests at 93.3% coverage` | `N automated tests at P% coverage` | 同 A2 |
+
+**A8–A11 要注意**：那四格抄的是**素材里的话**。素材现在写的是 `1,733`
+（`docs/outreach/project-brief.md:50`、`docs/outreach/cover-letter-templates.md:82`、
+`docs/outreach/scope-backend-automation.md:24`）——**素材与这份校对记录已经对不上了，
+门禁抓的就是这件事**。所以那四格要抄**素材改完之后真正写的那句话**，
+不是在这里自己拼一个 `N`。
+
+### 9.2 表 B：现在是对的，但重测后必须跟着核对
+
+| 位置 | 现在写的 | 重测后 | 谁会报 |
+|---|---|---|---|
+| `docs/portfolio.md:68` | `93.3% coverage` | `P%` | 新门禁 `portfolio-coverage` |
+| `docs/outreach/project-brief.md:50` | `1,733 automated tests, 93.3% coverage` | `N … P%` | `check-version-claims.py` 的 outward 规则 |
+| `docs/outreach/cover-letter-templates.md:82` | `1,733 automated tests at 93.3% coverage` | `N … P%` | 同上 |
+| `docs/outreach/scope-backend-automation.md:24` | `1,733 tests at 93.3% coverage` | `N … P%` | 同上 |
+| `CLAUDE.md:79`、`AGENTS.md:79`、`docs/portfolio.md:68`、`docs/status.md:26`、`:50`、`docs/HANDOVER.md:148` | `thirteen` / `13` / `十三个` | 仍以 `ci.yml` 现算为准（**只有加了 job 才变**） | 新门禁 `ci-jobs-*` |
+| `docs/portfolio.md:48`、`docs/HANDOVER.md:29`、`docs/status.md:256`、`docs/architecture/README.md:288` | `Eleven` / `eleven` / `十一个` | 仍以 `server.py` 现算为准（**只有加了 MCP 工具才变**） | 新门禁 `mcp-tools-*` |
+
+### 9.3 改完怎么验
+
+```bash
+uv run --no-sync python scripts/check-unguarded-numbers.py
+#   应输出：PASS 25 watched statements agree with the tree.
+uv run --no-sync python scripts/check-version-claims.py --base auto
+#   应输出：Every version claim matches the repository.
+```
+
+第一条是本窗口新加的门禁（红→绿实测过，§4.2）；第二条是主会话既有的对外文本门禁。
