@@ -844,3 +844,142 @@ def test_a_tree_whose_measurement_record_is_broken_is_read_as_unreadable() -> No
             return '<!--report-figures:{"source_fingerprint": -->\n'
 
     assert checker.tree_fingerprint(BrokenTree()) is None
+
+
+def _source_line(relative: str, text: str) -> int:
+    """The line a piece of code is on, read out of the file itself."""
+    return _line_of(REPO_ROOT / relative, text)
+
+
+def test_a_citation_that_declares_what_it_points_at_is_checked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration turns a location into a claim that can fail.
+
+    A citation that only points at a location has nothing to check the lines
+    against, so the lines are only asked to hold something. A citation that
+    declares what the range holds is asked whether it still holds it: when
+    the range has drifted to somewhere else, the declaration is not there any
+    more and the citation is a finding.
+    """
+    checker = _checker()
+    elsewhere = _source_line("src/dexatlas/cli/main.py", "app = typer.Typer(")
+    document = tmp_path / "doc.md"
+    document.write_text(
+        f"The command is implemented at `src/dexatlas/cli/main.py:{elsewhere}-{elsewhere}` "
+        "`anchor: def version(`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 1
+
+
+def test_a_declaration_that_still_holds_is_accepted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration that holds is not a finding.
+
+    The check has to be able to pass, or a gate that never opens is not a
+    gate.
+    """
+    checker = _checker()
+    version = _source_line("src/dexatlas/cli/main.py", "def version(")
+    document = tmp_path / "doc.md"
+    document.write_text(
+        f"The command is implemented at `src/dexatlas/cli/main.py:{version}-{version}` "
+        "`anchor: def version(`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 0
+
+
+def test_a_declared_name_is_checked_where_it_is_defined(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bare name is checked the way a named symbol is checked.
+
+    The declaration ``anchor: version`` says the range holds the thing
+    called ``version``. The file defines it in one place, and a range that
+    does not hold that place does not hold the thing.
+    """
+    checker = _checker()
+    elsewhere = _source_line("src/dexatlas/cli/main.py", "app = typer.Typer(")
+    document = tmp_path / "doc.md"
+    document.write_text(
+        f"The command is implemented at `src/dexatlas/cli/main.py:{elsewhere}-{elsewhere}` "
+        "`anchor: version`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 1
+
+
+def test_a_citation_that_declares_nothing_in_a_declaring_document_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A document that declares what its citations point at says so out loud.
+
+    In such a document a citation that names no symbol and carries no
+    declaration says nothing at all, and the silence is reported rather than
+    accepted.
+    """
+    checker = _checker()
+    document = tmp_path / "doc.md"
+    document.write_text(
+        "The logic lives at `src/dexatlas/core/models.py:2-3`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+    monkeypatch.setattr(
+        checker,
+        "DECLARING_DOCUMENTS",
+        frozenset({checker.relative_path(document)}),
+        raising=False,
+    )
+
+    assert checker.main() == 1
+
+
+def test_the_contract_table_declares_every_citation_that_points_only_at_a_location() -> None:
+    """The pilot document has no citation left that says nothing.
+
+    Every citation in the contract table either names a symbol or declares
+    what its range holds, so the checker can ask every one of them whether
+    it still says what the table says it says.
+    """
+    checker = _checker()
+    document = REPO_ROOT / "docs" / "architecture" / "public-contracts.md"
+
+    silent = [
+        citation.where
+        for clause in checker.document_clauses(document)
+        for citation, names in zip(clause.citations, clause.claims, strict=True)
+        if not getattr(citation, "anchors", ()) and not checker.is_compared(citation, names)
+    ]
+
+    assert silent == [], silent
+
+
+def test_a_declaration_that_names_no_citation_is_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declaration that says what no range holds says nothing.
+
+    It is bound to the citation before it, the way a bare line number is,
+    and only as long as no block boundary lies between them. A declaration
+    that names no citation is a claim nobody is checking, and it is
+    reported rather than ignored.
+    """
+    checker = _checker()
+    document = tmp_path / "doc.md"
+    document.write_text(
+        "`anchor: def version(`\n\nThe logic lives at `src/dexatlas/core/models.py:2-3`\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 1
