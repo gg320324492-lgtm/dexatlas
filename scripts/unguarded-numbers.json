@@ -16,153 +16,198 @@
       "id": "ci-jobs-claude",
       "path": "CLAUDE.md",
       "pattern": "CI runs (?P<number>[A-Za-z]+|\\d+) jobs",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
     {
       "id": "ci-jobs-agents",
       "path": "AGENTS.md",
       "pattern": "CI runs (?P<number>[A-Za-z]+|\\d+) jobs",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
     {
       "id": "ci-jobs-portfolio",
       "path": "docs/portfolio.md",
       "pattern": "and (?P<number>[A-Za-z]+|\\d+) CI jobs",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
     {
       "id": "ci-jobs-status-table",
       "path": "docs/status.md",
       "pattern": "\\*\\*(?P<number>[A-Za-z]+|\\d+) 个 workflow job",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
     {
       "id": "ci-jobs-status-prose",
       "path": "docs/status.md",
       "pattern": "CI 的(?P<number>[一二三四五六七八九十]+)个 workflow job",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
     {
       "id": "ci-jobs-handover",
       "path": "docs/HANDOVER.md",
       "pattern": "CI runs (?P<number>[A-Za-z]+|\\d+) jobs",
-      "groups": {"number": "ci_jobs"}
+      "groups": {
+        "number": "ci_jobs"
+      }
     },
-
     {
       "id": "ci-tag-runs-claude",
       "path": "CLAUDE.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) parallel runs on a tag",
-      "groups": {"number": "ci_tag_runs"}
+      "groups": {
+        "number": "ci_tag_runs"
+      }
     },
     {
       "id": "ci-tag-runs-agents",
       "path": "AGENTS.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) parallel runs on a tag",
-      "groups": {"number": "ci_tag_runs"}
+      "groups": {
+        "number": "ci_tag_runs"
+      }
     },
     {
       "id": "ci-tag-runs-portfolio",
       "path": "docs/portfolio.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) runs on a tag",
-      "groups": {"number": "ci_tag_runs"}
+      "groups": {
+        "number": "ci_tag_runs"
+      }
     },
     {
       "id": "ci-tag-runs-status",
       "path": "docs/status.md",
       "pattern": "tag 上 (?P<number>\\d+) 次并行运行",
-      "groups": {"number": "ci_tag_runs"}
+      "groups": {
+        "number": "ci_tag_runs"
+      }
     },
     {
       "id": "ci-tag-runs-handover",
       "path": "docs/HANDOVER.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) parallel runs on a tag",
-      "groups": {"number": "ci_tag_runs"}
+      "groups": {
+        "number": "ci_tag_runs"
+      }
     },
-
     {
       "id": "ci-push-runs-handover",
       "path": "docs/HANDOVER.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) on a push or a PR",
-      "groups": {"number": "ci_push_runs"}
+      "groups": {
+        "number": "ci_push_runs"
+      }
     },
     {
       "id": "ci-push-runs-status",
       "path": "docs/status.md",
       "pattern": "所以那边是 (?P<number>\\d+) 次",
-      "groups": {"number": "ci_push_runs"}
+      "groups": {
+        "number": "ci_push_runs"
+      }
     },
-
     {
       "id": "mcp-tools-portfolio",
       "path": "docs/portfolio.md",
       "pattern": "(?P<number>[A-Za-z]+|\\d+) tools over stdio",
-      "groups": {"number": "mcp_tools"}
+      "groups": {
+        "number": "mcp_tools"
+      }
     },
     {
       "id": "mcp-tools-handover",
       "path": "docs/HANDOVER.md",
       "pattern": "mcp/`, (?P<number>[A-Za-z]+|\\d+) tools,",
-      "groups": {"number": "mcp_tools"}
+      "groups": {
+        "number": "mcp_tools"
+      }
     },
     {
       "id": "mcp-tools-status",
       "path": "docs/status.md",
       "pattern": "MCP 服务器。(?P<number>[一二三四五六七八九十]+)个工具",
-      "groups": {"number": "mcp_tools"}
+      "groups": {
+        "number": "mcp_tools"
+      }
     },
     {
       "id": "mcp-tools-architecture",
       "path": "docs/architecture/README.md",
       "pattern": "^(?P<number>[A-Za-z]+|\\d+) tools:",
-      "groups": {"number": "mcp_tools"}
+      "groups": {
+        "number": "mcp_tools"
+      }
     },
-
     {
       "id": "portfolio-tests-total",
       "path": "docs/portfolio.md",
-      "pattern": "(?P<number>[\\d,]+) tests at",
-      "groups": {"number": "report_tests_total"}
+      "pattern": "<!--fig:tests.total-->(?P<number>[\\d,]+)<!--/fig--> tests at",
+      "groups": {
+        "number": "report_tests_total"
+      },
+      "note": "散文改标记（另一扇窗口）之后，这句话由测量统一写 —— 门禁改认标记"
     },
     {
       "id": "portfolio-coverage",
       "path": "docs/portfolio.md",
-      "pattern": "(?P<number>[\\d.]+)% coverage on the first-party code",
-      "groups": {"number": "report_coverage_pct"}
+      "pattern": "<!--fig:coverage.pct-->(?P<number>[\\d.]+)%<!--/fig--> coverage on the\\s+first-party code",
+      "groups": {
+        "number": "report_coverage_pct"
+      },
+      "note": "散文改标记（另一扇窗口）之后，这句话由测量统一写 —— 门禁改认标记"
     },
-
     {
       "id": "outreach-summary",
       "path": "docs/outreach/publish-review.md",
       "pattern": "(?P<tests>[\\d,]+)\\s*/\\s*(?P<pct>[\\d.]+)%",
-      "groups": {"tests": "report_tests_total", "pct": "report_coverage_pct"}
+      "groups": {
+        "tests": "report_tests_total",
+        "pct": "report_coverage_pct"
+      }
     },
     {
       "id": "outreach-quoted-texts",
       "path": "docs/outreach/publish-review.md",
       "pattern": "\\| `(?P<tests>[\\d,]+) (?:automated )?tests",
-      "groups": {"tests": "report_tests_total"}
+      "groups": {
+        "tests": "report_tests_total"
+      }
     },
     {
       "id": "outreach-truth-column",
       "path": "docs/outreach/publish-review.md",
       "pattern": "\\| (?P<tests>[\\d,]+) \\|\\s*$",
-      "groups": {"tests": "report_tests_total"}
+      "groups": {
+        "tests": "report_tests_total"
+      }
     },
-
     {
       "id": "status-m10-selfcheck",
       "path": "docs/status.md",
       "pattern": "(?P<passed>\\d+)/(?P<total>\\d+) 通过",
-      "groups": {"passed": "m10_automated_passed", "total": "m10_automated_total"}
+      "groups": {
+        "passed": "m10_automated_passed",
+        "total": "m10_automated_total"
+      }
     },
     {
       "id": "contract-static-checks",
       "path": "docs/glossary.md",
       "pattern": "静态条数\\*\\*是脚本里 `check\\(\\)` 调用点的数目（(?P<number>\\d+)）",
-      "groups": {"number": "contract_static_checks"}
+      "groups": {
+        "number": "contract_static_checks"
+      }
     },
-
     {
       "id": "status-trace-assertions",
       "path": "docs/status.md",

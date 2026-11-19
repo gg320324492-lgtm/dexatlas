@@ -60,7 +60,11 @@ def test_a_watched_sentence_with_the_wrong_number_is_reported() -> None:
     checker = _checker()
     truths = checker.facts()
     statement = _statement("portfolio-tests-total")
-    text = "Strict mypy typing, ruff lint/format, 1,999 tests at 93.3% coverage."
+    text = (
+        "Strict mypy typing, ruff lint/format, "
+        "<!--fig:tests.total-->1,999<!--/fig--> tests at "
+        "<!--fig:coverage.pct-->93.3%<!--/fig--> coverage."
+    )
     findings = checker.check_text(statement, text, truths)
     assert len(findings) == 1, findings
     finding = findings[0]
@@ -75,7 +79,10 @@ def test_the_same_sentence_with_the_right_number_is_silent() -> None:
     truths = checker.facts()
     statement = _statement("portfolio-tests-total")
     total = int(truths["report_tests_total"])
-    text = f"Strict mypy typing, {total:,} tests at 93.3% coverage."
+    text = (
+        f"Strict mypy typing, <!--fig:tests.total-->{total:,}<!--/fig--> tests at "
+        f"<!--fig:coverage.pct-->93.3%<!--/fig--> coverage."
+    )
     assert checker.check_text(statement, text, truths) == []
 
 
