@@ -149,7 +149,7 @@ uv run --no-sync python scripts/check-doc-citations.py   # drifted: 0
 ### 2.3 候选怎么写
 
 按 `docs/reports/v1.1.0-candidates.md` 自己的字段（状态 + 五个）写在
-[`docs/reports/v1.1.0-candidates.md:961`](v1.1.0-candidates.md#L961) 起的
+[`docs/reports/v1.1.0-candidates.md:1026`](v1.1.0-candidates.md#L1026) 起的
 **C17 · 散文里的手写数也改成标记：从此加一个测试不用再手改任何数字**：
 
 | 字段 | 写的是什么 |
