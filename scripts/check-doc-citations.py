@@ -176,6 +176,12 @@ DOCS: list[pathlib.Path] = [
     # rehearsal found, and the note that closes M8-4 in the history.
     REPO / "docs" / "reports" / "m10-material-fixes.md",
     REPO / "docs" / "reports" / "m8-4-note-and-c17.md",
+    # The reports of the batch that aligned the candidates with reality,
+    # rehearsed the materials for the third time, and built the method
+    # for telling local gates and CI gates apart.
+    REPO / "docs" / "reports" / "c5-c6-status-alignment.md",
+    REPO / "docs" / "reports" / "m10-reader-rehearsal-3rd.md",
+    REPO / "docs" / "reports" / "platform-gate-inventory.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
