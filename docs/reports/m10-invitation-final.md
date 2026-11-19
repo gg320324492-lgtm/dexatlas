@@ -78,7 +78,7 @@ DexAtlas 已完成从安装到交付样例的开发。现邀请您对**已发布
 的固定提交：
 
 ```text
-commit b8a06ab17fc6f0ad9c791b268e403f5aaf1caf68
+commit 2edaed92d3c835bf202c0ccc84a10ba4e1eaeb9b
 （取值说明：这一串是 `git rev-parse v1.0.0^{commit}` 的输出——也就是读者执行
  `git checkout v1.0.0` 所得到的那个提交，即含本轮全部材料修正的版本。
  注意必须带 `^{commit}`：`git rev-parse v1.0.0` 返回的是 tag 对象自身的
