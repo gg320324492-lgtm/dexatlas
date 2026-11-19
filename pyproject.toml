@@ -208,6 +208,9 @@ ignore = ["E501"]
 # The M10 self-check prints Chinese check names and findings, and its
 # docstrings explain them in Chinese; same reason as above.
 "scripts/m10_selfcheck.py" = ["RUF001", "RUF002"]
+# The A6 regression tests break sentences of a Chinese document by exact
+# match, so their string literals carry the document's fullwidth punctuation.
+"tests/test_m10_selfcheck.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"

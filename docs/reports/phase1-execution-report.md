@@ -260,6 +260,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_docker_image_samples.py` | Docker 镜像带样本：Dockerfile 里 COPY 的位置（在最后一次 uv sync 之后）与 CI 那条镜像内实跑命令（相对路径 + 核计数） |
 | `test_platform_gate_inventory.py` | 本地门禁与 CI 门禁的差异核对：每个 CI job、每个平台相关的测试、每处平台敏感的行都要在清单里写明差异是否合法；新增一个正确的 CI job 不需要改任何数字（C15 新增） |
 | `test_unguarded_numbers.py` | 没人守的手写测量数：门禁把真值从树上算出来，与文档里那句话里的数比；红→绿可复现，清单烂了会被说出来 |
+| `test_run_render.py` | C8「渲染某一次运行」：`dexatlas runs` 列出/回看运行记录、`dexatlas render` 把已发布运行的报告、证据包与 run 记录落成目录；输出结构、退出码（未知 run/项目→2、无运行→1）、未发布或已被替换的 run 拒绝渲染、渲染只读工作区（C8 新增） |
 
 ### 2.2 几类值得注意的测试
 

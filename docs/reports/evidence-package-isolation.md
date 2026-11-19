@@ -28,8 +28,8 @@
 
 ### 1.1 包里到底有什么
 
-`dexatlas export` 的实现只有一条路：`src/dexatlas/cli/main.py:855` 的 `export`
-命令 → `src/dexatlas/cli/main.py:890` 调 `build_evidence_package`。
+`dexatlas export` 的实现只有一条路：`src/dexatlas/cli/main.py:861` 的 `export`
+命令 → `src/dexatlas/cli/main.py:896` 调 `build_evidence_package`。
 没有第二条路：全仓只有这一处调用它（`grep build_evidence_package src/` 只命中
 `cli/main.py:64` 的 import 和 `cli/main.py:890` 的调用）。
 
@@ -38,22 +38,22 @@
 
 | 条目 | 来源 | 位置 |
 |---|---|---|
-| `reports/report.json` | `build_json_report(result)` | `evidence_package.py:117-119` |
-| `reports/report.md` | `render_markdown(result)` | `evidence_package.py:120` |
-| `reports/report.html` | `render_html(result)` | `evidence_package.py:121` |
-| `sources/<相对路径>` | `_cited_sources(...)` | `evidence_package.py:122-123` |
-| `manifest.json` | 清单本身（不列进自己的文件数组） | `MANIFEST_NAME`（`evidence_package.py:77`）、清单写入 `evidence_package.py:153-159` |
+| `reports/report.json` | `build_json_report(result)` | `evidence_package.py:147-149` |
+| `reports/report.md` | `render_markdown(result)` | `evidence_package.py:150` |
+| `reports/report.html` | `render_html(result)` | `evidence_package.py:151` |
+| `sources/<相对路径>` | `_cited_sources(...)` | `evidence_package.py:153-154` |
+| `manifest.json` | 清单本身（不列进自己的文件数组） | `MANIFEST_NAME`（`evidence_package.py:77`，写入清单那一行是它的使用处 `evidence_package.py:126`） |
 
 ### 1.2 谁决定收不收
 
-**决定权在 `_cited_sources`**（`src/dexatlas/reports/evidence_package.py:196-252`），
+**决定权在 `_cited_sources`**（`src/dexatlas/reports/evidence_package.py:233-288`），
 规则只有三条：
 
-1. 只有 **`jadx:` 前缀**的定位符才可能被收（`evidence_package.py:215`）；
-2. 定位符的相对位置必须是一条**安全相对路径**（`evidence_package.py:445` →
-   `_is_a_safe_relative_path`，`evidence_package.py:436-450`）；
-3. 文件从 **`<workspace>/jadx/<相对位置>`** 读出来（`evidence_package.py:232`），
-   复制成 `sources/<去掉 sources/ 或 resources/ 前缀后的路径>`（`evidence_package.py:250`）。
+1. 只有 **`jadx:` 前缀**的定位符才可能被收（`evidence_package.py:252`）；
+2. 定位符的相对位置必须是一条**安全相对路径**（`_is_a_safe_relative_path`，
+   `evidence_package.py:473-487`）；
+3. 文件从 **`<workspace>/jadx/<相对位置>`** 读出来（`evidence_package.py:267`），
+   复制成 `sources/<去掉 sources/ 或 resources/ 前缀后的路径>`（`evidence_package.py:287`）。
 
 `workspace` 是这次分析自己的目录：`src/dexatlas/core/pipeline.py:186`
 （`settings.projects_dir / project.id / "runs" / run.id`），
@@ -124,17 +124,17 @@ $ uv run --no-sync dexatlas export apk_80a8fe0e81204c9f -o .scratch/out/demo-pac
 
 ### 1.4 已经有的防线
 
-- `_is_a_safe_relative_path`（`evidence_package.py:436-450`）拒绝 `..`、绝对路径、
+- `_is_a_safe_relative_path`（`evidence_package.py:473-487`）拒绝 `..`、绝对路径、
   Windows 盘符、反斜杠、NUL。所以 `jadx:../../docs/outreach/publish-review.md`
   这种定位符在到达读取之前就被挡住了。
-- `_check_names`（`evidence_package.py:383` 起）拒绝归档里带路径穿越的条目名，
+- `_check_names`（`evidence_package.py:411` 起）拒绝归档里带路径穿越的条目名，
   并逐文件核对 sha256。
 
 ### 1.5 没有的防线
 
 两处，都是同一种毛病——**没有确认这个文件确实是分析的产物，就把它复制出去了**：
 
-1. **链接不解析。** `evidence_package.py:242` 的 `source.is_file()` 与
+1. **链接不解析。** `evidence_package.py:268-287` 的 `source.is_file()` 与
    `evidence_package.py:259` 的 `read_bytes()` 都跟随符号链接。反编译树里一个指向
    树外的链接，会被当成「分析的一个源文件」原样复制进包。
 2. **目录本身不是边界。** 只要定位符点名了 `<workspace>/jadx/` 下的任何**文件**，
@@ -191,7 +191,7 @@ $ uv run --no-sync dexatlas export apk_80a8fe0e81204c9f -o .scratch/out/demo-pac
 ### 3.1 打包时的守卫
 
 `src/dexatlas/reports/evidence_package.py` 新增 `_why_not_an_analysis_file`
-（`evidence_package.py:254-277`），在 `_cited_sources` 复制之前问两个问题，
+（`evidence_package.py:291-314`），在 `_cited_sources` 复制之前问两个问题，
 两个都得是「是」：
 
 1. **文件在反编译树之内吗？**（`is_inside`，链接已解析）——树里的链接指向树外，
@@ -201,7 +201,7 @@ $ uv run --no-sync dexatlas export apk_80a8fe0e81204c9f -o .scratch/out/demo-pac
 
 不满足就不复制（`evidence_package.py:238-249`），并**说出是哪一条不满足**
 （`logger.warning`）。引用仍留在证据里，`verify_citations`
-（`evidence_package.py:311`）会把它记成未解析——读者跟着引用找不到文件时，
+（`evidence_package.py:339`）会把它记成未解析——读者跟着引用找不到文件时，
 看到的是「没带」而不是「带了个假的」。
 
 模块 docstring 也补上了这条边界（`evidence_package.py:14-20`）。

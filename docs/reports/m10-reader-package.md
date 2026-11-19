@@ -197,10 +197,14 @@ apk_80a8fe0e81204c9f — 5 classes, 8 methods, 23 call sites, 21 call edges, 1 r
 情况下重复分析，预期仍以退出码 0 完成并产出报告，错误记录写明哪个后端
 `not_installed`；不得崩溃或静默省略。
 
-> **当场记下证据**：CLI 没有「渲染某一次运行」的命令，而重复分析会把该项目的
-> 最新一次运行换成新的一次 —— 所以**那一次 stdout 上的降级证据要当场抄下来**
-> （后端状态表、`errors[]` 里的 `not_installed`），否则重跑后就找不回来了 ✓。
-> 库里的记录仍在（`analysis_runs.errors` ✓），只是没有 CLI 命令把它渲染出来 ✓。
+> **回看那一次运行**：重复分析会把该项目的最新一次运行换成新的一次，而 CLI
+> 的 `dexatlas runs <project_id> --run <run_id>` 能把**那一次**的错误记录原样
+> 取回（`analysis_runs.errors` ✓）；`dexatlas render <project_id> <run_id>`
+> 能把某一次已发布运行的报告与证据包按可复核结构落盘 ✓。降级证据因此不再
+> 只活在 stdout 上，但**当场核对的习惯仍然成立**：只有「完成了且仍是已发布
+> 那次」的 run 能渲染，重跑会换掉已发布运行，旧 run 的快照随之不在工作区里
+> —— 所以该次 stdout 上的降级证据（后端状态表、`errors[]` 里的
+> `not_installed`）仍要当场抄下或用 `runs --run` 记下 run id ✓。
 
 ### 3.4 第 4 步：检索、证据与 locator 解析（验收项 B2–B5、C1–C3）
 
@@ -860,7 +864,11 @@ PowerShell 写法：`$env:DEXATLAS_JADX_PATH=""; $env:DEXATLAS_APKTOOL_JAR=""; u
 0 resource strings）是**降级不是回归**。
 
 > **当场抄下这一次的 stdout**：重复分析会把该项目的**最新一次运行**换成新的一次
-> （见 §3.3 的提醒），重跑之后就找不回这次的 `not_installed` 证据了。
+> （见 §3.3 的提醒），重跑之后就找不回这次的 `not_installed` 证据了——
+> `dexatlas runs <project_id> --run <run_id>` 能原样取回库里的错误记录
+> （`analysis_runs.errors` ✓），`dexatlas render` 能落盘某一次已发布运行的
+> 报告与证据包；但被新分析换下之后，旧 run 的**快照**不在工作区里，渲染不到它。
+> 所以趁它还是最新一次运行时，先记下 run id、当场核对证据。
 
 **G3 后端超时**
 

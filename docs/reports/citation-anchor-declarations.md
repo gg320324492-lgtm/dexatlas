@@ -13,7 +13,7 @@
 一条引用可以带一条声明。声明是一个反引号跨度，内容以 `anchor:` 开头：
 
 ```markdown
-| `dexatlas version` | 打印版本 | | `src/dexatlas/cli/main.py:289-291` `anchor: version` |
+| `dexatlas version` | 打印版本 | | `src/dexatlas/cli/main.py:295-297` `anchor: version` |
 ```
 
 ### 1.1 为什么是「一段源码」而不是别的
@@ -105,7 +105,7 @@ public-contracts.md:22  src/dexatlas/cli/main.py:289-291  anchor missing:
 1. **孤立的声明要报。** 声明绑定不到任何引用（写在了引用前面、或者隔了一个块），
    它就什么也没说。报出来，不当它不存在。见 `document_orphan_declarations`
    （`scripts/check-doc-citations.py:1976`）。
-2. **声明跨度不参与「名了符号」的推断。** 契约表里 `src/dexatlas/cli/main.py:289-291`
+2. **声明跨度不参与「名了符号」的推断。** 契约表里 `src/dexatlas/cli/main.py:295-297`
    `anchor: version` 这一条：声明里写的那个名字不是句子里被提到的名字，它是对源码的
    声明 —— 两条通道分开，不互相污染。
 3. **在「声明型文档」里，不声明就报错。** `DECLARING_DOCUMENTS`
@@ -227,7 +227,7 @@ FAILED test_a_declaration_that_names_no_citation_is_reported
 ### 5.1 三种难度，和它们各自的原因
 
 **低 —— 锚点是一个名字。** 引用指向一个函数、类或常量，锚点直接写那个名字，
-机器用结构化查法验。例：`evidence_package.py:445` → `anchor: _is_a_safe_relative_path`。
+机器用结构化查法验。例：`evidence_package.py:473` → `anchor: _is_a_safe_relative_path`。
 这是绝大多数情况，也是契约表 59 条里的绝大多数。
 
 **中 —— 锚点是一段源码。** 引用指向一条路由、一个 JSON 键、一个装饰器、或 docstring
@@ -326,7 +326,7 @@ FAILED test_a_declaration_that_names_no_citation_is_reported
 发现（3 条「孤儿声明」、1 条「引用模糊」、1 条「锚点不在范围」、1 条「行号漂了」、
 1 条「范围是空的」）。这一轮把它们逐条改掉：
 
-- **孤儿声明 3 条**：两处改成**真的绑定对**（`src/dexatlas/cli/main.py:289-291`
+- **孤儿声明 3 条**：两处改成**真的绑定对**（`src/dexatlas/cli/main.py:295-297`
   `anchor: version` 与 `src/dexatlas/api/app.py:402-405`
   `anchor: @app.get("/projects"`），一处改成散文 —— 一处讲的是「假如范围开得很宽」
   的假设，本来就不该是活引用。

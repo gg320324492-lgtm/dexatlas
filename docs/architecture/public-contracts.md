@@ -11,7 +11,7 @@
 
 ## 1. CLI
 
-CLI 是 Typer 应用（`src/dexatlas/cli/main.py:69-70` `anchor: app = typer.Typer(`）。全部命令委托
+CLI 是 Typer 应用（`src/dexatlas/cli/main.py:75-76` `anchor: app = typer.Typer(`）。全部命令委托
 `Analyzer`（`src/dexatlas/core/pipeline.py`），CLI 自身不做分析。全局选项：
 `--log-level`、`--verbose/-v`（`src/dexatlas/cli/main.py:274-285` `anchor: _root`）。
 
@@ -19,7 +19,7 @@ CLI 是 Typer 应用（`src/dexatlas/cli/main.py:69-70` `anchor: app = typer.Typ
 
 | 命令 | 用途 | 关键选项 | 实现 |
 |---|---|---|---|
-| `dexatlas version` | 打印版本 | | `src/dexatlas/cli/main.py:289-291` `anchor: version` |
+| `dexatlas version` | 打印版本 | | `src/dexatlas/cli/main.py:295-297` `anchor: version` |
 | `dexatlas backends` | 列出后端与版本 | | `src/dexatlas/cli/main.py:295-318` `anchor: backends` |
 | `dexatlas analyze <apk>` | 分析 APK 并出报告 | `-o/--output`（Markdown）、`--json`、`--html`、`--workspace` | `src/dexatlas/cli/main.py:322-422` `anchor: analyze` |
 | `dexatlas projects` | 列出项目 | | `src/dexatlas/cli/main.py:426-450` `anchor: projects` |
@@ -32,11 +32,19 @@ CLI 是 Typer 应用（`src/dexatlas/cli/main.py:69-70` `anchor: app = typer.Typ
 | `dexatlas export <pid>` | 证据包（.zip） | `-o/--output`（必填） | `src/dexatlas/cli/main.py:855-899` `anchor: export` |
 | `dexatlas manifest <pid>` | 解析后的 manifest | | `src/dexatlas/cli/main.py:903-931` `anchor: manifest` |
 | `dexatlas xrefs <pid> <mid>` | 方法调用者 | | `src/dexatlas/cli/main.py:935-964` `anchor: xrefs` |
+| `dexatlas runs <pid>` | 列出该项目的运行历史；`--run <rid>` 打印某一次运行自己的记录（工具版本、起止、时长、是否已发布、错误记录原样取回） | `--run`、`--limit`（≥1） | `src/dexatlas/cli/main.py:968-1044` `anchor: runs` |
+| `dexatlas render <pid> <rid>` | 把某一次**已完成且仍是已发布**的运行渲染成可复核目录：该次快照的三格式报告、`evidence/evidence-package.zip`（与 `export` 同一选择与守卫，写入后当场 `verify_package`/`verify_citations`）、run 记录 `run.json`。只读，不重新分析 | `-o/--output`（必填，目录须为空或不存在） | `src/dexatlas/cli/main.py:1047-1110` `anchor: render` |
+
+`runs` / `render` 的退出码（C8，2026-11-20 新增，向后兼容）：run id 或项目不存在、
+run 未发布/已取消/失败（无可渲染快照）、run 的快照已被新分析替换、输出目录非空 →
+`2`（`EXIT_BAD_REQUEST`）；项目没有运行历史 → `1`（`EXIT_EMPTY`）；渲染自身失败 →
+`3`（`EXIT_FAILED`）。没有新造退出码语义。`render` 的边界与 `export` 同界——都渲染
+**published run**；被替换的旧 run 记录仍可经 `runs --run` 读回。
 
 `source` 的文本格式把"这是 Java 还是 Smali、来自哪个文件"打到 stderr
 （`src/dexatlas/cli/main.py:564-572`），stdout 只承载源码本身；`--format json`
 把同一信息放进文档。方法名命中多个重载时列出候选并要求 `--descriptor`
-（`src/dexatlas/cli/main.py:596-598` `anchor: --descriptor`）。
+（`src/dexatlas/cli/main.py:601-602` `anchor: --descriptor`）。
 
 ### 1.2 退出码
 
@@ -304,7 +312,7 @@ Markdown、JSON、HTML 由同一组指标渲染：`reports/summary.py` 的
 `schema_version = 2`（`PACKAGE_SCHEMA_VERSION`，
 `src/dexatlas/reports/evidence_package.py:54`）。字段（
 `not_included` 写入清单的位置
-`src/dexatlas/reports/evidence_package.py:151` `anchor: "not_included": NOT_INCLUDED`；
+`src/dexatlas/reports/evidence_package.py:187` `anchor: "not_included": NOT_INCLUDED`；
 `NOT_INCLUDED` 常量定义在
 `src/dexatlas/reports/evidence_package.py:86-96` `anchor: NOT_INCLUDED = {`）：
 
@@ -362,12 +370,12 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 `claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑两次。
 快照测试 `tests/test_public_contracts.py` 把同样的清单固化为回归门禁。
 
-**检查项清单共 49 项：28 REST + 6 MCP + 15 CLI**——即
+**检查项清单共 52 项：28 REST + 6 MCP + 18 CLI**——即
 `scripts/verify-public-contracts.py` 里 `check()` 调用点的条数（`_rest_requests()`
-28 个、`mcp_checks()` 6 个、`cli_checks()` 15 个）。下面三张表每行对应脚本里的一次
+28 个、`mcp_checks()` 6 个、`cli_checks()` 18 个）。下面三张表每行对应脚本里的一次
 `check()`，行数与分项数相等。
 
-**49 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
+**52 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
 `server comes up` 只在服务起不来时记（起不来则本段只记这 1 项并中止），
 `X-DexAtlas-Source-* headers` 只在源码端点返回 200 时记。CLI 段的 `source` 与
 `resources` 各有一个调用点按「这次分析里有没有对应后端参与」分支，两种配置走不同的
@@ -375,8 +383,14 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 
 | 实跑（2026年11月17日） | 可用后端 | 执行条数 | 通过 | 退出码 |
 |---|---|---|---|---|
-| branch `claude/contract-check-premise-197604`（commit `8483db2`） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 47（26 REST + 6 MCP + 15 CLI） | **47/47** | 0 |
-| branch `claude/contract-check-premise-197604`（commit `8483db2`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 48（27 REST + 6 MCP + 15 CLI） | **48/48** | 0 |
+| branch `claude/contract-check-premise-197604`（commit `8483db2`） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 50（26 REST + 6 MCP + 18 CLI） | **50/50** | 0 |
+| branch `claude/contract-check-premise-197604`（commit `8483db2`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 51（27 REST + 6 MCP + 18 CLI） | **51/51** | 0 |
+
+> **2026年11月20日更新**：C8 落地（`dexatlas runs` / `dexatlas render`）后，CLI 段
+> 增加 3 个调用点（runs 列表、未知 run id → 2、render 已发布运行落盘），静态总数
+> 由 49 升至 **52**。上表的两行实跑数字是**旧脚本**的记录（当时 CLI 段 15 项）；按
+> 新脚本，两行相应为 50 / 51。表中保留旧数字以忠实记录当时那两次实跑；
+> 当前配置的实跑以 `scripts/check-contract-records.py --expect <配置>` 的结果为准。
 
 命令：`uv run --no-sync python scripts/verify-public-contracts.py`。本 worktree 没有
 自己的 `.venv`（`uv sync` 不在本次改动的范围内），实跑用的是主检出
@@ -385,7 +399,7 @@ worktree 的代码；后端路径经 `DEXATLAS_JADX_PATH` / `DEXATLAS_APKTOOL_JA
 `E:\Dexatlas\.scratch\backends`，临时目录指向本 worktree 的 `.scratch\tmp`。
 
 两次的差在一处条件检查上：缺 JADX 时源码端点返回 404，`X-DexAtlas-Source-* headers`
-不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。CLI 段的 15
+不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。CLI 段的 18
 项两种配置下都记满——分支走的是同一个调用点。
 
 ### 7.1 REST 实测
@@ -497,8 +511,9 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 
 改动前那 2 条未通过，正是 `source`（JADX 在场、答案非空 → 0）与 `resources`
 （Apktool 在场、资源表有 `app_name` → 0）两条：脚本断言的是「无后端时的 1」，而
-§1.2 承诺的是「答案为空即 1」。改动后静态条数不变（仍是 49 = 28 REST + 6 MCP +
-15 CLI），实跑的条数也不变（47 / 48），变的只是那两条断言的判定依据。
+§1.2 承诺的是「答案为空即 1」。改动后静态条数不变（当时仍是 49 = 28 REST + 6 MCP +
+15 CLI；2026年11月20日 C8 落地后升为 52 = 28 REST + 6 MCP + 18 CLI，见本节开头），
+那次实跑的条数也不变（47 / 48），变的只是那两条断言的判定依据。
 
 ## 8. 已知限制
 

@@ -9,6 +9,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`dexatlas render`：把某一次运行渲染成可复核的目录（候选 C8，公共契约
+  向后兼容新增）。** `dexatlas render <project_id> <run_id> --output <dir>`
+  只读地渲染一次**已完成且仍是已发布**的运行：该次快照的三格式报告、
+  `evidence/evidence-package.zip`（与 `export` 同一选择与守卫，写入后当场
+  `verify_package` / `verify_citations`）、以及 run 自身记录 `run.json`
+  （工具版本、起止、错误记录原样取回，路径脱敏）。配套 `dexatlas runs`
+  子命令列出/查看运行历史。错误情况复用既有退出码：run 不存在或 run 未
+  发布/快照已被替换 → `2`（请求错误）；输出目录非空 → `2`；渲染自身失败 →
+  `3`；项目不存在 → `2`。契约快照测试与契约活检脚本同步（CLI 活检 15→18、
+  静态总数 49→52：28 REST + 6 MCP + 18 CLI）。缓解 M10 演练 #9：某次运行的
+  证据可事后取回，但**重跑会换掉已发布运行**——旧 run 的快照不在工作区里，
+  渲染不到它，当场记录的建议仍然成立。
 - **案例证据包扩到四个、覆盖四次独立分析。** 第 3 篇走查改用它自己那一次
   REST API 分析的包（`run_fc8e432d4d094350`），第 2 篇的 multi-DEX 附录
   补上自己的包与报告；`docs/case-studies/attachments/` 由 9 个文件变为

@@ -938,14 +938,17 @@ def check_fixture_precondition(report: Report, root: Path = REPO_ROOT) -> None:
 
 
 def check_a6_onsite_record(report: Report, root: Path = REPO_ROOT) -> None:
-    """A6 的降级证据必须当场记下：材料的要求要与工具的实际能力一致。
+    """A6 的降级证据要能回看：材料说的能力与工具实际能力一致。
 
-    The CLI has no command that renders one particular run, and a new
-    analysis replaces the project's published one, so the degraded run's
-    output is gone the moment the reader analyses again. The material has
-    to say so and ask for the evidence to be written down at the time; if
-    the tool ever gains the ability to replay a run, the material's claim
-    that it cannot has to change with it.
+    The CLI renders one particular run: ``dexatlas runs <pid> --run <rid>``
+    reads a run's own record back, and ``dexatlas render <pid> <rid>`` writes
+    a published run's reports and evidence package to a directory. What the
+    material says about that has to stay true: only a run that *completed and
+    is still the published one* renders, a new analysis replaces the
+    published snapshot, and a failed or cancelled run published nothing. A
+    material that drops that bound — or still claims there is no way to look
+    at a run again — sends the reader back to a workspace that does not hold
+    what was promised.
     """
     cli_text = (root / CLI_REL).read_text(encoding="utf-8")
     storage_text = (root / STORAGE_REL).read_text(encoding="utf-8")
@@ -956,24 +959,43 @@ def check_a6_onsite_record(report: Report, root: Path = REPO_ROOT) -> None:
     publish_replaces = "UPDATE projects SET published_run_id" in storage_text
 
     claims_no_replay = any("渲染" in block and "没有" in block for block in blocks)
-    onsite = [block for block in blocks if "当场" in block]
-    says_onsite = bool(onsite)
-    reason_ok = any(any(marker in block for marker in _ONSITE_REASONS) for block in onsite)
+    says_onsite = any("当场" in block for block in blocks)
+    reason_ok = any(
+        "当场" in block and any(marker in block for marker in _ONSITE_REASONS) for block in blocks
+    )
     promises_replay = any(marker in reader_text for marker in _REPLAY_PROMISES)
+    # The capability stated, and the bound that makes the statement true:
+    # only the run that is still the published one renders. The bound is
+    # stated by the caveat's own words, not by any mention of a published
+    # run — describing what `render` can do names a published run too.
+    states_capability = any(
+        ("runs" in block and "--run" in block) or ("render" in block and "run" in block)
+        for block in blocks
+    )
+    states_bound = any("仍是已发布" in block for block in blocks)
 
     if cli_can_select_run:
-        ok = not claims_no_replay
+        ok = (
+            states_capability
+            and states_bound
+            and says_onsite
+            and not claims_no_replay
+            and not promises_replay
+        )
     else:
         ok = claims_no_replay and says_onsite and reason_ok and not promises_replay
 
     report.add(
         outcome_of(
             "A6.on-the-spot",
-            "A6 降级证据要当场记下：材料的要求与 CLI 能否回看历史运行一致",
+            "A6 降级证据要能回看：材料对「按 run 回看」的表述与 CLI 实际能力一致",
             ok,
             f"CLI 能按 run 选运行={cli_can_select_run}；新分析替换已发布运行={publish_replaces}"
-            f"；材料说工具不能回看={claims_no_replay}；要求当场记录={says_onsite}"
-            f"；说明了原因={reason_ok}；承诺事后可查={promises_replay}",
+            f"；材料说工具不能回看={claims_no_replay}"
+            f"；材料写了 runs/render 能力={states_capability}"
+            f"；材料写明只有已发布那次能渲染={states_bound}"
+            f"；要求当场记录={says_onsite}；说明了原因={reason_ok}"
+            f"；承诺无边界的事后可查={promises_replay}",
         )
     )
 
@@ -998,16 +1020,19 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
         role_block = package_src.split("_REPORT_PATHS = {", 1)[-1].split("}", 1)[0]
         roles = re.findall(r'"(\w+)":\s*"([^"]+)"', role_block)
 
-    files_block = ""
-    if "files: dict[str, bytes] = {}" in package_src:
-        files_block = package_src.split("files: dict[str, bytes] = {}", 1)[-1].split(
-            "manifest: dict[str, Any] = {", 1
-        )[0]
+    # The manifest's own file list is built by ``package_manifest`` from the
+    # packaged files' dictionary — the dictionary the packager filled, which
+    # never holds the manifest itself. A manifest that listed itself would
+    # spell ``manifest.json`` inside that function; one that lists a hand-
+    # built array would not read the dictionary at all.
+    manifest_fn = ""
+    if "def package_manifest(" in package_src:
+        manifest_fn = package_src.split("def package_manifest(", 1)[-1].split("\ndef ", 1)[0]
     manifest_written = (
         'archive.writestr("manifest.json"' in package_src
         or "archive.writestr(MANIFEST_NAME" in package_src
     )
-    manifest_not_listed = "manifest.json" not in files_block
+    manifest_not_listed = "files.items()" in manifest_fn and '"manifest.json"' not in manifest_fn
     # The printed number has to be the archive's own count, and it has to
     # come from the package module — the one place that knows what the
     # archive holds — or be the manifest's count plus the manifest itself.

@@ -228,34 +228,52 @@ def test_the_fixture_criterion_fails_without_the_exit_code_caveat(tmp_path: Path
 def test_the_a6_criterion_fails_when_the_material_promises_a_later_look(
     tmp_path: Path,
 ) -> None:
-    """The CLI cannot replay a run, so promising it does is a defect."""
+    """A material that promises an unqualified later look states a wrong fact.
+
+    The CLI can render a recorded run (`dexatlas runs --run`,
+    `dexatlas render`), but only the run that is still the published one: a
+    new analysis replaces the published snapshot, and a failed or cancelled
+    run published nothing. A material that tells the reader the evidence can
+    simply be looked at later — with no published-run bound and no capture
+    at the time — sends them back to a workspace that no longer holds it.
+    """
     script = _selfcheck_script()
     root = _dry_run_tree(tmp_path)
     _edit(
         root,
         "docs/reports/m10-reader-package.md",
-        "**当场记下证据**",
-        "**事后可以再查**",
+        "但**当场核对的习惯仍然成立**：只有「完成了且仍是已发布\n> 那次」的 run 能渲染，重跑会换掉已发布运行，旧 run 的快照随之不在工作区里\n> —— 所以该次 stdout 上的降级证据（后端状态表、`errors[]` 里的\n> `not_installed`）仍要当场抄下或用 `runs --run` 记下 run id ✓。",
+        "所以事后随时可以再看 ✓。",
+    )
+    _edit(
+        root,
+        "docs/reports/m10-reader-package.md",
+        "所以趁它还是最新一次运行时，先记下 run id、当场核对证据。",
+        "所以事后随时可以再看。",
     )
     outcome = _outcome(script, "check_a6_onsite_record", root)
     assert outcome.state == "fail", f"the promise went unnoticed: {outcome.detail}"
 
 
-def test_the_a6_criterion_fails_without_the_on_the_spot_instruction(
+def test_the_a6_criterion_fails_without_the_published_run_caveat(
     tmp_path: Path,
 ) -> None:
-    """A reader told to look back later will find nothing there."""
+    """A reader told to look back later, with no limit named, finds nothing.
+
+    The capability the material must state is bounded: only a run that is
+    still the published one renders. Take the caveat out and the material
+    over-promises — that is the defect this criterion exists to catch.
+    """
     script = _selfcheck_script()
     root = _dry_run_tree(tmp_path)
     _edit(
         root,
         "docs/reports/m10-reader-package.md",
-        "当场",
-        "稍后",
-        count=-1,
+        "但**当场核对的习惯仍然成立**：只有「完成了且仍是已发布\n> 那次」的 run 能渲染，重跑会换掉已发布运行，旧 run 的快照随之不在工作区里\n> —— 所以该次 stdout 上的降级证据（后端状态表、`errors[]` 里的\n> `not_installed`）仍要当场抄下或用 `runs --run` 记下 run id ✓。",
+        "。",
     )
     outcome = _outcome(script, "check_a6_onsite_record", root)
-    assert outcome.state == "fail", f"the missing instruction went unnoticed: {outcome.detail}"
+    assert outcome.state == "fail", f"the missing caveat went unnoticed: {outcome.detail}"
 
 
 def test_the_package_criterion_fails_when_the_material_miscounts(tmp_path: Path) -> None:

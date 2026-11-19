@@ -628,6 +628,32 @@ def cli_checks() -> None:
     result = runner.invoke(app, ["analyze", str(SCRATCH / "not-an-apk.txt")])
     check("a file that is not an APK exits 2", result.exit_code == EXIT_BAD_REQUEST)
 
+    # The runs and render commands answer from the workspace the analysis
+    # wrote. The listing names the run that is published; a run id that
+    # names nothing is a wrong request (2), and rendering the published run
+    # writes a self-contained directory whose package verifies.
+    published_run = Store.open(get_settings().database_path).get_published_run_id(pid)
+    result = runner.invoke(app, ["runs", pid])
+    check(
+        "runs lists the published run",
+        result.exit_code == 0 and published_run is not None and published_run in result.stdout,
+    )
+    result = runner.invoke(app, ["runs", pid, "--run", "run_nosuchrun"])
+    check("an unknown run id exits 2", result.exit_code == EXIT_BAD_REQUEST)
+    render_dir = SCRATCH / "rendered-run"
+    if published_run:
+        shutil.rmtree(render_dir, ignore_errors=True)
+        result = runner.invoke(app, ["render", pid, published_run, "--output", str(render_dir)])
+        package_ok = (render_dir / "evidence" / "evidence-package.zip").is_file() and (
+            render_dir / "run.json"
+        ).is_file()
+        check(
+            "render writes the published run's reports, package and record",
+            result.exit_code == 0 and package_ok,
+            f"exit={result.exit_code}",
+        )
+        shutil.rmtree(render_dir, ignore_errors=True)
+
     # Exit 4: one name, two overloads. The index answers with the candidates.
     store = Store.open(get_settings().database_path)
     synthetic = Project(

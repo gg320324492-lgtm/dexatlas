@@ -300,6 +300,34 @@ uv run dexatlas source apk_80a8fe0e81204c9f com.example.demo.MainActivity \
 `source` needs JADX or Apktool. Without either it reports that rather than returning an
 empty result.
 
+## Runs — one analysis attempt, kept readable
+
+A project is the APK; a run is one attempt at analysing it. Re-analysing the same
+APK does not overwrite a run — it publishes a new one in its place — and the
+project's counts describe the *published* run, the last one that completed.
+`dexatlas runs` shows a project's attempts; `--run` reads one run's own record
+back, including every error it recorded:
+
+```bash
+uv run dexatlas runs apk_80a8fe0e81204c9f
+uv run dexatlas runs apk_80a8fe0e81204c9f --run run_0123456789abcdef
+```
+
+`dexatlas render` writes one run to a directory a reader can archive or carry
+away: the three report formats that run's snapshot describes, the evidence
+package (`evidence/evidence-package.zip`, the same archive `dexatlas export`
+writes), and the run's own record as `run.json`:
+
+```bash
+uv run dexatlas render apk_80a8fe0e81204c9f run_0123456789abcdef \
+    --output rendered-run/
+```
+
+Only a run that completed and is still the project's published one renders: a
+later analysis replaces the published snapshot, and a run that failed or was
+cancelled published nothing to render. The render reads the workspace — no
+analysis runs, no backend starts.
+
 ## REST API
 
 ```bash
