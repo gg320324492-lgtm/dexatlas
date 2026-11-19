@@ -207,8 +207,8 @@ E       assert 11 == 10
 本轮往 `ci.yml` 里插了 16 行，插在第 601 行之前。所有指向 `ci.yml` **第 601 行之后**的引文
 都跟着移了 **+16**；第 601 行之前的（`ci.yml:4-22`、`ci.yml:436-494` 等）没动。
 
-**检查器只报了 2 条**（两处 `ci.yml:708`），因为只有它**认得出** YAML 的 job 名、
-能把 `ci.yml:708` 解析成「`measurement` 这个 job」再比它现在在哪。
+**检查器只报了 2 条**（两处指向 `measurement` job 的行号），因为只有它**认得出** YAML 的 job 名、
+能把那行解析成「`measurement` 这个 job」再比它现在在哪。
 **`scripts/remap-citations.py` 移了 0 条**——它查的是 Python 符号，YAML 的 job 不是符号。
 CLAUDE.md 规则 4 说得很清楚：指着「地方」而不是「符号」的引文，**留给人来判**。
 
@@ -229,8 +229,8 @@ CLAUDE.md 规则 4 说得很清楚：指着「地方」而不是「符号」的�
 ——那时 `refresh-report-figures.py --check` 正好在 705 行，`social-preview` job 在 630 行、
 它的 `--check` 在 651 行。后来 `ci.yml` 长胖了，引文没有跟着走，就漂了。
 所以它们是**按指代物**重新推导的（771 / 696 / 717），不是 `+16` 平移。
-`docker-image-samples.md` 里那句「引用 `measurement` job 的两处行号（`:708` 与 `:755`）」
-——`:708` 与 `:755` 正好是这两个指代物在**今天**的位置，与上表自洽。
+`docker-image-samples.md` 里那句「引用 `measurement` job 的两处行号」
+——那两个行号正好是这两个指代物在**当时**的位置，与上表自洽（今天又移过了 ✓）。
 
 **没有改的**：`handover-tails-audit.md`（明写「本报告的 `file:line` 只在 `0a8e02e` 上成立」——
 那是 v1.0.0 树，指的是那棵树）、`english-reader-review-2.md`（锚在 `2c456e0`）、

@@ -182,6 +182,11 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "c5-c6-status-alignment.md",
     REPO / "docs" / "reports" / "m10-reader-rehearsal-3rd.md",
     REPO / "docs" / "reports" / "platform-gate-inventory.md",
+    # The report of the batch that fixed the CI job that was missing its
+    # temporary-directory redirect, and the one that closed the gaps the
+    # third reader rehearsal found in the M10 materials.
+    REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
+    REPO / "docs" / "reports" / "m10-round3-fixes.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
