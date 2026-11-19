@@ -47,7 +47,11 @@
 修复**到底堵住没有**——而核对的方式必须是**实跑**，不是读修复记录本身。
 
 **这一轮最重要的结论（一句话）**：**11 条修复在「随函发出的那一份材料」里
-全部成立；但 tag 指向的那棵树上，一条都没有。** 详见 §4 的 S-4。
+全部成立；但 tag 指向的那棵树上，一条都没有。** 详见 §3 的 S-4。
+
+**另一条给主会话的**（本轮后补）：**重打 tag 这一步本身有一个前置条件** ——
+引用检查器把 release body 的 64 条引用绑在 `v1.0.0` 那棵树上，tag 一换就要
+重核，否则门禁立刻红。详见 §3 的 S-6 与 §8.1。
 
 ---
 
@@ -198,7 +202,7 @@ F3 无命令可用、tag 树里 hash 是占位符，三条都是读材料读不�
 
 ---
 
-## 3. 卡住（2 条）
+## 3. 卡住（3 条）
 
 ### S-4 【**全部 11 条修复**】tag 指向的树上，一条修复都没有 —— 读者读到的是修复前的材料
 
@@ -291,8 +295,9 @@ hash 会得到 `2715aef` —— 与随函那一串**逐字相同**（这一条�
 这一轮的事实改。**
 
 > **注意这不影响「随函发出的那一份」自身的正确性**：本轮 §2 的全部 57 步都是照
-> **修复后**的材料跑的，它们**全部与材料对得上**（唯一两处不符见 §4 的 M-7 /
-> M-8）。**修复的内容是对的，只是它没进 tag。**
+> **修复后**的材料跑的，它们**全部与材料对得上**（材料路径上只有两处不符，见 §4 的
+> M-7 / M-8；§3 的 S-5 与 S-6 是材料没给命令、门禁要重核，不在命令路径上）。
+> **修复的内容是对的，只是它没进 tag。**
 
 ### S-5 【验收项 C2 ★】locator 解析没有可照抄的命令，判据却要求「在分析工作区内解析到真实文件」
 
@@ -325,6 +330,27 @@ MCP 客户端**——那正是上一轮 S-1（F3）被记为卡住的**同一种
 `name` 换成 `resolve_locator`、`arguments` 换成
 `{"project_id":"…","locator":"…"}`），并把契约表 §2 那张路由表里「REST 没有
 locator 解析端点」这件事写明（读者不必去找）。
+
+### S-6 【重打 tag 这一步本身】新 tag 树会让 release body 的 64 条引用漂移
+
+**背景**：`scripts/check-doc-citations.py` 把 **release body** 的引用绑在
+**`v1.0.0` 那棵树上**，行号是 `git show v1.0.0:<file>` 读出来的。**tag 一换，
+那棵树就换了，引用要重核。**
+
+**实测**：用一个临时 tag 指向 HEAD 跑一遍（跑完已删除该 tag、脚本已还原、
+工作区已确认干净），得到 **drifted: 2**：
+
+1. **指纹声明**：release body 写「release tree: source fingerprint
+   `sha256:18f3ab15…`, suite 1710 passed / 0 failed」（`:175`、`:290`、`:304`）
+   —— 那是**旧 tag 树**的指纹与测试数；新树里是 `sha256:beddd7c9…` / `1733`；
+2. **一条引用指空**：`docs/reports/phase1-execution-report.md:879` 在旧树里是
+   「1694 passed + 0 xfailed + 1 skipped」那一行，新树里那一行挪了位。
+
+**为什么算卡住**：这一条**卡住的不是读者，是发版那一步** —— 主会话已经决定
+重打 tag，若「同步对外文本」发生在「重测」之前，tag 一打，门禁立刻红。
+**release body 里的指纹与测试数本身就是重测的产物**，所以同步必须排在重测之后。
+
+**完整的分析与建议顺序见 §8.1。**
 
 ---
 
@@ -637,6 +663,7 @@ $ git log --oneline "v1.0.0^{commit}"..HEAD | wc -l
 
 | # | 事项 | 类型 | 影响 | 代价 |
 |---|---|---|---|---|
+| 0 | **S-6** —— **重打 tag 之前**先处理「release body 的引用与新 tag 树对不上」这一条（详见 §8.1） | 卡住 | **重打 tag 这一步本身** | 见 §8.1 |
 | 1 | **S-4** —— 重打 tag 到材料定稿的提交（[就绪记录](m10-invitation-readiness.md) 第 2 步 / 发送清单 N1），或改口径说「树内是旧稿」并把三份材料随函发出 | 卡住 | **F2、F3（★）、C1、C2（★）、G1、G3（★）… 全部修复项** | 1 条命令 + 重填 hash（**但 tag 是公开可见的改动**） |
 | 2 | **S-5** —— 给 C2（★）补一条可照抄的 `resolve_locator` 命令 | 卡住 | C2（★） | 1 段管道 |
 | 3 | **M-8** —— 在 C1 判据或读者包 §3.4 里点明工具/版本/locator 在 `provenance[]` 里、且一条记录可能有多条；并在契约表 §5.1 展开 `Evidence` 的键 | 误读 | C1（★）、C3（★） | 2–3 句 |
@@ -646,17 +673,73 @@ $ git log --oneline "v1.0.0^{commit}"..HEAD | wc -l
 | 7 | **G5 的「未引用字符串」** —— 要么在判据里删掉这一半（改成「不含 APK 与全量源码」+ `not_included` 声明核对），要么在准备包里给出比对方法 | 没判据 | G5（★） | 1 句 |
 | 8 | **登记** —— 本文件进 `docs/reports/README.md` 与 `scripts/check-doc-citations.py` 的文档清单 | 登记 | 本文件自身的 `file:line` 才进检查器覆盖 | 主会话统一做 |
 
+### 8.1 【S-6】重打 tag 会让 `check-doc-citations.py` 立刻红 —— 这是重打那一步的前置条件
+
+**背景**：`scripts/check-doc-citations.py` 的 `TREE_DOCUMENTS` 表把 **release body**
+的引用绑在 **`v1.0.0` 这棵树上**
+（`"docs/reports/v1.0.0-github-release-body.md": "v1.0.0"`）：那 64 条引用的行号
+是**按 tag 树读的**（`git show v1.0.0:<file>`），不是按工作区读的。
+**tag 一换，那棵树就换了，引用要重核。**
+
+**本轮实测**（用一个临时 tag `v1.0.0-sim` 指向 HEAD 跑出来的；**跑完已删除
+该 tag、脚本已还原、工作区已确认干净**）：
+
+```text
+the v1.0.0-sim tree: 1 document(s), 64 citation(s)
+drifted: 2
+  v1.0.0-github-release-body.md  declaration  wrong tree:
+    the document quotes sha256:18f3ab15 but the v1.0.0-sim tree's fingerprint is
+    sha256:beddd7c924b51d8667afea5911fc967a572f1529c4f6696330782f98d4f42d3e
+  v1.0.0-github-release-body.md:299  docs/reports/phase1-execution-report.md:879-879
+    points at nothing: the range holds nothing
+    |  | 1694 passed + 0 xfailed + 1 skipped | `docs/reports/phase1-execution-report.md:879` |
+```
+
+**两条各是什么**：
+
+| # | 漂移 | 原因 | 怎么解 |
+|---|---|---|---|
+| a | **指纹声明** | release body 声明「release tree: source fingerprint `sha256:18f3ab15…`, suite 1710 passed / 0 failed」（`:175`、`:290`、`:304`）—— 那是**旧 tag 树**的指纹与测试数；新 tag 树（HEAD）的报告里是 `sha256:beddd7c9…` / `1733` 个测试 | **重测之后**（指纹与测试数都会变），release body 的这几处要跟着改成新树的指纹与测试数 |
+| b | **一条引用指空** | `docs/reports/phase1-execution-report.md:879` 在旧 tag 树里是「1694 passed + 0 xfailed + 1 skipped」那一行；新树里那一行挪了位，879 落在别处 | 手工重锚这一行（`scripts/remap-citations.py` 对「指向位置而非符号」的引用**按规则不动**，要人来锚） |
+
+**为什么这一条值得单列**：主会话已经决定重打 tag，顺序里也有「同步对外文本」
+与「重发 Release 正文」。**但「同步对外文本」必须发生在「重测」之后** ——
+release body 里写的**指纹与测试数本身就是重测的产物**。若在重测**前**同步，
+tag 一打，检查器立刻红；而红的原因（指纹与测试数）恰恰要等重测才有新值。
+
+**建议的顺序（只动这一段的次序，其余不变）**：
+
+```text
+合并 → 登记新报告 → 完整重测（指纹与测试数更新）→ 用新值同步 release body
+     → 重锚 release body 里那条指空的引用 → 重打 tag → 更新邀请函 §2 的 hash
+     → 重发 Release 正文 → 验 tag 的 CI
+```
+
+**验它绿了的命令**：
+
+```bash
+uv run --no-sync python scripts/check-doc-citations.py   # 期望 drifted: 0
+```
+
+> **本轮没有替主会话做这一步** —— 改 release body、跑重测、重打 tag 都是发版
+> 动作，且 tag 是公开可见的改动；本窗口是只读预演。
+
 ### 本窗口**做的**
 
 - 只读预演：克隆到 `.scratch/reader-rehearsal-3rd/dexatlas`、`git checkout v1.0.0`、
   照材料跑了 **57 步**（§2），另跑了 tag 树与修复后树的**逐条对照**（§3 S-4、
   §6）；
+- **一次模拟验证**（§3 S-6 / §8.1）：用一个**临时 tag** `v1.0.0-sim` 指向 HEAD，
+  跑 `scripts/check-doc-citations.py` 看重打 tag 后会发生什么，**得到 drifted: 2**；
+  **跑完已删除该 tag、已还原脚本、已确认工作区干净**（`git status --porcelain`
+  除本文件外无输出，`git rev-parse "v1.0.0^{commit}"` 仍是 `2715aef…`）；
 - 新增**一份**文件：`docs/reports/m10-reader-rehearsal-3rd.md`（本文件）；
 - 门禁：`ruff check` / `ruff format --check` / `mypy` / `vulture` /
   `check-doc-citations.py`（drifted: 0）/ `check-version-claims.py --base auto`；
 - **没有**跑 `scripts/refresh-report-figures.py`（并发测量会互相污染覆盖率）；
 - **没有**改任何既有文件 —— `docs/reports/m10-*.md` 里除本文件外的一切、
-  `docs/reports/README.md`、`scripts/`、`tests/` **一字未动**；
+  `docs/reports/README.md`、`scripts/`、`tests/` **一字未动**
+  （模拟时临时改过 `scripts/check-doc-citations.py` 的映射表，**已还原并核对**）；
 - 改动提交到**本窗口的分支** `claude/sleepy-mendeleev-530a1b`，**未推 main、
   未合并**。
 
