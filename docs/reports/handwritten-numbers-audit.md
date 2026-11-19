@@ -232,7 +232,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 - **是什么数**：`docs/analysis-provenance.md:398-402` 那张五个样本的分析表
   （类/方法/交叉引用/证据/字符串/资源/反编译成功）；`docs/analysis-provenance.md:411` 的 `五个样本、40 条证据，三种 kind`；
   `docs/analysis-provenance.md:850` 的 `在这 5 个自建样本上，JADX 一次都没失败`。
-- **谁在检**：**没人**。`scripts/check-doc-citations.py` 的 `DOCS` 白名单（`scripts/check-doc-citations.py:164`）
+- **谁在检**：**没人**。`scripts/check-doc-citations.py` 的 `DOCS` 名单（`scripts/check-doc-citations.py:271`）
   里有 `docs/analysis-provenance.md`，但它检的是**行号引用**，不检这张表的数；
   `check-version-claims.py` 的 outward 规则不覆盖 `docs/`（只覆盖 `docs/outreach/`、
   `docs/case-studies/`、`docs/proposals/`）。

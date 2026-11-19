@@ -154,119 +154,121 @@ def release_documents(root: pathlib.Path) -> list[pathlib.Path]:
     ]
 
 
-#: The documents whose citations are checked.
+#: Reports that the check does not read, each with the reason it is left out.
 #:
-#: Every document that states a ``file:line`` belongs here. A citation in a
-#: document nobody checks is a citation nobody has to keep true, and the
-#: release notes and the release body carry the appendix that says where each
-#: number of a release came from: those line numbers drifted for a long time
-#: because the documents were not on this list.
-DOCS: list[pathlib.Path] = [
-    REPO / "docs" / "analysis-provenance.md",
-    REPO / "docs" / "architecture" / "public-contracts.md",
-    REPO / "docs" / "reports" / "phase1-execution-report.md",
-    REPO / "docs" / "benchmarks" / "large-apk.md",
-    # The howto for the social preview card states, for every figure on the
-    # card, the file and the line it was read from. Two of those citations
-    # were wrong for a long time, because the document was not on this list:
-    # a citation nobody checks is a citation nobody has to keep true.
-    REPO / "docs" / "reports" / "social-preview-howto.md",
-    # The review reports of the November 2026 round. Each one declares, where
-    # it states its basis, the commit its line numbers are anchored to, and
-    # this is the round whose reports drifted for days precisely because they
-    # were not on this list: a citation nobody checks is a citation nobody has
-    # to keep true.
-    REPO / "docs" / "reports" / "outreach-first-read.md",
-    REPO / "docs" / "reports" / "readme-image-consistency.md",
-    REPO / "docs" / "reports" / "case-studies-client-read.md",
-    REPO / "docs" / "reports" / "round-two-fresh-read.md",
-    REPO / "docs" / "reports" / "stale-number-scan-2.md",
-    REPO / "docs" / "reports" / "denominator-and-tree-pass.md",
-    REPO / "docs" / "reports" / "local-vs-ci-gates.md",
-    REPO / "docs" / "reports" / "english-reader-review-2.md",
-    # The evidence package's isolation report: it quotes the line numbers of
-    # the packager, of the pipeline that produced the workspace it checked and
-    # of the paths module. A citation nobody checks is a citation nobody has
-    # to keep true.
-    REPO / "docs" / "reports" / "evidence-package-isolation.md",
-    # The three rehearsal reports of the release week. Each one quotes the
-    # line numbers of the tree it rehearsed against -- the invitation, the
-    # container image and the post-release procedure -- so their citations
-    # have to keep being true.
-    REPO / "docs" / "reports" / "invitation-reader-rehearsal.md",
-    REPO / "docs" / "reports" / "docker-examples-gap.md",
-    REPO / "docs" / "reports" / "post-release-rehearsal.md",
-    # The landing of the Docker sample change: it quotes the CLI's count line,
-    # the JSON report's summary keys, the sample's pinned numbers and the CI
-    # step that checks them, so all of those have to keep being true.
-    REPO / "docs" / "reports" / "docker-image-samples.md",
-    # The wording of the "the backend did not finish" evidence record: it
-    # quotes the evidence module and the pipeline that writes the record, so
-    # the line numbers it names have to keep being true.
-    REPO / "docs" / "reports" / "evidence-incomplete-backend-wording.md",
-    # The outward-number parity report: it quotes the lines of the four
-    # outward texts it compared and of the checker it wrote.
-    REPO / "docs" / "reports" / "outward-number-parity.md",
-    # The candidate that carries the manifest's fourth key forward to v1.1.0:
-    # it quotes the packager, the contract table and the three places that
-    # pin the manifest's shape.
-    REPO / "docs" / "reports" / "v1.1.0-candidate-c10-manifest.md",
-    # The landing report of that fourth key (C16): it records the new manifest
-    # shape, the re-cut packages' run ids and hashes, and what was left for the
-    # main session to re-measure.
-    REPO / "docs" / "reports" / "c16-manifest-fourth-key.md",
-    # The reports of the batch that followed the release: the second reader
-    # rehearsal of the invitation, the build time C6's criterion (a) asks for,
-    # the gates' own regression tests, and the landing of the auto-write
-    # mechanism. Each one quotes line numbers of the tree it was written
-    # against, so their citations have to keep being true.
-    REPO / "docs" / "reports" / "m10-reader-rehearsal-2nd.md",
-    REPO / "docs" / "reports" / "c6-build-time-from-ci.md",
-    REPO / "docs" / "reports" / "gate-self-checks.md",
-    REPO / "docs" / "reports" / "figures-auto-write-landing.md",
-    # The reports of the batch that fixed the materials the second reader
-    # rehearsal found, and the note that closes M8-4 in the history.
-    REPO / "docs" / "reports" / "m10-material-fixes.md",
-    REPO / "docs" / "reports" / "m8-4-note-and-c17.md",
-    # The reports of the batch that aligned the candidates with reality,
-    # rehearsed the materials for the third time, and built the method
-    # for telling local gates and CI gates apart.
-    REPO / "docs" / "reports" / "c5-c6-status-alignment.md",
-    REPO / "docs" / "reports" / "m10-reader-rehearsal-3rd.md",
-    REPO / "docs" / "reports" / "platform-gate-inventory.md",
-    # The report of the batch that fixed the CI job that was missing its
-    # temporary-directory redirect, and the one that closed the gaps the
-    # third reader rehearsal found in the M10 materials.
-    # The reports of the batch that let the citations declare what they
-    # claim, and the read-only audit of the hand-written numbers the
-    # mechanism does not cover.
-    # The report of the batch that taught the checker to compare the values a
-    # citation states with the values on the lines it names.
-    REPO / "docs" / "reports" / "citation-value-comparison.md",
-    REPO / "docs" / "reports" / "citation-anchor-declarations.md",
-    REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
-    REPO / "docs" / "reports" / "card-travels-with-the-measurement.md",
-    REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
-    REPO / "docs" / "reports" / "m10-round3-fixes.md",
-    REPO / "docs" / "reports" / "declarations-outward.md",
-    # The report of the batch that gave the unguarded hand-written
-    # numbers their gates (or an explicit reason not to).
-    REPO / "docs" / "reports" / "unguarded-numbers-gates.md",
-    # The report of the batch that turned the prose numbers into markers,
-    # so adding a test no longer means hand-editing any number.
-    REPO / "docs" / "reports" / "prose-to-markers.md",
-    # The report of the batch that closed C17: the last hand-written
-    # measurement numbers (the collect summaries, the document count, the
-    # test-file table's rows, the card's sidecar) are written or audited by
-    # the mechanism.
-    REPO / "docs" / "reports" / "c17-markers-everywhere.md",
-    # The report of the fourth reader rehearsal: the one that proved the
-    # five material fixes had never reached the tagged tree, and that the
-    # F2 fallback really falls back when both ports are taken.
-    REPO / "docs" / "reports" / "m10-reader-rehearsal-4th.md",
-    *sorted((REPO / "docs" / "releases").glob("*.md")),
-    *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
-]
+#: Every report under ``docs/reports/`` is checked by default. A report leaves
+#: the check only through this registry, and only with a stated reason: an
+#: exclusion nobody can explain is a citation nobody has to keep true, which is
+#: exactly the hole this check exists to close.
+#:
+#: The reports below are historical records whose ``file:line`` citations were
+#: taken against the tree they were written on -- most of them name that tree
+#: in their header (``行号基准`` / ``基线`` / ``复核树``). Checking them against
+#: the working copy reports hundreds of "drifted" lines that are not drift but
+#: a moved tree. Bringing one back into the check means registering its tree in
+#: ``TREE_DOCUMENTS`` and quoting that tree's measurement fingerprint in the
+#: document, so the check can read its citations against the tree it claims.
+#: Until that is done for a report, it stays here, visibly, with its reason.
+REPORT_EXCLUSIONS: dict[str, str] = {
+    # -- Phase 1/2 audits: line numbers pinned to the pre-release trees they
+    #    name in their headers (b8ef71a, 8df894b).
+    "phase1-maturity-assessment.md": "历史评估快照，行号按其文首声明的基线树 b8ef71a 写；该树未在 TREE_DOCUMENTS 登记指纹，按当前树核会全数误报。待按其基线树回锚后移出。",
+    "phase2-issue-list.md": "Phase 2 开工清单，行号按其文首声明的 HEAD=8df894b 写；按当前树核会全数误报。待按其基线树回锚后移出。",
+    "phase1-findings-ledger.md": "发现台账快照，行号按其文首声明的基线 8df894b 写；待回锚。",
+    "phase1-review-report.md": "Phase 1 评审报告的历史快照，行号按写作当时的树取值；待回锚。",
+    "phase3-baseline.md": "Phase 3 基线报告，行号按其声明的基线 6b08684 写；待回锚。",
+    # -- M10 acceptance materials: pinned to the trees they accepted.
+    "m10-acceptance-pack.md": "M10 验收包，初稿基准 ff5c4cc（文首声明）；行号按该树写，待回锚。",
+    "m10-number-traceability.md": "数字溯源报告，表格数值是基线 78102a8 的快照（文首声明），行号同基线；待回锚。",
+    "m10-materials-alignment.md": "M10 材料对账报告，行号按其复核树 0104ccb 写；待回锚。",
+    "m10-reader-walkthrough.md": "第一轮读者走查，行号基准 HEAD=599ab67（文首声明）；待回锚。",
+    "m10-reader-walkthrough-2nd.md": "第二轮读者走查，行号基准 02e6d9c（文首声明）；待回锚。",
+    "m10-reader-walkthrough-3rd.md": "第三轮读者走查，行号基准 c6bf3f7（文首声明）；待回锚。",
+    "m10-reader-walkthrough-4th.md": "第四轮读者走查，材料定稿树 81336a5（文内声明）；待回锚。",
+    "m10-reader-kit.md": "读者工具包的审计报告，行号按写作当时树取值（未声明基线）；待回锚。",
+    "m10-invitation-readiness.md": "邀请函就绪复核，行号按其复核时树（v1.0.0 tag = b71bf30）取值；待回锚。",
+    "m10-invitation-final.md": "邀请函成稿引用的 commit/行号按 2edaed9 树写；待回锚。",
+    "m10-review-record-template.md": "验收记录模板，示例 hash 按 2edaed9 树写（文内声明以随函邀请函为准）；待回锚。",
+    # -- Release-week records: pinned to the trees they recorded.
+    "release-notes-consistency.md": "发布文本一致性复核，基线 78102a8（§0 声明，含被污染工作副本的说明）；引用对象行号按该树写，待回锚。",
+    "changelog-vs-release-notes.md": "CHANGELOG 对账，行号基准 d2c5f35（文首声明）；待回锚。",
+    "v1.0.0-release-checklist.md": "发版清单，行号按 53358c5 树写；待回锚。",
+    "v1.0.0-release-runbook.md": "发版 runbook，行号按 277d0fa 树写；待回锚。",
+    "v1.0.0-release-commit-draft.md": "发版提交草案，行号按 a4e7af5 树写；待回锚。",
+    "v1.0.0-ci-run-record.md": "CI run 记录，行号按其记录的 run 当时树取值；待回锚。",
+    "reader-dry-run.md": "读者干跑记录，file:line 明确针对 v1.0.0 tag 那棵树（文首声明）；待按 tag 树回锚。",
+    "release-process-dry-run.md": "发版流程演练，行号按其演练树（.scratch 干净副本）取值；待回锚。",
+    # -- November 2026 audit round: each names its review tree in its header.
+    "ci-gate-coverage.md": "CI 门禁覆盖审计，复核树 062c4b5（文首声明）；待回锚。",
+    "coverage-guard-audit.md": "覆盖率守护审计，引用基线 8868e30（文首声明）；待回锚。",
+    "new-pages-crosscheck.md": "新页校对，基线 e5060af（文首声明）；待回锚。",
+    "readme-map-audit.md": "README 地图审计，基线 062c4b5（文首声明）；待回锚。",
+    "handover-tails-audit.md": "交接尾巴核对，核对树 0a8e02e（文首声明）；待回锚。",
+    "final-outward-consistency.md": "对外文本一致性复核，行号按其复核树 d43369b 写；待回锚。",
+    "english-reader-review.md": "英文读者终检第一轮，行号按写作当时树取值（未声明基线）；待回锚。",
+    "stale-number-scan.md": "过期数扫描（第一轮），行号按写作当时树取值（未声明基线）；待回锚。",
+    "outreach-recheck.md": "对外素材复核，行号按 48a56b5 树写；待回锚。",
+    "outreach-final-review.md": "对外素材终审，行号按其 worktree 基线 78102a8 写（文内声明）；待回锚。",
+    "outreach-publish-checklist.md": "发布清单核对，行号按写作当时树取值；待回锚。",
+    "github-repo-metadata-proposal.md": "仓库元数据提案，行号按其复核时远端 main=8f9ddca 写；待回锚。",
+    # -- Design/analysis reports written against a since-moved tree.
+    "figures-coverage-design.md": "数字自动覆盖的设计报告，行号按 2026-11-18 当时树写（未声明基线）；其多处引用已随后续提交位移，待回锚。",
+    "case-studies-run-correspondence.md": "案例与 run 对应关系报告，行号按 9f0dae3 树写；待回锚。",
+    "case-studies-third-package.md": "第三案例包报告，行号按 c3586d8 树写；待回锚。",
+    "m8-install-rehearsal.md": "M8 安装演练报告，行号按 e4f3011 树写；待回锚。",
+    "glossary-pass.md": "术语表工作记录，行号按 75976e0 树写；待回锚。",
+    "portfolio-readiness-2026-11-18.md": "作品集准备度评估，评估基准 75976e0（文首声明该 tag 已被重打）；待回锚。",
+    # -- This candidates list itself: it cites benchmark files by line, and
+    #    those lines belong to the trees the candidates were written on.
+    "v1.1.0-candidates.md": "候选清单本身引用多处基准文件行号，按写作当时树取值；其 C13 节自述了这一缺口，待统一回锚。",
+}
+
+
+def collect_documents(root: pathlib.Path = REPO) -> list[pathlib.Path]:
+    """Every document the citation check reads.
+
+    Every report under ``docs/reports/`` is read, without a list to maintain:
+    a new report is checked the moment it lands, because a citation in a
+    document nobody checks is a citation nobody has to keep true. A report
+    leaves the check only through :data:`REPORT_EXCLUSIONS`, which states the
+    reason each exclusion is standing. The release notes and the release body
+    carry the appendix that says where each number of a release came from;
+    those line numbers drifted for a long time because the documents were not
+    read at all.
+
+    The few documents outside the reports directory that state ``file:line``
+    citations are named here explicitly, so the check cannot silently narrow
+    to the reports alone.
+    """
+    reports = root / "docs" / "reports"
+    releases = root / "docs" / "releases"
+    named = [
+        root / "docs" / "analysis-provenance.md",
+        root / "docs" / "architecture" / "public-contracts.md",
+        root / "docs" / "benchmarks" / "large-apk.md",
+    ]
+    report_documents: list[pathlib.Path] = []
+    if reports.is_dir():
+        report_documents = sorted(
+            path for path in reports.glob("*.md") if path.name not in REPORT_EXCLUSIONS
+        )
+    release_documents_found: list[pathlib.Path] = []
+    if releases.is_dir():
+        release_documents_found = sorted(
+            path for path in releases.iterdir() if path.suffix == ".md"
+        )
+    collected = [*named, *report_documents, *release_documents_found]
+    unique: list[pathlib.Path] = []
+    seen: set[pathlib.Path] = set()
+    for document in collected:
+        if document not in seen:
+            seen.add(document)
+            unique.append(document)
+    return unique
+
+
+#: The documents whose citations are checked.
+DOCS: list[pathlib.Path] = collect_documents()
 
 #: The trees some documents describe, and the ref each one names.
 #:
@@ -411,7 +413,7 @@ CITATION = re.compile(r"^([\w./-]+\.(?:py|sh|toml|yml|md)):(\d+)(?:-(\d+))?$")
 BARE_LINE = re.compile(r"^:(\d+)(?:-(\d+))?$")
 
 #: The dashes that join two citations into one range.
-DASHES = "-–—"  # noqa: RUF001
+DASHES = "-–—"
 
 #: A declaration of what a citation's range holds: ``anchor: def version(``.
 #:
@@ -459,14 +461,14 @@ NAME = re.compile(
 SLACK = 0
 
 #: Brackets, Chinese and English. A comma inside them does not end a clause.
-OPEN_BRACKETS = "（([{"  # noqa: RUF001
-CLOSE_BRACKETS = "）)]}"  # noqa: RUF001
+OPEN_BRACKETS = "（([{"
+CLOSE_BRACKETS = "）)]}"
 
 #: Characters that end a sentence, Chinese and English.
-SENTENCE_ENDS = "。！？；!?;"  # noqa: RUF001
+SENTENCE_ENDS = "。！？；!?;"
 
 #: Characters that end a clause inside a sentence.
-CLAUSE_ENDS = "，,：:—–→⇒"  # noqa: RUF001
+CLAUSE_ENDS = "，,：:—–→⇒"
 
 #: Words that are capitalised or in backticks but are not symbols: the names
 #: of the tools, of the project, and the type names of Python.

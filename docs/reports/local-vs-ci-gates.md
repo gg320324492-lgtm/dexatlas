@@ -207,7 +207,7 @@
 |---|---|---|
 | 字符串排序 | 全仓库 | `sorted()` 作用在字符串上时按 Unicode 码点排，与 locale 无关；**全仓库没有 `locale` / `strcoll` / `setlocale`**。中英混排的顺序在两个平台上相同（Path 对象上的排序是另一回事，见 D29） |
 | 集合与字典的迭代顺序 | 全仓库 | Python 3.7 起的插入序，两个平台一致 |
-| 目录遍历的顺序 | `tests/test_docs.py:100`、`tests/test_public_contracts.py:837`、`scripts/check-doc-citations.py:430` | `os.walk` 的产出顺序取决于文件系统（NTFS 与 ext4 不同），但这三处要么把结果排序，要么只当集合用 |
+| 目录遍历的顺序 | `tests/test_docs.py:100`、`tests/test_public_contracts.py:837`、`scripts/check-doc-citations.py:432` | `os.walk` 的产出顺序取决于文件系统（NTFS 与 ext4 不同），但这三处要么把结果排序，要么只当集合用 |
 | 文件读取的编码 | 全部门禁脚本与测试 | 读文件一律显式写 `encoding="utf-8"`，不落回平台默认 |
 | 子进程输出的编码<br>（引用与版本声明两处） | `scripts/check-doc-citations.py:462-470`、`scripts/check-version-claims.py:462-470` | 这两处显式写了 `encoding="utf-8", errors="replace"`；只有测量脚本那一处漏了（见 D2） |
 | 换行的归一 | `scripts/check-doc-citations.py:461`、`:793` | 文本模式读入会把 CRLF 归一成 LF，行号与内容在两个平台上相同 |
