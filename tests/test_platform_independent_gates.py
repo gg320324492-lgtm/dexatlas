@@ -849,6 +849,44 @@ def test_every_ci_job_redirects_its_temporary_directory() -> None:
     )
 
 
+def test_the_contract_jobs_redirect_their_temporary_directory() -> None:
+    """The difference the platform-gate inventory found, pinned where it was found.
+
+    ``contracts-without-jadx`` runs the live contract check by proxy:
+    ``scripts/check-contract-records.py`` runs
+    ``scripts/verify-public-contracts.py`` itself, and that check keeps its
+    workspace in ``tempfile.gettempdir()``.  The job did not move its
+    temporary directory into the workspace, so it wrote into the runner's
+    system temporary directory while its sibling job ``contracts`` wrote
+    into the workspace.  The inventory found it; this test keeps it fixed.
+
+    The property above catches this, but only for as long as the inventory
+    says "yes".  A claim of "exempt" or "defect" is the method's way of
+    writing a difference down rather than settling it, and it is a
+    legitimate thing for it to allow -- so the escape hatch is real.  This
+    test says which way *this* difference was settled: fixed.  A later edit
+    that quietly reopens it has to argue with this test instead of slipping
+    through the hatch.
+    """
+    module = _load(PLATFORM_GATES, "check_platform_gates")
+    inventory = module.load_inventory(PLATFORM_GATES_INVENTORY)
+    jobs = module.read_ci_jobs(CI_WORKFLOW)
+
+    for name in ("contracts", "contracts-without-jadx"):
+        job = jobs.get(name)
+        assert job is not None, f"the CI job {name!r} is not in ci.yml"
+        assert job.runs_uv, f"the CI job {name!r} does not install with uv"
+        assert job.redirects_temp, (
+            f"the CI job {name!r} runs the live contract check and does not move "
+            "its temporary directory into the workspace"
+        )
+        claim = inventory.ci_jobs.get(name, {}).get("temp_redirect")
+        assert claim == "yes", (
+            f"the inventory says the CI job {name!r} is {claim!r}; this difference "
+            "was settled by fixing the job, not by writing it down"
+        )
+
+
 # ---------------------------------------------------------------------------
 # D26 -- the fixture fetch script states which files the suite reads
 # ---------------------------------------------------------------------------

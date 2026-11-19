@@ -83,8 +83,8 @@
   重测量，而这里**数字确实变了**（多一条测试 = 多一个 passed）—— 真正含糊的是它的**兄弟
   条目 R2**。
 - **漏过的后果**：报告与徽章描述的树不存在（CLAUDE.md 规则 3 的反面）。CI 的 `measurement`
-  job（`.github/workflows/ci.yml:708`，**仅 tag 触发**，跑
-  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:705`）会红 —— 但那已经在
+  job（`.github/workflows/ci.yml:724`，**仅 tag 触发**，跑
+  `refresh-report-figures.py --check`，`.github/workflows/ci.yml:771`）会红 —— 但那已经在
   重打 tag 的半路上了。
 
 ---
@@ -181,8 +181,8 @@
   没有「重画卡片」这一步**。
 - **现在的判据**：`tests/test_social_preview.py::test_the_cards_are_current`
   （`tests/test_social_preview.py:114-120`）与 CI 的 `social-preview` job
-  （`.github/workflows/ci.yml:630`，跑 `scripts/make-social-preview.py --check`，
-  `.github/workflows/ci.yml:651`）**能抓住**。但：
+  （`.github/workflows/ci.yml:696`，跑 `scripts/make-social-preview.py --check`，
+  `.github/workflows/ci.yml:717`）**能抓住**。但：
   （i）`scripts/refresh-report-figures.py` 里 `preview` 一词 **0 命中** —— 测量脚本
   **不画卡**，画卡是 `scripts/make-social-preview.py` 的活；
   （ii）§3 步骤 2 的**本地**门禁清单里**没有** `make-social-preview.py --check`。

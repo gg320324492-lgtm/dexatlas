@@ -61,11 +61,10 @@
     },
     "contracts-without-jadx": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-contract-records.py"],
-      "temp_redirect": "defect",
-      "reason": "the job runs scripts/check-contract-records.py, which runs the live contract check itself; that check keeps its workspace in tempfile.gettempdir() (scripts/verify-public-contracts.py), so without the redirect this job writes into the runner's system temporary directory while its sibling job (contracts) writes into the workspace",
-      "fix": "give the job the same 'Keep generated files in .scratch' step the contracts job has, before the install step. The file is .github/workflows/ci.yml, which this window does not own -- the main session applies it.",
-      "local_counterpart": "uv run --no-sync python scripts/check-contract-records.py --expect without-jadx"
+      "gate_scripts": ["scripts/check-contract-records.py", "scripts/verify-public-contracts.py"],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync python scripts/check-contract-records.py --expect without-jadx",
+      "note": "This job used to be a defect and the inventory said so: it runs scripts/check-contract-records.py, which runs the live contract check itself, and that check keeps its workspace in tempfile.gettempdir() (scripts/verify-public-contracts.py), so the job wrote into the runner's system temporary directory while its sibling job (contracts) wrote into the workspace. The redirect was added on 2026-11-19 -- the same 'Keep generated files in .scratch' step the contracts job has, before the install step -- and the claim is 'yes' now. A 'yes' claim is the one that makes the property enforced rather than documented: should the step be removed, the check says the tree and the inventory disagree."
     },
     "m10-selfcheck": {
       "runs_on": "ubuntu-latest",
@@ -153,7 +152,7 @@
       "constructs": ["tempfile.gettempdir"],
       "reason": "the live check's workspace lives in the platform's temporary directory, which is why the CI jobs that run it have to redirect TMPDIR",
       "verdict": "legitimate",
-      "note": "This is the line the contracts-without-jadx job's missing redirect bears on."
+      "note": "This is the line the contracts-without-jadx job's redirect bears on: it runs the same live check by proxy, and its redirect was missing until 2026-11-19 — it is the one the platform-gate inventory found."
     }
   },
 
