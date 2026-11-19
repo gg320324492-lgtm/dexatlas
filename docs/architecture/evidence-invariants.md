@@ -194,7 +194,8 @@ EvidenceBuilder(
 ```
 
 The analysis passes them, at one call site in `core/pipeline.py`, where the
-workspace is already in hand (`src/dexatlas/core/pipeline.py:206-217`). With
+workspace is already in hand (`src/dexatlas/core/pipeline.py:206-217`
+`anchor: EvidenceBuilder`). With
 that, the resolution half of the rule is on in the real pipeline: a
 cross-reference's citation is resolved like a located finding's, instead of
 going unchecked.
@@ -224,7 +225,13 @@ and the closing sentence of the report reads
 > the analysis this report describes.
 
 Both renderers carry the wording — the level table at
-`src/dexatlas/reports/markdown.py:28-29` and
-`src/dexatlas/reports/html_report.py:45-46`, the closing sentence at
-`src/dexatlas/reports/markdown.py:195-197` and
-`src/dexatlas/reports/html_report.py:298-300`.
+`src/dexatlas/reports/markdown.py:28-29`
+`anchor: Deterministically established by an analysis tool, with a citation that` and
+`src/dexatlas/reports/html_report.py:45-46`
+`anchor: Deterministically established by an analysis tool, with a citation that`, the closing
+sentence at
+`src/dexatlas/reports/markdown.py:195-197`
+`anchor: This report describes only what was deterministically established by the`
+and
+`src/dexatlas/reports/html_report.py:298-300`
+`anchor: This report describes only what was deterministically established by the`.

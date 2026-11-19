@@ -15,7 +15,7 @@
 - 流水线把项目记为 `completed`：只有 `classes` 为空**且** `manifest` 也为空
   才记 `FAILED`（`src/dexatlas/core/pipeline.py:334-336`）；
 - `AnalysisResult.succeeded` 因此为真（`src/dexatlas/core/pipeline.py:110-112`）；
-- `analyze` 走成功分支，**退出码 0**（`src/dexatlas/cli/main.py:334-352`）。
+- `analyze` 走成功分支，**退出码 0**（`src/dexatlas/cli/main.py:401-402` `anchor: exit_code = 0`）。
 
 而 §1.2 与 `docs/install.md` 的退出码表对调用方的承诺是：**只看退出码就能
 分辨残缺运行**。截断确实有专属的退出码 5（`src/dexatlas/cli/main.py:123`，
@@ -29,9 +29,9 @@
 
 | 通道 | 能否分辨这种残缺 | 依据 |
 |---|---|---|
-| CLI 退出码 | **不能**（缺口所在） | 成功分支给 0，`src/dexatlas/cli/main.py:334-352` |
-| JSON 报告 | 能 | `summary.index_complete == false`、`index_gaps[]`、`errors[]`（`src/dexatlas/reports/summary.py:23-34`、`src/dexatlas/reports/json_report.py:136`、`src/dexatlas/reports/json_report.py:40`） |
-| REST | 能 | `ProjectResponse.errors[]`、`RunResponse.completeness == "partial"`（`src/dexatlas/api/app.py:188-220`、`src/dexatlas/api/app.py:229-252`；run 记 completeness 的判定在 `src/dexatlas/core/pipeline.py:349-353`） |
+| CLI 退出码 | **不能**（缺口所在） | 成功分支给 0，`src/dexatlas/cli/main.py:401-402` `anchor: exit_code = 0` |
+| JSON 报告 | 能 | `summary.index_complete == false`、`index_gaps[]`、`errors[]`（`src/dexatlas/reports/summary.py:23-34` `anchor: index_completeness`、`src/dexatlas/reports/json_report.py:136` `anchor: index_complete`、`src/dexatlas/reports/json_report.py:40` `anchor: errors": [e.model_dump(mode="json") for e in project.errors]`） |
+| REST | 能 | `ProjectResponse.errors[]`、`RunResponse.completeness == "partial"`（`src/dexatlas/api/app.py:188-220` `anchor: ProjectResponse`、`src/dexatlas/api/app.py:229-252` `anchor: RunResponse`；run 记 completeness 的判定在 `src/dexatlas/core/pipeline.py:349-353` `anchor: run.completeness = (`） |
 
 即：机器可读的补救通道已经存在，缺的只是退出码这一条「最廉价的通道」。
 M8 按用户决策只记录、不修复；本文补上修复方案，供后续版本决策（后来的决定见文首状态行）。
@@ -83,10 +83,10 @@ def _no_index(result: AnalysisResult) -> bool:
 
 **对三个传输的影响**：
 
-- CLI：新增常量 `EXIT_NO_INDEX = 6`（与 `src/dexatlas/cli/main.py:91-123`
-  的五个常量并列）、epilog 追加一句（`src/dexatlas/cli/main.py:71-78`）、
+- CLI：新增常量 `EXIT_NO_INDEX = 6`（与 `src/dexatlas/cli/main.py:93-135`
+  中的其余五个常量并列）、epilog 追加一句（`src/dexatlas/cli/main.py:71-78`）、
   stderr 打一条与截断分支同风格的黄色警告、退出码 6。报告文件照常写出
-  （`src/dexatlas/cli/main.py:354-369` 不变）。
+  （`src/dexatlas/cli/main.py:404-420` `anchor: output.write_text(render_markdown(result), encoding="utf-8")` 不变）。
 - REST：无变化。REST 本就不经过 CLI 退出码，且 `errors[]` 与
   `completeness` 已能表达残缺。
 - JSON：无形状变化。`schema_version` 仍为 3
@@ -114,12 +114,12 @@ def _no_index(result: AnalysisResult) -> bool:
 **影响与兼容性**：第一条路改动深——项目状态变 `failed` 后，`publish_run`
 被跳过（`src/dexatlas/core/pipeline.py:359-364`），REST 里该项目状态显示
 `failed`（`src/dexatlas/api/app.py:188-220` 的 `status` 字段），且按
-`src/dexatlas/api/app.py:380-390` 的现行逻辑，同 APK 再上传会触发重新分析；
+`src/dexatlas/api/app.py:380-390` `anchor: if existing is not None and existing.status is not ProjectStatus.FAILED:` 的现行逻辑，同 APK 再上传会触发重新分析；
 「后端失败是值、运行照常出报告」的设计原则（`src/dexatlas/core/pipeline.py`
 的既有注释与 §8.1 的描述）也被打破。第二条路（CLI 改判）不动状态机，但
 让 3 的语义从「运行摔倒」扩成「运行摔倒**或**没读到东西」，两种失败原因
 不同、处置不同（前者查环境，后者换参数/换 APK），混在一起违背
-`src/dexatlas/cli/main.py:7-30` 阐明的「不同的空要分开」的原则。
+`src/dexatlas/cli/main.py:7-30` `anchor: Three kinds of "nothing" are kept apart, because they mean different things to` 阐明的「不同的空要分开」的原则。
 
 **迁移成本**：高。状态机、发布语义、REST 消费方、重分析回路都要复核；
 测试面覆盖 `ProjectStatus` 三态流转。
@@ -129,7 +129,7 @@ def _no_index(result: AnalysisResult) -> bool:
 **语义定义**：把「索引为空」视为截断的极端情形，复用 5。
 
 **影响与兼容性**：5 的现有契约是「运行跑完，但有步骤被上限**截短**」，
-判定只认 `output_truncated`（`src/dexatlas/cli/main.py:161-174`）。超时
+判定只认 `output_truncated`（`src/dexatlas/cli/main.py:173-186`）。超时
 不是 `output_truncated`，要让它命中 5 必须扩宽判定谓词——这等于**更改
 既有退出码的语义**，是 §6 明文的破坏性变更：今天收到 5 的调用方读到的是
 「索引被截短但仍可观」，明天同一个 5 可能意味着「索引整个是空的」。把
@@ -161,7 +161,7 @@ def _no_index(result: AnalysisResult) -> bool:
 （`src/dexatlas/api/app.py:188-220`）、JSON 报告 project 块
 （`src/dexatlas/reports/json_report.py:82`）与数据库中，所有做
 `status == "completed"` 判断的消费方都要适配；且 run 级已有
-`completeness == "partial"`（`src/dexatlas/api/app.py:229-252`），同名
+`completeness == "partial"`（`src/dexatlas/api/app.py:229-252` `anchor: RunResponse`），同名
 不同物，词汇表会更混乱。方案 A 用退出码表达同一判断，不需要动状态机。
 
 ### 比较
@@ -181,8 +181,8 @@ def _no_index(result: AnalysisResult) -> bool:
 1. **对症**：缺口是「退出码通道分不出这种残缺」；A 是唯一让该通道本身
    变得可分辨、且不改动任何既有码含义的方案。
 2. **有先例**：退出码 5 当年就是以同样的方式加入的——加常量、写 epilog、
-   同步 `docs/install.md` 表、进契约快照测试（`docs/install.md:206-223`、
-   `tests/test_public_contracts.py:450-462`）。A 完全复用这条已被验证的
+   同步 `docs/install.md` 表、进契约快照测试（`docs/install.md:254-266` `anchor: ### Exit codes`、
+   `tests/test_public_contracts.py:450-462` `anchor: test_the_cli_exit_code_table_is_the_contract`）。A 完全复用这条已被验证的
    路径。
 3. **兼容**：0–5 一个不动；把非零当失败的调用方立即受益；把 0 当成功的
    调用方中，受影响的恰是本应把这类运行当失败的那部分——收窄即修正。
@@ -210,7 +210,7 @@ def _no_index(result: AnalysisResult) -> bool:
 
 同步义务清单（实施时一次做完；这五项现已全部落地）：
 
-- epilog（`src/dexatlas/cli/main.py:71-78`）；
+- epilog（`src/dexatlas/cli/main.py:72-81` `anchor: epilog=(`）；
 - `docs/install.md` 退出码表；
 - 契约表 §1.2 的退出码表与 §8.1（缺口关闭后改写为「已于某版修复」或删除）；
 - 契约快照 `EXPECTED_EXIT_CODES`（`tests/test_public_contracts.py:122-128`）；

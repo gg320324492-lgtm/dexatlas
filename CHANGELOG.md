@@ -141,7 +141,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - **v1.0.0 发版流程预研与本地 dry-run。** 新增
   `docs/reports/v1.0.0-release-runbook.md`：发版流程的完整操作方案——版本号
-  落点（`src/dexatlas/__init__.py:11` 单一来源，pyproject 经 hatch 读取）、
+  落点（`src/dexatlas/__init__.py:11` `anchor: __version__` 单一来源，
+  pyproject 经 hatch 读取）、
   CHANGELOG 1.0.0 条目草稿、B4 完整重测与全门禁清单、annotated tag 与
   push 命令、GitHub Release 步骤、HANDOVER 改指 v1.0.0 的替换文本、阻断项
   B1–B5 现状核对（基于 `c3586d8`）。只准备、不发布：不打 tag、不改版本号、

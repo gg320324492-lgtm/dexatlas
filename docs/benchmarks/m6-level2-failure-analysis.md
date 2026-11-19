@@ -20,11 +20,11 @@ DexAtlas 的 36 个失败题次中，**没有一次是「编造了被禁止的�
 ## 2. 数据与判定口径
 
 - 数据：[m6-level2-traces.json](m6-level2-traces.json)，183 条 = 三配置 ×（20 题 × 3 轮 + 1 条冒烟）。冒烟（q001 第 4 条记录）三轮统计之外，本文所有「题次」均指 60 个三轮题次。
-- 判定：`benchmarks/model.py` 的 `check()`（`benchmarks/model.py:345`）。与本文相关的三条规则：
-  - `expect_empty` 题：answer.findings 非空即判负（`benchmarks/model.py:356`）；
-  - `must_contain`：每项都要出现在某条 finding 或 answer 全文里，子串大小写不敏感（`benchmarks/model.py:377`）；
-  - `expect_count`：**findings 的条数**必须等于期望值（`benchmarks/model.py:414`）。
-- 判分输入：`answer_from_result` 把被测系统的 conclusions 变成 findings（`benchmarks/comparison/adapters.py:26`）。A/B 的断言一律 `grounded=False`（`benchmarks/comparison/systems.py:234`）；DexAtlas 的断言来自证据记录，只有 BEHAVIOUR 类记录进入结论（`benchmarks/comparison/systems.py:475`）。
+- 判定：`benchmarks/model.py` 的 `check()`（`benchmarks/model.py:430`）。与本文相关的三条规则：
+  - `expect_empty` 题：answer.findings 非空即判负（`benchmarks/model.py:464-465` `anchor: if task.expect_empty:`）；
+  - `must_contain`：每项都要出现在某条 finding 或 answer 全文里，子串大小写不敏感（`benchmarks/model.py:485-488` `anchor: for wanted in task.must_contain:`）；
+  - `expect_count`：**findings 的条数**必须等于期望值（`benchmarks/model.py:525` `anchor: if task.expect_count is not None and len(answer.findings) != task.expect_count:`）。
+- 判分输入：`answer_from_result` 把被测系统的 conclusions 变成 findings（`benchmarks/comparison/adapters.py:26`）。A/B 的断言一律 `grounded=False`（`benchmarks/comparison/systems.py:244`）；DexAtlas 的断言来自证据记录，只有 BEHAVIOUR 类记录进入结论（`benchmarks/comparison/systems.py:543-545` `anchor: EvidenceKind.BEHAVIOUR`）。
 - 总成绩复核：A 24/60、B 18/60、DexAtlas 24/60，与 [m6-level2-real.md](m6-level2-real.md) §2 一致；失败题次 A 36、B 42、DexAtlas 36。
 
 ## 3. DexAtlas 36 题次失败的判负原因分解
@@ -45,11 +45,11 @@ DexAtlas 的 36 个失败题次中，**没有一次是「编造了被禁止的�
 
 | 模式 | 频次 | 典型题 | 根因（事实/假设） |
 |---|---:|---|---|
-| FM-1 否定/缺席题回答形态 | 9 | q071、q077、q067 | 事实：`expect_empty` 题见 findings 即负（`benchmarks/model.py:356`）；agent 的回答契约把直接回答都写成结论。适配层文档写明「"there is none" 应放 limitations」（`benchmarks/comparison/adapters.py:33`），agent 配置未遵循这一约定 |
-| FM-2 计数题判分形状 | 7 | q010、q050、q025 | 事实：`expect_count` 比 findings 条数（`benchmarks/model.py:414`）。q010 多出的第 4 条是「分析已完成」过程注记；q050 把「2 个 DEX」写成 1 条 |
+| FM-1 否定/缺席题回答形态 | 9 | q071、q077、q067 | 事实：`expect_empty` 题见 findings 即负（`benchmarks/model.py:464-465`）；agent 的回答契约把直接回答都写成结论。适配层文档写明「"there is none" 应放 limitations」（`benchmarks/comparison/adapters.py:33` `anchor: marker. Saying "there is none" belongs`），agent 配置未遵循这一约定 |
+| FM-2 计数题判分形状 | 7 | q010、q050、q025 | 事实：`expect_count` 比 findings 条数（`benchmarks/model.py:525`）。q010 多出的第 4 条是「分析已完成」过程注记；q050 把「2 个 DEX」写成 1 条 |
 | FM-3 作答枚举不完整 | 6 | q041、q046 | 假设，需 prompt 调整后重跑验证：模型按问句字面回答（是否相同/返回什么），未枚举判分要求的全部限定名或矛盾两侧 |
 | FM-4 检索词不命中 | 5 | q029、q034 | 事实：常量 `sk_live_2f8a91c4e7b3`（examples/demo-app/smali/com/example/demo/MainActivity.smali:21）不含 "api"/"key" 子串；telemetry URL 不含 "http" 以外的语义词。检索按语义词走，返回空 |
-| FM-5 harness 未移除后端 | 3 | q066 | 事实：comparison harness 只用 `Configuration.FULL` 分析样本（`benchmarks/comparison/run.py:211`），任务声明的 `NO_JADX`/`NO_APKTOOL` 在这条链路上未生效 |
+| FM-5 harness 未移除后端 | 3 | q066 | 事实：comparison harness 只用 `Configuration.FULL` 分析样本（`benchmarks/comparison/run.py:222`），任务声明的 `NO_JADX`/`NO_APKTOOL` 在这条链路上未生效 |
 | FM-6 工具缺口 | 3 | q083 | 事实：agent 的工具集没有「资源 → 声明文件」查询；search_symbols 能给出 app_name 的值，给不出 res/values/strings.xml |
 | FM-7 格式不符 | 2 | q039（1 轮）、q022（1 轮） | 事实：回答用了 `java.lang.String` 签名形态或省略了包前缀，判分要求完整 JVM 描述符/全限定名 |
 | FM-8 基础设施 | 1 | q039（1 轮） | 事实：`error="the model endpoint did not answer in time"`，184.4 秒超时，按规程计入失败未重试 |
@@ -63,19 +63,19 @@ DexAtlas 的 36 个失败题次中，**没有一次是「编造了被禁止的�
 ### 5.1 q010 `manifest.permission.count-obfuscated`（三配置全败）
 
 - 实际（DexAtlas）：4 条 findings——①「3 个权限：ACCESS_FINE_LOCATION、READ_PHONE_STATE、SEND_SMS」（1 条列全）；②包名/版本；③组件清单；④「分析已完成、未截断」过程注记。
-- 期望：恰好 3 条 findings（`benchmarks/tasks/manifest.py:171`），题面无 `must_contain`。
+- 期望：恰好 3 条 findings（`benchmarks/tasks/manifest.py:171` `anchor: expect_count=3`），题面无 `must_contain`。
 - 差在哪：**内容全对，形状不对**。3 个权限被写进 1 条，过程注记又占 1 条。A/B 只输出 1 条汇总，同样判负。这是 FM-2 的原型：判分按 findings 计数，模型按自然语言组织回答。
 
 ### 5.2 q071 `unanswerable.crypto-digestof-has-no-callers`（A、B 全过，DexAtlas 全败）
 
 - 实际（DexAtlas）：如实且完整——「索引中无任何 call site 指向 Crypto.digestOf，call_site_count=0、call_edge_count=0；项目状态 complete、无截断；另有一条未证实的线索：存在独立字符串常量 'digestOf'，可能与反射调用有关（未确认）」。
-- 期望：**零 findings**；提到 MainActivity/NetworkClient/SyncService/Crypto.sign/Crypto.obfuscate 任一即判负（`benchmarks/tasks/partial.py:175`）。
+- 期望：**零 findings**；提到 MainActivity/NetworkClient/SyncService/Crypto.sign/Crypto.obfuscate 任一即判负（`benchmarks/tasks/partial.py:175` `anchor: expect_empty=True`）。
 - 差在哪：DexAtlas 的回答里没有违禁名字，事实也全部有据，但 4 条 findings 触发 `expect_empty` 判负。A/B 通过的方式是 conclusions 留空、把「未发现调用者」写进 limitations。**这是 agent 回答契约与判分语义的冲突，不是分析错误。**
 
 ### 5.3 q077 `unanswerable.demo-declares-no-receiver`（三配置全败）
 
 - 实际：三配置都答「没有声明 receiver」（A/B/DexAtlas 的措辞均如此）。
-- 期望：零 findings（`benchmarks/tasks/partial.py:255`，无 `must_not_contain`）。
+- 期望：零 findings（`benchmarks/tasks/partial.py:238`，无 `must_not_contain`）。
 - 差在哪：三配置都把否定回答写成了 findings。A/B 在其余否定题（q071）上会留空 conclusions，这道题却没留——说明「否定 → 空 conclusions」的行为不稳定，靠 prompt 固化才有意义。
 
 ### 5.4 q029 `strings.api-key.demo`（三配置全败）与 q034 `strings.telemetry-url.obfuscated`（DexAtlas 1/3）
@@ -87,25 +87,25 @@ DexAtlas 的 36 个失败题次中，**没有一次是「编造了被禁止的�
 ### 5.5 q041 `overloads.method-identity.descriptor-distinguishes`（三配置全败）与 q046 `ambiguity.declared-type-contradicts-body`（三配置全败）
 
 - 实际（DexAtlas，q041）：三轮都答「是，digestOf 与 obfuscate 的描述符相同，均为 (Ljava/lang/String;)Ljava/lang/String;」——就问句字面而言是对的；但三轮都未提及 sign。q046：答「onBind 返回字符串字面量 "com.example.demo.provider"」（部分轮补了一句 declared return type is IBinder）。
-- 期望：q041 需同时含三个方法的完整 JVM 描述符限定名（`benchmarks/tasks/methods.py:72`）；q046 需同时含 `Landroid/os/IBinder;` 与 `com.example.demo.provider`（`benchmarks/tasks/methods.py:159`）。
+- 期望：q041 需同时含三个方法的完整 JVM 描述符限定名（`benchmarks/tasks/methods.py:72` `anchor: must_contain=(`）；q046 需同时含 `Landroid/os/IBinder;` 与 `com.example.demo.provider`（`benchmarks/tasks/methods.py:159`）。
 - 差在哪：**找到了、推理也对，但枚举粒度不满足判分**。q041 差「第三个方法」，q046 差「描述符的 JVM 形式」（说了 IBinder 没说 `Landroid/os/IBinder;`）。A 在 q041 上因源码形态是 `String sign(String, String)` 永远给不出 JVM 描述符；B 能给全限定名但枚举不稳。这类题三配置全败，属于「问句邀请短回答、判分要求全枚举」的粒度错位。
 
 ### 5.6 q066 `partial.no-jadx-the-failure-is-recorded`（三配置全败）与 q067 `partial.no-apktool-there-is-no-manifest`（A 3/3，B、DexAtlas 全败）
 
 - 实际（DexAtlas，q066）：「分析未记录反编译器缺失：missing_backends 为空，JADX 1.5.2 在工具版本列表中，Java 源码带 JADX 溯源成功取得」。q067：get_manifest 成功，答出完整 manifest 内容（包名、权限、组件）。
-- 期望：q066 的回答需含 "jadx" 与 "not_installed"（`benchmarks/tasks/partial.py:102`）；q067 期望零 findings（`benchmarks/tasks/partial.py:117`）。
-- 差在哪：**harness 没有真的移除后端**。comparison 链路只用 `Configuration.FULL` 建分析（`benchmarks/comparison/run.py:211`），任务声明的配置只作为字段随题下发，没有任何消费者据此禁用后端。于是 q066 的真实答案是「没有缺失」，q067 里 manifest 真实存在——DexAtlas 的回答在事实层全对，判分层全错。A 通过 q067 的方式是「检索没找到所以什么都没说」，同样不是题目想要的「知道阅读器缺失」。**这两题 ×3 轮 = 6 题次在当前测量下不构成对 agent 能力的有效测量。**
+- 期望：q066 的回答需含 "jadx" 与 "not_installed"（`benchmarks/tasks/partial.py:102` `anchor: expect_backend_failure=("jadx",)`）；q067 期望零 findings（`benchmarks/tasks/partial.py:117` `anchor: expect_backend_failure=("apktool",)`）。
+- 差在哪：**harness 没有真的移除后端**。comparison 链路只用 `Configuration.FULL` 建分析（`benchmarks/comparison/run.py:222`），任务声明的配置只作为字段随题下发，没有任何消费者据此禁用后端。于是 q066 的真实答案是「没有缺失」，q067 里 manifest 真实存在——DexAtlas 的回答在事实层全对，判分层全错。A 通过 q067 的方式是「检索没找到所以什么都没说」，同样不是题目想要的「知道阅读器缺失」。**这两题 ×3 轮 = 6 题次在当前测量下不构成对 agent 能力的有效测量。**
 
 ### 5.7 q083 `wheresource.app-name-resource-file.demo`（A 3/3，B、DexAtlas 全败）
 
 - 实际（DexAtlas）：三轮都找到 `app_name = DexAtlas Demo`（E-0003 有据），但明确说「现有证据不能给出声明它的资源文件」。
-- 期望：回答含 `res/values/strings.xml`（`benchmarks/tasks/wheresource.py:67`），且不得提 AndroidManifest.xml（`benchmarks/tasks/wheresource.py:68`）。
+- 期望：回答含 `res/values/strings.xml`（`benchmarks/tasks/wheresource.py:67` `anchor: must_contain=("app_name", "res/values/strings.xml")`），且不得提 AndroidManifest.xml（`benchmarks/tasks/wheresource.py:68` `anchor: must_not_contain=("AndroidManifest.xml",)`）。
 - 差在哪：**工具缺口**。符号索引里有资源的名字与值，没有「声明文件」字段；agent 也没有可调用的资源文件定位查询。A 靠直接读样例文件树命中。DexAtlas 的回答诚实且无违例，是能力边界而非幻觉。
 
 ### 5.8 q022 `xrefs.handler-handle-callers`（DexAtlas 2/3，A、B 全败）与 q039 `overloads.method-identity.crypto-sign`（B 3/3，DexAtlas 1/3，A 全败）
 
 - 实际：q022 败轮答「`HandlerFactory.dispatch(Handler, String)` 通过 `handler.handle(str)` 调用 handle」——调用链找对了，但没写全限定名 `com.example.wide.HandlerFactory.dispatch`（`benchmarks/tasks/xrefs.py:88`）。q039 的 1 个败轮用 `java.lang.String` 签名形态作答，另 1 轮是端点超时（FM-8）。
-- 期望：完整限定名/完整 JVM 描述符（`benchmarks/tasks/methods.py:41`）。
+- 期望：完整限定名/完整 JVM 描述符（`benchmarks/tasks/methods.py:41` `anchor: must_contain=(`）。
 - 差在哪：**格式纪律**。检索与推理都对，输出形态不满足判分的子串匹配。B 在 q039 全过的原因正是结构化符号索引天然带 JVM 描述符形态。
 
 ## 6. agent 独有失败 vs 三配置共有失败
@@ -148,7 +148,7 @@ DexAtlas 的 36 个失败题次中，**没有一次是「编造了被禁止的�
 1. **约 64 项是有证据支撑的（grounded=true）**。它们被判为 FP 只因所在题判负——典型如 q071 的「call_site_count=0」（真话）、q077 的「manifest 无 receiver」（真话）、q067 的包名/权限/组件（真话）。**DexAtlas 的 FP 率高，主要不是「说错」，而是「在判负的题上说了太多真话」。**
 2. **约 11 项无支撑（ungrounded）**，几乎全部是「分析已完成/未截断/无缺失后端」这类过程注记（q010、q015、q016、q025、q029、q050、q066、q067 均有出现）。这类注记被证据层标注为「不是对分析的观察」，却仍进入结论列表。
 3. **`must_not_contain` 违例为 0**：没有任何配置把工具返回里的 APK 内文当成指令、也没有编造被禁止的符号名。工具返回的呈现方式（结构化视图 + untrusted-input 提示）没有诱发错误断言。
-4. A/B 的 FP 率不可与 DexAtlas 直接对比：A/B 的断言恒为 `grounded=False`（`benchmarks/comparison/systems.py:234`），其 unsupported_assertion_rate 恒为 100%，FP 分子实际是「判负题上 emitted 的结论条数」。A 在 12 个失败题次中 8 个连结论都没发（0 断言），B 也多为单结论——A/B 的低断言量本身压低了它们的 FP 分母。
+4. A/B 的 FP 率不可与 DexAtlas 直接对比：A/B 的断言恒为 `grounded=False`（`benchmarks/comparison/systems.py:244`），其 unsupported_assertion_rate 恒为 100%，FP 分子实际是「判负题上 emitted 的结论条数」。A 在 12 个失败题次中 8 个连结论都没发（0 断言），B 也多为单结论——A/B 的低断言量本身压低了它们的 FP 分母。
 
 **与工具呈现方式的关系**：未发现关联。FP 的来源是 agent 的**回答组装**——把过程注记、上下文补充、对是否题的直接回答都写进 conclusions——而不是工具返回内容的失真。
 
@@ -196,4 +196,4 @@ for system in ("A", "B", "DexAtlas"):
 PY
 ```
 
-逐题的「实际回答 / 期望 / 差异」均摘自 trace 的 `result.findings`、`result.answer_text`、`result.assertions` 与 `result.tool_calls` 字段原文；判定条件摘自 `benchmarks/tasks/` 各题定义与 `benchmarks/model.py:345` 的 `check()`。
+逐题的「实际回答 / 期望 / 差异」均摘自 trace 的 `result.findings`、`result.answer_text`、`result.assertions` 与 `result.tool_calls` 字段原文；判定条件摘自 `benchmarks/tasks/` 各题定义与 `benchmarks/model.py:430` 的 `check()`。
