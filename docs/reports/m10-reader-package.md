@@ -439,6 +439,13 @@ uv run --no-sync python -c \
   > 期望（实测）：`{"status":"ok","version":"1.0.0","backends":{…}}`——**必须是
   > `"status":"ok"` 且带 `version` 与 `backends`**；返回 `{"status":"healthy"}`
   > 或 `{"detail":"Not Found"}` 就说明这个端口上**不是 DexAtlas**，继续换端口。
+  >
+  > **再确认一次：这个端口上应答的是不是你自己起的那个服务**——8011 也可能被占
+  > （本机实测 8000 与 8011 同时被占，8011 上跑的是**另一个 DexAtlas**，它的
+  > `/health` 同样返回 `{"status":"ok",…}`）。**判断依据是 uvicorn 的日志**：里面
+  > 有 `[WinError 10048] error while attempting to bind` 就是**你的服务没起来**，
+  > `/health` 答的是别人的——换个还没被占的端口（下面第二步的 `B` 跟着改），
+  > 或者先把占着端口的那个服务停掉。
 
   **第二步：六类关键端点各一条命令**（`P` 是 §3.3 分析出来的 project id；`B` 是
   端口——按上面第一步的结果填 `8000` 或 `8011`，两处一起改）：
