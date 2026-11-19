@@ -7,8 +7,8 @@
 > 验收记录填写[验收记录模板](m10-review-record-template.md)。
 >
 > 编写日期：2026-11-16（2026-11-17 定稿）· 验收对象：**`v1.0.0` 这个 tag 所指的提交**
-> ——发出前由发起人把 tag 重打到材料定稿的那棵树上，完整 hash 写在
-> [邀请函成稿 §2](m10-invitation-final.md)的占位符里（由发起人填好）；
+> ——发出前由发起人把 tag 重打到材料定稿的那棵树上，完整 hash 写在**随函发出的
+> 那份邀请函**的 §2 里（仓库里同名文件是**填 hash 之前**的版本，见 §1.6）；
 > **不要使用移动的 `main` 分支**
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%）与[复评](portfolio-readiness-2026-11-15-recheck.md)
@@ -49,9 +49,13 @@
 5. **阻断项一票否决。** 19 个标 ★ 的验收项（清单见[准备包 §2.8](m10-acceptance-pack.md)）
    任何一个不通过，M10 即不通过，高分不能抵消。
 6. **固定 commit。** 验收 commit 由验收发起人钉定，**随邀请函给出**（本轮是
-   v1.0.0 发版 commit，完整 hash 在[邀请函成稿 §2](m10-invitation-final.md)）——
-   不需要你另行索取，全程只验这一个 commit，所有记录写明 hash。不要用移动的
-   `main` 分支做验收。
+   v1.0.0 发版 commit，完整 hash 见**随函发出的那份邀请函**的 §2）——
+   不需要你另行索取，全程只验这一个 commit，所有记录写明 hash。
+   > **仓库里那份同名文件是「填 hash 之前」的版本**：填 hash 这一步发生在打
+   > tag **之后**（tag 指的那棵树上，`docs/reports/m10-invitation-final.md` 的
+   > §2 仍是占位符），所以**以随函发出的那一份为准**。你自己核的方式是
+   > `git rev-parse v1.0.0^{commit}`——它的输出应当与随函那一串**逐字相同**。
+   > 不要用移动的 `main` 分支做验收。
 7. ** secrets 与第三方样本不入记录。** 记录中的个人路径、密钥、日志用 `<redacted>` 脱敏；
    不要把第三方 APK 或 `so` 文件传给任何人。
 
@@ -83,7 +87,8 @@ git status
 ```
 
 预期：`git status` 干净；记录 commit hash（`git rev-parse HEAD` 的输出，
-应与[邀请函成稿 §2](m10-invitation-final.md)钉定的那一串相同）、clone 来源 URL、日期。
+应与**随函发出的那份邀请函** §2 钉定的那一串相同——仓库里那份同名文件是填 hash
+之前的版本，见 §1.6）、clone 来源 URL、日期。
 
 ### 3.2 第 2 步：环境准备（验收项 A2、A3）
 
@@ -307,21 +312,176 @@ uv run --no-sync python -c \
   ```
 
 - **REST / MCP / 报告 schema（F2–F4）**：这三项的判据都在
-  [公共契约表](../architecture/public-contracts.md) 里，抽查用的命令：
+  [公共契约表](../architecture/public-contracts.md) 里。下面按 F2 点名的**六类关键
+  端点各给一条命令**（上传 / 项目 / 运行 / 符号 / 源码 / 报告）；F2 的判据是
+  「**抽查 3 个端点**」——你自选其中 3 个记录即可，不必六条全跑。
+
+  **第一步：起 REST 服务。**
 
   ```bash
-  uv run --no-sync uvicorn dexatlas.api.app:app --port 8000   # 起 REST 服务
-  curl -s localhost:8000/health                               # 抽查一个端点的响应形状
-  curl -s localhost:8000/projects | head -c 400               # 项目列表
-  uv run --no-sync dexatlas-mcp                               # 起 MCP server（列工具清单）
-  curl -s "localhost:8000/projects/apk_80a8fe0e81204c9f/report?format=json" \
-    | python -c "import json,sys; print(sorted(json.load(sys.stdin)))"   # 报告的 10 个顶层字段
+  uv run --no-sync uvicorn dexatlas.api.app:app --port 8000
   ```
 
-  预期：报告 JSON 的顶层字段是 `errors`、`evidence`、`generated_at`、
-  `latest_attempt_status`、`manifest`、`project`、`run`、`schema_version`、
-  `summary`、`tools` —— 10 个。MCP 工具清单与只读注解在契约表 §7；REST 路由表在
-  契约表 §2；报告 JSON 的 `schema_version` 与顶层字段在契约表 §4。
+  成功时日志里出现这一行，**它是「服务真的起来了」的唯一信号**：
+
+  ```text
+  INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+  ```
+
+  > **端口被占用时的退路（这一处会静默失败，请照做）**：8000 被别的服务占着时，
+  > uvicorn 会**先**打印 `Application startup complete.`（这句不作数）**再**打印
+  > `[WinError 10048] error while attempting to bind`，然后自己退出；此时
+  > `curl localhost:8000/health` **不报错**，返回的是**别人的**响应——本机实测
+  > 8000 上跑着另一个 FastAPI 应用，`/health` 返回 `{"status":"healthy"}`、
+  > `/projects` 返回 `{"detail":"Not Found"}`。照材料走的读者很容易把它写成一条
+  > F2 的假卡点（「端点与契约表不符」），而实际上服务压根没起来。
+  > **退路是换端口**：把上面那条命令的 `--port 8000` 改成 `--port 8011`；
+  > 下面第二步的命令块用 `B=localhost:8011` 承载端口（**实测输出就是在 8011 上
+  > 跑出来的**——本机的 8000 被别的服务占了），你把 `B` 改成自己的端口即可，
+  > 响应形状与状态码一样。起好之后先确认服务身份：
+  >
+  > ```bash
+  > curl -s localhost:8011/health
+  > ```
+  >
+  > 期望（实测）：`{"status":"ok","version":"1.0.0","backends":{…}}`——**必须是
+  > `"status":"ok"` 且带 `version` 与 `backends`**；返回 `{"status":"healthy"}`
+  > 或 `{"detail":"Not Found"}` 就说明这个端口上**不是 DexAtlas**，继续换端口。
+
+  **第二步：六类关键端点各一条命令**（`P` 是 §3.3 分析出来的 project id；`B` 是
+  端口——按上面第一步的结果填 `8000` 或 `8011`，两处一起改）：
+
+  ```bash
+  P=apk_80a8fe0e81204c9f
+  B=localhost:8011
+
+  # 上传（契约表 §2.2）——幂等：同样的字节再传一次返回同一个 project
+  curl -s -w "\n[%{http_code}]\n" -X POST -F "file=@examples/demo-app/demo.apk" $B/analyze
+  # 202
+  # {"project_id":"apk_80a8fe0e81204c9f","status":"completed","detail":"/projects/apk_80a8fe0e81204c9f"}
+
+  # 项目（§2.3）
+  curl -s -w "\n[%{http_code}]\n" $B/projects
+  # 200
+  # [{"id":"apk_80a8fe0e81204c9f","status":"completed",…,"class_count":5,"method_count":8,…}]
+
+  # 运行（§2.3）
+  curl -s -w "\n[%{http_code}]\n" $B/projects/$P/runs
+  # 200
+  # {"project_id":"apk_80a8fe0e81204c9f","total":1,"published_run_id":"run_…","runs":[{…,"status":"completed","completeness":"complete",…}]}
+
+  # 符号（§2.4）
+  curl -s -w "\n[%{http_code}]\n" "$B/projects/$P/classes?limit=2"
+  # 200
+  # {"project_id":"apk_80a8fe0e81204c9f","total":5,"classes":[{…,"name":"com.example.demo.Crypto","kind":"class",…}]}
+
+  # 源码（§2.5）——只取响应头：正文是 Java 源码，头里才是契约里的那几项
+  curl -s -D - -o /dev/null "$B/projects/$P/classes/com.example.demo.MainActivity/source"
+  # HTTP/1.1 200 OK
+  # x-dexatlas-source-kind: java
+  # x-dexatlas-source-tool: jadx
+  # x-dexatlas-source-locator: jadx:sources/com/example/demo/MainActivity.java
+  # x-dexatlas-source-tool-version: 1.5.2
+
+  # 报告（§2.6）——10 个顶层字段
+  curl -s "$B/projects/$P/report?format=json" \
+    | uv run --no-sync python -c "import json,sys; print(sorted(json.load(sys.stdin)))"
+  # ['errors', 'evidence', 'generated_at', 'latest_attempt_status', 'manifest', 'project', 'run', 'schema_version', 'summary', 'tools']
+  ```
+
+  上面每个 `#` 开头的行是**实测输出**（2026年11月19日，Windows 11 + JDK 21 + 三个
+  后端齐备、同一棵工作树；`…` 表示省略的中间字段）。**状态码是 F2 判据的一部分**，
+  所以命令里带了 `-w "\n[%{http_code}]\n"`。
+
+  **第三步（F3）：MCP 工具清单与只读注解。** `dexatlas-mcp` 是 stdio 传输的 MCP
+  server，**直接起它看不到工具清单**——要用 MCP 的 JSON-RPC 协议问它一次。下面
+  两条命令**照抄即可，不需要你写代码**；末尾的 `sleep 3` 是让 server 有时间回话
+  （stdin 一闭合，它会把还没回的请求丢掉），不是别的意思。
+
+  ```bash
+  # 列出 11 个工具与四个只读注解
+  { printf '%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'; sleep 3; } \
+  | uv run --no-sync dexatlas-mcp \
+  | uv run --no-sync python -c "import json,sys;ts=[t for l in sys.stdin if l.strip() for d in [json.loads(l)] for t in d.get('result',{}).get('tools',[])];print('\n'.join('{}\treadOnly={}\tdestructive={}\tidempotent={}\topenWorld={}'.format(t['name'],*(a.get(k) for k in ('readOnlyHint','destructiveHint','idempotentHint','openWorldHint'))) for t in ts for a in [t.get('annotations',{})]));print('tool count:',len(ts))"
+  ```
+
+  预期（实测，11 行 + 一行计数）：
+
+  ```text
+  list_projects	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  get_project_status	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  get_manifest	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  search_symbols	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  get_class_source	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  get_method_source	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  find_callers	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  find_callees	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  get_evidence	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  resolve_locator	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  find_resource_declarations	readOnly=True	destructive=False	idempotent=True	openWorld=False
+  tool count: 11
+  ```
+
+  逐条与[契约表 §3.1](../architecture/public-contracts.md) 的 11 个工具**逐名
+  对上**，四个注解与[契约表 §3](../architecture/public-contracts.md) 开头写的
+  一致（`read_only_hint=true`、`destructive_hint=false`、
+  `idempotent_hint=true`、`open_world_hint=false`）。
+
+  **再抽查 2 个工具的返回形状**（F3 判据的后半句）：
+
+  ```bash
+  { printf '%s\n' \
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+    '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_projects","arguments":{}}}' \
+    '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_project_status","arguments":{"project_id":"apk_80a8fe0e81204c9f"}}}'; sleep 3; } \
+  | uv run --no-sync dexatlas-mcp \
+  | uv run --no-sync python -c "import json,sys;[print('id={} -> {}'.format(d.get('id'),json.dumps(d.get('result',{}).get('structuredContent'),ensure_ascii=False)[:400])) for l in sys.stdin if l.strip() for d in [json.loads(l)] if d.get('id') in (3,4)]"
+  ```
+
+  预期（实测，两行；`structuredContent` 是工具返回的对象本身）：
+
+  ```text
+  id=3 -> {"projects": [{"id": "apk_80a8fe0e81204c9f", "apk_name": "demo.apk", …, "class_count": 5, "method_count": 8, …}], "total": 1, "offset": 0, "limit": 50}
+  id=4 -> {"project": {"id": "apk_80a8fe0e81204c9f", …}, "completeness": {"complete": true, …}, "published_run": {…}}
+  ```
+
+  **两行的先后顺序不固定**（两个调用是并发执行的，实测两种顺序都出现过）——按
+  `id=` 对号入座即可：`id=3` 是 `list_projects`，`id=4` 是 `get_project_status`。
+
+  把返回对象的形状与[契约表 §3.1](../architecture/public-contracts.md) 那一行的
+  「返回」列对一下（`ProjectList{projects,total,offset,limit}`、
+  `ProjectStatus{project,completeness,published_run?,runs[]}`）即可。
+
+  PowerShell 写法（同一台机器上实测通过，PowerShell 7 与 5.1 都可）：
+
+  ```powershell
+  & {
+    '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+    '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+    '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+    Start-Sleep -Seconds 3
+  } | uv run --no-sync dexatlas-mcp | uv run --no-sync python -c "import json,sys;ts=[t for l in sys.stdin if l.strip() for d in [json.loads(l)] for t in d.get('result',{}).get('tools',[])];print('\n'.join('{}\treadOnly={}\tdestructive={}\tidempotent={}\topenWorld={}'.format(t['name'],*(a.get(k) for k in ('readOnlyHint','destructiveHint','idempotentHint','openWorldHint'))) for t in ts for a in [t.get('annotations',{})]));print('tool count:',len(ts))"
+  ```
+
+  抽查两个工具的那一条，把第 3、4 行换成：
+
+  ```powershell
+    '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_projects","arguments":{}}}'
+    '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_project_status","arguments":{"project_id":"apk_80a8fe0e81204c9f"}}}'
+  ```
+
+  想把原始 JSON-RPC 记录留作证据，就在管道中间加一个落盘步骤：bash 用
+  `> mcp-tools.jsonl`，PowerShell 用 `| Out-File -Encoding utf8 mcp-tools.jsonl`。
+
+  **报告 schema（F4）**：报告 JSON 的顶层字段是 `errors`、`evidence`、
+  `generated_at`、`latest_attempt_status`、`manifest`、`project`、`run`、
+  `schema_version`、`summary`、`tools` —— 10 个（上面「报告」那条命令已打印）。
+  MCP 工具清单与只读注解在契约表 §3；REST 路由表在契约表 §2；报告 JSON 的
+  `schema_version` 与顶层字段在契约表 §5.1。
 
 - **服务回归集（E1–E5）**：读[服务回归集](../benchmarks/service-regression-set.md)
   与[层级 1 scripted 演练](../benchmarks/m6-level1-scripted.md)，确认你能区分
@@ -401,9 +561,11 @@ uv run --no-sync python -c \
   ——这类运行现在返回 6，并在 `errors[]`、`summary.index_complete == false` 与
   `run.completeness = "partial"` 里同时说明；契约见
   [公共契约表 §8.1](../architecture/public-contracts.md)，引入它的提案见
-  [exit-code-partial-read.md](../proposals/exit-code-partial-read.md)。复现与
-  理由见 [M8 演练 §6](m8-install-rehearsal.md)。请核对：读到 6 时你是否仍会把它
-  误读为「分析成功」。
+  [exit-code-partial-read.md](../proposals/exit-code-partial-read.md)。
+  > **注意 [M8 演练 §6](m8-install-rehearsal.md) 记的是「当时（修复前）的实况」**
+  > ——那一节写的是退出码仍为 0，是**提出这个缺口的历史记录**，不是现在的语义；
+  > 那份记录里没有前向指针，所以**以本条与契约表 §8.1 为准**。
+  > 请核对：读到 6 时你是否仍会把它误读为「分析成功」。
 - **M8-2（已修复并合入）**：容器内查询类命令缺 `--workspace` 选项的历史问题已修
   ——现在所有命令都带 `--workspace`/`-w`；容器里仍建议用 `DEXATLAS_WORKSPACE`
   统一工作区。
@@ -544,8 +706,13 @@ commit 上跑出来的不同，**以你的实测为准**，不要据此判「作
 
 **G1 坏输入（拿非 ZIP 当 APK 分析）**
 
+> **这条要在「一个空工作区」里跑。** §9.1 是附录，排在 §3.3–§3.6 之后，而 §3.3
+> 已经把 demo.apk 分析进主工作区了——在主工作区里 `projects` **列着 A4 的那个
+> 项目是正常的**，不是半成品。所以下面两条命令都带一个**新的**工作区目录：
+> 坏输入不该在主工作区里留下任何东西，主工作区里已有的项目也不该因此消失。
+
 ```bash
-uv run dexatlas analyze README.md
+DEXATLAS_WORKSPACE=./g1-fresh uv run dexatlas analyze README.md
 ```
 
 预期退出码 **2**，一行能读懂的错误（实测）：
@@ -554,13 +721,18 @@ uv run dexatlas analyze README.md
 Not a usable APK: README.md is not a ZIP archive; APKs are ZIP archives
 ```
 
-再确认**工作区里没有留下半成品项目**（实测）：
+再确认**这个工作区里没有留下半成品项目**（实测）：
 
 ```bash
-uv run dexatlas projects
+DEXATLAS_WORKSPACE=./g1-fresh uv run dexatlas projects
 ```
 
 预期：`No projects yet. Run \`dexatlas analyze <apk>\`.`——列表是空的。
+
+> PowerShell 写法：`$env:DEXATLAS_WORKSPACE="./g1-fresh"; uv run dexatlas analyze README.md`。
+>
+> **在主工作区里再跑一次 `uv run dexatlas projects` 也没问题**：它列着 A4 的项目，
+> 计数与 §3.3 记录的一致，就是没有多出半个坏输入项目——这一条同样算 G1 通过。
 
 **G2 后端缺失（降级，不抛异常）**
 
@@ -598,7 +770,16 @@ PowerShell 写法：`$env:DEXATLAS_JADX_PATH=""; $env:DEXATLAS_APKTOOL_JAR=""; u
 DEXATLAS_TOOL_TIMEOUT_SECONDS=1 uv run dexatlas analyze examples/demo-app/demo.apk
 ```
 
-预期：报告照常产出，超时的后端**各记一条 `timeout`**（实测）：
+预期：**至少一条后端记 `timeout`，且报告照常产出**。**权威判据见
+[准备包 §2.7 G3](m10-acceptance-pack.md)**——那里是这条判据的唯一出处，
+**条数与本机速度有关，不是固定值**。下面是**示例**（本机 2026年11月19日实测：
+androguard 与 apktool 都在 1 秒内跑完了，**只有 jadx 超时**，所以只有一条）：
+
+```text
+!  jadx exceeded its 1s timeout; its launcher had already exited
+```
+
+三后端都慢的机器上会看到三条（每条一个 `!` 行）：
 
 ```text
 !  apktool exceeded its 1s timeout; its launcher had already exited
@@ -606,33 +787,31 @@ DEXATLAS_TOOL_TIMEOUT_SECONDS=1 uv run dexatlas analyze examples/demo-app/demo.a
 !  jadx exceeded its 1s timeout and was terminated
 ```
 
-报告 JSON 里 `errors[]` 每条的 `code` 是 `timeout`；`summary.index_complete` 是
-**false**，`summary.index_gaps` 里有一条 `androguard` 的 `timeout`。
+**条数随后端速度变化**——本机实测只有一条，你的机器上可能是两条或三条；
+**判据是「后端失败时记 `timeout`、不抛异常、报告照常产出」，不是「一定有三条
+`timeout`」**。
+
+报告 JSON 里 `errors[]` 每条的 `code` 是 `timeout`。`summary.index_complete` 与
+`summary.index_gaps` **只跟索引后端有关**：`index_gaps` 只统计 **androguard**
+（索引后端）或分析级失败，**jadx 超时不构成 gap**——所以只有 jadx 超时时，
+`index_complete` 是 `true`、`index_gaps` 是 `[]`（本机实测如此）；**只有 androguard
+自己也超时**时，才是 `index_complete=false` 且 `index_gaps` 里有一条
+`androguard` 的 `timeout`。
 
 > **退出码是 0，不是 6——这是对的。** 退出码 6（`EXIT_NO_INDEX`）说的是「跑完了，
 > 但**一个符号都没索引到**」；1 秒超时下 androguard 已经把类表交出来了
 > （`5 classes`），索引是**残缺**而不是**空**——残缺由 `index_complete=false` 与
-> `index_gaps` 说明，退出码仍是 0。要拿到 6，需要「三个后端全失败**且**一个类都
-> 没索引到」，而这个分支用超时变量在 demo APK 上测不出来（androguard 总是先交出
-> 类表）；它由契约活检脚本用一个没有索引的分析触发
+> `index_gaps` 说明，退出码仍是 0。退出码 6 的语义见
+> [公共契约表 §1.2](../architecture/public-contracts.md)；要拿到 6，需要「三个后端
+> 全失败**且**一个类都没索引到」，而这个分支用超时变量在 demo APK 上测不出来
+> （androguard 总是先交出类表）；它由契约活检脚本用一个没有索引的分析触发
 > （`scripts/verify-public-contracts.py` 里的 `an analysis with no index exits 6`）。
 > **把实际退出码记进记录**——准备包 G3 的判据就是「记录实际退出码」。
-
-> **若 androguard 在你的机器上 1 秒内就跑完了**，`errors[]` 会只有两条、
-> `index_complete` 是 `true`——**这同样是正确行为**（没超时的后端不留 `timeout`
-> 记录）。判据是「后端失败时记 `timeout`、不抛异常、报告照常产出」，
-> 不是「一定有三条 `timeout`」。
->
-> **`index_complete` / `index_gaps` 只跟索引后端有关。** `index_gaps` 只统计
-> **androguard**（索引后端）或分析级失败；**jadx 超时不构成 gap**。所以上面那段
-> 「`index_complete` 是 `false`、`index_gaps` 里有一条 `androguard` 的 `timeout`」
-> **只在 androguard 自己也超时**时才成立；只有 jadx 超时时，`index_complete` 是
-> `true`、`index_gaps` 是 `[]`——同样正确。
 >
 > **超时运行的证据条数与正常运行不同**：会**多出一条** `verified` 的「后端未完成」
 > 记录（`errors[]` 里每个超时后端一条），所以证据条数随后端配置变化
-> （干净 / 降级 / 超时各不相同）。**判据是「以报告自身为准」**：报告里写了几条
-> 就是几条，不要拿别次运行的条数来比。
+> （干净 / 降级 / 超时各不相同；本机实测：正常运行 11 条，jadx 超时那次 12 条）。
+> **判据是「以报告自身为准」**：报告里写了几条就是几条，不要拿别次运行的条数来比。
 
 **G4 幂等（同一个 APK 连着分析两次）**
 
