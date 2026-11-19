@@ -106,11 +106,12 @@
 - [ ] **demo 与 api-integration 两个包是同一份样本的两次分析，别当成两个样本，也别因为「看起来重复」去删一个。**
   怎么查：解开两个 zip 读 `manifest.json`。
   查过是什么样：两者的 `project_id` 都是 `apk_80a8fe0e81204c9f`（project id 是
-  APK sha256 的前缀，同一份样本必然同一个），但 `run_id` 不同
-  （`run_e8e49384ab5246ab` 与 `run_fc8e432d4d094350`）；`report.md` 与
+  APK sha256 的前缀，同一份样本必然同一个），但 `run_id` 不同；`report.md` 与
   `report.html` **各只有 `run_id` 与 `Analysis time` 两行不同**，其余数字相同。
-  `obfuscated` 包（`run_dd897202eba74e28`）与 `multidex` 包
-  （`run_4fde2fa0b5254ccb`）是另外两次分析，独立。
+  `obfuscated` 包与 `multidex` 包是另外两次分析，独立。
+  （当前 run id：demo `run_bc38a1ba…`、api-integration `run_aafda311…`、
+  obfuscated `run_6646f0a9…`、multidex `run_d1b4246f…`——2026-11-20 随清单
+  第四键重打，见 [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)。）
 
 ---
 
@@ -180,10 +181,9 @@
 - [ ] **两个包的 `report.md` / `report.html` 只差两行是正常的，别误删其中一个。**
   怎么查：解两个 zip 比 `sha256`。
   查过是什么样：`demo` 与 `api-integration` 的 `report.html`（8,549 字节）与
-  `report.md`（5,171 字节）**长度相同，但 sha256 不同**——同一样本的两次分析
-  （`run_e8e49384ab5246ab` 与 `run_fc8e432d4d094350`），差别只有 `run_id` 一行与
-  `Analysis time` 一行。**这不是重复文件错误，不要因为「看起来重复」删掉一个包**，
-  那会把「一份样本、两次分析」变成少一份附件。
+  `report.md`（5,171 字节）**长度相同，但 sha256 不同**——同一样本的两次分析，
+  差别只有 `run_id` 一行与 `Analysis time` 一行。**这不是重复文件错误，
+  不要因为「看起来重复」删掉一个包**，那会把「一份样本、两次分析」变成少一份附件。
 - [ ] **别把内部文件打进 zip。**
   怎么查：检查包内清单。
   查过是什么样：四个包内只有报告与 `manifest.json`，

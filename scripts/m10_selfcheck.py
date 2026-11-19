@@ -583,16 +583,16 @@ def check_rest_route_contract(report: Report) -> None:
 
 
 def check_evidence_boundary_contract(report: Report) -> None:
-    """D3/G5 的代码侧：证据包 manifest 声明不含 APK、全量源码、未引用字符串。"""
+    """D3/G5 的代码侧：证据包 manifest 声明不含 APK、全量源码、未引用字符串，且只装本次分析。"""
     package = REPO_ROOT / "src" / "dexatlas" / "reports" / "evidence_package.py"
     text = package.read_text(encoding="utf-8")
     block = text.split("NOT_INCLUDED = {", 1)[-1].split("}", 1)[0]
     declared = set(re.findall(r'"([a-z_]+)":', block))
-    expected = {"apk", "full_sources", "unrelated_strings"}
+    expected = {"apk", "full_sources", "unrelated_strings", "outside_analysis"}
     report.add(
         outcome_of(
             "D3.not-included",
-            "证据包 not_included 声明 apk/full_sources/unrelated_strings",
+            "证据包 not_included 声明 apk/full_sources/unrelated_strings/outside_analysis",
             declared == expected,
             f"声明={sorted(declared)}",
             blocking=True,

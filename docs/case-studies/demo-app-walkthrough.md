@@ -3,7 +3,7 @@
 **Sample:** [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
 (sha256 `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`)
 **Run:** one `dexatlas analyze` — the session quoted in §3 took 5.0 s; the
-attached package is a later run of the same APK (`run_e8e49384ab5246ab`, 4.5 s)
+attached package is a later run of the same APK (`run_bc38a1ba488449b6`, 3.6 s)
 **Backends:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 **Who this is for:** a developer or security researcher who wants to see, end to
 end, what an analysis produces and how each claim traces back to the code it
@@ -244,7 +244,7 @@ construction. DexAtlas reports what the bytes contain and where each fact was
 read from; impact assessment stays with the reader.
 
 **What a human does next with this**: a reviewer gets an accurate, complete
-map of a small app in seconds (4.5 s in the attached run) and can spend their
+map of a small app in seconds (3.6 s in the attached run) and can spend their
 time on the two findings that matter (the unguarded exported components, the
 credential in the code) instead of on rebuilding context.
 
@@ -303,12 +303,15 @@ above, on the same sample, with the tool versions printed in the report):
 [offline HTML report](attachments/demo-report.html),
 [evidence package](attachments/demo-evidence-package.zip).
 
-The package is run `run_e8e49384ab5246ab` (4.5 s) — a later run of the same
+The package is run `run_bc38a1ba488449b6` (3.6 s) — a later run of the same
 APK than the session quoted in §3, so every count in the two reports agrees
-while the run id and the timing differ. The loose report files are the
-package's own `reports/` entries, copied out of it: the packaged
-`report.json` and the loose `report.json` are byte-for-byte identical
-(sha256 `921d3d3e3c8b6b08f5c3d23488e333d610bfeadf41cbb67ed8c471ea5a67f63e`),
+while the run id and the timing differ. Its manifest is `schema_version = 2`:
+`not_included` carries the fourth key `outside_analysis`, the statement that
+the package holds only the files of this analysis (see
+[the fourth-key report](../reports/c16-manifest-fourth-key.md)). The loose
+report files are the package's own `reports/` entries, copied out of it: the
+packaged `report.json` and the loose `report.json` are byte-for-byte identical
+(sha256 `29194a2df8a13e707d01cd28e6aefebaa947a706f58f9b2a9fdd547344d6383a`),
 so the hash the manifest records is the hash of the loose file too. They are
 taken from the package rather than from the files `analyze` writes, because
 those carry this platform's CRLF line endings and their hashes would only

@@ -165,7 +165,7 @@
 > **C1 / C2 / G5 三行各写什么**：C1 写抽到的记录号与四个字段（**工具、版本、
 > locator 从 `provenance[]` 抄，`level` 从记录顶层抄**）；C2 写 locator 与
 > `resolve_locator` 的 `resolved` / `reason`（**解析不出来的单独列一行**）；
-> G5 写包内实际文件与 `manifest.json` 的 `not_included` 三键声明——其中
+> G5 写包内实际文件与 `manifest.json` 的 `not_included` 四键声明——其中
 > **「未引用字符串」核的是这条声明**（包里没有全量字符串表可比对），判据见
 > [准备包 §2.7 G5](m10-acceptance-pack.md)。
 

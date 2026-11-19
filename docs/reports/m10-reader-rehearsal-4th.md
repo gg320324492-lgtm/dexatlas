@@ -289,7 +289,7 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 写完 6 行请求后**关闭 stdin**；MCP server 一读到 EOF 就退出，**还没回的请求丢掉**——
 材料在 §3.8 写这句的时候其实已经知道这个机制（「末尾的 `sleep 3` 是让 server 有
 时间回话（stdin 一闭合，它会把还没回的请求丢掉）」，
-[`docs/reports/m10-reader-package.md:500`](m10-reader-package.md) `anchor: sleep 3`）。
+[`docs/reports/m10-reader-package.md:502`](m10-reader-package.md) `anchor: sleep 3`）。
 **问题在于那个 `3` 是一个没有保证的常数**：它必须**大于** server 的启动时间，
 而 server 的启动时间 = uv 解析工程 + 装 Python 进程 + 导入 MCP 栈，**随机器、
 随 uv 缓存冷热、随机器上别的进程有多少而变**。这台机器上它是 **2.17–2.91 秒**，
@@ -331,11 +331,11 @@ tag 树里一条修复都没有，三条都是读材料读不出来的。所以�
 
 > 「uvicorn 会**先**打印 `Application startup complete.`（这句不作数）**再**打印
 > `[WinError 10048] error while attempting to bind`，然后自己退出」
-> —— [`docs/reports/m10-reader-package.md:425`](m10-reader-package.md) `anchor: error while attempting to bind`
+> —— [`docs/reports/m10-reader-package.md:427`](m10-reader-package.md) `anchor: error while attempting to bind`
 
 > 「**判断依据是 uvicorn 的日志**：里面有 `[WinError 10048] error while attempting to bind`
 > 就是**你的服务没起来**」
-> —— [`docs/reports/m10-reader-package.md:446`](m10-reader-package.md) `anchor: error while attempting to bind`
+> —— [`docs/reports/m10-reader-package.md:448`](m10-reader-package.md) `anchor: error while attempting to bind`
 
 **实测**：本机 8000 与 8011 都被占着（§2.5），照材料走，uvicorn 的日志**原文**是：
 
@@ -414,10 +414,10 @@ FileNotFoundError: [Errno 2] No such file or directory: 'report.json'
 读者包 §9.1 的 G3 下面给了两段标着「实测」的示例：
 
 ```text
-（单条示例，[`docs/reports/m10-reader-package.md:881`](m10-reader-package.md) `anchor: its launcher had already exited`）
+（单条示例，[`docs/reports/m10-reader-package.md:883`](m10-reader-package.md) `anchor: its launcher had already exited`）
 !  jadx exceeded its 1s timeout; its launcher had already exited
 
-（三条示例，[`docs/reports/m10-reader-package.md:887-889`](m10-reader-package.md) `anchor: and was terminated`）
+（三条示例，[`docs/reports/m10-reader-package.md:889-891`](m10-reader-package.md) `anchor: and was terminated`）
 !  apktool exceeded its 1s timeout; its launcher had already exited
 !  androguard exceeded its 1s timeout; its launcher had already exited
 !  jadx exceeded its 1s timeout and was terminated
@@ -687,7 +687,7 @@ C2 的判据要区分三件事（[`docs/reports/m10-acceptance-pack.md:117`](m10
 | [`src/dexatlas/mcp/tools/evidence.py:34`](../../src/dexatlas/mcp/tools/evidence.py#L34) `anchor: entry.locator for entry in record.provenance` | `sed -n '30,38p'`，第 5 行是 `provenance=[entry.locator for entry in record.provenance],` |
 | [`src/dexatlas/mcp/schemas.py:406`](../../src/dexatlas/mcp/schemas.py#L406) `anchor: class LocatorResolution` | `sed -n '400,412p'`，第 7 行是 `class LocatorResolution(BaseModel):`；`provenance` 字段在 :402 |
 | [`src/dexatlas/core/locators.py:161`](../../src/dexatlas/core/locators.py#L161) `anchor: path: Path | None = None` | `sed -n '155,165p'`，第 7 行是 `path: Path | None = None` |
-| [`docs/reports/m10-reader-package.md:243`](m10-reader-package.md) `anchor: 还没导出就先跑那一条` / [`:264`](m10-reader-package.md) `anchor: 一条可照抄的命令` / [`:280`](m10-reader-package.md) `anchor: resolved=%s kind=%s locator=%s reason=%s` / [`:318`](m10-reader-package.md) `anchor: text.text` / [`:425`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:446`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:500`](m10-reader-package.md) `anchor: sleep 3` / [`:881`](m10-reader-package.md) `anchor: its launcher had already exited` / [`:887-889`](m10-reader-package.md) `anchor: and was terminated` | `grep -n` 逐条取行号，再 `sed -n` 看该行原文与材料里引用的一致 |
+| [`docs/reports/m10-reader-package.md:243`](m10-reader-package.md) `anchor: 还没导出就先跑那一条` / [`:264`](m10-reader-package.md) `anchor: 一条可照抄的命令` / [`:280`](m10-reader-package.md) `anchor: resolved=%s kind=%s locator=%s reason=%s` / [`:318`](m10-reader-package.md) `anchor: text.text` / [`:427`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:448`](m10-reader-package.md) `anchor: error while attempting to bind` / [`:502`](m10-reader-package.md) `anchor: sleep 3` / [`:883`](m10-reader-package.md) `anchor: its launcher had already exited` / [`:889-891`](m10-reader-package.md) `anchor: and was terminated` | `grep -n` 逐条取行号，再 `sed -n` 看该行原文与材料里引用的一致 |
 | [`docs/reports/m10-acceptance-pack.md:117`](m10-acceptance-pack.md) `anchor: 按构造解析` / [`:167`](m10-acceptance-pack.md) `anchor: 包里能直接判的两条` | `sed -n '112,168p'` 看 C2 与 G5 两行 |
 | [`scripts/refresh-report-figures.py:111`](../../scripts/refresh-report-figures.py#L111) `anchor: The files that decide how the measurement comes out` / [`scripts/verify-public-contracts.py:453`](../../scripts/verify-public-contracts.py#L453) `anchor: get_project_status` | §8 交接表第 2 行里的两处示例引用；`sed -n` 核该行原文 |
 

@@ -48,7 +48,7 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
 | `F3.mcp-tools` | F3 | MCP 工具清单：契约表 = 测试断言（11 个） |
 | `F4.report-fields` / `F4.schema-version` | F4 | JSON 报告顶层 10 字段与 `schema_version=3`：契约表 = 测试断言 |
 | `F2.route-test` | F2 | 契约快照测试覆盖 REST/CLI/MCP 三表 |
-| `D3.not-included` | D3/G5 | 证据包 `not_included` 声明 apk/full_sources/unrelated_strings |
+| `D3.not-included` | D3/G5 | 证据包 `not_included` 声明 apk/full_sources/unrelated_strings/outside_analysis |
 | `D1.no-external` | D1 | HTML 渲染器无脚本标签/外部资源 |
 | `D5.escape` | D5 | HTML 渲染器使用 `html.escape` |
 | `E1.frozen-20` | E1 | 冻结回归集恰 20 题（`benchmarks/m6_service_set.py`） |
@@ -128,7 +128,7 @@ uv run --no-sync python scripts/m10_selfcheck.py --json    # 机器可读输出
    `<!--fig:tests.fast-->`、`<!--fig:tests.slow-->` 为准——重测一次它们就换新，
    材料跟着换，读者以自己 checkout 出来的那一份为准。
 4. F1/F3/F4/D3/D1/D5/E1/E5 的静态契约核对全部一致（退出码 **0–6**、MCP 11 工具、
-   报告 10 顶层字段 + `schema_version=3`、`not_included` 三键、HTML 无外部资源、
+   报告 10 顶层字段 + `schema_version=3`、`not_included` 四键、HTML 无外部资源、
    冻结 20 题、两套报告入口）。
 5. §6.3 门禁的 7 个命令中 6 个在本机可执行（`vulture` 因本环境未装 dev extras
    不可执行，见上表）；5 个被点名脚本均有 `__main__` 入口；本脚本不代跑全量门禁。

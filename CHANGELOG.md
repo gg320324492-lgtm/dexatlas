@@ -29,7 +29,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **证据包只装本次分析自己的文件。** `dexatlas export` 的打包器此前把「被证据引用到的任意文件」从反编译目录复制进包，既不解析链接，也不问那个文件是不是反编译器写的产物——反编译树里一个指向树外的链接会被当成分析的一个源文件原样复制给客户。现在复制之前先过两道：文件必须在反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或 `resources/`）；不满足的文件不进包，引用仍留在证据里，并由 `verify_citations` 记为未解析而不是假装带上了。清单的形状与 `not_included` 三键未变（那是公共契约，另议）。核对报告：[证据包的隔离边界](docs/reports/evidence-package-isolation.md)；回归测试：`tests/test_evidence_package_isolation.py`（5 条，其中 3 条在旧实现下变红）。
+- **证据包清单升为 `schema_version = 2`：`not_included` 增加第四个键
+  `outside_analysis`。** 证据包的隔离边界此前只有执行侧的一道守卫
+  （反编译树之外的文件、指向树外的链接不进包，见上一条），清单本身没有
+  声明「包里只有本次分析的文件」——读者打开 `manifest.json` 看到的是三个
+  「少带了什么」的键，要自己去读打包器的实现才知道边界在哪。现在清单把这
+  条边界**说**出来：`not_included.outside_analysis` 明示「包里只装本次分析
+  自己的文件；反编译树之外的文件、以及经树内链接指向树外的文件，一律不进
+  包」。清单的形状变了，`schema_version` 随之从 1 升到 2——**这是破坏性
+  变更**：新代码的 `verify_package` 会拒绝 `schema_version = 1` 的旧包。
+  仓库里四个已入库的案例证据包已用新代码重新分析并导出（每个包对应它自己
+  那次分析，`run_id` 不变），案例研究里记录的包 sha256 已同步更新。
+  同步修订：契约表 §5.3 的形状块、M10 验收材料里「`not_included` 三键」
+  的判据、`scripts/m10_selfcheck.py` 的 `D3.not-included` 阻塞检查。
+  核对报告：[清单的第四个键](docs/reports/c16-manifest-fourth-key.md)；
+  回归测试：`tests/test_evidence_package_isolation.py`（新增 2 条，先红后绿）。
+- **证据包只装本次分析自己的文件。** `dexatlas export` 的打包器此前把「被证据引用到的任意文件」从反编译目录复制进包，既不解析链接，也不问那个文件是不是反编译器写的产物——反编译树里一个指向树外的链接会被当成分析的一个源文件原样复制给客户。现在复制之前先过两道：文件必须在反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或 `resources/`）；不满足的文件不进包，引用仍留在证据里，并由 `verify_citations` 记为未解析而不是假装带上了。清单的声明层由下一条（`schema_version = 2` 的第四键）落地。核对报告：[证据包的隔离边界](docs/reports/evidence-package-isolation.md)；回归测试：`tests/test_evidence_package_isolation.py`（5 条，其中 3 条在旧实现下变红）。
 - 自查判据条数在材料里的表述随之更新：`docs/reports/m10-selfcheck.md`、
   `docs/reports/m10-invitation-sender-checklist.md`、`docs/reports/ci-gate-coverage.md`、
   `docs/status.md`、`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md`。

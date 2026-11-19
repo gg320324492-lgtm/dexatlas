@@ -268,7 +268,7 @@ uv run --no-sync python -c \
 `citations_resolved` 为 `True`、`citations_unresolved` 为空
 （`docs/reports/m10-reader-package.md:253`）。再把包复制到另一个目录或另一台机器复验一次
 （验收项 C6），并解压对照 `manifest.json` 的 `not_included` 声明，确认包里没有 APK、
-全量源码和未被证据引用的字符串（验收项 D3、G5）。
+全量源码、未被证据引用的字符串，且只装本次分析自己的文件（验收项 D3、G5）。
 
 **Q6：哪些结论是作者自述，不能当验收依据？**
 

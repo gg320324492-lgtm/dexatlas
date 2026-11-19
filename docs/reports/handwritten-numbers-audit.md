@@ -212,7 +212,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 
 ### B6 ★ 契约检查项数（49）：权威处有人守，复述处没人守
 
-- **是什么数**：`docs/architecture/public-contracts.md:360` 的
+- **是什么数**：`docs/architecture/public-contracts.md:365` 的
   `检查项清单共 49 项：28 REST + 6 MCP + 15 CLI`（§7 的记录）；`docs/glossary.md:186` 的
   `静态条数…（49）；实跑条数…（48 或 47，依可用后端而定）`。
 - **谁在检**：**§7 有人守**（`check-contract-records.py` 实跑后对记录，

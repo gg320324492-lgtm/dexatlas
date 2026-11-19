@@ -4,7 +4,7 @@
 **APK:** `demo.apk`  
 **SHA-256:** `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`  
 **Status:** completed  
-**Run:** `run_fc8e432d4d094350` (completed, complete)  
+**Run:** `run_aafda311d9864a4a` (completed, complete)  
 **Tool versions:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 
 ---
@@ -26,7 +26,7 @@
 | Evidence records | 11 |
 | DEX files | 1 |
 | Native libraries | 0 |
-| Analysis time | 4.9s |
+| Analysis time | 3.5s |
 
 > **The cross-reference counts are about two different things.** A *call site* is
 > one place in the bytecode where a call happens. A *call edge* is the
