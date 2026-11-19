@@ -256,7 +256,7 @@ tool count: 11
 **这是本轮最重要的一条。**
 
 邀请函 §2 里那一串 hash 已经填好了（工作区里是
-`docs/reports/m10-invitation-final.md:79`：
+`docs/reports/m10-invitation-final.md:81`：
 `commit 2715aefda06c3cbbc055a9edf795535e71464068`）。但**填 hash 的那个提交
 `7a416bd` 在 tag 之后**——`v1.0.0` 指的是 `2715aef`，而 `2715aef` 的树里：
 
@@ -359,7 +359,7 @@ $ curl -s localhost:8000/projects
 
 | 出处 | 原文 |
 |---|---|
-| 准备包 §2.7 G3 | 「设置极短超时后**至少一条后端记 `timeout` 且报告照常产出**（条数与本机速度有关：没超时的后端不留记录，不是「一定有三条」）」（`docs/reports/m10-acceptance-pack.md:164`） |
+| 准备包 §2.7 G3 | 「设置极短超时后**至少一条后端记 `timeout` 且报告照常产出**（条数与本机速度有关：没超时的后端不留记录，不是「一定有三条」）」（`docs/reports/m10-acceptance-pack.md:165`） |
 | 读者包 §9.1 G3 | 「超时的后端**各记一条 `timeout`**（实测）」+ 三行实测输出（apktool / androguard / jadx 各一条） |
 | 读者包 §9.1 G3 的括注 | 「**若 androguard 在你的机器上 1 秒内就跑完了**，`errors[]` 会**只有两条**、`index_complete` 是 `true`——这同样是正确行为」 |
 | M8 演练 §5 | 「三后端各记一条 `timeout` 错误（jadx 被杀进程树、apktool/androguard 的 launcher 已先退出）」 |

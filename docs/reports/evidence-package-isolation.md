@@ -264,7 +264,7 @@ AssertionError: assert {'manifest.js...sh-review.md'} == {'manifest.json', …, 
 
 | 方案 | 改什么 | 代价 | 我的建议 |
 |---|---|---|---|
-| **A. 加第四个 `not_included` 键** | 例如 `"internal_records": "操作者自己的评审记录、工作文档与未发布素材一律不进包"` | 清单**形状变了**：`PACKAGE_SCHEMA_VERSION` 需从 1 升到 2（`evidence_package.py:50`），并同步改 `docs/architecture/public-contracts.md:316`、`tests/test_public_contracts.py:740`、`scripts/m10_selfcheck.py:591`，以及 M10 验收材料里「`not_included` 三键」的判据（`docs/reports/m10-acceptance-pack.md:128`） | **不建议在这一轮做**：这是公共契约变更（CLAUDE.md 规则 5），影响面远大于它覆盖的风险，而且**执行侧的守卫不依赖它** |
+| **A. 加第四个 `not_included` 键** | 例如 `"internal_records": "操作者自己的评审记录、工作文档与未发布素材一律不进包"` | 清单**形状变了**：`PACKAGE_SCHEMA_VERSION` 需从 1 升到 2（`evidence_package.py:50`），并同步改 `docs/architecture/public-contracts.md:316`、`tests/test_public_contracts.py:740`、`scripts/m10_selfcheck.py:591`，以及 M10 验收材料里「`not_included` 三键」的判据（`docs/reports/m10-acceptance-pack.md:129`） | **不建议在这一轮做**：这是公共契约变更（CLAUDE.md 规则 5），影响面远大于它覆盖的风险，而且**执行侧的守卫不依赖它** |
 | **B. 只改 `full_sources` 的措辞** | 例如改成「only the source fragments the evidence cites are packaged, and only from the analysis's own decompiler tree」 | 键集合不变 → M10 自检与契约文档的键列表都还成立；但 `tests/test_evidence_package.py:305` 钉的是整段字面量，要同步改；仓库里四个已入库包的清单带的是旧措辞（历史产物，非破坏） | **可以接受**，但它是「契约文本变更」，仍应进 CHANGELOG |
 
 **这一轮实际做了什么**：**没有动清单**（形状、键集合、措辞一字未改），
