@@ -215,6 +215,130 @@ def test_every_generated_number_in_the_repository_is_written_by_the_measurement(
         )
 
 
+def test_a_figure_inside_a_code_block_is_not_written(tmp_path: Path) -> None:
+    """The writer uses the same ruler as the finder.
+
+    The finder does not see a marker inside a code block: it is an
+    illustration, and a page that carries one is not carrying a number. The
+    writer used to see it anyway, and the moment the page also carried a
+    figure of its own, the illustration was given a number -- so the page
+    that teaches the reader what a marker looks like showed a number nobody
+    measured, and a document that describes a released tree had that
+    release edited.
+    """
+    script = _figure_script()
+    page = tmp_path / "page.md"
+    page.write_text(
+        "```text\n<!--fig:tests.total-->1712<!--/fig-->\n```\n\n"
+        "The suite has <!--fig:tests.total-->1<!--/fig--> tests.\n",
+        encoding="utf-8",
+    )
+
+    refreshed = script.write_figures(page, {"tests.total": "1733"})
+
+    assert "<!--fig:tests.total-->1712<!--/fig-->" in refreshed, refreshed
+    assert "<!--fig:tests.total-->1733<!--/fig-->" in refreshed, refreshed
+
+
+def test_an_opening_tag_whose_closing_tag_is_elsewhere_does_not_delete_the_text(
+    tmp_path: Path,
+) -> None:
+    """A cell that is not a figure is left alone, and said out loud.
+
+    An opening tag whose closing tag is somewhere else -- in another
+    paragraph, several pages away -- is not a figure. Filling it in would
+    delete everything in between, and it did: a document whose opening tag
+    had no closing tag of its own lost a third of its lines the moment it
+    also carried a figure. So the writer leaves such a cell alone, keeps the
+    text, and says which cell it was.
+    """
+    script = _figure_script()
+    page = tmp_path / "page.md"
+    page.write_text(
+        "<!--fig:tests.total-->\n\nsome prose that is not a number\n\n"
+        "<!--/fig-->\n\nThe suite has <!--fig:tests.total-->1<!--/fig--> tests.\n",
+        encoding="utf-8",
+    )
+
+    refreshed = script.write_figures(page, {"tests.total": "1733"})
+
+    assert "some prose that is not a number" in refreshed, refreshed
+    assert "<!--fig:tests.total-->1733<!--/fig--> tests." in refreshed, refreshed
+
+
+def test_a_cell_that_is_not_a_figure_is_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A figure nobody can place is a figure nobody can check.
+
+    So the writer says which one it was and that it left it alone. A reader
+    who finds a number that never changes learns where it came from.
+    """
+    script = _figure_script()
+    page = tmp_path / "page.md"
+    page.write_text("<!--fig:tests.total-->\n\nsome prose\n\n<!--/fig-->\n", encoding="utf-8")
+
+    script.write_figures(page, {"tests.total": "1733"})
+
+    out = capsys.readouterr().out
+    assert "tests.total" in out, out
+    assert "not a figure" in out, out
+
+
+def test_the_three_counts_are_written_as_one_phrase() -> None:
+    """The pages read the three counts in one breath, so the script writes them that way.
+
+    A marker holds one value, and the pages read the total, the fast half
+    and the integration half as a single phrase. Three markers would put
+    three numbers in the sentence and leave the reader to join them up; one
+    marker holding the whole phrase keeps the sentence a sentence, and what
+    the script writes is the phrase the page already read -- so writing it
+    again changes nothing.
+    """
+    script = _figure_script()
+    figures = script.render_figures(_record())
+
+    assert figures["tests.trio"] == "**1733**（**1584** 快 + **149** 集成）"  # noqa: RUF001
+
+    page = "应当是 <!--fig:tests.trio-->**1733**（**1584** 快 + **149** 集成）<!--/fig-->。"  # noqa: RUF001
+    written, unknown, malformed = script.apply_figures(page, figures)
+
+    assert not unknown, unknown
+    assert not malformed, malformed
+    assert written == page, written
+
+
+def test_a_copy_of_a_figure_inside_a_code_block_is_written() -> None:
+    """The report shows what its commands print, and that copy has to move.
+
+    The report's code blocks repeat the figures it states in prose -- they
+    are the output of the commands it tells the reader to run. Everywhere
+    else a marker inside a code block is an illustration, and the writer
+    leaves those alone; here it is a copy, and a copy that did not move with
+    the numbers would state the old ones twice over.
+    """
+    script = _figure_script()
+    page = "```bash\nuv run pytest   # <!--fig:tests.total-->1733<!--/fig--> tests\n```\n"
+
+    written, unknown, malformed = script.apply_figures(page, {"tests.total": "1737"}, copies=True)
+
+    assert not unknown, unknown
+    assert not malformed, malformed
+    assert written == (
+        "```bash\nuv run pytest   # <!--fig:tests.total-->1737<!--/fig--> tests\n```\n"
+    ), written
+
+
+def _record() -> dict[str, Any]:
+    """A measurement, as the script reads it back."""
+    return {
+        "code": {"cli_commands": 13, "api_endpoints": 28, "sample_apks": 4},
+        "tests": {"total": 1733, "fast": 1584, "slow": 149},
+        "suite": {"passed": 1732, "skipped": 1, "xfailed": 0},
+        "coverage": {"statements": 7671, "missing": 514, "files": {}},
+    }
+
+
 def test_the_documents_the_measurement_writes_are_the_ones_that_carry_figures() -> None:
     """The report and the status page are written because they carry figures.
 
