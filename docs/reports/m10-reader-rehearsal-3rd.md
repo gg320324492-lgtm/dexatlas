@@ -714,8 +714,9 @@ drifted: 2
 
 #### 8.1.1 重锚不能照搬行号差 —— 检查器只查「范围非空」，查不出语义错位
 
-**检查器的判定有多宽**：`holds_content()` 只要求「那一行不是空行」
-（`scripts/check-doc-citations.py:1015-1023`），**不检查那一行说的是不是这句话**。
+**检查器的判定有多宽**：`holds_content()`（`scripts/check-doc-citations.py` 里那个
+只返回 `bool(line.strip())` 的函数）只要求「那一行不是空行」，
+**不检查那一行说的是不是这句话**。
 所以 release body 里**语义已经错位、但仍落在一个非空行上**的引用，**检查器查不出来**。
 
 本轮把 release body 对 `phase1-execution-report.md` 的 **6 条**引用逐条比了
@@ -789,12 +790,12 @@ uv run --no-sync python scripts/check-doc-citations.py   # 期望 drifted: 0
 主会话把这条列为下一批的候选（「让引用检查器能验『这一行说的是不是那句话』」）。
 本轮把盲区的**确切边界**查清了，写在这里，下一批不必重查。
 
-**检查器的两类引用**（`scripts/check-doc-citations.py:1113-1130` 的 `is_compared`）：
+**检查器的两类引用**（`scripts/check-doc-citations.py` 里的 `is_compared()`）：
 
 | 类别 | 判定 | 检查器验什么 | 盲区 |
 |---|---|---|---|
 | **名了符号** | `is_symbolic(name)` 或 `symbol_lines(lines, anchor)` —— 名字像符号，或被引的那些行里**出现了这个名字** | 名字**在不在**被引的行里；不在 → 报 drifted | **无**（名字在不在，机器能判） |
-| **只指位置** | 上面两条都不成立 —— 名字是散文，不是符号 | **只验「被引的范围不是空行」**（`holds_content()`，`:1015-1023`） | **有**：那行**说的是不是那句话**，机器不判 |
+| **只指位置** | 上面两条都不成立 —— 名字是散文，不是符号 | **只验「被引的范围不是空行」**（`holds_content()`，只返回 `bool(line.strip())`） | **有**：那行**说的是不是那句话**，机器不判 |
 
 **本轮用检查器自己的模块跑了一遍 release body**：它对
 `phase1-execution-report.md` 的 **10 处**引用，`names` **全是空的**
