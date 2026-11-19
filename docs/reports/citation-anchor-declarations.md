@@ -51,8 +51,8 @@
 
 裸名字走结构化查法（强），片段走字面查法（覆盖非标识符的东西：路由、装饰器、
 JSON 键、docstring 里的一句话）。规则落在 `DECLARATION`
-（`scripts/check-doc-citations.py:424`）、`ANCHOR_NAME`（`:430`）、
-`check_anchor_name`（`:1902`）、`check_anchor_fragment`（`:1934`）。
+（`scripts/check-doc-citations.py:428`）、`ANCHOR_NAME`（`:434`）、
+`check_anchor_name`（`:1906`）、`check_anchor_fragment`（`:1938`）。
 
 > **一个词的三个意思。** 本报告说的「锚点」是**引用声明的内容**；仓库里还有两个
 > 同名的旧东西：Markdown 的**标题锚点**（`#fragment` 链接，`scripts/` 之外的
@@ -82,7 +82,7 @@ JSON 键、docstring 里的一句话）。规则落在 `DECLARATION`
 
 声明**绑定到它前面最近的那条引用**，且两者之间不能隔着一个块边界 —— 与裸行号
 ``:143`` 的绑定规则完全一样（表格的一行是一个块，一个段落是一个块）。
-实现见 `_resolve`（`scripts/check-doc-citations.py:1072`）。
+实现见 `_resolve`（`scripts/check-doc-citations.py:1076`）。
 
 这样写的好处是：声明与引用**分成两个跨度**，声明在文档里读起来是「这里，以及这里
 说的是什么」，而不是一串挤在一起的代码。
@@ -98,20 +98,20 @@ public-contracts.md:22  src/dexatlas/cli/main.py:289-291  anchor missing:
 
 裸名字的报法与既有的「符号漂移」一致（`` `X` is at line N ``）；片段的报法是
 `` the anchor `X` is at line N ``，找不到就说「不在范围里」。
-见 `check_anchor`（`scripts/check-doc-citations.py:1875`）。
+见 `check_anchor`（`scripts/check-doc-citations.py:1879`）。
 
 ### 2.3 三条防呆
 
 1. **孤立的声明要报。** 声明绑定不到任何引用（写在了引用前面、或者隔了一个块），
    它就什么也没说。报出来，不当它不存在。见 `document_orphan_declarations`
-   （`scripts/check-doc-citations.py:1976`）。
+   （`scripts/check-doc-citations.py:1980`）。
 2. **声明跨度不参与「名了符号」的推断。** 契约表里 `src/dexatlas/cli/main.py:289-291`
    `anchor: version` 这一条：声明里写的那个名字不是句子里被提到的名字，它是对源码的
    声明 —— 两条通道分开，不互相污染。
 3. **在「声明型文档」里，不声明就报错。** `DECLARING_DOCUMENTS`
-   （`scripts/check-doc-citations.py:439` 的 `DECLARING_DOCUMENTS`）列出的文档里，任何「既没有名了符号、又
+   （`scripts/check-doc-citations.py:443` 的 `DECLARING_DOCUMENTS`）列出的文档里，任何「既没有名了符号、又
    没有声明」的引用都报成 `declares nothing`。契约表在名单里，所以它的沉默是
-   决定，不是疏忽。见 `check_declaration_of_content`（`:1950`）。
+   决定，不是疏忽。见 `check_declaration_of_content`（`:1954`）。
 
 ### 2.4 摘要多了一行
 
