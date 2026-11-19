@@ -108,16 +108,16 @@
 - **触发条件**：第 4 步（改文档里的数字与引用）之后、第 6 步（重打 tag）之前跑
   `scripts/check-doc-citations.py`。
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
-  `scripts/check-doc-citations.py:228-241` 的 `TREE_DOCUMENTS` 把
+  `scripts/check-doc-citations.py:236-249` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
-  （`scripts/check-doc-citations.py:2137-2140`）按这个 ref 取树；本地 tag 还没动 →
+  （`scripts/check-doc-citations.py:1387-1390`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
-  `check_declaration()`（`scripts/check-doc-citations.py:2158-2208`）还会把正文里引的测量
+  `check_declaration()`（`scripts/check-doc-citations.py:1417-1466`）还会把正文里引的测量
   指纹与**那棵树**的测量记录比对 —— 旧树的指纹，于是也判「不符」。
 - **该在哪一步被拦住**：**第 4 步与第 6 步之间**。清单第 4 条只说了「按内容重锚」，没说
   重锚的**基准是本地 tag 还是远端 tag**，也没说重锚完要**在 tag 移过之后再核一次**。
 - **现在的判据**：机制是齐的 —— `TREE_DOCUMENTS` + `Tree` + `tree_fingerprint()`
-  （`scripts/check-doc-citations.py:2143-2146`）+ `check_declaration()`；
+  （`scripts/check-doc-citations.py:1393-1396`）+ `check_declaration()`；
   `tests/test_doc_citations.py::test_the_release_body_is_read_out_of_the_release_tree`
   （`tests/test_doc_citations.py:687-701`）守住「Release 正文必须是从 release 树里读出来的」。
   **缺的只是清单里的顺序要求**。
@@ -336,7 +336,7 @@
 
   > **第 2 步与第 6 步之间有一个顺序要求**：引用检查器对
   > `docs/reports/v1.0.0-github-release-body.md` 读的是**本地 `v1.0.0` ref 指向的树**
-  > （`scripts/check-doc-citations.py:154-155`、`:1101-1104`）。所以顺序是
+  > （`scripts/check-doc-citations.py:236-249`、`:1387-1390`）。所以顺序是
   > **先重打本地 tag → 再跑 `check-doc-citations.py` → 若漂了则改正文 → 再提交 →
   > 再重打一次 tag → 再跑一次检查器**。在 tag 移过之前跑的那一次结论，与将发布的树无关。
   >
