@@ -67,11 +67,13 @@ message thread」，不写「已提交」「已发布」「客户可联系到」
 |---|---|---:|---:|---:|---|
 | §What I offer（粘贴段） | `scope-ai-mcp.md` | 781 | 773 | 5,000 | ✅ 不变 |
 | Project title | `project-brief.md` | 53 | 53 | 60 | ✅ 不变 |
-| Template 1 正文 | `cover-letter-templates.md` | 2,476 | 2,465 | 2,500 | ✅ 仍有余量 |
-| Template 2 正文 | `cover-letter-templates.md` | 2,819 | 2,794 | 2,500 | ❌ **超了，见下** |
+| Template 1 正文 | `cover-letter-templates.md` | 2,545 | 2,524 | 2,500 | ⚠️ **raw 超 45**（去掉响应时长那版曾回到 2,476/2,465；最终版含签名前联系段），见下 |
+| Template 2 正文 | `cover-letter-templates.md` | 2,788 | 2,763 | 2,500 | ❌ **超了，见下** |
 
-**Template 2 超 2,500 门限是本轮改动的直接后果**（改动前它就是压线的
-2,500/2,485）。两个处理选项：
+**两个模板的正文都超了 2,500 门限，是本轮加联系段的直接后果**
+（Template 2 改动前就是压线的 2,500/2,485；Template 1 改动前 2,185/2,174，
+去掉响应时长那句后 2,476/2,465，最终版随「Write to … or reply here」措辞
+落在 2,545/2,524）。两个处理选项：
 
 1. 发送时**删去不适用的小节**——用法说明（usage notes）本来就要求这么做，
    删节后长度以实际粘贴版为准；
@@ -85,15 +87,25 @@ message thread」，不写「已提交」「已发布」「客户可联系到」
 
 | 门禁 | 结果 |
 |---|---|
-| `ruff check .` | 待跑 |
-| `ruff format --check .` | 待跑 |
-| `mypy` | 待跑 |
-| `vulture … --min-confidence 80` | 待跑 |
-| `python scripts/check-doc-citations.py` | 待跑（本轮把它自己登记进 `DOCS`） |
-| `python scripts/check-version-claims.py --base auto` | 待跑 |
-| `python scripts/check-unguarded-numbers.py` | 待跑 |
+| `ruff check .` | ✅ All checks passed |
+| `ruff format --check .` | ✅ 420 files already formatted |
+| `mypy` | ✅ no issues in 68 source files |
+| `vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80` | ✅ exit 0 |
+| `python scripts/check-doc-citations.py` | ✅ **drifted: 0**（本报告已登记进 `DOCS` 名单；顺手把三份声明期报告锚在旧树上的 12 处行号重锚到现树） |
+| `python scripts/check-version-claims.py --base auto` | ✅ exit 0 |
+| `python scripts/check-unguarded-numbers.py` | ✅ PASS，25 watched statements agree with the tree |
 
-（本表由提交前的实测回填；见 git 历史里本报告的最终提交。）
+> **一处顺手修掉的漂移（不是 C9 引入的，但挡着这道门禁）**：
+> [citation-anchor-declarations.md](citation-anchor-declarations.md)、
+> [declarations-outward.md](declarations-outward.md) 与
+> [post-release-rehearsal.md](post-release-rehearsal.md) 三份报告写就时，
+> 检查器还没有值比对通道（提交 `4232d6e`）及其后的扩充；它们引用的
+> `DECLARATION`、`check_anchor_name` 等符号的行号此后整体后移了 4 行。
+> 本轮按符号的现位置重锚（`remap-citations.py` 收了 3 处，其余 9 处逐条手改），
+> 检查器回到 **drifted: 0**。改动只有行号，没有改任何一句结论。
+
+**pytest 未跑**：本窗口的判据不要求；且主会话正在统一测量（C17 收尾的既定安排），
+并发跑套件会互相污染覆盖率（`.scratch/` 与 `.coverage` 的既知问题）。
 
 ## 5. 哪些是本窗口做的、哪些留给主会话
 
