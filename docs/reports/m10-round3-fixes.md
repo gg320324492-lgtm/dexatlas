@@ -266,7 +266,7 @@ uvicorn 绑不上端口（日志里是 `[WinError 10048] error while attempting 
    §1（这一步按分工由发起人执行，见[发送前清单](m10-invitation-sender-checklist.md)
    的 N1 与[就绪记录](m10-invitation-readiness.md)第 2 步）。
 2. **`docs/glossary.md` 的「裸树 locator」词条**引的是
-   `reports/m10-acceptance-pack.md:116`，而「裸树 locator」实际在 **:117**（C2
+   准备包 §2.7 的 **C1 那一行**（第 116 行），而「裸树 locator」实际在**下一行**（C2
    那一行）——**这一行号在本批之前就已经差了一行**（上一轮改 C1/C2 的判据时移动
    的），本批没有再移动它（表格行数未变）。该文件不在本批拥有范围内，也没有
    进引用检查器的清单，**留给主会话统一处理**。本批保留了 `path=None` 这个词
