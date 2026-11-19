@@ -108,7 +108,7 @@
 - **触发条件**：第 4 步（改文档里的数字与引用）之后、第 6 步（重打 tag）之前跑
   `scripts/check-doc-citations.py`。
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
-  `scripts/check-doc-citations.py:282-282` 的 `TREE_DOCUMENTS` 把
+  `scripts/check-doc-citations.py:284-284` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
   （`scripts/check-doc-citations.py:2154-2157`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。

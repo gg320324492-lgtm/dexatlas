@@ -31,10 +31,10 @@
 
 `` `src/dexatlas/cli/main.py:289-291` `anchor: version` ``
 
-声明是一个反引号跨度，内容以 `anchor:` 开头（`scripts/check-doc-citations.py:424`
+声明是一个反引号跨度，内容以 `anchor:` 开头（`scripts/check-doc-citations.py:426`
 `anchor: DECLARATION = re.compile`）。裸名字走结构化查法
-（`scripts/check-doc-citations.py:1902` `anchor: def check_anchor_name`），
-其余走字面查法（`scripts/check-doc-citations.py:1934`
+（`scripts/check-doc-citations.py:1904` `anchor: def check_anchor_name`），
+其余走字面查法（`scripts/check-doc-citations.py:1936`
 `anchor: def check_anchor_fragment`）。
 
 试点在契约表（`docs/architecture/public-contracts.md:22`
@@ -107,7 +107,7 @@ findings**（怎么验的见 §6）。
    `<!--fig:coverage.weak_modules-->`。
 
 **为什么片段也不算漂**：检查器比的是「这段文字**逐字**在不在被引的范围里」
-（`scripts/check-doc-citations.py:1934` `anchor: def check_anchor_fragment`）。
+（`scripts/check-doc-citations.py:1936` `anchor: def check_anchor_fragment`）。
 代码往上挪十行，片段一个字都不用改；而行号要改——行号正是机器能验的东西。
 片段被改写时，机器会报出来。
 
@@ -134,7 +134,7 @@ findings**（怎么验的见 §6）。
 
 > 这一条对主会话有直接影响：`docs/glossary.md` 现在**可以**被登记进
 > `scripts/check-doc-citations.py` 的 `DOCS` 名单（该名单见
-> `scripts/check-doc-citations.py:164` `anchor: DOCS`）。
+> `scripts/check-doc-citations.py:271` `anchor: DOCS`）。
 > 登记之前它不在名单里，所以它一条引用都没被检查过。
 
 ### 5.2 术语表的 59 条引用，指着的行上已经没有那个词了
@@ -216,8 +216,8 @@ findings**（怎么验的见 §6）。
 ## 6. 怎么验的
 
 **这台机器上没有第二个检查器**：`scripts/check-doc-citations.py` 的 `DOCS`
-名单是主会话统一登记的（`scripts/check-doc-citations.py:164`
-`anchor: DOCS`），本批**不能动那个文件**。
+名单由 `collect_documents()` 自动收集（`scripts/check-doc-citations.py:227`
+`anchor: def collect_documents`），本批**不能动那个文件**。
 所以本批借了检查器自己的机器，写了一个只读脚本（放在 `.scratch/`，
 不进仓库）：它 `import` 检查器、用**同一套判据**跑这 7 份文档。
 

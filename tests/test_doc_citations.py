@@ -1236,3 +1236,128 @@ def test_the_value_findings_are_reported_and_do_not_fail_the_check(
     assert "values not matching:" in written
     assert "1694 passed" in written
     assert code == 0, f"the value findings failed the check:\n{written}"
+
+
+def test_the_reports_are_collected_without_a_handwritten_list(tmp_path: Path) -> None:
+    """Every report under docs/reports/ is read, without a list to maintain.
+
+    The first version of this checker read only the documents a hand-written
+    list named, and the reports that were not on the list drifted for days
+    with nothing to notice. The collection is structural now: a report is
+    checked the moment it lands, and it leaves the check only through the
+    exclusion registry, which states a reason for every name it holds.
+    """
+    checker = _checker()
+    reports = tmp_path / "docs" / "reports"
+    reports.mkdir(parents=True)
+    (reports / "a-checked-report.md").write_text("no citations here\n", encoding="utf-8")
+    (reports / "README.md").write_text("the index\n", encoding="utf-8")
+    (tmp_path / "docs" / "releases").mkdir(parents=True)
+    (tmp_path / "docs" / "releases" / "v9.9.9.md").write_text("release notes\n", encoding="utf-8")
+
+    documents = checker.collect_documents(tmp_path)
+
+    assert (reports / "a-checked-report.md") in documents
+    assert (reports / "README.md") in documents
+    assert (tmp_path / "docs" / "releases" / "v9.9.9.md") in documents
+    # The documents outside the reports directory that the check reads by
+    # name are still read.
+    assert (tmp_path / "docs" / "analysis-provenance.md") in documents
+
+
+def test_an_excluded_report_is_left_out_and_its_reason_is_stated(tmp_path: Path) -> None:
+    """An exclusion is a decision, not an omission.
+
+    A report leaves the check only through the registry, and the registry
+    has to say why: an exclusion nobody can explain is a citation nobody
+    has to keep true.
+    """
+    checker = _checker()
+    reports = tmp_path / "docs" / "reports"
+    reports.mkdir(parents=True)
+    (reports / "a-historical-report.md").write_text("history\n", encoding="utf-8")
+    monkey_exclusion = {"a-historical-report.md": "pinned to its baseline tree; re-anchor later."}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(checker, "REPORT_EXCLUSIONS", monkey_exclusion, raising=False)
+        documents = checker.collect_documents(tmp_path)
+    assert (reports / "a-historical-report.md") not in documents
+
+    for name, reason in checker.REPORT_EXCLUSIONS.items():
+        assert reason.strip(), f"the exclusion of {name} states no reason"
+
+
+def test_every_report_is_either_checked_or_excluded() -> None:
+    """No report under docs/reports/ falls through both lists.
+
+    The structural collection and the exclusion registry together have to
+    cover the directory: a report that is in neither would be a citation
+    nobody checks, which is the hole this check exists to close.
+    """
+    checker = _checker()
+    reports = checker.REPO / "docs" / "reports"
+    covered = {document.name for document in checker.DOCS} | set(checker.REPORT_EXCLUSIONS)
+    on_disk = {path.name for path in reports.glob("*.md")}
+    missing = sorted(on_disk - covered)
+    assert not missing, f"these reports are neither checked nor excluded: {missing}"
+    stale = sorted(set(checker.REPORT_EXCLUSIONS) - on_disk)
+    assert not stale, f"the exclusion registry names reports that are gone: {stale}"
+
+
+def test_the_documents_are_not_read_twice() -> None:
+    """A document read twice is counted twice, so the list has to be unique."""
+    checker = _checker()
+    names = [str(document) for document in checker.DOCS]
+    assert len(names) == len(set(names))
+
+
+def test_a_new_report_with_a_bad_citation_fails_the_check_without_touching_a_list(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The red/green of the structural collection.
+
+    A report lands in docs/reports/ carrying a citation that points past the
+    end of the file it names. No list is edited, nothing is registered -- and
+    the check still reads the report and fails. Under the hand-written list
+    this report would not have been read at all, and the run would have been
+    green; that green is the hole this test keeps closed.
+    """
+    checker = _checker()
+    reports = tmp_path / "docs" / "reports"
+    reports.mkdir(parents=True)
+    (reports / "a-fresh-report.md").write_text(
+        "The suite is listed at `pyproject.toml:99999-100001`.\n", encoding="utf-8"
+    )
+
+    documents = checker.collect_documents(tmp_path)
+    assert (reports / "a-fresh-report.md") in documents, (
+        "a report that just landed is not being read"
+    )
+
+    monkeypatch.setattr(checker, "DOCS", documents)
+    assert checker.main() == 1, "a bad citation in a brand-new report passed the check"
+    written = capsys.readouterr().out
+    assert "a-fresh-report.md" in written
+    assert "drifted: 1" in written or "out of range" in written
+
+
+def test_a_new_report_that_is_clean_leaves_the_check_green(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The collection checks a new report; a clean one stays green.
+
+    The failure above has to come from the report's own bad citation, not
+    from the act of adding a report: a report whose citations hold must not
+    turn the run red.
+    """
+    checker = _checker()
+    reports = tmp_path / "docs" / "reports"
+    reports.mkdir(parents=True)
+    (reports / "a-clean-report.md").write_text(
+        "The suite lives in `pyproject.toml:1-1`.\n", encoding="utf-8"
+    )
+
+    documents = checker.collect_documents(tmp_path)
+    monkeypatch.setattr(checker, "DOCS", documents)
+
+    assert checker.main() == 0
+    assert "Every citation still says what it says." in capsys.readouterr().out
