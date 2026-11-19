@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "what_this_is": "The declared inventory of every difference between the local gates and the CI gates that the platform decides. The prose is in docs/reports/platform-gate-inventory.md; scripts/check-platform-gates.py checks this file against the tree. Nothing here is a count: a job added tomorrow is one more entry, not a number to edit.",
+  "how_to_read_it": [
+    "ci_jobs -- one entry per job of .github/workflows/ci.yml. 'temp_redirect' says what the job does about its temporary directory: 'yes' (it moves it into the workspace), 'exempt' (it does not need to, and says why), 'defect' (it needs to and does not, with the fix named) or 'n/a' (the job installs nothing with uv).",
+    "platform_tests -- every test whose execution, or whose verdict, depends on the platform. 'kind' is skipped-on (the test does not run on one platform), branching (it runs on both but asserts different things) or parameterised (it runs on both and asserts both -- the shape that closes a gap).",
+    "platform_sensitive_code -- every place a script under scripts/ reads the platform. The key is file::function, never a line number: a line number in an inventory is a line number that rots.",
+    "coverage_gaps -- the scripts that run in only one of the two places. 'ci_only' runs in a workflow and nowhere in the local gate list; 'local_only' runs in neither a workflow nor the test suite, so only a person runs it.",
+    "local_gates -- the local gate list, each entry naming the CI job that runs the same gate. A gate in this list with no CI job would be a gate nobody else runs."
+  ],
+
+  "ci_jobs": {
+    "lint": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/check-version-claims.py"],
+      "temp_redirect": "yes",
+      "local_counterpart": "ruff check / ruff format --check / mypy / vulture / check-version-claims.py",
+      "note": "CI installs --extra dev --extra mcp and then runs 'uv run' *without* --no-sync, so uv re-resolves and synges the environment at every step; the local gate list installs --all-extras and runs with --no-sync. The installed set is the same either way -- uv's 'uv run' does not remove the extras that were synced (measured on uv 0.11.21) -- but the command is not the same, and a re-lock inside a CI checkout is a difference the local run never sees."
+    },
+    "test": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/fetch-fixtures.sh", "scripts/install-backends.sh"],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync pytest -q"
+    },
+    "test-partial-backends": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/fetch-fixtures.sh", "scripts/install-backends.sh"],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync pytest -q",
+      "note": "The same suite with DEXATLAS_JADX_PATH emptied: the JADX-dependent tests are the ones that stop running, so this job's pass count is lower than the full job's for a reason that is not a failure."
+    },
+    "m3-comparison": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [],
+      "temp_redirect": "yes",
+      "local_counterpart": "the benchmark comparison under benchmarks/comparison/"
+    },
+    "docker": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [],
+      "temp_redirect": "n/a",
+      "reason": "the job builds and runs a container image and installs nothing with uv on the host, so there is no temporary directory to move",
+      "local_counterpart": "none -- the Docker image is not in the local gate list"
+    },
+    "security": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [],
+      "temp_redirect": "yes",
+      "local_counterpart": "none -- the dependency audit runs only in CI"
+    },
+    "contracts": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [
+        "scripts/check-contract-records.py",
+        "scripts/install-backends.sh",
+        "scripts/verify-public-contracts.py"
+      ],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync python scripts/verify-public-contracts.py"
+    },
+    "contracts-without-jadx": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/check-contract-records.py"],
+      "temp_redirect": "defect",
+      "reason": "the job runs scripts/check-contract-records.py, which runs the live contract check itself; that check keeps its workspace in tempfile.gettempdir() (scripts/verify-public-contracts.py), so without the redirect this job writes into the runner's system temporary directory while its sibling job (contracts) writes into the workspace",
+      "fix": "give the job the same 'Keep generated files in .scratch' step the contracts job has, before the install step. The file is .github/workflows/ci.yml, which this window does not own -- the main session applies it.",
+      "local_counterpart": "uv run --no-sync python scripts/check-contract-records.py --expect without-jadx"
+    },
+    "m10-selfcheck": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/check-m10-snapshot.py", "scripts/m10_selfcheck.py"],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync python scripts/m10_selfcheck.py"
+    },
+    "gate-coverage": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/check-gate-coverage.py"],
+      "temp_redirect": "exempt",
+      "reason": "the script reads the repository's scripts and workflows and writes nothing, so it has no temporary files to move",
+      "local_counterpart": "uv run --no-sync python scripts/check-gate-coverage.py"
+    },
+    "social-preview": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/make-social-preview.py"],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync python scripts/make-social-preview.py",
+      "note": "CI runs --check, which compares the numbers; locally the script writes the card. The card's bytes are not compared -- the two platforms have different fonts and the images differ by design."
+    },
+    "measurement": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [
+        "scripts/fetch-fixtures.sh",
+        "scripts/install-backends.sh",
+        "scripts/refresh-report-figures.py"
+      ],
+      "temp_redirect": "yes",
+      "local_counterpart": "uv run --no-sync python scripts/refresh-report-figures.py",
+      "note": "The job runs on a tag push only. Locally the measurement writes the figures; in CI it runs --check, which re-measures and compares."
+    },
+    "release-numbers": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": ["scripts/check-release-numbers.py"],
+      "temp_redirect": "yes",
+      "local_counterpart": "none -- the outward release numbers are checked only in CI"
+    }
+  },
+
+  "platform_tests": {
+    "tests/test_backend_discovery.py::test_the_launcher_choice_is_a_rule_about_the_platform": {
+      "kind": "parameterised",
+      "platforms": ["posix", "windows"],
+      "reason": "the launcher rule is about the platform it names, not the one it runs on: the rule is asserted for both names on both platforms",
+      "verdict": "legitimate",
+      "note": "This is the shape that closes a gap instead of describing one."
+    },
+    "tests/test_backend_discovery.py::test_jadx_prefers_the_launcher_this_platform_executes": {
+      "kind": "branching",
+      "platforms": ["posix", "windows"],
+      "reason": "the launcher this platform executes is the one it prefers; the other platform's rule is asserted by the parameterised test above",
+      "verdict": "legitimate",
+      "note": "It runs on both platforms but asserts something different on each, so the two platforms do not verify each other's branch. The parameterised test is what covers the other side."
+    },
+    "tests/test_backend_timeout.py::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work": {
+      "kind": "skipped-on",
+      "platforms": ["posix"],
+      "reason": "the launcher tree is exercised natively above: a POSIX equivalent of the batch file has to be built as a shell script, which only exists on a POSIX platform",
+      "verdict": "legitimate",
+      "note": "One of the two reasons the two platforms report different pass counts. It runs on CI and not on the developer's Windows machine."
+    },
+    "tests/test_backend_timeout.py::test_a_windows_launcher_is_stopped_with_its_work": {
+      "kind": "skipped-on",
+      "platforms": ["windows"],
+      "reason": "a batch file is a Windows launcher: the shape the timeout has to handle (a cmd.exe whose child is the work) only exists there",
+      "verdict": "legitimate",
+      "note": "The other half of the pair. It runs on the developer's machine and not on CI."
+    }
+  },
+
+  "platform_sensitive_code": {
+    "scripts/refresh-report-figures.py::try_measurement_slot": {
+      "constructs": ["os.name"],
+      "reason": "the measurement lock is msvcrt on Windows and fcntl elsewhere; both are non-blocking, so a busy slot is reported as busy rather than waited for",
+      "verdict": "legitimate"
+    },
+    "scripts/render-demo.py::_posix": {
+      "constructs": ["sys.platform"],
+      "reason": "the MSYS bash that Git for Windows ships opens /g/x, not G:\\x, so the path is rewritten for that shell only",
+      "verdict": "legitimate",
+      "note": "Not a gate -- it captures the demo. It is listed because it is the one script under scripts/ that is Windows-shaped on purpose."
+    },
+    "scripts/verify-public-contracts.py::<module>": {
+      "constructs": ["tempfile.gettempdir"],
+      "reason": "the live check's workspace lives in the platform's temporary directory, which is why the CI jobs that run it have to redirect TMPDIR",
+      "verdict": "legitimate",
+      "note": "This is the line the contracts-without-jadx job's missing redirect bears on."
+    }
+  },
+
+  "coverage_gaps": {
+    "ci_only": [
+      "scripts/check-contract-records.py",
+      "scripts/check-gate-coverage.py",
+      "scripts/check-m10-snapshot.py",
+      "scripts/check-release-numbers.py",
+      "scripts/fetch-fixtures.sh",
+      "scripts/install-backends.sh",
+      "scripts/make-social-preview.py"
+    ],
+    "local_only": [
+      "scripts/accept-chip.sh",
+      "scripts/capture-demo.sh",
+      "scripts/create-milestone-issues.sh",
+      "scripts/fetch-jadx.py",
+      "scripts/linux-check.sh",
+      "scripts/prove-red.sh",
+      "scripts/remap-citations.py"
+    ],
+    "notes": {
+      "ci_only": "Every one of these is named by a workflow and by no local gate. Two of them are the blind spots the release checklist's section 8.2 asks a person to watch: the dependency audit and the Docker image are CI-only gates that no local command stands in for. The others are steps CI takes to make the suite runnable (fetch-fixtures.sh, install-backends.sh) or checks whose inputs CI has and a local machine may not (the contract records, the M10 snapshot, the outward release numbers).",
+      "local_only": "Neither a workflow nor the test suite names these, so only a person runs them. scripts/linux-check.sh is the sharpest one: it is the Linux-side sweep that exists because two defects passed every local test and failed on the runner, it is manual, it has to be run in WSL, and CI does not call it. scripts/prove-red.sh and scripts/remap-citations.py are steps of a method rather than gates. The scripts/m6_*.py files are one-off milestone drills from an earlier phase; they are local-only in the same sense and are left out of the list because they are history, not method.",
+      "not_platform_but_the_same_table": "The lint job installs a different set of extras than the local gate list does. That is an environment difference, not a platform one, and it is the same kind of thing: a gate that runs in two places that are not quite the same."
+    }
+  },
+
+  "local_gates": [
+    {
+      "name": "the test suite",
+      "command": "uv run --no-sync pytest -q",
+      "script": null,
+      "ci_jobs": ["test", "test-partial-backends", "m3-comparison"]
+    },
+    {
+      "name": "lint, format, types, dead code",
+      "command": "uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync mypy && uv run --no-sync vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80",
+      "script": null,
+      "ci_jobs": ["lint"]
+    },
+    {
+      "name": "the citation checker",
+      "command": "uv run --no-sync python scripts/check-doc-citations.py",
+      "script": "scripts/check-doc-citations.py",
+      "ci_jobs": ["test", "test-partial-backends"]
+    },
+    {
+      "name": "the version claims",
+      "command": "uv run --no-sync python scripts/check-version-claims.py --base auto",
+      "script": "scripts/check-version-claims.py",
+      "ci_jobs": ["lint"]
+    },
+    {
+      "name": "the measurement",
+      "command": "uv run --no-sync python scripts/refresh-report-figures.py",
+      "script": "scripts/refresh-report-figures.py",
+      "ci_jobs": ["measurement"],
+      "note": "CI runs it with --check, and only on a tag push."
+    },
+    {
+      "name": "the M10 self-check",
+      "command": "uv run --no-sync python scripts/m10_selfcheck.py",
+      "script": "scripts/m10_selfcheck.py",
+      "ci_jobs": ["m10-selfcheck"]
+    },
+    {
+      "name": "the live contract check",
+      "command": "uv run --no-sync python scripts/verify-public-contracts.py",
+      "script": "scripts/verify-public-contracts.py",
+      "ci_jobs": ["contracts"]
+    },
+    {
+      "name": "the platform gate reconciliation",
+      "command": "uv run --no-sync python scripts/check-platform-gates.py",
+      "script": "scripts/check-platform-gates.py",
+      "ci_jobs": ["test", "test-partial-backends"],
+      "note": "It runs in the test suite, so it runs wherever the suite runs. This is the mechanism half of the method: the reconciliation is not a command a person has to remember."
+    }
+  ]
+}

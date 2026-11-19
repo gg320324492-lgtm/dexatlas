@@ -258,6 +258,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_figures_auto_write.py` | 测量数字随测量走的机制：带生成标记的文档由脚本统一写、写不出的标记要中止；pytest 汇总行读不出来时不许读成 0 项 |
 | `test_release_numbers.py` | 对外文本同源比对：四份对外文本与执行报告的数逐个比上；已发布的那份正文对 v1.0.0 tag 树里的报告比，不拿新数去比旧正文 |
 | `test_docker_image_samples.py` | Docker 镜像带样本：Dockerfile 里 COPY 的位置（在最后一次 uv sync 之后）与 CI 那条镜像内实跑命令（相对路径 + 核计数） |
+| `test_platform_gate_inventory.py` | 本地门禁与 CI 门禁的差异核对：每个 CI job、每个平台相关的测试、每处平台敏感的行都要在清单里写明差异是否合法；新增一个正确的 CI job 不需要改任何数字（C15 新增） |
 
 ### 2.2 几类值得注意的测试
 
