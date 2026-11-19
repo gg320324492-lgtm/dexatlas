@@ -99,9 +99,9 @@
     },
     "release-numbers": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-release-numbers.py"],
+      "gate_scripts": ["scripts/check-release-numbers.py", "scripts/check-unguarded-numbers.py"],
       "temp_redirect": "yes",
-      "local_counterpart": "none -- the outward release numbers are checked only in CI"
+      "local_counterpart": "the hand-written numbers: uv run --no-sync python scripts/check-unguarded-numbers.py; the outward release numbers are checked only in CI"
     }
   },
 
@@ -205,6 +205,12 @@
       "name": "the version claims",
       "command": "uv run --no-sync python scripts/check-version-claims.py --base auto",
       "script": "scripts/check-version-claims.py",
+      "ci_jobs": ["lint"]
+    },
+    {
+      "name": "the hand-written numbers in the documents",
+      "command": "uv run --no-sync python scripts/check-unguarded-numbers.py",
+      "script": "scripts/check-unguarded-numbers.py",
       "ci_jobs": ["lint"]
     },
     {
