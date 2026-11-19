@@ -1,6 +1,6 @@
 # `docs/reports/` 索引
 
-这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**93 份报告**
+这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**94 份报告**
 （**这是 2026-11-18 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
 看到的是一堵墙；不知道哪一份是现状、哪一份是当时的快照、哪一份已经被后面的检查推翻了。
 
@@ -25,8 +25,8 @@
 | [§3 里程碑与对外准备度](#3-里程碑与对外准备度) | 6 | 这个项目作为对外作品集是什么成色 |
 | [§4 M10 独立验收材料](#4-m10-独立验收材料) | 11 | 外部独立验收要执行的那套完整流程 |
 | [§5 v1.0.0 发版材料](#5-v100-发版材料) | 8 | 发版要发什么、凭什么、怎么发 |
-| [§6 本轮审计与走查](#6-本轮审计与走查2026-11-17–18) | 62 | 发版前最后一轮找出来的问题，以及怎么处置的 |
-| 合计 | 93 | |
+| [§6 本轮审计与走查](#6-本轮审计与走查2026-11-17–18) | 55 | 发版前最后一轮找出来的问题，以及怎么处置的 |
+| 合计 | 94 | |
 
 **每个「份数」就是该节表格的行数**（§7「历史记录」是横切视角，点名的文件都已计在上面的
 分组里，不另计份数）。要核某一节，就数那一节的行。
@@ -39,7 +39,7 @@ ls docs/reports/*.md | wc -l      # 减掉本页自己（README.md）就是报�
 ```
 
 **下面 §1–§6 的每一行都点名了一个文件**，所以「哪几份没被收录」可以直接比出来。
-（2026-11-18 复核：目录里 93 个 `.md` **全部被点名，无遗漏**——§1–§6 每行点一个文件，合计 99 行；§7 那张表点名的 8 份**都已在 §1–§6 里出现过**，它一份新的都没加，所以不另计份数。上面各节的「份数」是**该节表格的行数**。）
+（2026-11-18 复核：目录里 94 个 `.md` **全部被点名，无遗漏**——§1–§6 每行点一个文件，合计 79 行；§7 那张表点名的 8 份**都已在 §1–§6 里出现过**，它一份新的都没加，所以不另计份数。上面各节的「份数」是**该节表格的行数**。）
 
 §7「历史记录」是横切视角，点名的文件都已计在上面的分组里，不另计份数。
 
@@ -57,11 +57,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | 报告 | 回答什么 | 什么时候看它 |
 |---|---|---|
 | [phase1-execution-report.md](phase1-execution-report.md) | Phase 1 执行报告（v0.1.0）：落地了什么、每项能力对应哪些文件。**README 徽章与执行报告里的 `<!--fig:…-->` 数字由 `scripts/refresh-report-figures.py` 填进这份文件的表格**，不是手写的。 | 想知道「报告里某个数字是从哪来的」时看它；想知道 Phase 1 的交付范围时看它。 |
-| [phase1-review-report.md](phase1-review-report.md) | Phase 1 源码评审报告（基准 `8df894b` 及其后修复）：按评审协议逐条判定通过与否。 | 要判断 Phase 1 是否真的过了评审时看它。 |
 | [phase1-maturity-assessment.md](phase1-maturity-assessment.md) | Phase 1 成熟度评估（评估对象 DexAtlas @ `b8ef71a`，2026-10-21）：只记「能跑出来、能指到行号」的证据，并给出阶段判断。 | 想看「当时为什么认为项目到了某个阶段」时看它。 |
-| [phase1-findings-ledger.md](phase1-findings-ledger.md) | 阶段验收的**证据台账**：每条发现当时是怎么独立复验的（不采信评审 agent 的自述）。 | 想追问「某条发现凭什么算证据」时看它；单条发现的现状看 [§7](#7-历史记录不要当现状读)。 |
-| [phase2-issue-list.md](phase2-issue-list.md) | Phase 2 开工清单：被评审推迟的发现逐条写成可执行 issue（现状、代价、两种方案、推荐、验收标准、钉住它的测试怎么写）。 | 要接手 Phase 2 的遗留项时看它。 |
-| [claim-mismatches.md](claim-mismatches.md) | `phase2-issue-list.md` 第 8 节那 25 处「注释/docstring 与代码不一致」（编号 M1–M24）的逐条复核，量于 `8df894b`。 | 要查某一处注释是否还跟得上代码时看它。**这是快照，不是现状**，见 §7。 |
 | [phase3-baseline.md](phase3-baseline.md) | Phase 3 M5 基线校准：对外声明有什么证据、三份 benchmark 能否从原始 trace 重算、还剩哪些问题。 | 想确认「对外说的每个数都能重算」时看它。 |
 
 ## 2. M4 / M8 验收与模型可禁用性
@@ -78,12 +74,9 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 
 | 报告 | 回答什么 | 什么时候看它 |
 |---|---|---|
-| [portfolio-readiness-2026-11-15.md](portfolio-readiness-2026-11-15.md) | GitHub / Upwork 作品集准备度评估（基准 `752d10a`）。**已被同日的复评取代，见 §7。** | 想看这套评分维度与等级定义是怎么定的时看它。 |
-| [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md) | 同一套评分表对当前树（基准 `da69f5d`）的复评。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-15 对外材料是什么成色」时看它。**已被 2026-11-18 的第二轮复评取代，见下一行。** |
 | [portfolio-readiness-2026-11-18.md](portfolio-readiness-2026-11-18.md) | 同一套评分表的**第二轮复评**（基准为 2026-11-18 的树）：GitHub 85.0%、Upwork 81.9%，两处仍差半档（首次试用、客户交付件），独立使用验证仍缺。**作者自评，不是独立验收结论。** | 要看「截至 2026-11-18 对外材料是什么成色」时看它。 |
 | [next-engagements.md](next-engagements.md) | 下一轮**可接什么活**的纪要（只读调研）：两个服务方向、为什么建议先接 1–2 个便宜试点、以及发布前 12 步清单（第 1 步是发出 M10 邀请函）。**不含任何报价或费率**——仓库里没有价格依据。 | 要决定「下一轮接什么活、什么时候对外发布」时看它。 |
 | [v1.1.0-candidates.md](v1.1.0-candidates.md) | 下一轮（v1.1.0）的**需求候选清单**：15 项候选，每项写明解决的缺口、可交付物、做完判据、依赖与估时（估时按仓库实测口径，不是拍脑袋）。**调研产出，不是已排期的计划。** | 要看「下一轮可以做什么、每项做完算不算完」时看它。 |
-| [case-studies-run-correspondence.md](case-studies-run-correspondence.md) | 案例证据包与「三次分析」的**实测对应关系**（基准 `d43369b`，sha256 逐个实测）：三个案例包实际只覆盖**两次**分析——`demo` 与 `api-integration` 同出 `run_e112e717…`，两者 `report.md`/`report.html` 逐字节相同；`obfuscated` 出自另一次 `run_8d6735d…`。还查出**走查正文引用的会话与附件承载的运行不是同一次**（耗时与 run id 对不上），以及包内 `report.json` 与散装 `report.json` 差两个时间戳字段。含「第三个包补不补」的结论、方案与代价。**这段结论已被后续补包推翻——见 [case-studies-third-package.md](case-studies-third-package.md)。** | 要对外说清「几个案例、几次分析、几份证据」，或要把第 3 篇换成它自己那次分析的包时看它。 |
 
 ## 4. M10 独立验收材料
 
@@ -96,8 +89,6 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [m10-reader-package.md](m10-reader-package.md) | 上面那份准备包整理成的**一站式执行包**：从它出发，读者不需要再向作者要任何步骤。 | 读者拿到验收任务、问「我该从哪开始」时看它。 |
 | [m10-reader-kit.md](m10-reader-kit.md) | 配套工具包：评分表、回填说明、常见问答。**不含任何结论，也不预填分数。** | 读者开始填表时看它。 |
 | [m10-executive-summary.md](m10-executive-summary.md) | 一页版执行摘要：项目是什么、验收要回答什么问题、读者要做哪几步、要多久、交回什么。 | 读者问「这事大概要花我多久」时看它。 |
-| [m10-invitation-final.md](m10-invitation-final.md) | 邀请函**成稿**：验收 commit 已钉定到 v1.0.0 发版 commit，只差发起人把完整 hash 填进占位符。**发之前只剩一件事**：把成稿第二节的完整 hash 填进去（`git rev-parse v1.0.0^{commit}` → 当前指向的 commit；**tag 会被重打，所以填之前现查，不要抄本索引里的旧值**）。原先那条「tag 仍停在旧 commit、成稿还不能发」的限制**已经解除**——`v1.0.0` tag 已重打并推上远端，`origin/main` 在其上继续推进（发版后的文档修正 ✓）（原发现记在 [`m10-reader-walkthrough-2nd.md`](m10-reader-walkthrough-2nd.md) 的 N1 ✓）。 | 要把验收正式发出去时看它；**发之前先确认 tag 与远端都已经推进。** |
-| [m10-invitation-template.md](m10-invitation-template.md) | 邀请函**模板**：正文仍以「发起人钉定的固定 commit」表述，保持模板对后续轮次的通用性——但**验收 commit 已钉定为 v1.0.0 发版 commit**，**只有完整 hash 未填**，那串 hash 写在成稿第二节的占位符里（模板本身不预设具体 hash）。**成稿见上一行，模板见 §7。** | 需要改写信封语气、或另邀一位评审者时看它。 |
 | [m10-review-record-template.md](m10-review-record-template.md) | 验收记录模板（空白）：记录元数据、首次读者会话记录、评分回填。**填完不等于 M10 完成。** | 评审者要记录验收过程时看它。 |
 | [m10-selfcheck.md](m10-selfcheck.md) | 作者侧自动化预检（`scripts/m10_selfcheck.py`）的自测记录。**不产生任何「通过/不通过」判定。** | 提交验收材料前，作者想先抓文档层面的错时看它。 |
 | [m10-invitation-sender-checklist.md](m10-invitation-sender-checklist.md) | 发起人**发出邀请前**要逐条走完的清单：填邀请函剩下的空格、钉定验收 commit、确认三个后端在位、跑自查。**它不替发起人执行任何动作**——不打 tag、不推送、不发送。 | 邀请函要发出去之前，发起人自己照着走一遍时看它。 |
@@ -108,11 +99,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 
 | 报告 | 回答什么 | 什么时候看它 |
 |---|---|---|
-| [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md) | 发版**前**必须完成或明确接受的事项（该清单的 §1–§6 是流程，§7 是 2026-11-17 这一轮实际踩到、已改进过代码的八条坑）。**核对清单，不是发版执行记录。** | 要发版、或要复盘「这一轮发版踩了哪些坑」时看它。 |
 | [v1.0.0-github-release-body.md](v1.0.0-github-release-body.md) | GitHub Release 正文的草稿：每个数字都逐字抄自仓库里的落盘文件，并给出出处；附录是数字溯源表，**贴 Release 时不贴附录**。 | 要贴 Release 正文时看它。 |
-| [v1.0.0-release-runbook.md](v1.0.0-release-runbook.md) | 发版**流程**预研（runbook 草案）：顺序、门禁、前提。**不发布、不打 tag、不改版本号。** | 要照着走一遍发版流程时看它。**是预研稿，已被执行，见 §7。** |
-| [v1.0.0-release-commit-draft.md](v1.0.0-release-commit-draft.md) | 发版 commit 的完整变更清单与 commit message 草案。**不执行发版。** | 要照着起草发版 commit 时看它。**是草案，已被执行，见 §7。** |
-| [v1.0.0-dry-run.md](v1.0.0-dry-run.md) | 发版流程的**本地预演**（2026-11-16）：只核对流程与证据，不创建 tag、不发布、不改版本号。 | **预演记录，不是发版执行记录**，见 §7。 |
 | [release-process-dry-run.md](release-process-dry-run.md) | 发版**清单本身**的实走演练（2026-11-18）：照 `v1.0.0-release-checklist.md` 走一遍，**75 行判定表**里 **17 行**判「不一致」、**2 行**缺失/不完整、**16 处**前提过期。**只读演练：没有打 tag、没有推送、没有建 Release。** 全部判定只对演练克隆里的 `75976e0` 那棵树成立。**只读演练：没有打 tag、没有推送、没有建 Release。** | 要知道「发版清单哪里对不上现实」时看它；清单已按它的发现修过一轮。 |
 | [v1.0.0-ci-run-record.md](v1.0.0-ci-run-record.md) | `v1.0.0` 这个 tag 的**每一次 CI run** 落盘记录：run 编号、时间、headSha、逐 job 结论，以及 tag 为何被重打过多次、其中一次以 `failure` 结束（4 个 job 红）。末尾留了「待补：最终 run」的占位。 | 要查「这个发布版本的 CI 结论到底是什么」时看它。 |
 | [social-preview-howto.md](social-preview-howto.md) | GitHub social preview 图怎么设（图只能手动设，GitHub 没有 API），以及图上每一个字、每一个数是从哪个文件的哪一行读出来的。 | 要换那张图、或要核对图上的数字与报告是否一致时看它。 |
@@ -126,7 +113,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 
 这一节回答「本轮 v1.0.0 发版审计产生了哪些报告」。
 
-这六十二份报告**以只读审计为主**：审计方不改被核的代码或文案，只记录发现与依据，
+这五十五份报告**以只读审计为主**：审计方不改被核的代码或文案，只记录发现与依据，
 改动由主线按清单执行。所以每份报告里既有「必须改的 N 处」，也有「已经改好了」的复核结果。
 **三十份报告的数字都锚在各自的基线上**——基线之后的变动写在报告开头的声明里，读的时候
 先看那段。
@@ -140,8 +127,6 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [release-notes-consistency.md](release-notes-consistency.md) | 两份面向读者的发布文本（发版说明与 Release 正文）之间有没有互相矛盾的数字。结论：没有矛盾数字，但有 **9 处**「一边有、一边无」或口径不等价必须统一（含 M10 尚未开始这条边界、Licence 与第三方后端不随项目分发、窄验证第 1 轮的具体数字、复测 token 数与 A/B 对照数）。 | 7 处按复核报告改进提交 `85a63e8`；验证口径、窄验证闸门槛与方案 3 具名、Release 正文附录重锚进提交 `b9ed1d7`；契约活检分母与第 11 个 MCP 工具名进提交 `2459601`。 |
 | [changelog-vs-release-notes.md](changelog-vs-release-notes.md) | `CHANGELOG.md` 的 `[1.0.0]` 段、发版说明、Release 正文**三方同源核对**。结论：**仍须统一的 12 处**，最严重的是 CHANGELOG 同一节内对「退出码 6 是否已实施」自相矛盾，以及「MCP 十个工具」与同文件「十一个」直接冲突；另给出 retest3 / retest4 / 窄验证三套口径的区分规则。 | CHANGELOG `[1.0.0]` 段的 6 处进提交 `b60ae35`；发版说明与 Release 正文的相关条目进提交 `b9ed1d7`、`2459601`；本报告由提交 `a9f09e8` 收进仓库。 |
 | [stale-number-scan.md](stale-number-scan.md) | 全库过期数字扫描（只读）。结论：**必须改的 52 处**，分七组——退出码 6 没同步进全部落盘材料、MCP 工具数 11 没同步进全部文档、发版已落地为 1.0.0 而文档仍写旧版本号、`docs/status.md` 的「真模型对照」段是上一轮测量、其他与仓库不符的数字与说法、公共契约活检分母过期、基准文档里的数字错误。另排除历史陈述 **30 处**与计划待办 **21 处**（该报告 §2 末尾两段逐条给了理由：历史陈述见 `stale-number-scan.md:177`、计划待办见 `stale-number-scan.md:207`，这两类不算过期）。 | `docs/status.md` 的「真模型对照」段与基准文档进提交 `3b3a1bb`（按仓库自己的 trace 复算后改写）；安装说明、出处文档、提案、作品集、两份 README 与 dry-run 进提交 `5aab5c0`；架构与契约文档进提交 `1917a23`；CHANGELOG `[1.0.0]` 段进提交 `b60ae35`。 |
-| [m10-reader-walkthrough.md](m10-reader-walkthrough.md) | 第一轮读者视角走查：一位没参与开发的外部评审者通读 M10 四份材料，会卡在哪。结论：**29 条独立问题**（路径/命令失效 8、数字矛盾 12、术语未定义 3、顺序缺失 3、重复或自相矛盾 5、过度承诺或含糊 4、该有而没有 5；分类含跨类，故分项之和大于 29）。 | 退出码 6 同步进三份验收材料并重定位引用（提交 `599ab67`）；M8-4 三处说法统一、钉定 commit 换成 v1.0.0 发版占位符（提交 `c4785ee`）；M10 自查口径改成 0–6（提交 `144d5a9`）。 |
-| [m10-reader-walkthrough-2nd.md](m10-reader-walkthrough-2nd.md) | 第二轮读者视角走查：上一轮那 29 条是否真的关闭，修正本身有没有引入新问题。结论：**已关闭 23 条、未关闭 5 条（A12、B1–B3、C7）、判定有误 1 条（C5）**，另新发现 8 条；其中最严重的一条（**N1**）指出重打 tag 之前不能发邀请函——**这一条至今未关闭**：`v1.0.0` tag 与 `origin/main` 都还停在 `8f9ddca`，落后当前树。 | 最后一批修正（N2–N8、A12、C7）进提交 `ef82439`；M10 读者材料与验收 commit 重钉合并进提交 `02e6d9c`。**N1（重打 `v1.0.0` tag、把远端推进到最终 commit）未处理。** |
 | [final-outward-consistency.md](final-outward-consistency.md) | 发布前最终一致性复核：七份对外文本放在一起读，会不会互相打架。结论：**必须统一的 23 处**，分九组（M6 首测验收线、停机轮次、契约活检条数、CHANGELOG 过期数字、Phase 3 状态措辞、v1.0.0 发布门槛、退出码 6 的定位、案例附件表述、中英对等）。 | 23 处按清单逐条统一进提交 `0403847`（合并进 `e1a1587`）；其中契约活检条数那两处主线程已先行解决（提交 `a3bbd3c`），该提交只做核对。 |
 | [english-reader-review.md](english-reader-review.md) | 英文读者视角终检（只读复核）：五份对外英文文本，一个没有项目背景的人读完能不能顺畅读下去、会形成什么印象。判据不是「与源码是否一致」，而是「读者会怎么读、怎么想」。**未修改任何被核文本。** | 要判断英文读者会不会被措辞绊住、会不会形成错觉时看它。16 处修正进提交 `7ba97c9`。 |
 | [english-reader-review-2.md](english-reader-review-2.md) | 英文读者视角终检**第二轮**（只读复核）：这一轮新合并的三份报告与修订后的发版清单，英文读者读完会不会做出错误结论。结论：**19 处必须改**（同一件事两份报告给了相反答案且错的那句进了评分证据、「73 项判定」复算不出来、源指纹四个值、索引份数三个数……），另 16 条未定义术语、**20 行（19 项不同的数）**缺分母、8 处缺树限定语、10 处自相矛盾。**未修改任何被核文档。** | 要知道「这一轮新材料对英文读者说了什么错话」时看它；清单与两份报告已按它的发现修过。 |
@@ -181,12 +166,6 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [c5-c6-status-alignment.md](c5-c6-status-alignment.md) | 候选 **C5 与 C6 的状态与现实对齐**：C6 走的判据 (a) 已落地（镜像自带样本 ✓、CI 在镜像内实跑并核计数 ✓、构建时间的新口径单点存放 ✓），C5 的 multi-DEX 证据包早已入库 ✓；**「镜像内未本地实跑、由 CI 验证」这一点如实留在状态里** ✓（不写成「已验证跑通」✓）。 | 候选清单里**写着一个数的 13 处口径全部改齐** ✓（已完成 5→7 ✓、仓库内可做 5→3 ✓、总数仍 17 ✓）。 |
 | [m10-reader-rehearsal-3rd.md](m10-reader-rehearsal-3rd.md) | M10 材料的**第三轮**读者视角预演（只读）：上一轮那 11 条修复**实跑全部通过** ✓；但 tag 指向的树仍是**修复前**的树 ✓，读者 checkout `v1.0.0` 读到的还是旧稿 ✓（重打 tag 即解决 ✓）。另新发现**三条与 tag 无关**的缺口：**S-5**（C2 没给 locator 解析的命令 ★）、**M-8**（evidence 的三个字段不在 JSON 顶层 ★）、**M-9**（判据的词与 API 实际字段对不上 ★）。 | 40 项的归属：**能自己判 35 / 必须问作者 4 / 没判据 1**（上一轮是 39 / 1 / 0 ✓）；F3 会随 tag 重打而自己好 ✓。 |
 | [platform-gate-inventory.md](platform-gate-inventory.md) | 候选 **C15** 的核对方法三件套：**清单**（`scripts/platform-gates.json` ✓）、**机制**（`scripts/check-platform-gates.py` ✓，接进测试套件 ✓）、**记录**（本文件 ✓）—— 哪些门禁是**平台相关**的、差异为什么有、哪些差异是**合法的**（如 POSIX launcher 测试在 Windows 上按设计跳过 ✓）。 | 守的是**性质**而不是个数 ✓（「每个跑 uv 的 job 都重定向了临时目录」✓），因此**每加一个 CI job 不必再改一个写死的数** ✓；方法查出一个**真缺陷**：CI 的 `contracts-without-jadx` job 缺临时目录重定向 ✓。 |
-| [ci-temp-redirect-fix.md](ci-temp-redirect-fix.md) | C15 的核对方法查出的**真缺陷**与它的修法：CI 的 `contracts-without-jadx` job 跑 `uv` 却**没把临时目录重定向到工作区** ✓ → 补上那一步 ✓；清单里它的声明从 `defect` 改成 `yes` ✓（性质从「被记着」变成「被守着」✓）；另加一条回归测试**堵住 `defect` 这个逃生舱** ✓。 | `ci.yml` 里「Keep generated files in .scratch」的标记从 10 处到 11 处 ✓、YAML 仍能解析 ✓；那条「数着 10/12 个 job」的测试**已退役** ✓ —— C15 的机制接管 ✓（守性质而不是守个数 ✓）。 |
-| [m10-round3-fixes.md](m10-round3-fixes.md) | 第三轮读者预演记下的缺口逐条处置：**S-5**（C2 补一条可照抄的 locator 解析命令 ★）、**M-8**（evidence 的「工具、版本、locator」三个字段不在 JSON 顶层 ★，材料改成指 `provenance` ✓）、**M-9**（判据的词与 API 实际返回的字段对不上 ★）、**G5**（判据改成包里能判的那几条，「未引用字符串」交给 manifest 的声明 ✓）、以及 **F2 的端口退路**（原来那判据会**假通过** ✓ → 判断依据改成 uvicorn 的日志 ✓）。 | 纯文档 ✓、未动任何 `.py` ✓；门禁全绿 ✓。剩下的只有 tag 尚未重打 ✓ —— 读者读到的仍是旧稿 ✓。 |
-| [citation-anchor-declarations.md](citation-anchor-declarations.md) | 让「只指位置」的引用**自己声明它声称的内容** ✓：一条引用后跟一个 `anchor:` 跨度 ✓（装着一个稳定的名字或源码片段 ✓ —— **不随行号漂** ✓、**也不随数值漂** ✓）→ 机器就能比 ✓，而不是靠猜 ✓。试点在**契约表** ✓（59 处逐条改完 ✓）。 | 改的过程中**实测出其中 13 处原本就指错了地方** ✓（检查器此前看不见 ✓ —— 它们落在非空行上 ✓）；检查器新增「声明型文档」的强制规则 ✓。 |
-| [handwritten-numbers-audit.md](handwritten-numbers-audit.md) | 「数字随测量走」还差哪些手写数：**只读审计** ✓ —— `docs/` 与仓库根下每一处**手写的测量数** ✓，逐处说清「是什么数 ✓、谁在检它 ✓、陈旧了会怎样 ✓、该改成标记还是该另设门禁 ✓」✓。 | 查出 **10 处没人守** ✓ 的手写数 ✓（陈旧了**静默**✓ —— 没有任何门禁会报 ✓），其中 portfolio.md 的 1,695 ✓、how-to-verify 的 1664/31/27 ✓、publish-review.md 的 1,695/93.3% ✓ **已经过期** ✓；按「静默过期 **且** 读者会照着核对」排了优先级 ✓。 |
-| [citation-value-comparison.md](citation-value-comparison.md) | 让引用检查器能验「**句中含具体值**」的那一类 ✓：引用句里的值与被引那一行的实际值比 ✓ —— 本轮实测到那 3 条错位**全在这一类** ✓，值比对能一次抓住 ✓。认不出值的那类（裸数字 ✓、限值 ✓、版本号 ✓、派生值 ✓……）归「**无法比对**」而不是误报 ✓。 | 判据与边界（带量词的计数 ✓、百分数 ✓、指纹 ✓；表格行按单元格 ✓、散文按距离 ✓、点了符号就不比值 ✓、点名另一棵树就整段不比 ✓）写在报告里 ✓；**13 处真发现**全在 release body 的附录表里 ✓ —— 留给主会话按语义重锚 ✓。 |
-| [m10-reader-rehearsal-4th.md](m10-reader-rehearsal-4th.md) | M10 材料的**第四轮**读者视角预演（只读）：上一轮那 5 条修复**内容全部成立** ✓，**但 5 条一条都没进 tag** ✓ —— `v1.0.0` 仍指 `2715aef` ✓，tag 树里五个特征串 `git grep -F -c` 命中**全为 0** ✓（重打 tag 的硬证据 ✓）。**真正验到了 F2 的退路** ✓（本机 8000 与 8011 恰好都被占 ✓）。新挖 **5 条**（卡住 2 ✓ / 误读 2 ✓ / 多余 1 ✓），4 条直接来自上一轮那批修复 ✓：S-7（locator 解析命令的**启动竞态** ✓）、S-8（裸树与文件级两行**输出形状几乎一样** ✓）、M-10（退路判据引用的**日志字面串在真日志里不存在** ✓）、M-11（「还没导出就先跑」**顺序歧义** ✓）、X-4（G3 同节两段「实测」措辞来自**两种不同运行结局** ✓）。 | 40 项归属：修复后的树 **39/1/0** ✓、tag 树 **35/4/1** ✓。另订正第三轮报告对第一轮数字的记错 ✓（33/5/2、41 步 ✗ → **39/1/0、34 步** ✓）。 |
 | [m10-reader-rehearsal-4th.md](m10-reader-rehearsal-4th.md) | M10 材料的**第四轮**读者视角预演（只读）：上一轮那 5 条修复**内容全部成立** ✓，**但 5 条一条都没进 tag** ✓ —— tag 树里五个特征串 `git grep -F -c` 命中**全为 0** ✓（重打 tag 的硬证据 ✓）。**真正验到了 F2 的退路** ✓（本机 8000 与 8011 恰好都被占 ✓）。新挖 **5 条**（S-7 启动竞态 ✓、S-8 两行输出形状几乎一样 ✓、M-10 日志字面串不存在 ✓、M-11 顺序歧义 ✓、X-4 第三种措辞没提 ✓），4 条直接来自上一轮那批修复 ✓。 | 40 项归属：修复后的树 **39/1/0** ✓、tag 树 **35/4/1** ✓；另订正第三轮对第一轮数字的记错 ✓。 |
 | [citation-value-comparison.md](citation-value-comparison.md) | 让引用检查器能验「**句中含具体值**」的那一类 ✓：引用句里的值与被引那一行的实际值比 ✓ —— 本轮那 3 条错位**全在这一类** ✓，值比对能一次抓住 ✓。认不出的（裸数字 ✓、限值 ✓、版本号 ✓、派生值 ✓……）归「**无法比对**」而不是误报 ✓。 | 判据与边界写在报告里 ✓（表格行按单元格 ✓、散文按距离 ✓、点了符号就不比值 ✓、点名另一棵树就整段不比 ✓）；**13 处真发现**全在 release body 的附录表里 ✓。 |
 | [citation-anchor-declarations.md](citation-anchor-declarations.md) | 让「只指位置」的引用**自己声明它声称的内容** ✓：一条引用后跟一个 `anchor:` 跨度 ✓（稳定的名字或源码片段 ✓ —— **不随行号漂** ✓、**也不随数值漂** ✓）→ 机器就能比 ✓。试点在**契约表** ✓（59 处逐条改完 ✓）。 | 过程中**实测出其中 13 处原本就指错的地方** ✓（检查器此前看不见 ✓ —— 它们落在非空行上 ✓）；检查器新增「声明型文档」的强制规则 ✓；另查出检查器 `clauses()` 的一个既有缺陷 ✓（围栏代码块会让后面的引用失去检查 ✓），补丁交给主会话排期 ✓。 |
@@ -195,6 +174,10 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [ci-temp-redirect-fix.md](ci-temp-redirect-fix.md) | C15 的核对方法查出的**真缺陷**与修法：CI 的 `contracts-without-jadx` job 跑 `uv` 却**没把临时目录重定向到工作区** ✓ → 补上 ✓；清单里它的声明从 `defect` 改成 `yes` ✓（性质从「被记着」变成「被守着」✓）；另加一条回归测试**堵住 `defect` 这个逃生舱** ✓。 | 那条「数着 10/12 个 job」的测试**已退役** ✓ —— C15 的机制接管 ✓（守性质而不是守个数 ✓）。 |
 | [m10-round3-fixes.md](m10-round3-fixes.md) | 第三轮读者预演记下的缺口逐条处置：**S-5**（C2 补一条可照抄的 locator 解析命令 ★）、**M-8**（evidence 的「工具、版本、locator」三个字段**不在 JSON 顶层** ★，材料改成指 `provenance` ✓）、**M-9**（判据的词与 API 实际返回的字段对不上 ★）、**G5**（判据改成**包里能判**的那几条 ✓，「未引用字符串」交给 manifest 的声明 ✓）、**F2 的端口退路**（原判据会**假通过** ✓ → 判断依据改成 uvicorn 的日志 ✓）。 | 纯文档 ✓、未动任何 `.py` ✓；门禁全绿 ✓。剩下的只有 tag 尚未重打 ✓ —— 读者读到的仍是旧稿 ✓。 |
 | [declarations-outward.md](declarations-outward.md) | 把「引用带声明」**推到对外文本** ✓：**208 处**「只指位置」的引用全部带上声明 ✓、**重锚 80 处** ✓（先改读者会照着核对的那几份 ✓ —— 作者定的范围 ✓）。 | 过程中**实测出 19 处原本就指错的引用** ✓；6 条 pytest 失败与 16 处漂移**还原 HEAD 验过** ✓ —— 都是本批之前就红的 ✓。 |
+| [unguarded-numbers-gates.md](unguarded-numbers-gates.md) | 给审计查出的 **10 处无人守** ✓ 的手写测量数配门禁（或明确不归 ✓）：新门禁守的是**性质** ✓（「文档说的与测量出来的一致」✓），**不是写死的数** ✓ —— 这一轮刚栽过两个写死数的跟头 ✓（CI 的 job 数 ✓、引用行号 ✓）；另加回归测试**堵住 `defect` 逃生舱** ✓，并把那条「数着 10/12 个 job」的测试退役 ✓。 | `scripts/check-unguarded-numbers.py` ✓ + `scripts/unguarded-numbers.json` ✓ + `tests/test_unguarded_numbers.py` ✓；**红→绿**证过 ✓；「仍然没人守的」那一栏**不空** ✓ ✓。 |
+| [case-studies-run-correspondence.md](case-studies-run-correspondence.md) | 案例证据包与「三次分析」的**实测对应关系**（基准 `d43369b`，sha256 逐个实测）：三个案例包实际只覆盖**两次**分析——`demo` 与 `api-integration` 同出 `run_e112e717…`，两者 `report.md`/`report.html` 逐字节相同；`obfuscated` 出自另一次 `run_8d6735d…`。还查出**走查正文引用的会话与附件承载的运行不是同一次**（耗时与 run id 对不上），以及包内 `report.json` 与散装 `report.json` 差两个时间戳字段。含「第三个包补不补」的结论、方案与代价。**这段结论已被后续补包推翻——见 [case-studies-third-package.md](case-studies-third-package.md)。** | 要对外说清「几个案例、几次分析、几份证据」，或要把第 3 篇换成它自己那次分析的包时看它。 |
+| [claim-mismatches.md](claim-mismatches.md) | M1–M24 的复核量于 `8df894b`（2026-10-21），此后落地了五个大变更，文件开头就说明了这一点。 | [phase2-issue-list.md](phase2-issue-list.md) 第 8 节与当前源码。 |
+| [v1.0.0-dry-run.md](v1.0.0-dry-run.md) | 发版流程的本地**预演**（2026-11-16，基准是 main 的一个旧提交），文件开头就写明「预演，非发版执行记录」；不创建 tag、不发布、不改版本号。发版此后已经发生。 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md)（该清单的 §7 记着这一轮实际踩到的八条坑）；发版结果看 [`docs/releases/v1.0.0.md`](../releases/v1.0.0.md) 与 git tag。 |
 
 ## 7. 历史记录：不要当现状读
 
@@ -205,13 +188,11 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 
 | 文件 | 为什么是历史记录 | 以哪一份为准 |
 |---|---|---|
-| [v1.0.0-dry-run.md](v1.0.0-dry-run.md) | 发版流程的本地**预演**（2026-11-16，基准是 main 的一个旧提交），文件开头就写明「预演，非发版执行记录」；不创建 tag、不发布、不改版本号。发版此后已经发生。 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md)（该清单的 §7 记着这一轮实际踩到的八条坑）；发版结果看 [`docs/releases/v1.0.0.md`](../releases/v1.0.0.md) 与 git tag。 |
 | [v1.0.0-release-runbook.md](v1.0.0-release-runbook.md) | **预研文档**，基准是发版前的合并成果 `c3586d8`；发版流程此后已经走完。 | [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md) 与实际发版提交。 |
 | [v1.0.0-release-commit-draft.md](v1.0.0-release-commit-draft.md) | 发版 commit 的**草案**，不执行发版；实际发版提交已经存在。 | 实际发版提交与 [`CHANGELOG.md`](../../CHANGELOG.md) 的 `[1.0.0]` 段。 |
 | [portfolio-readiness-2026-11-15.md](portfolio-readiness-2026-11-15.md) | 作品集准备度的**基线评估**（基准 `752d10a`），当日就被复评取代。 | [portfolio-readiness-2026-11-15-recheck.md](portfolio-readiness-2026-11-15-recheck.md)。 |
 | [m10-reader-walkthrough.md](m10-reader-walkthrough.md) | 第一轮走查的问题清单。它的**问题判定**已经被第二轮逐条复核（23 条关闭、5 条未关闭、1 条判定有误），当作「现在还有这些问题」读就错了。 | [m10-reader-walkthrough-2nd.md](m10-reader-walkthrough-2nd.md)。 |
 | [m10-invitation-template.md](m10-invitation-template.md) | 邀请函**模板**：验收 commit 那一格保持空白，**只有完整 hash 未填**（hash 写在成稿的占位符里），commit 本身已钉定为 v1.0.0 发版 commit。 | [m10-invitation-final.md](m10-invitation-final.md)。 |
-| [claim-mismatches.md](claim-mismatches.md) | M1–M24 的复核量于 `8df894b`（2026-10-21），此后落地了五个大变更，文件开头就说明了这一点。 | [phase2-issue-list.md](phase2-issue-list.md) 第 8 节与当前源码。 |
 | [phase1-findings-ledger.md](phase1-findings-ledger.md) | 台账记的是**复验当时**的状态（基准 `8df894b`），文件开头指明每条发现的现状在别处。 | [phase1-review-report.md](phase1-review-report.md) 与 [phase2-issue-list.md](phase2-issue-list.md)。 |
 
 另外三条通则，比单份文件更要紧：

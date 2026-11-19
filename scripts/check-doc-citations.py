@@ -233,13 +233,9 @@ DOCS: list[pathlib.Path] = [
     # The report of the batch that fixed the CI job that was missing its
     # temporary-directory redirect, and the one that closed the gaps the
     # third reader rehearsal found in the M10 materials.
-    REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
-    REPO / "docs" / "reports" / "m10-round3-fixes.md",
     # The reports of the batch that let the citations declare what they
     # claim, and the read-only audit of the hand-written numbers the
     # mechanism does not cover.
-    REPO / "docs" / "reports" / "citation-anchor-declarations.md",
-    REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
     # The report of the batch that taught the checker to compare the values a
     # citation states with the values on the lines it names.
     REPO / "docs" / "reports" / "citation-value-comparison.md",
@@ -249,6 +245,9 @@ DOCS: list[pathlib.Path] = [
     REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
     REPO / "docs" / "reports" / "m10-round3-fixes.md",
     REPO / "docs" / "reports" / "declarations-outward.md",
+    # The report of the batch that gave the unguarded hand-written
+    # numbers their gates (or an explicit reason not to).
+    REPO / "docs" / "reports" / "unguarded-numbers-gates.md",
     # The report of the fourth reader rehearsal: the one that proved the
     # five material fixes had never reached the tagged tree, and that the
     # F2 fallback really falls back when both ports are taken.
