@@ -438,7 +438,7 @@ v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的
 
 | 文件 | 改了什么 | 为什么 |
 |---|---|---|
-| `.github/workflows/ci.yml` | `release-numbers` job 的 checkout 加了 `fetch-depth: 0`（`.github/workflows/ci.yml:786`） | 第二段要读 **tag 树**里的报告，而那个 job 原来的 checkout 是**浅克隆**，里面没有 `v1.0.0` 这个 tag。同一份文件里另外四个需要 tag 的 job 早就是 `fetch-depth: 0` 了，这里是照着它们的样子加的 |
+| `.github/workflows/ci.yml` | `release-numbers` job 的 checkout 加了 `fetch-depth: 0`（`.github/workflows/ci.yml:802`） | 第二段要读 **tag 树**里的报告，而那个 job 原来的 checkout 是**浅克隆**，里面没有 `v1.0.0` 这个 tag。同一份文件里另外四个需要 tag 的 job 早就是 `fetch-depth: 0` 了，这里是照着它们的样子加的 |
 
 如果这一行不加，CI 上那个 job 会以退出码 2 结束，并报
 `the v1.0.0 tree could not be read: the v1.0.0 tag is not in this checkout`——

@@ -598,6 +598,22 @@ jobs:
           enable-cache: true
       # No JRE and no backend download: Androguard is the only backend in
       # this configuration, and it comes from the analysis extra.
+      #
+      # The same redirect the contracts job has.  This job runs the live
+      # check by proxy -- scripts/check-contract-records.py runs
+      # scripts/verify-public-contracts.py itself -- and that check keeps
+      # its workspace in tempfile.gettempdir().  Without this step the job
+      # wrote into the runner's system temporary directory while its
+      # sibling wrote into the workspace.
+      - name: Keep generated files in .scratch
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
+          {
+            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
+          } >> "$GITHUB_ENV"
       - name: Install dependencies
         run: uv sync --extra dev --extra analysis --extra mcp --frozen
       # An empty path disables a backend outright, with no PATH lookup: the
