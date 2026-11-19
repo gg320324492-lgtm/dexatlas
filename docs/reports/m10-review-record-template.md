@@ -90,6 +90,15 @@
 | 2 |  |  |  |  |
 | 3 |  |  |  |  |
 
+> **四栏各填什么**：「结论原文」抄证据记录的 `summary`；「evidence / locator」
+> 写记录号（如 `E-0004`）与它 `provenance[]` 里的**工具、版本、locator**——
+> **这三个字段不在记录顶层**（顶层是 `id` / `kind` / `level` / `summary` /
+> `detail` / `provenance`，只有 `level` 在顶层），**一条记录可能有不止一条
+> provenance**，逐条抄；「定位结果」抄 `resolve_locator` 的 **`resolved`** 与
+> **`reason`**（`resolved=true` 而**没有可读的文件内容** = 按构造解析，不是失败；
+> `resolved=false` 才要单独列出来）；「耗时」填这次解析的用时。
+> 可照抄的命令在[读者验收包 §3.4](m10-reader-package.md)。
+
 **红旗清单命中项**
 
 ```text
@@ -152,6 +161,13 @@
 | G3 |  |  |  |
 | G4 |  |  |  |
 | G5 |  |  |  |
+
+> **C1 / C2 / G5 三行各写什么**：C1 写抽到的记录号与四个字段（**工具、版本、
+> locator 从 `provenance[]` 抄，`level` 从记录顶层抄**）；C2 写 locator 与
+> `resolve_locator` 的 `resolved` / `reason`（**解析不出来的单独列一行**）；
+> G5 写包内实际文件与 `manifest.json` 的 `not_included` 三键声明——其中
+> **「未引用字符串」核的是这条声明**（包里没有全量字符串表可比对），判据见
+> [准备包 §2.7 G5](m10-acceptance-pack.md)。
 
 ### 5.3 最终门禁
 

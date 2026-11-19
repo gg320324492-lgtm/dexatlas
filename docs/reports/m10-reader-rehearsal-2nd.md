@@ -201,7 +201,7 @@
 
 **材料怎么说**：读者包 §3.8 把它写成一行命令，注释写着「列工具清单」——
 `uv run --no-sync dexatlas-mcp                               # 起 MCP server（列工具清单）`
-（`docs/reports/m10-reader-package.md:314`）。
+（这行命令在 `v1.0.0` 那棵树的读者包第 314 行；材料后来换成了协议级的两条，现行材料在 `docs/reports/m10-reader-package.md:498`）。
 
 **实际发生**：这条命令**不产生任何输出**。空 stdin 跑一遍，stdout 一个字节都没有，
 退出码 0：

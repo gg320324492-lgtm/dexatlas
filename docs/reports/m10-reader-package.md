@@ -225,14 +225,98 @@ uv run dexatlas xrefs apk_80a8fe0e81204c9f \
 | source | 第一行标明 `source kind: java`（或 smali 回退）与 locator，例如 `jadx:sources/com/example/demo/MainActivity.java` |
 | xrefs | `1 call site(s), 1 call edge(s)`，调用点为 `classes.dex@34` |
 
-**证据核查（C 组核心）**：打开 JSON 报告或证据包，任选 3 条 evidence 记录，
-逐条核对工具、版本、locator、level 四个字段；理解三级语义——`verified` 是
-确定性工具产出且 citation 可解析，`lead` 是线索不是结论，`insufficient` 是
-证据不足；模型生成的文本永远不能是 `verified`。三级定义的出处是
-[公共契约表 §证据三级](../architecture/public-contracts.md)；静态分析管线只
-产生 `verified`，demo 报告 11 条 evidence 全为 `verified`、`lead 0` 是设计而非
-缺失，`lead`/`insufficient` 由模型 claim 与人工复核产生。locator 解析规则见
-[准备包 §2.3 C2](m10-acceptance-pack.md)。
+**证据核查（C 组核心）**：打开 JSON 报告（`report.json`）或证据包里的
+`reports/report.json`，任选 3 条 evidence 记录，逐条核对工具、版本、locator、
+level 四个字段。**这四个字段各在哪，是最容易读错的一处**：
+
+- 记录的**顶层**只有六个键：`id` / `kind` / `level` / `summary` / `detail` /
+  `provenance` ——**`level` 就在顶层**；
+- **工具、版本、locator 在 `provenance[]` 数组里**，每个元素是
+  `{"tool": …, "tool_version": …, "apk_sha256": …, "locator": …}`；
+- **一条记录可能有不止一条 provenance**（demo 的 E-0004–E-0006 各有两条），
+  逐条列出即可；
+- REST 的 `GET /projects/{pid}/evidence` 是同一个形状；MCP 的 `get_evidence`
+  返回的 `provenance` 是**只含 locator 的字符串数组**（那一侧没有工具与版本），
+  工具与版本看 JSON 报告那一侧。
+
+把三个字段连同 `level` 一起打出来，可以照抄这一条（`report.json` 由 §3.5 的导出
+命令生成；还没导出就先跑那一条，或者把下面命令里的路径换成证据包里的
+`evidence/reports/report.json`）：
+
+```bash
+uv run --no-sync python -c "import json;d=json.load(open('report.json',encoding='utf-8'));[print(e['id'], e['level'], [(p['tool'], p['tool_version'], p['locator'][:60]) for p in e['provenance']]) for e in d['evidence'][:3]]"
+```
+
+预期（实测，2026年11月19日，三个后端齐备）：
+
+```text
+E-0001 verified [('androguard', '4.1.4', 'androguard:AndroidManifest.xml')]
+E-0002 verified [('apktool', '2.11.1', 'apktool:AndroidManifest.xml')]
+E-0003 verified [('apktool', '2.11.1', 'apktool:AndroidManifest.xml#/application')]
+```
+
+再理解三级语义——`verified` 是确定性工具产出且 citation 可解析，`lead` 是线索
+不是结论，`insufficient` 是证据不足；模型生成的文本永远不能是 `verified`。
+三级定义的出处是[公共契约表 §证据三级](../architecture/public-contracts.md)；
+静态分析管线只产生 `verified`，demo 报告 11 条 evidence 全为 `verified`、
+`lead 0` 是设计而非缺失，`lead`/`insufficient` 由模型 claim 与人工复核产生。
+
+**locator 解析（C2 ★）：一条可照抄的命令。** 解析 locator 只有一个入口——
+MCP 的 `resolve_locator`（**REST 侧没有 locator 解析端点**，不必去找）。
+下面这条命令把五类 locator 各解析一次：DEX 成员、manifest、裸树、文件级，
+外加一个**解析不出来**的。照抄即可，不需要写代码：
+
+```bash
+{ printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:classes.dex#com.example.demo.Crypto"}}}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:AndroidManifest.xml"}}}' \
+  '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"jadx:sources"}}}' \
+  '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"jadx:sources/com/example/demo/MainActivity.java"}}}' \
+  '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:classes.dex#com.example.demo.NoSuchClass"}}}' \
+  ; sleep 3; } \
+| uv run --no-sync dexatlas-mcp \
+| uv run --no-sync python -c "import json,sys;[print('resolved=%s kind=%s locator=%s reason=%s' % (s['resolved'], s['kind'], (s['provenance'][0] if s['provenance'] else '(none)'), s['reason'])) for l in sys.stdin if l.strip() for d in [json.loads(l)] for t in [(d.get('result') or {}).get('content')] if t for s in [json.loads(t[0]['text'])] if 'resolved' in s]"
+```
+
+预期（实测，2026年11月19日，三个后端齐备）：
+
+```text
+resolved=True kind=java locator=jadx:sources reason=<工作区里 jadx\sources 的绝对路径>
+resolved=True kind=java locator=jadx:sources/com/example/demo/MainActivity.java reason=<该文件的绝对路径>
+resolved=False kind=None locator=(none) reason=com.example.demo.NoSuchClass is not in this analysis
+resolved=True kind=None locator=androguard:AndroidManifest.xml reason=AndroidManifest.xml is a dex file of this analysis
+resolved=True kind=None locator=androguard:classes.dex#com.example.demo.Crypto reason=com.example.demo.Crypto is in classes.dex
+```
+
+**五行的先后顺序不固定**（几个调用并发执行）——按 `locator=` 对号入座即可。
+
+PowerShell 写法（同一台机器上实测通过，PowerShell 7 与 5.1 都可）：
+
+```powershell
+& {
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}'
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:classes.dex#com.example.demo.Crypto"}}}'
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:AndroidManifest.xml"}}}'
+  '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"jadx:sources"}}}'
+  '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"jadx:sources/com/example/demo/MainActivity.java"}}}'
+  '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"resolve_locator","arguments":{"project_id":"apk_80a8fe0e81204c9f","locator":"androguard:classes.dex#com.example.demo.NoSuchClass"}}}'
+  Start-Sleep -Seconds 3
+} | uv run --no-sync dexatlas-mcp | uv run --no-sync python -c "import json,sys;[print('resolved=%s kind=%s locator=%s reason=%s' % (s['resolved'], s['kind'], (s['provenance'][0] if s['provenance'] else '(none)'), s['reason'])) for l in sys.stdin if l.strip() for d in [json.loads(l)] for t in [(d.get('result') or {}).get('content')] if t for s in [json.loads(t[0]['text'])] if 'resolved' in s]"
+```
+
+要解析别的 locator，就换 `arguments` 里的 `locator` 值（`project_id` 换成你要查的
+那个项目 id）——一条一次。
+
+**C2 的判据怎么用这张表**（判据全文见[准备包 §2.3 C2](m10-acceptance-pack.md)）：
+
+| `resolved` | 是什么 | C2 怎么判 |
+|---|---|---|
+| `true`，`reason` 是工作区里的一个绝对路径，且 `text` 里**有内容**（`bytes > 0`） | **文件级 locator**：在工作区内解析到了真实文件 | 通过：核对那个文件确实存在（在 `.dexatlas/` 工作区里） |
+| `true`，**没有可读的文件内容**（DEX 成员 locator 的 `text` 是 `null`；裸树 locator 的是空文本——`text.text` 为空串、`bytes` 为 0） | **DEX 成员 locator**（如 `androguard:classes.dex#…`）与**裸树 locator**（如 `jadx:sources`）：**按构造解析**——它指的不是某个文件，是这次分析里的一类位置 | 通过：**不是失败**，不要记成「解析不出来」 |
+| `false` | 解析不出来（类不在这次分析里、后端没装、文件不在工作区……） | 单独列出来，记进记录 |
 
 ### 3.5 第 5 步：三格式报告导出（验收项 A5、D1–D2）
 
@@ -270,9 +354,17 @@ uv run --no-sync python -c \
 校验，仍应通过；包内路径不得指向生成它的机器。
 
 **数据边界（D3、G5）**：解压 `python -m zipfile -e evidence.zip evidence`，
-打开 `evidence/manifest.json`，对照 `not_included` 声明检查包内实际文件——
-证据包**不含** APK、全量源码、未被证据引用的字符串。包内只有裸树/DEX locator
-时没有 `sources/` 目录，这是按构造解析，不是缺失（详见[准备包 §3.5](m10-acceptance-pack.md)）。
+打开 `evidence/manifest.json`，对照 `not_included` 的三个键
+（`apk` / `full_sources` / `unrelated_strings`）检查包内实际文件。
+**包里能直接判的是两条**：**不含 APK**（zip 的条目里没有 `.apk`，
+`manifest.json` 的 `files` 清单里也没有）、**不含全量源码**（包内没有
+`sources/` 目录，`files` 清单里只有报告）。
+**「未引用字符串」核的是 manifest 的声明**——`not_included.unrelated_strings`
+写着「未被证据引用的字符串常量不进包」；包里**没有** APK 的完整字符串表可供
+比对，读者核的是**这条声明与包内实际内容一致**（判据全文见
+[准备包 §2.7 G5](m10-acceptance-pack.md)）。
+包内只有裸树/DEX locator 时没有 `sources/` 目录，这是按构造解析，不是缺失
+（详见[准备包 §3.5](m10-acceptance-pack.md)）。
 
 ### 3.7 第 7 步：至少一个完整案例核对（验收项 B1–B6）
 
@@ -347,6 +439,13 @@ uv run --no-sync python -c \
   > 期望（实测）：`{"status":"ok","version":"1.0.0","backends":{…}}`——**必须是
   > `"status":"ok"` 且带 `version` 与 `backends`**；返回 `{"status":"healthy"}`
   > 或 `{"detail":"Not Found"}` 就说明这个端口上**不是 DexAtlas**，继续换端口。
+  >
+  > **再确认一次：这个端口上应答的是不是你自己起的那个服务**——8011 也可能被占
+  > （本机实测 8000 与 8011 同时被占，8011 上跑的是**另一个 DexAtlas**，它的
+  > `/health` 同样返回 `{"status":"ok",…}`）。**判断依据是 uvicorn 的日志**：里面
+  > 有 `[WinError 10048] error while attempting to bind` 就是**你的服务没起来**，
+  > `/health` 答的是别人的——换个还没被占的端口（下面第二步的 `B` 跟着改），
+  > 或者先把占着端口的那个服务停掉。
 
   **第二步：六类关键端点各一条命令**（`P` 是 §3.3 分析出来的 project id；`B` 是
   端口——按上面第一步的结果填 `8000` 或 `8011`，两处一起改）：
@@ -365,10 +464,13 @@ uv run --no-sync python -c \
   # 200
   # [{"id":"apk_80a8fe0e81204c9f","status":"completed",…,"class_count":5,"method_count":8,…}]
 
-  # 运行（§2.3）
+  # 运行（§2.3）——`total` 是这个项目**跑过几次分析**，不是固定值：
+  # 照 §3.3 → §3.5 → §3.8（F1 那条 analyze）的顺序走，到这里是 3。
+  # 判据看**形状**：`runs` 的条数 == `total`，其中**恰有一条** `published=true`，
+  # 那一条的 id 就是 `published_run_id`（上面那条上传命令是幂等的，不会再加一次）
   curl -s -w "\n[%{http_code}]\n" $B/projects/$P/runs
   # 200
-  # {"project_id":"apk_80a8fe0e81204c9f","total":1,"published_run_id":"run_…","runs":[{…,"status":"completed","completeness":"complete",…}]}
+  # {"project_id":"apk_80a8fe0e81204c9f","total":3,"published_run_id":"run_…","runs":[{…,"status":"completed","completeness":"complete","published":true,…},…]}
 
   # 符号（§2.4）
   curl -s -w "\n[%{http_code}]\n" "$B/projects/$P/classes?limit=2"

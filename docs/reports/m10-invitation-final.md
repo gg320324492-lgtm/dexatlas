@@ -145,12 +145,20 @@ JADX 与 Apktool 是可选的第三方后端，不是本仓库依赖：没有它
 4. **案例与证据核查**：按[读者验收包 §3.4–3.7](m10-reader-package.md)
    执行 manifest / search / source / xrefs、三格式报告导出、证据包导出与
    校验，并任选 3 条 evidence 记录核对工具、版本、locator、level 四字段：
+   - **这四个字段各在哪**：记录的**顶层**只有 `id` / `kind` / `level` /
+     `summary` / `detail` / `provenance` 六个键——**`level` 在顶层**；
+     **工具、版本、locator 在 `provenance[]` 数组里**（每个元素含 `tool` /
+     `tool_version` / `apk_sha256` / `locator`），**一条记录可能有不止一条**，
+     逐条列出即可；
    - `tool` 与 `version` 抄这条 evidence 记录自己写的值，不用另行查证；
-   - **`locator` 按[准备包 §2.3 C2](m10-acceptance-pack.md)的规则核**：**文件级**
+   - **`locator` 按[准备包 §2.3 C2](m10-acceptance-pack.md)的规则核**（可照抄的
+     解析命令在[读者验收包 §3.4](m10-reader-package.md)）：**文件级**
      locator 要在分析工作区里解析到真实文件；**DEX 成员 locator 与裸树 locator**
-     （如 `jadx:sources`）是**按构造解析**的——`path=None` 是设计，不是失败
+     （如 `jadx:sources`）是**按构造解析**的——`resolve_locator` 返回
+     `resolved=true` 而**没有可读的文件内容**（DEX 成员 locator 的 `text` 是
+     `null`，裸树 locator 的是空文本），是按构造解析，不是失败
      （证据包不含整棵源码树，所以包里没有 `sources/` 目录）；解析不了的
-     locator 要单独列出来；
+     locator（`resolved=false`）要单独列出来；
    - `level` 按[读者验收包 §3.4](m10-reader-package.md) 的三级语义读：
      `verified`＝确定性工具产出且引用可解析，`lead`＝待核线索不是结论，
      `insufficient`＝证据不足。
