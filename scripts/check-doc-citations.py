@@ -213,6 +213,11 @@ DOCS: list[pathlib.Path] = [
     # third reader rehearsal found in the M10 materials.
     REPO / "docs" / "reports" / "ci-temp-redirect-fix.md",
     REPO / "docs" / "reports" / "m10-round3-fixes.md",
+    # The reports of the batch that let the citations declare what they
+    # claim, and the read-only audit of the hand-written numbers the
+    # mechanism does not cover.
+    REPO / "docs" / "reports" / "citation-anchor-declarations.md",
+    REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
