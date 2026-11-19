@@ -641,10 +641,14 @@ def build_aside(repo: Path, facts: Facts, copies: dict[str, Copy]) -> dict[str, 
             "The figures the social preview cards draw, and the images that carry "
             "them. Written by scripts/make-social-preview.py; checked by the same "
             "script's --check mode. The numbers are compared, never the image "
-            "bytes: a PNG drawn on one machine has different bytes on another."
+            "bytes: a PNG drawn on one machine has different bytes on another. "
+            "The suite block holds every outcome the measuring script accounts "
+            "for (its SUITE_NAMES), so a measurement that gains an outcome is a "
+            "sidecar that has to be redrawn, not one that passes in silence."
         ),
         "figures": dict(sorted(facts.figures.items())),
         "origins": dict(sorted(facts.origins.items())),
+        "suite": dict(sorted(facts.suite.items())),
         "cards": cards,
     }
 
@@ -703,6 +707,21 @@ def check(repo: Path) -> int:
             f"figure {key}",
             recorded_figures.get(key) == value,
             f"the card says {recorded_figures.get(key)!r}, the reports say {value!r}",
+        )
+
+    # The sidecar is the record of what the cards drew, so it carries the
+    # whole measurement the same way the report's record does: the outcomes
+    # the run accounted for. A key the measuring script writes but the
+    # sidecar does not is a figure the card drew that nobody can check
+    # against the record -- the gap this loop closes. It reads the same
+    # names as the measuring script's own accounting (``SUITE_NAMES``),
+    # rather than a copy of the list: a second list is a second answer.
+    recorded_suite = recorded.get("suite", {})
+    for name in SUITE_NAMES:
+        result.check(
+            f"the sidecar records suite.{name}",
+            name in recorded_suite,
+            f"the sidecar has no suite.{name}; the measurement record has it",
         )
 
     recorded_origins = recorded.get("origins", {})

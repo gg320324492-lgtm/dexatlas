@@ -297,7 +297,13 @@ def _minimal_report() -> str:
 
 
 def _gate_record(total: int = 4, passed: int = 4, skipped: int = 0) -> dict[str, Any]:
-    """The record of a measurement taken where nothing skipped."""
+    """The record of a measurement taken where nothing skipped.
+
+    It carries the table audit the way the measuring script writes one: the
+    refresh states the audit even when it states nothing was wrong, and a
+    record without the key would make every ``--check`` below look stale
+    against a report the script had really written.
+    """
     return {
         "schema": 4,
         "code": {"api_endpoints": 1, "cli_commands": 1, "sample_apks": 1},
@@ -313,6 +319,7 @@ def _gate_record(total: int = 4, passed: int = 4, skipped: int = 0) -> dict[str,
             "skipped_tests": [],
             "xfailed_tests": [],
         },
+        "table": {"missing_rows": [], "stale_rows": []},
         "tests": {"fast": total - 1, "slow": 1, "total": total},
     }
 

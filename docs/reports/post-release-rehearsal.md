@@ -72,9 +72,9 @@
   的 `source_fingerprint` 与当前树对不上。
 - **该在哪一步被拦住**：**第 1 步之后、第 3 步之前**。
 - **现在的判据**：`scripts/refresh-report-figures.py` 的 `fingerprint_files()`
-  （`scripts/refresh-report-figures.py:840-863`）把 `src/` 与 `tests/` 下**全部 `.py`**，
+  （`scripts/refresh-report-figures.py:908-931`）把 `src/` 与 `tests/` 下**全部 `.py`**，
   连同 `pyproject.toml` 与测量脚本一起哈希；`source_fingerprint()`
-  （`scripts/refresh-report-figures.py:866-893`）算它。核对靠
+  （`scripts/refresh-report-figures.py:934-961`）算它。核对靠
   `tests/test_docs.py::test_execution_report_coverage_figures_describe_the_current_code`
   （`tests/test_docs.py:725`）；「测试树进指纹」这条不变式由
   `tests/test_docs.py::test_the_fingerprint_covers_the_code_and_the_suite`
@@ -108,16 +108,16 @@
 - **触发条件**：第 4 步（改文档里的数字与引用）之后、第 6 步（重打 tag）之前跑
   `scripts/check-doc-citations.py`。
 - **现象**：检查器的结论**与将要发布的那棵树无关**。
-  `scripts/check-doc-citations.py:277-277` 的 `TREE_DOCUMENTS` 把
+  `scripts/check-doc-citations.py:278-278` 的 `TREE_DOCUMENTS` 把
   `docs/reports/v1.0.0-github-release-body.md` 映射到 ref `v1.0.0`；`tree_of()`
-  （`scripts/check-doc-citations.py:2149-2152`）按这个 ref 取树；本地 tag 还没动 →
+  （`scripts/check-doc-citations.py:2150-2153`）按这个 ref 取树；本地 tag 还没动 →
   读的是**旧树**。于是：为新树写的行号被判「漂移」，或者旧的行号被判「对」。
   `check_declaration()`（`scripts/check-doc-citations.py:2173-2222`）还会把正文里引的测量
   指纹与**那棵树**的测量记录比对 —— 旧树的指纹，于是也判「不符」。
 - **该在哪一步被拦住**：**第 4 步与第 6 步之间**。清单第 4 条只说了「按内容重锚」，没说
   重锚的**基准是本地 tag 还是远端 tag**，也没说重锚完要**在 tag 移过之后再核一次**。
 - **现在的判据**：机制是齐的 —— `TREE_DOCUMENTS` + `Tree` + `tree_fingerprint()`
-  （`scripts/check-doc-citations.py:2155-2158`）+ `check_declaration()`；
+  （`scripts/check-doc-citations.py:2156-2159`）+ `check_declaration()`；
   `tests/test_doc_citations.py::test_the_release_body_is_read_out_of_the_release_tree`
   （`tests/test_doc_citations.py:687-701`）守住「Release 正文必须是从 release 树里读出来的」。
   **缺的只是清单里的顺序要求**。
@@ -208,7 +208,7 @@
   | `.github/social-preview*.png` 两张卡片 | **有** | `scripts/make-social-preview.py --check`（CI job + pytest） |
   | `docs/status.md:24` 覆盖率 | **有** | `<!--fig:coverage.pct-->` 标记 |
   | `docs/how-to-verify.md:172`、`docs/how-to-verify.zh-CN.md:149` | **无** | `tests/test_how_to_verify.py` 比的是该页的 **collect 汇总数**（总数/快测/集成，见 `tests/test_how_to_verify.py:114-132`），**不比对这一行的 passed/skipped** |
-  | `docs/releases/v1.0.0.md:95` | **无** | `scripts/check-version-claims.py` 的 `release_documents()`（`scripts/check-version-claims.py:976-996`）把发版说明纳入检查，但 `expected["tests.total"]` 取自 `history.<tag>.tests`（`scripts/check-version-claims.py:1275`），而 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:228`）只有 `v0.1.0`–`v0.1.3`，**不含 v1.0.0** → 这个数**没有可比的测量**，规则跳过 |
+  | `docs/releases/v1.0.0.md:95` | **无** | `scripts/check-version-claims.py` 的 `release_documents()`（`scripts/check-version-claims.py:976-996`）把发版说明纳入检查，但 `expected["tests.total"]` 取自 `history.<tag>.tests`（`scripts/check-version-claims.py:1275`），而 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:229`）只有 `v0.1.0`–`v0.1.3`，**不含 v1.0.0** → 这个数**没有可比的测量**，规则跳过 |
   | `docs/reports/v1.0.0-github-release-body.md:168`、`:175`、`:267`、`:299`、`:304` | **部分** | 测量**指纹**被 `check-declaration` 比对；**测试数没有** |
   | GitHub 上已发布的那一份正文 | **无** | 不在仓库里 |
 
@@ -277,9 +277,9 @@
 
 - **触发条件**：重打 `v1.0.0`。
 - **现象**：报告里的历史数字（`v0.1.0` 204 / `v0.1.1` 244 / `v0.1.2` 275 / `v0.1.3` 444）
-  **不随重打变化**。原因是 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:228`）只列了
+  **不随重打变化**。原因是 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:229`）只列了
   `v0.1.0`–`v0.1.3`，**不含 `v1.0.0`**；而 `collected_at_tag()`
-  （`scripts/refresh-report-figures.py:933-959`）用 `git archive <tag>` 量 tag 自己的树，
+  （`scripts/refresh-report-figures.py:1044-1070`）用 `git archive <tag>` 量 tag 自己的树，
   量的是那个 tag 当时的样子。
 - **现在的判据**：`HISTORY_TAGS` 本身就是判据；
   `tests/test_docs.py::test_execution_report_history_figures_match_the_released_tags`
@@ -304,7 +304,7 @@
 
   > 要不要重测量，看**指纹**，不看数字。指纹覆盖 `src/` 与 `tests/` 下的全部 `.py`、
   > `pyproject.toml` 和测量脚本本身 —— 收哪些文件由 `fingerprint_files()` 决定
-  > （`scripts/refresh-report-figures.py:840-863`）——
+  > （`scripts/refresh-report-figures.py:908-931`）——
   > **改 `tests/` 里的一条测试也算指纹变了**，哪怕测试数与覆盖率一个都没动。
   > 判据的权威定义就是这个函数，**不要另写一份**。
 
@@ -401,11 +401,11 @@
 
 | # | 结论 | 依据 |
 |---|---|---|
-| 1 | 重打 `v1.0.0` **不会**让报告里的 `history.*.tests` 作废 | `HISTORY_TAGS` 不含 `v1.0.0`（`scripts/refresh-report-figures.py:228`）；`collected_at_tag()` 从 `git archive <tag>` 量（`:933-959`）—— R12 |
-| 2 | 改 `docs/` 下的文件**不进**指纹，所以改文档本身不需要重测量 | `fingerprint_files()`（`scripts/refresh-report-figures.py:840-863`）只收 `src/`、`tests/`、`pyproject.toml` 与测量脚本 —— R1 |
+| 1 | 重打 `v1.0.0` **不会**让报告里的 `history.*.tests` 作废 | `HISTORY_TAGS` 不含 `v1.0.0`（`scripts/refresh-report-figures.py:229`）；`collected_at_tag()` 从 `git archive <tag>` 量（`:1044-1070`）—— R12 |
+| 2 | 改 `docs/` 下的文件**不进**指纹，所以改文档本身不需要重测量 | `fingerprint_files()`（`scripts/refresh-report-figures.py:908-931`）只收 `src/`、`tests/`、`pyproject.toml` 与测量脚本 —— R1 |
 | 3 | 已开始的 CI run **不会**被后来的 tag push 打断 | `.github/workflows/ci.yml:23-32`，`cancel-in-progress: false` —— R5 |
 | 4 | 第四份对外文本（GitHub 上已发布的那一份）确实**没有**自动比对，清单已如实标出 | §7 N6（`docs/reports/v1.0.0-release-checklist.md:448-464`）—— R8 |
-| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:866-893`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`tests/test_docs.py:1339`）—— 这条**不是**重打 tag 路径的坑 |
+| 5 | 测量指纹的**跨平台**归一（CRLF/LF）已在脚本里做了，两个平台算出的指纹相同 | `source_fingerprint()` 对换行做归一（`scripts/refresh-report-figures.py:934-961`）；`tests/test_docs.py::test_the_source_fingerprint_ignores_line_endings`（`tests/test_docs.py:1339`）—— 这条**不是**重打 tag 路径的坑 |
 
 ---
 

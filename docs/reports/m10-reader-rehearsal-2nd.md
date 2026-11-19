@@ -258,6 +258,7 @@ tool count: 11
 邀请函 §2 里那一串 hash 已经填好了（工作区里是
 `docs/reports/m10-invitation-final.md` §2（写这份预演时是 2715aef ✓）：
 `commit 2715aefda06c3cbbc055a9edf795535e71464068`）。但**填 hash 的那个提交
+`commit 2edaed92d3c835bf202c0ccc84a10ba4e1eaeb9b`——tag 重打后邀请函 §2 已更新；本节记的是预演当时的值 ✓
 `7a416bd` 在 tag 之后**——`v1.0.0` 指的是 `2715aef`，而 `2715aef` 的树里：
 
 ```text

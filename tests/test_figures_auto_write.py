@@ -329,6 +329,133 @@ def test_a_copy_of_a_figure_inside_a_code_block_is_written() -> None:
     ), written
 
 
+# -- the collect sentences ---------------------------------------------------
+
+
+def test_a_collect_sentence_inside_a_fence_is_written() -> None:
+    """The collection output the pages promise a reader is written, not typed.
+
+    The two how-to-verify pages show their collection commands and the
+    summary lines those commands print, inside the fence. A fence is a
+    quotation, and the ordinary writer does not rewrite a quotation -- which
+    is why these sentences used to be the last hand-written measurement
+    numbers in the repository: adding a test went red, and the red could
+    only be cleared by hand. The collect writer reaches into the fence for
+    that one sentence, so the pages move with the measurement like every
+    other figure does.
+    """
+    script = _figure_script()
+    page = (
+        "```bash\n"
+        'uv run --no-sync pytest --collect-only -q -m "not slow"'
+        "   # → <!--fig:tests.collect.fast-->1626/1775 tests collected"
+        " (149 deselected)<!--/fig-->\n"
+        "```\n"
+    )
+
+    written, unknown, malformed = script.apply_figures(
+        page,
+        {"tests.collect.fast": "1584/1733 tests collected (149 deselected)"},
+        collect=True,
+    )
+
+    assert not unknown, unknown
+    assert not malformed, malformed
+    assert written == (
+        "```bash\n"
+        'uv run --no-sync pytest --collect-only -q -m "not slow"'
+        "   # → <!--fig:tests.collect.fast-->1584/1733 tests collected"
+        " (149 deselected)<!--/fig-->\n"
+        "```\n"
+    ), written
+
+
+def test_the_collect_writer_writes_nothing_else_into_a_fence() -> None:
+    """Only the collect sentences are written into fences.
+
+    The collect writer is the one exception to "a fence is a quotation",
+    and an exception that rewrote every marker in the fence would edit the
+    page's illustrations too. The illustration stays whatever it was.
+    """
+    script = _figure_script()
+    page = "```text\n<!--fig:tests.total-->1712<!--/fig-->\n```\n"
+
+    written, unknown, malformed = script.apply_figures(
+        page,
+        {"tests.total": "1733", "tests.collect.fast": "1/1 tests collected (0 deselected)"},
+        collect=True,
+    )
+
+    assert not unknown, unknown
+    assert not malformed, malformed
+    assert written == page, written
+
+
+def test_a_collect_sentence_the_measurement_fills_is_found_on_the_page(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """A page that carries a collect sentence is a page the measurement writes.
+
+    The pages are found by their markers; a collect sentence lives inside a
+    fence, which the ordinary finder does not look into -- so a page that
+    states nothing but its collection output would be invisible to the
+    mechanism that exists to keep it true. The finder looks into the fences
+    for these.
+    """
+    script = _figure_script()
+    page = (
+        "```bash\n"
+        'uv run --no-sync pytest --collect-only -q -m "slow"'
+        "   # → <!--fig:tests.collect.slow-->149/1733 tests collected"
+        " (1584 deselected)<!--/fig-->\n"
+        "```\n"
+    )
+    root = page_path(tmp_path_factory, page)
+
+    assert script.documents_with_figures(root) == [root / "page.md"]
+
+
+def test_a_collect_sentence_the_writer_cannot_fill_stops_the_write(tmp_path: Path) -> None:
+    """A collect sentence behind an unknown key is a number written by hand.
+
+    The same refusal the ordinary figures get: a guessed sentence is a
+    sentence that looks measured and is not.
+    """
+    script = _figure_script()
+    page = tmp_path / "page.md"
+    page.write_text(
+        "```text\n<!--fig:tests.collect.mystery-->1/1 tests collected (0 deselected)<!--/fig-->\n```\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SystemExit) as stopped:
+        script.write_figures(page, {"tests.collect.fast": "1/1 tests collected (0 deselected)"})
+
+    assert "tests.collect.mystery" in str(stopped.value)
+
+
+def test_the_collect_sentences_are_rendered_from_the_record() -> None:
+    """The two sentences come out of the measurement, phrased as pytest prints them.
+
+    A marker holds one value; the value here is the whole summary line, so
+    the sentence the reader sees is the one pytest would print -- written
+    from the measured counts, not assembled by hand on the page.
+    """
+    script = _figure_script()
+    figures = script.render_figures(_record())
+
+    assert figures["tests.collect.fast"] == "1584/1733 tests collected (149 deselected)"
+    assert figures["tests.collect.slow"] == "149/1733 tests collected (1584 deselected)"
+
+
+def page_path(tmp_path_factory: pytest.TempPathFactory, text: str) -> Path:
+    """A one-page repository: the smallest thing the finder can walk."""
+    root = tmp_path_factory.mktemp("collect-page")
+    page = root / "page.md"
+    page.write_text(text, encoding="utf-8")
+    return root
+
+
 def _record() -> dict[str, Any]:
     """A measurement, as the script reads it back."""
     return {

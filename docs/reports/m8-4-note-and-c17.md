@@ -154,7 +154,7 @@ uv run --no-sync python scripts/check-doc-citations.py   # drifted: 0
 
 | 字段 | 写的是什么 |
 |---|---|
-| **状态** | ⬜ **未开始**；仓库内可做，但**要排进一次测量窗口**——它改 `scripts/refresh-report-figures.py`，**那个脚本在源指纹里**（`FINGERPRINT_FILES`，`scripts/refresh-report-figures.py:114`）→ 改源指纹 → 报告数字要重测。按作者的决定**排在 v1.1.0** |
+| **状态** | ⬜ **未开始**；仓库内可做，但**要排进一次测量窗口**——它改 `scripts/refresh-report-figures.py`，**那个脚本在源指纹里**（`FINGERPRINT_FILES`，`scripts/refresh-report-figures.py:115`）→ 改源指纹 → 报告数字要重测。按作者的决定**排在 v1.1.0** |
 | **解决的缺口** | 上面那三个闭环，逐个指名出处；散文的那个最根治 |
 | **要做什么** | ①散文里的手写数改成标记；②让测量脚本能写散文里的数（按**同一把尺子**：代码块与行内代码仍然只算插图）；③测试文件表改成生成的；④卡片要么让脚本画、要么另设门禁；⑤**加一个用例不用改任何数字** |
 | **怎么算做完** | 加一个会数进套件的用例 → `pytest -q` 不因数字过期而失败 → 测量把新数写进散文；`tests/test_how_to_verify.py`、`tests/test_social_preview.py`、`tests/test_docs.py` 全绿；散文里不再有手写的测试数；测量遇缺行不退出；`check-doc-citations.py` 报 `drifted: 0` |

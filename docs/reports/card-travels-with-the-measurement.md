@@ -15,7 +15,7 @@
 - 原来的做法是**两件事靠顺序连起来**：先重画卡片，再测量，测完再重画一遍。
   谁忘了中间那步，测量就会把整个仓库锁死（§1）。
 - 现在测量自己会画：**报告落盘之后，测量顺手把卡片按新数重画**
-  （`scripts/refresh-report-figures.py:2266-2268` 的 `draw_social_preview` 调用，
+  （`scripts/refresh-report-figures.py:2613-2615` 的 `draw_social_preview` 调用，
   函数在 `:2152`）。于是「测量 → 卡片」不再是一段要人记得的顺序，
   而是一次测量里的一个步骤。
 - 时序只有一条规矩：**卡片画的是落盘后的报告**，不是收敛循环手里那份还没落盘的候选（§3）。
@@ -51,7 +51,7 @@
 ### 2.1 机制：从「两段顺序」变成「一个步骤」
 
 测量脚本在写盘分支里多了一步：在报告、状态页、README 徽章和其它带标记的文档
-都写完之后，重画卡片（`scripts/refresh-report-figures.py:2266-2268`）。
+都写完之后，重画卡片（`scripts/refresh-report-figures.py:2613-2615`）。
 
 ```python
         card_drawn = True
@@ -94,7 +94,7 @@ python scripts/make-social-preview.py --repo-root <仓库根>
 （`tests/test_figures_auto_write.py` 里的 `_install_fake_measurements()`）。
 给一份副本画卡片，卡片上会是仓库里那份真报告的数字——卡片和报告就成了两棵树的两个事实，
 正是这一步要防的那种错位。这条边界由
-`tests/test_figures_auto_write.py:535` 的
+`tests/test_figures_auto_write.py:662` 的
 `test_a_run_against_a_copy_of_the_report_leaves_the_card_alone` 守着。
 
 ---
@@ -118,7 +118,7 @@ python scripts/make-social-preview.py --repo-root <仓库根>
 卡片在最后，是因为徽章在 README 里，而徽章上写的正是卡片要核的那两个数
 （`suite.passed` 和 `coverage.pct`）——徽章先写，卡片才和它对得上。
 
-这条时序由 `tests/test_figures_auto_write.py:500` 的
+这条时序由 `tests/test_figures_auto_write.py:627` 的
 `test_the_measurement_draws_the_card_from_the_report_it_wrote` 守着：它把画图脚本换成一个
 只会记下「你要我画哪份报告」的桩，然后断言桩记下的内容**逐字等于**落盘后的报告。
 
@@ -152,12 +152,12 @@ FAILED tests/test_figures_auto_write.py::test_the_measurement_draws_the_card_fro
 
 | 测试 | 守着什么 |
 |---|---|
-| `tests/test_figures_auto_write.py:500` `test_the_measurement_draws_the_card_from_the_report_it_wrote` | 测量画了卡片，且画的是**落盘后**的报告 |
-| `tests/test_figures_auto_write.py:535` `test_a_run_against_a_copy_of_the_report_leaves_the_card_alone` | 刷副本时不碰卡片（§2.3 的闸门） |
+| `tests/test_figures_auto_write.py:627` `test_the_measurement_draws_the_card_from_the_report_it_wrote` | 测量画了卡片，且画的是**落盘后**的报告 |
+| `tests/test_figures_auto_write.py:662` `test_a_run_against_a_copy_of_the_report_leaves_the_card_alone` | 刷副本时不碰卡片（§2.3 的闸门） |
 
 测试用的不是真画图：画图脚本被换成一个只会记下「你要我画哪份报告」的桩
-（`tests/test_figures_auto_write.py:364` 的 `CARD_STUB`），测量脚本在**自己的一棵树**里跑
-（`_tree()`，`:376`）。这样测试不依赖字体、不依赖 Pillow、在任何机器上都能跑，
+（`tests/test_figures_auto_write.py:491` 的 `CARD_STUB`），测量脚本在**自己的一棵树**里跑
+（`_tree()`，`:503`）。这样测试不依赖字体、不依赖 Pillow、在任何机器上都能跑，
 而且不会在跑测试的时候把仓库自己的卡片重画一遍。
 
 ---
@@ -205,7 +205,7 @@ FAILED tests/test_figures_auto_write.py::test_the_measurement_draws_the_card_fro
 |---|---|---|
 | `tests.total` / `tests.fast` / `tests.slow` | 本次给套件加了 2 个测试（`tests/test_figures_auto_write.py`） | 测量 |
 | `suite.passed` / `suite.skipped` / `suite.xfailed` | 同上（套件规模变了） | 测量 |
-| `source_fingerprint` | `tests/` 与 `scripts/refresh-report-figures.py` 都在源指纹覆盖范围内（`scripts/refresh-report-figures.py:114` 的 `FINGERPRINT_FILES`） | 测量 |
+| `source_fingerprint` | `tests/` 与 `scripts/refresh-report-figures.py` 都在源指纹覆盖范围内（`scripts/refresh-report-figures.py:115` 的 `FINGERPRINT_FILES`） | 测量 |
 | README 徽章（两个语言） | 徽章里的数由测量写（`apply_badges()`） | 测量 |
 | `docs/status.md` 里的数 | 同上 | 测量 |
 | 首页卡片（两张 PNG）与 `.github/social-preview.json` | 卡片上的数来自报告的标记 | **测量**（新机制：落盘后自动重画） |

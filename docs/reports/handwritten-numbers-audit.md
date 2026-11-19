@@ -64,7 +64,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 | A1 | 测试总数/快慢拆分/套件通过跳过/coverage | `docs/reports/phase1-execution-report.md` 的 `<!--fig:…-->` | `refresh-report-figures.py` 写；`tests/test_docs.py::test_execution_report_numbers_match_the_code` 按源码指纹比对；CI `measurement` job 在 tag 上重算 | **门禁先红**，挡住更新——正是那三个闭环的形状。改数要走脚本 |
 | A2 | 同上（状态页） | `docs/status.md:23-24` | 同 A1；同一套标记机制是 `scripts/refresh-report-figures.py` 的 `documents_with_figures()` 按标记发现文档 | 同 A1 |
 | A3 | 测试数 / 覆盖率**徽章** | `README.md:12-13`、`README.zh-CN.md:12-13` | `refresh-report-figures.py` 写 URL；`check-version-claims.py::check_badges` 读 URL 里的数与测量比 | 徽章过期 → badge 门禁红 |
-| A4 | 测试数/拆分/套件数（散文） | `docs/how-to-verify.md:147,172`、`.zh-CN.md:120,149` | `check-release-numbers.py` 的「工作副本」段；`tests/test_how_to_verify.py::test_the_page_states_the_numbers_the_suite_has` | 门禁先红。**但**：另一扇窗口正在把这两页的散文改成标记（改法见该窗口的交接），改的过程中 `tests/test_how_to_verify.py:36` 的 `STATED_NUMBERS` 形状要求会挡路——**本报告不动这两页** |
+| A4 | 测试数/拆分/套件数（散文） | `docs/how-to-verify.md:147,172`、`.zh-CN.md:120,149` | `check-release-numbers.py` 的「工作副本」段；`tests/test_how_to_verify.py::test_the_page_states_the_numbers_the_suite_has` | 门禁先红。**但**：另一扇窗口正在把这两页的散文改成标记（改法见该窗口的交接），改的过程中 `tests/test_how_to_verify.py:49` 的 `STATED_NUMBERS` 形状要求会挡路——**本报告不动这两页** |
 | A5 | 测试文件表（§2.1 的文件名集合） | `docs/reports/phase1-execution-report.md:150-…` | `tests/test_docs.py::test_execution_report_lists_every_test_file`（集合相等）；`refresh-report-figures.py` 写之前也比一次 | 加一个测试文件 → 门禁先红 → 必须补一行。表右边那句**说明**没人检（见 B10） |
 | A6 | 已发布 release 的数（tests/coverage/套件） | `docs/releases/v1.0.0.md`、`docs/reports/v1.0.0-github-release-body.md`、GitHub 上已发布的 release body | `check-release-numbers.py` 的「已发布 release」段，对 **tag 树**的报告比 | 门禁先红。**这是对的**：release 说的是它自己那棵树测出来的数 |
 | A7 | 对外素材的测试数/覆盖率/MCP 工具数/样本数 | `docs/outreach/`、`docs/case-studies/`、`docs/proposals/` | `check-version-claims.py::check_outward_numbers`（`OUTWARD_DIRECTORIES`） | 门禁先红。**但这套规则只认几种写法**——见 B3 |
@@ -206,7 +206,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   但同一页第 48、285、295 行认得住。
 - **陈旧了会怎样**：**静默**。今天 11 个，是对的；给 MCP 加一个只读工具，那三处就错了。
 - **该怎么做**：**加键或扩门禁**。`refresh-report-figures.py` 的 `render_figures()`
-  （`scripts/refresh-report-figures.py:1108`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
+  （`scripts/refresh-report-figures.py:1228`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
   加一个 `mcp.tools` 是同一形状的事；或者把 `check_outward_counts()` 的适用范围
   从 `OUTWARD_DIRECTORIES` 放宽到「任何写了工具数的文档」。
 

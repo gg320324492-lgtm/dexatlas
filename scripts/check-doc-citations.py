@@ -255,6 +255,11 @@ DOCS: list[pathlib.Path] = [
     # The report of the batch that turned the prose numbers into markers,
     # so adding a test no longer means hand-editing any number.
     REPO / "docs" / "reports" / "prose-to-markers.md",
+    # The report of the batch that closed C17: the last hand-written
+    # measurement numbers (the collect summaries, the document count, the
+    # test-file table's rows, the card's sidecar) are written or audited by
+    # the mechanism.
+    REPO / "docs" / "reports" / "c17-markers-everywhere.md",
     # The report of the fourth reader rehearsal: the one that proved the
     # five material fixes had never reached the tagged tree, and that the
     # F2 fallback really falls back when both ports are taken.
