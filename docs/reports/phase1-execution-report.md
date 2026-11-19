@@ -883,7 +883,7 @@ uv run python scripts/refresh-report-figures.py
 uv run pytest          # 收集 <!--fig:tests.total-->1775<!--/fig--> 个：<!--fig:tests.fast-->1626<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1753<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1774<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1015,278 +1015,74 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   },
   "coverage": {
     "files": {
-      "__init__.py": [
-        3,
-        0
-      ],
-      "agent/__init__.py": [
-        8,
-        0
-      ],
-      "agent/evidence_verifier.py": [
-        122,
-        6
-      ],
-      "agent/orchestrator.py": [
-        613,
-        53
-      ],
-      "agent/planner.py": [
-        47,
-        0
-      ],
-      "agent/providers/__init__.py": [
-        6,
-        0
-      ],
-      "agent/providers/base.py": [
-        87,
-        4
-      ],
-      "agent/providers/local.py": [
-        53,
-        10
-      ],
-      "agent/providers/openai_compat.py": [
-        103,
-        8
-      ],
-      "agent/providers/scripted.py": [
-        42,
-        2
-      ],
-      "agent/providers/transport.py": [
-        30,
-        2
-      ],
-      "agent/reporter.py": [
-        127,
-        12
-      ],
-      "agent/state.py": [
-        201,
-        5
-      ],
-      "agent/sufficiency.py": [
-        31,
-        1
-      ],
-      "agent/tool_executor.py": [
-        368,
-        35
-      ],
-      "api/__init__.py": [
-        3,
-        0
-      ],
-      "api/app.py": [
-        309,
-        22
-      ],
-      "api/uploads.py": [
-        181,
-        14
-      ],
-      "cli/__init__.py": [
-        3,
-        0
-      ],
-      "cli/console.py": [
-        34,
-        6
-      ],
-      "cli/main.py": [
-        331,
-        12
-      ],
-      "config/__init__.py": [
-        3,
-        0
-      ],
-      "config/settings.py": [
-        34,
-        1
-      ],
-      "core/__init__.py": [
-        3,
-        0
-      ],
-      "core/calls.py": [
-        32,
-        0
-      ],
-      "core/evidence.py": [
-        113,
-        1
-      ],
-      "core/ingest.py": [
-        88,
-        3
-      ],
-      "core/locators.py": [
-        306,
-        17
-      ],
-      "core/methods.py": [
-        218,
-        10
-      ],
-      "core/models.py": [
-        343,
-        5
-      ],
-      "core/paths.py": [
-        36,
-        2
-      ],
-      "core/pipeline.py": [
-        522,
-        32
-      ],
-      "core/runs.py": [
-        70,
-        1
-      ],
-      "core/storage.py": [
-        396,
-        11
-      ],
-      "mcp/__init__.py": [
-        2,
-        0
-      ],
-      "mcp/errors.py": [
-        21,
-        1
-      ],
-      "mcp/schemas.py": [
-        181,
-        0
-      ],
-      "mcp/security.py": [
-        28,
-        3
-      ],
-      "mcp/server.py": [
-        57,
-        12
-      ],
-      "mcp/tools/__init__.py": [
-        1,
-        0
-      ],
-      "mcp/tools/evidence.py": [
-        29,
-        1
-      ],
-      "mcp/tools/projects.py": [
-        45,
-        4
-      ],
-      "mcp/tools/references.py": [
-        29,
-        0
-      ],
-      "mcp/tools/resources.py": [
-        27,
-        1
-      ],
-      "mcp/tools/symbols.py": [
-        71,
-        1
-      ],
-      "reports/__init__.py": [
-        4,
-        0
-      ],
-      "reports/coverage.py": [
-        11,
-        0
-      ],
-      "reports/evidence_package.py": [
-        187,
-        18
-      ],
-      "reports/html_report.py": [
-        86,
-        5
-      ],
-      "reports/json_report.py": [
-        27,
-        0
-      ],
-      "reports/markdown.py": [
-        97,
-        0
-      ],
-      "reports/summary.py": [
-        25,
-        2
-      ],
-      "tools/__init__.py": [
-        3,
-        0
-      ],
-      "tools/androguard/__init__.py": [
-        3,
-        0
-      ],
-      "tools/androguard/adapter.py": [
-        287,
-        24
-      ],
-      "tools/androguard/isolation.py": [
-        97,
-        4
-      ],
-      "tools/androguard/worker.py": [
-        112,
-        31
-      ],
-      "tools/apktool/__init__.py": [
-        3,
-        0
-      ],
-      "tools/apktool/adapter.py": [
-        317,
-        22
-      ],
-      "tools/base.py": [
-        181,
-        21
-      ],
-      "tools/jadx/__init__.py": [
-        3,
-        0
-      ],
-      "tools/jadx/adapter.py": [
-        360,
-        40
-      ],
-      "tools/registry.py": [
-        28,
-        0
-      ],
-      "workbench/__init__.py": [
-        0,
-        0
-      ],
-      "workbench/__main__.py": [
-        69,
-        29
-      ],
-      "workbench/agent_tasks.py": [
-        180,
-        14
-      ],
-      "workbench/app.py": [
-        166,
-        4
-      ],
-      "workbench/benchmarks.py": [
-        68,
-        2
-      ]
+      "__init__.py": [3, 0],
+      "agent/__init__.py": [8, 0],
+      "agent/evidence_verifier.py": [122, 6],
+      "agent/orchestrator.py": [613, 53],
+      "agent/planner.py": [47, 0],
+      "agent/providers/__init__.py": [6, 0],
+      "agent/providers/base.py": [87, 4],
+      "agent/providers/local.py": [53, 10],
+      "agent/providers/openai_compat.py": [103, 8],
+      "agent/providers/scripted.py": [42, 2],
+      "agent/providers/transport.py": [30, 2],
+      "agent/reporter.py": [127, 12],
+      "agent/state.py": [201, 5],
+      "agent/sufficiency.py": [31, 1],
+      "agent/tool_executor.py": [368, 35],
+      "api/__init__.py": [3, 0],
+      "api/app.py": [309, 22],
+      "api/uploads.py": [181, 14],
+      "cli/__init__.py": [3, 0],
+      "cli/console.py": [34, 6],
+      "cli/main.py": [331, 12],
+      "config/__init__.py": [3, 0],
+      "config/settings.py": [34, 1],
+      "core/__init__.py": [3, 0],
+      "core/calls.py": [32, 0],
+      "core/evidence.py": [113, 1],
+      "core/ingest.py": [88, 3],
+      "core/locators.py": [306, 17],
+      "core/methods.py": [218, 10],
+      "core/models.py": [343, 5],
+      "core/paths.py": [36, 2],
+      "core/pipeline.py": [522, 32],
+      "core/runs.py": [70, 1],
+      "core/storage.py": [396, 11],
+      "mcp/__init__.py": [2, 0],
+      "mcp/errors.py": [21, 1],
+      "mcp/schemas.py": [181, 0],
+      "mcp/security.py": [28, 3],
+      "mcp/server.py": [57, 12],
+      "mcp/tools/__init__.py": [1, 0],
+      "mcp/tools/evidence.py": [29, 1],
+      "mcp/tools/projects.py": [45, 4],
+      "mcp/tools/references.py": [29, 0],
+      "mcp/tools/resources.py": [27, 1],
+      "mcp/tools/symbols.py": [71, 1],
+      "reports/__init__.py": [4, 0],
+      "reports/coverage.py": [11, 0],
+      "reports/evidence_package.py": [187, 18],
+      "reports/html_report.py": [86, 5],
+      "reports/json_report.py": [27, 0],
+      "reports/markdown.py": [97, 0],
+      "reports/summary.py": [25, 2],
+      "tools/__init__.py": [3, 0],
+      "tools/androguard/__init__.py": [3, 0],
+      "tools/androguard/adapter.py": [287, 24],
+      "tools/androguard/isolation.py": [97, 4],
+      "tools/androguard/worker.py": [112, 31],
+      "tools/apktool/__init__.py": [3, 0],
+      "tools/apktool/adapter.py": [317, 22],
+      "tools/base.py": [181, 21],
+      "tools/jadx/__init__.py": [3, 0],
+      "tools/jadx/adapter.py": [360, 40],
+      "tools/registry.py": [28, 0],
+      "workbench/__init__.py": [0, 0],
+      "workbench/__main__.py": [69, 29],
+      "workbench/agent_tasks.py": [180, 14],
+      "workbench/app.py": [166, 4],
+      "workbench/benchmarks.py": [68, 2]
     },
     "missing": 514,
     "statements": 7671
@@ -1308,16 +1104,15 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "schema": 4,
   "source_fingerprint": "sha256:26732ca4dd14b83997f44577f3ec0e0271a5803436ff16c8eb719a2f88b0ca02",
   "suite": {
-    "failed": 5,
-    "passed": 1753,
+    "failed": 0,
+    "passed": 1774,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
     ],
     "xfailed": 0,
     "xfailed_tests": [],
-    "xpassed": 0,
-    "deselected": 16
+    "xpassed": 0
   },
   "tests": {
     "fast": 1626,
