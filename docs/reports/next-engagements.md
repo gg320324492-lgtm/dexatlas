@@ -289,12 +289,12 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 **结论**：三篇走查、三个证据包，**实际只有两次独立分析**。附件时不能当成三份独立证据报数。
 
 > **已闭合（2026-11-18）**：附件集换过一轮，现在仓库里是**四个证据包、四次
-> 分析**——`run_e8e49384…`（demo）、`run_fc8e432d…`（api-integration）、
-> `run_dd897202…`（obfuscated）、`run_4fde2fa0…`（multidex），run id 两两不同，
-> 每个包都过了 `verify_package`。demo 与 api-integration 仍然是**同一份 APK 的两次
-> 分析**（报告只差 `run_id` 与 `Analysis time` 两行），但那是「一次样本、两次
-> 分析」，不是「一次分析、两个包」。测量与逐条哈希见
-> [case-studies-third-package.md](case-studies-third-package.md)。
+> 分析**——run id 两两不同，每个包都过了 `verify_package`。demo 与
+> api-integration 仍然是**同一份 APK 的两次分析**（报告只差 `run_id` 与
+> `Analysis time` 两行），但那是「一次样本、两次分析」，不是「一次分析、两个包」。
+> 测量与逐条哈希见 [case-studies-third-package.md](case-studies-third-package.md)。
+> **2026-11-20 起四个包随清单第四键重打**（`schema_version = 2`），当前 run id
+> 见 [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)。
 
 ### 3.5 第三个样本（multi-DEX）只有走查附录，没有证据包（**2026-11-18 已闭合**）
 
@@ -310,9 +310,9 @@ Phase 3 的退出标准要求 M5–M9 全部验收、M10 完成独立复现与�
 而这正是方向 A 里「数据摄取与归一化」能讲的硬活。
 
 > **已闭合（2026-11-18）**：`multidex-evidence-package.zip` 与
-> `multidex-report.{md,json,html}` 已落盘（`run_4fde2fa0b5254ccb`，4.7 s，
-> `verify_package` 与 9 条引用全部通过），走查 2 的附录与
-> [case-studies/README.md](../case-studies/README.md) 都已补上链接。
+> `multidex-report.{md,json,html}` 已落盘（`verify_package` 与 9 条引用全部通过），
+> 走查 2 的附录与 [case-studies/README.md](../case-studies/README.md)
+> 都已补上链接。2026-11-20 该包随清单第四键重打（新 run `run_d1b4246f…`，3.4 s）。
 
 ### 3.6 联系方式、时区、可用性在素材里一个都没有
 

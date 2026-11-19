@@ -6,6 +6,10 @@
 - **基准树 = `415f522`**（对齐时工作副本的 HEAD；`git rev-parse v1.0.0^{commit}` = `2715aef`，领先 22 个提交）
 - 改动的文件：`docs/reports/v1.1.0-candidates.md`（**只改状态、判据对账与计数**）、本文
 - **没有改**任何 `.py` → **源指纹不变**，报告里的数字保持有效
+- **⚠️ 2026年11月20日起**：本文记的「`not_included` 三个键、`schema_version = 1`」
+  描述的是**当时的包**；清单的第四个键（`schema_version = 2`）落地后，
+  `docs/case-studies/attachments/` 里的四个包已重打，见
+  [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)。本文其余结论不受影响。
 
 ## 0. 结论先说
 
@@ -64,9 +68,11 @@
 multi-DEX 的包**在**：`multidex-evidence-package.zip` + `multidex-report.{md,json,html}`，
 入库提交 `92053b0`。
 
-四个包里的 `manifest.json` 自记的 `run_id` **两两不同**：
+四个包里的 `manifest.json` 自记的 `run_id` **两两不同**
+（下表是 2026-11-20 重打前的 id；重打后的当前 id 见
+[c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)）：
 
-| 包 | run_id |
+| 包 | run_id（重打前） |
 |---|---|
 | `demo-evidence-package.zip` | `run_e8e49384ab5246ab` |
 | `api-integration-evidence-package.zip` | `run_fc8e432d4d094350` |

@@ -3,6 +3,13 @@
 日期：2026年11月18日 · 复核基准：本 worktree 的 `9e1aa61`
 （`git rev-parse HEAD`）。
 
+> **⚠️ 2026年11月20日起，本文核对过的四个证据包（schema 1）已被重新分析并导出**
+> （清单的第四个键，`schema_version = 2`），包哈希与 run id 已全部更换；
+> 当前附件的实测见 [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)。
+> 本文的核对记录保留的是**上一批包**的状态，供对照——正文里引用的
+> `run_e8e49384…` / `run_dd897202…` / `run_4fde2fa0…` / `run_fc8e432d…`
+> 与各处耗时都是**当时**的实测，不是当前附件的。
+
 > **本文是什么**：一次**只读**复核的产物。它站在「一个客户 / 一个要评估这个项目的人」
 > 的位置上，把 `docs/case-studies/` 的三篇走查、案例索引、四个证据包，以及
 > `docs/reports/case-studies-run-correspondence.md`、

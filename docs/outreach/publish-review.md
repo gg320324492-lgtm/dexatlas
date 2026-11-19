@@ -140,15 +140,17 @@ tag（`git for-each-ref refs/tags/v1.0.0`），`src/dexatlas/__init__.py` 的
 不同的分析。** 把两个 zip 解开逐文件比对，`reports/report.md` 与
 `reports/report.html` **各只有两行不同**——`run_id` 一行与 `Analysis time` 一行，
 其余每一个数字相同。两边的 `manifest.json` 写明是两个不同的 `run_id`
-（`run_e8e49384…` 与 `run_fc8e432d…`），APK sha256 同为 `80a8fe0e…`。原因是 case
+（`run_bc38a1ba…` 与 `run_aafda311…`；2026-11-20 随清单第四键重打前是
+`run_e8e49384…` 与 `run_fc8e432d…`），APK sha256 同为 `80a8fe0e…`。原因是 case
 study 1 与 case study 3 分析的是**同一个**一方样本 `examples/demo-app/demo.apk`
 ——case study 3 走的是 REST API / MCP 入口，不是另一个样本。
 
 **样本数与分析数不是一回事。** 三篇走查涉及**三个**一方样本：`demo.apk`
 （case study 1 与 3）、`obfuscated.apk`（case study 2）、`multidex.apk`（case study 2
-的 multi-DEX 附录）。**四个证据包对应四次分析**，每包一次：`run_e8e49384…`（demo）、
-`run_dd897202…`（obfuscated）、`run_4fde2fa0…`（multidex 附录）、`run_fc8e432d…`
-（api-integration）。对外可以说「四个包、四次分析」，但**不要**读成四份互不相干的
+的 multi-DEX 附录）。**四个证据包对应四次分析**，每包一次：`run_bc38a1ba…`（demo）、
+`run_6646f0a9…`（obfuscated）、`run_d1b4246f…`（multidex 附录）、`run_aafda311…`
+（api-integration）（2026-11-20 随清单第四键重打，旧 id 见
+[c16-manifest-fourth-key.md](../reports/c16-manifest-fourth-key.md)）。对外可以说「四个包、四次分析」，但**不要**读成四份互不相干的
 证据，更不要读成客户案例——样本全是自建的一方样本，没有客户参与。
 素材侧已各加了一句澄清（`project-brief.md` §Links、
 `cover-letter-templates.md` 用法说明）。

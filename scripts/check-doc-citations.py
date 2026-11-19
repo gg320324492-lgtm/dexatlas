@@ -211,6 +211,10 @@ DOCS: list[pathlib.Path] = [
     # it quotes the packager, the contract table and the three places that
     # pin the manifest's shape.
     REPO / "docs" / "reports" / "v1.1.0-candidate-c10-manifest.md",
+    # The landing report of that fourth key (C16): it records the new manifest
+    # shape, the re-cut packages' run ids and hashes, and what was left for the
+    # main session to re-measure.
+    REPO / "docs" / "reports" / "c16-manifest-fourth-key.md",
     # The reports of the batch that followed the release: the second reader
     # rehearsal of the invitation, the build time C6's criterion (a) asks for,
     # the gates' own regression tests, and the landing of the auto-write

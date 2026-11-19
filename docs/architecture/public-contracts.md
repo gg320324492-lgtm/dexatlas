@@ -300,20 +300,23 @@ Markdown、JSON、HTML 由同一组指标渲染：`reports/summary.py` 的
 
 ### 5.3 证据包 manifest
 
-`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:102-152`），
-`schema_version = 1`（`PACKAGE_SCHEMA_VERSION`，
-`src/dexatlas/reports/evidence_package.py:50`）。字段（
-`src/dexatlas/reports/evidence_package.py:126-143` `anchor: NOT_INCLUDED`）：
+`build_evidence_package`（`src/dexatlas/reports/evidence_package.py:111-155`），
+`schema_version = 2`（`PACKAGE_SCHEMA_VERSION`，
+`src/dexatlas/reports/evidence_package.py:54`）。字段（
+`not_included` 写入清单的位置
+`src/dexatlas/reports/evidence_package.py:151` `anchor: "not_included": NOT_INCLUDED`；
+`NOT_INCLUDED` 常量定义在
+`src/dexatlas/reports/evidence_package.py:86-96` `anchor: NOT_INCLUDED = {`）：
 
 ```text
-schema_version: 1
+schema_version: 2
 project_id: str
 apk_sha256: str
 run_id: str | null
 package_generated_at: ISO-8601
 tool_versions: {name: version | null}
 files: [{path, sha256, bytes, role}]        # role ∈ report | evidence_source | evidence
-not_included: {apk, full_sources, unrelated_strings}
+not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 ```
 
 包内路径固定：`reports/report.{json,md,html}`、`sources/<相对路径>`、
@@ -324,14 +327,16 @@ not_included: {apk, full_sources, unrelated_strings}
 包内只有本次分析。被引用的源码片段必须**是分析自己的反编译产物**：文件在
 反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或
 `resources/`）。不满足的文件不进包；引用仍留在证据里，并由
-`verify_citations` 记为未解析，而不是被当作已经带在包里。
+`verify_citations` 记为未解析，而不是被当作已经带在包里。清单的第四个
+`not_included` 键（`outside_analysis`）把这条边界**声明**出来——读者打开
+清单就能看到「包里只有本次分析的文件」，而不必去读打包器的实现。
 
 `dexatlas export` 的成功消息打印的是**归档里的文件数**，不是清单列出的
 数：清单列的是归档里除清单以外的文件，加上清单自己才是归档的全部条目。
 消息同时说清这个数由什么组成（`3 reports + 1 manifest`；被证据引用的源码
 片段另计 `N source fragments`），读者打开 zip 数一次就能对上包里有多少
-文件。清单的形状与 `schema_version = 1` 不变——变的是消息里那个数字指的
-是什么。
+文件。清单的形状在 v1.1.0 升为 `schema_version = 2`：新增
+`not_included.outside_analysis` 一个键，其余字段不变（变更记录见 CHANGELOG）。
 
 ## 6. 版本政策
 

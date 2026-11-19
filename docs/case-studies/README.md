@@ -36,9 +36,9 @@ Three walkthroughs cover three first-party APKs — `demo-app`, `obfuscated-app`
 and `multidex-app` (the multi-DEX appendix) — with case studies 1 and 3 both
 analysing the same `demo-app` APK. The four evidence packages come from
 **four separate analyses**, one package per analysis, and every manifest
-records the run it was made from: `run_e8e49384ab5246ab` (study 1's
-attachment), `run_dd897202eba74e28` (study 2's), `run_4fde2fa0b5254ccb`
-(study 2's multi-DEX appendix) and `run_fc8e432d4d094350` (study 3's).
+records the run it was made from: `run_bc38a1ba488449b6` (study 1's
+attachment), `run_6646f0a97a0c4401` (study 2's), `run_d1b4246fe1054c63`
+(study 2's multi-DEX appendix) and `run_aafda311d9864a4a` (study 3's).
 
 Those four are the runs the packages were made from, not the only runs the
 material mentions: the three walkthroughs quote seven runs in total, because
@@ -49,10 +49,13 @@ same bytes, so every count in their two reports agrees while the run id and
 the timing differ — same input, two runs, two ids. And a package's manifest
 records the hash of the `report.json` **inside the package**, which is
 byte-for-byte the loose `report.json` of that same analysis. The measured
-hashes and the run ids are in [the third-package
-report](../reports/case-studies-third-package.md); the earlier
+hashes and the run ids are in [the fourth-key
+report](../reports/c16-manifest-fourth-key.md), which re-cut the four
+packages for the manifest's `schema_version = 2`; the
+[third-package report](../reports/case-studies-third-package.md) records the
+previous cut (schema 1, runs of 2026-11-15/17) and the earlier
 [correspondence report](../reports/case-studies-run-correspondence.md)
-records what the attachment set looked like **before** that round and is
+records what the attachment set looked like **before** that round — both are
 kept for the comparison.
 
 All three APK samples are **first-party**: built from smali sources committed

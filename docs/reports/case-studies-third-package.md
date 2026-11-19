@@ -3,6 +3,12 @@
 日期：2026年11月18日 · 基准：本 worktree 的 `48a56b5`
 （`git rev-parse HEAD`）。
 
+> **⚠️ 2026年11月20日起，本文的包哈希与 run id 描述的是上一批包（schema 1）。**
+> 清单的第四个键（`schema_version = 2`）落地时，`docs/case-studies/attachments/`
+> 里的四个包已用新代码**重新分析并导出**，哈希与 run id 已全部更换；
+> 新一批的实测见 [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md)。
+> 本文保留的是**上一批（2026-11-17/18）的实测记录**，供对照，不再描述当前附件。
+
 > **本文是什么**：一次**新分析**的产物。它为[需求候选清单 C4](../reports/v1.1.0-candidates.md)
 > 指出的「三个案例包实际只覆盖两次分析」这一条，**补出了真实的第三次分析**，
 > 并给出「哪些文件放进 `docs/case-studies/attachments/`、放进去之后哪些文档

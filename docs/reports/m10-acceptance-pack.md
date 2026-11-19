@@ -126,7 +126,7 @@
 |---|---|:---:|---|---|
 | D1 | HTML 离线：断网或复制到另一台机器后直接打开 `report.html`；页面可读，无 `<script>`、无外部 CSS/JS/字体请求、无网络依赖。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 打开方式：；网络请求： |
 | D2 | 三格式一致：同一分析的 Markdown / JSON / HTML 中，计数与关键结论一致；抽查 3 个数字。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 抽查：；三处值： |
-| D3 | 包内声明：`manifest.json` 的 `not_included` 明示不含 APK、全量源码、未被证据引用的字符串；实际包内容与该声明一致。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 声明：；实际内容： |
+| D3 | 包内声明：`manifest.json` 的 `not_included` 明示不含 APK、全量源码、未被证据引用的字符串，且只装本次分析自己的文件（`outside_analysis`）；实际包内容与该声明一致。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 声明：；实际内容： |
 | D4 | 包内引用：若证据含 file-level `jadx:sources/...` locator，包内对应片段位于同名相对路径，读者不安装 DexAtlas 也能按路径打开；若只有裸树/DEX locator，包内不出现 `sources/`，读者能说明这是按构造解析而非缺失。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | locator 类型：；包内路径： |
 | D5 | 文本转义：样本中的字符串/类名不能写入 HTML 结构（无未转义标签、无事件属性）；异常文本只作为文本显示。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 样本：；页面表现： |
 
@@ -164,7 +164,7 @@
 | G2 | 后端缺失：清空后端环境变量后分析继续，错误记录 `not_installed`，报告照常产出；不得把失败当异常抛出。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；errors： |
 | G3 | 超时：设置极短超时后**至少一条后端记 `timeout` 且报告照常产出**（条数与本机速度有关：没超时的后端不留记录，不是「一定有三条」）；退出码 **6**（`EXIT_NO_INDEX`）**不由超时变量触发**——它由 `scripts/verify-public-contracts.py` 的 `an analysis with no index exits 6` 一条覆盖，本项只需**核对退出码 6 的语义**（[公共契约表 §1.2](../architecture/public-contracts.md)；**M8-4 是提出该缺口的历史记录，已由退出码 6 关闭**，见[读者包 §4.4](m10-reader-package.md)）并记录实际退出码。**本项是 G3 判据的唯一权威出处**——[读者包 §9.1](m10-reader-package.md)给的是可照抄的命令与**示例**输出，条数随后端速度变化，以本行为准。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 命令：；退出码：；timeout 条数：；退出码 6 的结论： |
 | G4 | 幂等：同一 APK 连续分析两次，project id 相同，`projects` 只有一条，计数一致。 |  | ☐ 通过　☐ 不通过　☐ 未验证 | 两次 id：；项目数： |
-| G5 | 数据隔离：**包里能直接判的两条**——证据包**不含 APK**（zip 的条目里没有 `.apk`，`manifest.json` 的 `files` 清单里也没有）、**不含全量源码**（包内没有 `sources/` 目录，`files` 清单里只有报告）；**「未引用字符串」按 manifest 的声明核对**：`manifest.json` 的 `not_included.unrelated_strings` 声明「未被证据引用的字符串常量不进包」——包里**没有** APK 的完整字符串表可供比对，读者核的是**这条声明与包内实际内容一致**（这是本项的判据，不是「与全量字符串表比对」）。记录 SHA-256 绑定（`apk_sha256`）但 APK 本身没进包。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 包内容：；manifest.not_included： |
+| G5 | 数据隔离：**包里能直接判的两条**——证据包**不含 APK**（zip 的条目里没有 `.apk`，`manifest.json` 的 `files` 清单里也没有）、**不含全量源码**（包内没有 `sources/` 目录，`files` 清单里只有报告）；**「未引用字符串」按 manifest 的声明核对**：`manifest.json` 的 `not_included.unrelated_strings` 声明「未被证据引用的字符串常量不进包」——包里**没有** APK 的完整字符串表可供比对，读者核的是**这条声明与包内实际内容一致**（这是本项的判据，不是「与全量字符串表比对」）。第四个键 `not_included.outside_analysis` 声明「包里只装本次分析自己的文件」——读者核的是包内实际文件与这条声明一致（没有来自反编译树之外的文件）。记录 SHA-256 绑定（`apk_sha256`）但 APK 本身没进包。 | ★ | ☐ 通过　☐ 不通过　☐ 未验证 | 包内容：；manifest.not_included： |
 
 ### 2.8 判定规则与阻断项
 
@@ -328,8 +328,9 @@ uv run --no-sync python -c \
 ```
 
 预期：`citations_resolved` 为 `True`，`citations_unresolved` 为空；
-`manifest.json` 的 `not_included` 有三个键——`apk` / `full_sources` /
-`unrelated_strings`——明示 APK、全量源码、未被证据引用的字符串不在包内。
+`manifest.json` 的 `not_included` 有四个键——`apk` / `full_sources` /
+`unrelated_strings` / `outside_analysis`——明示 APK、全量源码、未被证据
+引用的字符串不在包内，且包里只装本次分析自己的文件。
 **判据是「声明与包内实际内容是否一致」**（其中「未引用字符串」核的是这条声明，
 包里没有全量字符串表可比对，见 §2.7 的 G5）。
 
@@ -343,8 +344,8 @@ uv run --no-sync python -c \
    ```
 
 3. 打开 `evidence/reports/report.html`，再打开 `evidence/manifest.json`；
-   对照 `not_included` 的三个键（`apk` / `full_sources` / `unrelated_strings`）
-   检查包内实际文件——其中「未引用字符串」核的是**这条声明**
+   对照 `not_included` 的四个键（`apk` / `full_sources` / `unrelated_strings` /
+   `outside_analysis`）检查包内实际文件——其中「未引用字符串」核的是**这条声明**
    （包里没有全量字符串表可比对，见 §2.7 的 G5）。
 4. 打开 `evidence/reports/report.json`，看 evidence 记录的 locator 类型：
    - 若是 file-level `jadx:sources/...`，在 `evidence/` 下按同名相对路径找到源码片段；
@@ -603,7 +604,8 @@ uv run --no-sync python benchmarks/comparison/run.py \
 - `--html` 生成单文件；无 `<script>`、无外部资源；样本文本被转义。
 - `dexatlas export` 后：`verify_package` 通过 schema、路径、哈希、绑定检查；
   `verify_citations` 通过；包搬到另一目录后仍通过。
-- 包内不含 APK、全量源码、未被证据引用的字符串；`not_included` 与实际一致。
+- 包内不含 APK、全量源码、未被证据引用的字符串，且只装本次分析自己的文件；
+  `not_included` 与实际一致。
 - 相关测试必须真实覆盖管线写出的记录，而不是只构造理想 evidence 记录；
   M8-1 的回归测试就是反例教训。
 

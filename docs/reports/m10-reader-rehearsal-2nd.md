@@ -552,7 +552,7 @@ curl -s -D - -o /dev/null \
 `androguard:classes.dex#…`、`jadx:sources`（裸树）这一类。证据包里**没有一条**
 解析到字节——包里只有 3 份报告 + 1 份 manifest，没有 `sources/` 目录，也没有 DEX。
 这正是 `verify_citations` 所说的「**按构造解析**（resolved by construction, not by
-a file here）」——代码里 `src/dexatlas/reports/evidence_package.py:302` 的
+a file here）」——代码里 `src/dexatlas/reports/evidence_package.py:311` 的
 `verify_citations` 对 DEX locator 与裸树 locator 都走 `resolved += 1; continue`，
 不查包内文件。
 

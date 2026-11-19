@@ -12,6 +12,13 @@ published — to travel out with the package.
 These tests are the boundary written down: the analysis's own file ships,
 anything else does not, and the citation that named it is reported as
 unresolved rather than quietly satisfied.
+
+The manifest states the boundary as well: the fourth ``not_included`` key
+says the package holds only the analysis's own files — nothing from outside
+the decompiler's trees, and nothing reached through a link out of the tree.
+The statement was missing while the guard already held, so a reader opening
+the manifest could not see the boundary the packager enforces; the tests
+below keep the statement and the behaviour together.
 """
 
 from __future__ import annotations
@@ -35,7 +42,7 @@ from dexatlas.core.models import (
     Provenance,
 )
 from dexatlas.core.storage import Store
-from dexatlas.reports.evidence_package import verify_citations
+from dexatlas.reports.evidence_package import NOT_INCLUDED, verify_citations
 
 runner = CliRunner()
 
@@ -329,3 +336,42 @@ def test_every_file_in_the_package_is_the_analysis_and_nothing_else(
         "sources/com/example/demo/Crypto.java",
     }
     assert names == allowed
+
+
+# -- the manifest's statement of the boundary ---------------------------------
+
+
+def test_the_manifest_declares_the_package_holds_only_the_analysis(
+    workspace: Path, tmp_path: Path
+) -> None:
+    """The fourth ``not_included`` key states what the packager enforces.
+
+    The guard keeps the operator's material out of the archive, but the
+    manifest said nothing about it: a reader who checked the manifest saw
+    three keys about what is deliberately absent and no statement that
+    everything present is the analysis's own. The key is that statement.
+    """
+    project_id = _build_project(workspace, [])
+    target = tmp_path / "pkg" / "evidence.zip"
+    assert _export(project_id, target) == 0
+
+    with zipfile.ZipFile(target) as package:
+        manifest = json.loads(package.read("manifest.json"))
+    declared = manifest["not_included"]
+    assert "outside_analysis" in declared
+    # The statement says the positive fact — only the analysis's own files —
+    # and the two ways something else could otherwise get in: a file from
+    # outside the decompiler's trees, and a link inside the tree pointing out.
+    assert "only" in declared["outside_analysis"]
+    assert "link" in declared["outside_analysis"]
+
+
+def test_the_declared_boundary_names_everything_the_guard_refuses() -> None:
+    """The declared keys and the enforced boundary are one boundary.
+
+    A key the manifest declares but the guard does not enforce would be a
+    promise the packager does not keep; a refusal the manifest does not
+    declare would be a rule a reader cannot see. The two sets say the same
+    thing.
+    """
+    assert set(NOT_INCLUDED) == {"apk", "full_sources", "unrelated_strings", "outside_analysis"}

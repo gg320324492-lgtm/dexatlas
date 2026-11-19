@@ -735,9 +735,14 @@ def test_the_symbol_counts_name_what_they_count() -> None:
 
 def test_the_evidence_package_manifest_is_versioned() -> None:
     """The manifest says which shape it is, and names what it leaves out."""
-    assert PACKAGE_SCHEMA_VERSION == 1
+    assert PACKAGE_SCHEMA_VERSION == 2
     assert set(_REPORT_PATHS) == {"json", "markdown", "html"}
-    assert set(NOT_INCLUDED) == {"apk", "full_sources", "unrelated_strings"}
+    assert set(NOT_INCLUDED) == {
+        "apk",
+        "full_sources",
+        "unrelated_strings",
+        "outside_analysis",
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -42,7 +42,7 @@
 | `reports/report.md` | `render_markdown(result)` | `evidence_package.py:120` |
 | `reports/report.html` | `render_html(result)` | `evidence_package.py:121` |
 | `sources/<相对路径>` | `_cited_sources(...)` | `evidence_package.py:122-123` |
-| `manifest.json` | 清单本身（不列进自己的文件数组） | `MANIFEST_NAME`（`evidence_package.py:73`）、清单写入 `evidence_package.py:144-150` |
+| `manifest.json` | 清单本身（不列进自己的文件数组） | `MANIFEST_NAME`（`evidence_package.py:77`）、清单写入 `evidence_package.py:153-159` |
 
 ### 1.2 谁决定收不收
 
@@ -50,7 +50,7 @@
 规则只有三条：
 
 1. 只有 **`jadx:` 前缀**的定位符才可能被收（`evidence_package.py:215`）；
-2. 定位符的相对位置必须是一条**安全相对路径**（`evidence_package.py:436` →
+2. 定位符的相对位置必须是一条**安全相对路径**（`evidence_package.py:445` →
    `_is_a_safe_relative_path`，`evidence_package.py:436-450`）；
 3. 文件从 **`<workspace>/jadx/<相对位置>`** 读出来（`evidence_package.py:232`），
    复制成 `sources/<去掉 sources/ 或 resources/ 前缀后的路径>`（`evidence_package.py:250`）。
@@ -127,15 +127,15 @@ $ uv run --no-sync dexatlas export apk_80a8fe0e81204c9f -o .scratch/out/demo-pac
 - `_is_a_safe_relative_path`（`evidence_package.py:436-450`）拒绝 `..`、绝对路径、
   Windows 盘符、反斜杠、NUL。所以 `jadx:../../docs/outreach/publish-review.md`
   这种定位符在到达读取之前就被挡住了。
-- `_check_names`（`evidence_package.py:374` 起）拒绝归档里带路径穿越的条目名，
+- `_check_names`（`evidence_package.py:383` 起）拒绝归档里带路径穿越的条目名，
   并逐文件核对 sha256。
 
 ### 1.5 没有的防线
 
 两处，都是同一种毛病——**没有确认这个文件确实是分析的产物，就把它复制出去了**：
 
-1. **链接不解析。** `evidence_package.py:233` 的 `source.is_file()` 与
-   `evidence_package.py:250` 的 `read_bytes()` 都跟随符号链接。反编译树里一个指向
+1. **链接不解析。** `evidence_package.py:242` 的 `source.is_file()` 与
+   `evidence_package.py:259` 的 `read_bytes()` 都跟随符号链接。反编译树里一个指向
    树外的链接，会被当成「分析的一个源文件」原样复制进包。
 2. **目录本身不是边界。** 只要定位符点名了 `<workspace>/jadx/` 下的任何**文件**，
    它就会进包——包括反编译器根本没写过的文件（JADX 只写 `sources/` 与 `resources/`
@@ -197,11 +197,11 @@ $ uv run --no-sync dexatlas export apk_80a8fe0e81204c9f -o .scratch/out/demo-pac
 1. **文件在反编译树之内吗？**（`is_inside`，链接已解析）——树里的链接指向树外，
    一律不算分析的产物；
 2. **它在反编译器写的两棵树之一之下吗？**（`sources/` 或 `resources/`，
-   常量 `_DECOMPILER_TREES`，`evidence_package.py:67`）
+   常量 `_DECOMPILER_TREES`，`evidence_package.py:71`）
 
 不满足就不复制（`evidence_package.py:238-249`），并**说出是哪一条不满足**
 （`logger.warning`）。引用仍留在证据里，`verify_citations`
-（`evidence_package.py:302`）会把它记成未解析——读者跟着引用找不到文件时，
+（`evidence_package.py:311`）会把它记成未解析——读者跟着引用找不到文件时，
 看到的是「没带」而不是「带了个假的」。
 
 模块 docstring 也补上了这条边界（`evidence_package.py:14-20`）。
@@ -264,7 +264,7 @@ AssertionError: assert {'manifest.js...sh-review.md'} == {'manifest.json', …, 
 
 | 方案 | 改什么 | 代价 | 我的建议 |
 |---|---|---|---|
-| **A. 加第四个 `not_included` 键** | 例如 `"internal_records": "操作者自己的评审记录、工作文档与未发布素材一律不进包"` | 清单**形状变了**：`PACKAGE_SCHEMA_VERSION` 需从 1 升到 2（`evidence_package.py:50`），并同步改 `docs/architecture/public-contracts.md:316`、`tests/test_public_contracts.py:740`、`scripts/m10_selfcheck.py:591`，以及 M10 验收材料里「`not_included` 三键」的判据（`docs/reports/m10-acceptance-pack.md:129`） | **不建议在这一轮做**：这是公共契约变更（CLAUDE.md 规则 5），影响面远大于它覆盖的风险，而且**执行侧的守卫不依赖它** |
+| **A. 加第四个 `not_included` 键** | 例如 `"internal_records": "操作者自己的评审记录、工作文档与未发布素材一律不进包"` | 清单**形状变了**：`PACKAGE_SCHEMA_VERSION` 需从 1 升到 2（`evidence_package.py:54`），并同步改 `docs/architecture/public-contracts.md:316`、`tests/test_public_contracts.py:740`、`scripts/m10_selfcheck.py:591`，以及 M10 验收材料里「`not_included` 三键」的判据（`docs/reports/m10-acceptance-pack.md:129`） | **不建议在这一轮做**：这是公共契约变更（CLAUDE.md 规则 5），影响面远大于它覆盖的风险，而且**执行侧的守卫不依赖它** |
 | **B. 只改 `full_sources` 的措辞** | 例如改成「only the source fragments the evidence cites are packaged, and only from the analysis's own decompiler tree」 | 键集合不变 → M10 自检与契约文档的键列表都还成立；但 `tests/test_evidence_package.py:305` 钉的是整段字面量，要同步改；仓库里四个已入库包的清单带的是旧措辞（历史产物，非破坏） | **可以接受**，但它是「契约文本变更」，仍应进 CHANGELOG |
 
 **这一轮实际做了什么**：**没有动清单**（形状、键集合、措辞一字未改），

@@ -354,8 +354,8 @@ uv run --no-sync python -c \
 校验，仍应通过；包内路径不得指向生成它的机器。
 
 **数据边界（D3、G5）**：解压 `python -m zipfile -e evidence.zip evidence`，
-打开 `evidence/manifest.json`，对照 `not_included` 的三个键
-（`apk` / `full_sources` / `unrelated_strings`）检查包内实际文件。
+打开 `evidence/manifest.json`，对照 `not_included` 的四个键
+（`apk` / `full_sources` / `unrelated_strings` / `outside_analysis`）检查包内实际文件。
 **包里能直接判的是两条**：**不含 APK**（zip 的条目里没有 `.apk`，
 `manifest.json` 的 `files` 清单里也没有）、**不含全量源码**（包内没有
 `sources/` 目录，`files` 清单里只有报告）。
@@ -363,6 +363,8 @@ uv run --no-sync python -c \
 写着「未被证据引用的字符串常量不进包」；包里**没有** APK 的完整字符串表可供
 比对，读者核的是**这条声明与包内实际内容一致**（判据全文见
 [准备包 §2.7 G5](m10-acceptance-pack.md)）。
+第四个键 `outside_analysis` 声明「包里只装本次分析自己的文件」——反编译树
+之外的文件、经树内链接指向树外的文件，一律不进包。
 包内只有裸树/DEX locator 时没有 `sources/` 目录，这是按构造解析，不是缺失
 （详见[准备包 §3.5](m10-acceptance-pack.md)）。
 

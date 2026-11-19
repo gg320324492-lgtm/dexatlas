@@ -2,7 +2,7 @@
 
 **Sample:** [`examples/demo-app/demo.apk`](../../examples/demo-app/demo.apk)
 (sha256 `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`)
-**Run:** one analysis over the REST API — `run_fc8e432d4d094350`; the
+**Run:** one analysis over the REST API — `run_aafda311d9864a4a`; the
 attached package and every report quoted below were rendered from that run
 **Surfaces:** REST API (`uvicorn dexatlas.api.app:app`), MCP server
 (`dexatlas-mcp`, stdio), plus a Python SDK-style client over HTTP
@@ -201,7 +201,7 @@ The Markdown answer opens:
 **APK:** `demo.apk`
 **SHA-256:** `80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9`
 **Status:** completed
-**Run:** `run_fc8e432d4d094350` (completed, complete)
+**Run:** `run_aafda311d9864a4a` (completed, complete)
 **Tool versions:** androguard 4.1.4, apktool 2.11.1, jadx 1.5.2
 ```
 
@@ -219,10 +219,13 @@ sample): [Markdown report](attachments/api-integration-report.md),
 
 **Which analysis they come from.** The package and the three loose report
 files are the output of **the run this study quotes** —
-`run_fc8e432d4d094350`, the analysis started in §3.2 and polled to
-completion there. The package's manifest records that run id, and the
+`run_aafda311d9864a4a`, the analysis started in §3.2 and polled to
+completion there. The package's manifest records that run id and is
+`schema_version = 2` (its `not_included.outside_analysis` states that the
+package holds only the files of this analysis — see
+[the fourth-key report](../reports/c16-manifest-fourth-key.md)), and the
 `report.md` inside the package is byte-for-byte the loose `report.md` above
-(sha256 `dd5e2a35d1c739f3b48687a5350d0c9bf693635a3bec588766e2f44b6f0ec601`):
+(sha256 `af3f00d7bf4b77e9272b913b4a356f1dfe4fcb5a605368e565408eee8c3e6835`):
 the HTTP response and the packaged report are rendered by the same function
 from the same run, so a reader can diff the attachment against the quoted
 output and get an empty diff.
@@ -256,7 +259,7 @@ examples/api_client.py examples/demo-app/demo.apk`, against a running API):
 analyze: completed  apk_80a8fe0e81204c9f
 project: completed  5 classes, 8 methods, 21 call edges, 11 evidence records
 search:   string  sk_live_2f8a91c4e7b3
-report:  schema 3, run run_fc8e432d4d094350 (complete)
+report:  schema 3, run run_aafda311d9864a4a (complete)
 ```
 
 Two counts, two meanings: a *call site* is one place in the bytecode where a

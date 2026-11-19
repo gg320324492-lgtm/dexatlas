@@ -47,7 +47,11 @@ logger = logging.getLogger(__name__)
 
 #: The package manifest's own version. A reader checks this before it trusts
 #: anything else in the file; a change to the manifest's shape moves it.
-PACKAGE_SCHEMA_VERSION = 1
+#:
+#: Version 2 adds the fourth ``not_included`` key (``outside_analysis``):
+#: the manifest now states that the package holds only the analysis's own
+#: files. The shape of the manifest is otherwise unchanged.
+PACKAGE_SCHEMA_VERSION = 2
 
 #: Where the packaged reports live, inside the archive.
 _REPORT_PATHS = {
@@ -83,6 +87,11 @@ NOT_INCLUDED = {
     "apk": "the analysed APK is not packaged; identify it by its SHA-256",
     "full_sources": "only the source fragments the evidence cites are packaged",
     "unrelated_strings": "string constants that no evidence record cites are not packaged",
+    "outside_analysis": (
+        "the package holds only the files of this analysis: a file from outside"
+        " the decompiler's output trees, or reached through a link out of them,"
+        " is not packaged"
+    ),
 }
 
 _WINDOWS_DRIVE = re.compile(r"^[A-Za-z]:")

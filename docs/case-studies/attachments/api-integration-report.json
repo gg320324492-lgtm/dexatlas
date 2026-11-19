@@ -1,6 +1,6 @@
 {
   "schema_version": 3,
-  "generated_at": "2026-11-17T18:30:23.635063+00:00",
+  "generated_at": "2026-11-19T16:00:29.325918+00:00",
   "project": {
     "id": "apk_80a8fe0e81204c9f",
     "apk": {
@@ -14,7 +14,7 @@
       "has_signed_certificate": false
     },
     "status": "completed",
-    "created_at": "2026-11-17T18:30:13.533760+00:00",
+    "created_at": "2026-11-19T16:00:24.046311+00:00",
     "class_count": 5,
     "method_count": 8,
     "reference_count": 23,
@@ -24,7 +24,7 @@
     "resource_count": 1
   },
   "run": {
-    "id": "run_fc8e432d4d094350",
+    "id": "run_aafda311d9864a4a",
     "status": "completed",
     "completeness": "complete",
     "apk_sha256": "80a8fe0e81204c9fe9a74625806518c101030440a65cae4b27a0e224e7969ff9",
@@ -33,9 +33,9 @@
       "apktool": "2.11.1",
       "androguard": "4.1.4"
     },
-    "started_at": "2026-11-17T18:30:13.533760+00:00",
-    "finished_at": "2026-11-17T18:30:18.470554+00:00",
-    "duration_seconds": 4.937000000034459
+    "started_at": "2026-11-19T16:00:24.046311+00:00",
+    "finished_at": "2026-11-19T16:00:27.537958+00:00",
+    "duration_seconds": 3.4839999999385327
   },
   "latest_attempt_status": null,
   "tools": {
@@ -359,7 +359,7 @@
     },
     "index_complete": true,
     "index_gaps": [],
-    "duration_seconds": 4.94,
+    "duration_seconds": 3.48,
     "backends_with_errors": []
   }
 }

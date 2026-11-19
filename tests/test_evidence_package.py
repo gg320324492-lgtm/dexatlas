@@ -304,6 +304,11 @@ def test_the_clients_apk_and_the_whole_source_tree_stay_out(
         "apk": "the analysed APK is not packaged; identify it by its SHA-256",
         "full_sources": "only the source fragments the evidence cites are packaged",
         "unrelated_strings": "string constants that no evidence record cites are not packaged",
+        "outside_analysis": (
+            "the package holds only the files of this analysis: a file from outside"
+            " the decompiler's output trees, or reached through a link out of them,"
+            " is not packaged"
+        ),
     }
 
 
