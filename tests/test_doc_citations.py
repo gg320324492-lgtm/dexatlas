@@ -698,7 +698,13 @@ def test_the_release_body_is_read_out_of_the_release_tree() -> None:
     assert trees.get("the v1.0.0 tree"), (
         f"the release body was not read out of the release tree: {report.trees}"
     )
-    assert not report.findings, [finding.render() for finding in report.findings]
+    # The value findings are a separate class: they say what a number in the
+    # document states against the number the line holds, and the release
+    # body's appendix has some of those. What this test is about is the
+    # tree, and a citation that drifted or could not be resolved would say
+    # that the tree was read wrong.
+    assert not report.drifted, [finding.render() for finding in report.drifted]
+    assert not report.unresolved, [finding.render() for finding in report.unresolved]
 
 
 def test_every_document_that_declares_a_tree_is_one_the_checker_reads() -> None:
@@ -983,3 +989,248 @@ def test_a_declaration_that_names_no_citation_is_reported(
     monkeypatch.setattr(checker, "DOCS", [document])
 
     assert checker.main() == 1
+#: The report the release body quotes, as the v1.0.0 tree holds it.
+#:
+#: The three lines a claim points at are the ones the release body's
+#: appendix names, and the three numbers it quotes sit two lines further
+#: down: the suite result, the source fingerprint and the fixture count.
+REPORT_LINES = [
+    "uv sync --extra dev --extra analysis --extra demo",
+    "bash scripts/install-backends.sh    # JADX / Apktool",
+    "bash scripts/fetch-fixtures.sh      # 两个第三方集成样本",
+    "",
+    "uv run pytest          # 收集 1712 个：1563 快 + 149 集成",  # noqa: RUF001
+    "uv run pytest --cov=dexatlas --cov-report=term",
+    "                      # 一方代码覆盖率 93.3%（7157/7671 行）",  # noqa: RUF001
+    "                      # 完整环境下的结果：1710 passed + 0 xfailed，1 skipped",  # noqa: RUF001
+    "",
+    "  },",
+    '  "schema": 4,',
+    '  "source_fingerprint": "sha256:18f3ab15b40b156110b7e57722427c468290691f31e2be9cd2b3646c74b5b525",',
+]
+
+
+def _repository_with_a_report(tmp_path: Path) -> Path:
+    """A repository whose report holds the numbers a document quotes.
+
+    The document is the release body's appendix: a table of "number |
+    source", and the source lines it names do not hold the numbers. The
+    numbers are two lines further down, which is what the v1.0.0 release
+    tree looks like.
+    """
+    repository = tmp_path / "report-repo"
+    repository.mkdir()
+    _git(repository, "init", "-q", "-b", "main")
+    _git(repository, "config", "user.email", "test@example.invalid")
+    _git(repository, "config", "user.name", "Test")
+
+    record = repository / "docs"
+    record.mkdir(parents=True)
+    (record / "report.md").write_text("\n".join(REPORT_LINES) + "\n", encoding="utf-8")
+    scripts = repository / "scripts"
+    scripts.mkdir()
+    (scripts / "fetch-fixtures.sh").write_text(
+        "\n".join(f"line {number}" for number in range(1, 12))
+        + "\n# Only what a test actually reads. Two fixtures were fetched here.\n",
+        encoding="utf-8",
+    )
+    (repository / "doc.md").write_text(
+        "| Number in the body | Source |\n"
+        "|---|---|\n"
+        "| 1694 passed + 0 xfailed + 1 skipped | `docs/report.md:6` |\n"
+        "| Source fingerprint `sha256:18f3ab15…` | `docs/report.md:10` |\n"
+        "| Two third-party integration fixtures, fetched by "
+        "`scripts/fetch-fixtures.sh`, never committed | `docs/report.md:1` |\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "-A")
+    _git(repository, "commit", "-qm", "the release")
+    _git(repository, "tag", "v1")
+    return repository
+
+
+def _value_findings(report) -> list:
+    """The findings of the value check."""
+    return [finding for finding in report.findings if finding.kind == "value drifted"]
+
+
+def test_a_value_the_sentence_states_is_compared_with_the_line_it_cites(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A number in the sentence is a claim about the cited line.
+
+    The three rows are the ones the v1.0.0 release body's appendix carries
+    and the release body got wrong: the suite result, the source fingerprint
+    and the fixture count each sit two lines below the line the appendix
+    names. The checker has to say so, and to say where the number is.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    findings = _value_findings(report)
+    assert findings, "the value in the sentence was not compared with the cited line"
+    details = "\n".join(finding.detail for finding in findings)
+    assert "1694 passed" in details
+    assert "sha256:18f3ab15" in details
+    assert "Two third-party" in details
+    # The number is not on the cited line, and the checker says where it is.
+    assert "line 8" in details
+    assert "line 12" in details
+    assert "line 3" in details
+
+
+def test_a_value_the_cited_line_holds_is_not_reported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same three rows, pointed at the lines that hold the numbers.
+
+    A check that reports everything is not a check. The rows here are the
+    appendix written correctly, and the checker has to stay quiet.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "| Number in the body | Source |\n"
+        "|---|---|\n"
+        "| 1710 passed + 0 xfailed + 1 skipped | `docs/report.md:8` |\n"
+        "| Source fingerprint `sha256:18f3ab15…` | `docs/report.md:12` |\n"
+        "| Two third-party integration fixtures, fetched by "
+        "`scripts/fetch-fixtures.sh`, never committed | `docs/report.md:3` |\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not _value_findings(report), "the value was reported where it holds"
+
+
+def test_a_claim_that_states_no_value_is_not_compared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A sentence that only says where the thing lives cannot be checked.
+
+    There is nothing in the sentence to check the line against, so the
+    citation gets the location check and nothing more.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    document.write_text("The reproduction steps live in `docs/report.md:6`.\n", encoding="utf-8")
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not _value_findings(report)
+
+
+def test_a_number_that_is_not_a_measurement_is_not_compared(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The numbers a sentence uses for other things are not claims.
+
+    A row numbered ``1``, a status code, a limit, a version and a
+    quotation are all numbers, and none of them is a measurement the cited
+    line is supposed to carry.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "| # | claim | source |\n"
+        "|---|---|---|\n"
+        "| 1 | `docs/report.md:6` | a row number |\n"
+        "| 2 | 200 / 404 (`docs/report.md:6`) | status codes |\n"
+        "| 3 | at least 16/20 per round (`docs/report.md:6`) | a limit |\n"
+        "| 4 | version 2.11.1 (`docs/report.md:6`) | a version |\n"
+        "| 5 | 「1710 passed」 (`docs/report.md:6`) | a quotation |\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not _value_findings(report), "a number that is not a measurement was compared"
+
+
+def test_a_citation_that_names_a_symbol_is_not_compared_with_a_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A number beside a symbol counts what the symbol holds.
+
+    "28 checks in ``_rest_requests()``" is a claim about the function, and
+    the checker already compares the function against the cited lines. The
+    number is not a number the line has to carry.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The 1710 checks are in `fetch_fixtures()` (`docs/report.md:6`).\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not _value_findings(report), "a number beside a symbol was compared"
+
+
+def test_the_value_is_read_out_of_the_tree_the_document_declares(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The number is compared with the tree the document is about.
+
+    The release body says its line numbers refer to the release tree, so
+    the number is read out of that tree and not out of the working copy.
+    A checker that read the working copy would report a drift where the
+    document is right.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "| Number in the body | Source |\n"
+        "|---|---|\n"
+        "| 1710 passed + 0 xfailed + 1 skipped | `docs/report.md:8` |\n"
+        "| Source fingerprint `sha256:18f3ab15…` | `docs/report.md:12` |\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "-A")
+    _git(repository, "commit", "-qm", "the rows")
+    _git(repository, "tag", "-f", "v2")
+    # The working copy moves on and the numbers change with it.
+    (repository / "docs" / "report.md").write_text(
+        "\n".join("the working copy moved on" for _ in range(12)) + "\n", encoding="utf-8"
+    )
+    _git(repository, "commit", "-qam", "the tree moved on")
+
+    checker = _checker_for(repository, monkeypatch, "v2")
+    report = checker.check_documents([document])
+    assert not _value_findings(report), "the number was read out of the working copy"
+
+    checker = _checker_for(repository, monkeypatch, None)
+    report = checker.check_documents([document])
+    assert _value_findings(report), "the number was not compared with the working copy"
+
+
+def test_the_value_findings_are_reported_and_do_not_fail_the_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The value findings are printed, and the exit code is still the answer.
+
+    A number in a document is a snapshot of a measurement, and a
+    measurement writes new numbers every time it runs. The outward texts
+    are refreshed by hand after it, and that refresh is the release
+    session's work. What the checker owes it is the two numbers side by
+    side; the exit code still belongs to the citations that name a symbol.
+    """
+    repository = _repository_with_a_report(tmp_path)
+    checker = _checker_for(repository, monkeypatch, None)
+    monkeypatch.setattr(checker, "DOCS", [repository / "doc.md"])
+
+    code = checker.main()
+    written = capsys.readouterr().out
+
+    assert "values not matching:" in written
+    assert "1694 passed" in written
+    assert code == 0, f"the value findings failed the check:\n{written}"

@@ -62,7 +62,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 | # | 是什么数 | 在哪 | 谁在检 | 陈旧了会怎样 |
 |---|---|---|---|---|
 | A1 | 测试总数/快慢拆分/套件通过跳过/coverage | `docs/reports/phase1-execution-report.md` 的 `<!--fig:…-->` | `refresh-report-figures.py` 写；`tests/test_docs.py::test_execution_report_numbers_match_the_code` 按源码指纹比对；CI `measurement` job 在 tag 上重算 | **门禁先红**，挡住更新——正是那三个闭环的形状。改数要走脚本 |
-| A2 | 同上（状态页） | `docs/status.md:23-24` | 同 A1（同一套标记机制，`documents_with_figures()` 发现的文档） | 同 A1 |
+| A2 | 同上（状态页） | `docs/status.md:23-24` | 同 A1；同一套标记机制是 `scripts/refresh-report-figures.py` 的 `documents_with_figures()` 按标记发现文档 | 同 A1 |
 | A3 | 测试数 / 覆盖率**徽章** | `README.md:12-13`、`README.zh-CN.md:12-13` | `refresh-report-figures.py` 写 URL；`check-version-claims.py::check_badges` 读 URL 里的数与测量比 | 徽章过期 → badge 门禁红 |
 | A4 | 测试数/拆分/套件数（散文） | `docs/how-to-verify.md:147,172`、`.zh-CN.md:120,149` | `check-release-numbers.py` 的「工作副本」段；`tests/test_how_to_verify.py::test_the_page_states_the_numbers_the_suite_has` | 门禁先红。**但**：另一扇窗口正在把这两页的散文改成标记（改法见该窗口的交接），改的过程中 `tests/test_how_to_verify.py:36` 的 `STATED_NUMBERS` 形状要求会挡路——**本报告不动这两页** |
 | A5 | 测试文件表（§2.1 的文件名集合） | `docs/reports/phase1-execution-report.md:150-…` | `tests/test_docs.py::test_execution_report_lists_every_test_file`（集合相等）；`refresh-report-figures.py` 写之前也比一次 | 加一个测试文件 → 门禁先红 → 必须补一行。表右边那句**说明**没人检（见 B10） |
@@ -86,9 +86,9 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 
 ### B1 ★★★ `docs/portfolio.md` 的四个数 —— 整页没人守
 
-- **是什么数**：`docs/portfolio.md:67` 的 `1,695 tests at`；`:68` 的 `93.3% coverage`；
-  `:68` 的 `thirteen CI jobs (fourteen runs on a tag — the test job is a 3.12/3.13 matrix)`；
-  另加 `:48` 的 `Eleven tools over stdio`。
+- **是什么数**：`docs/portfolio.md:67` 的 `1,695 tests at`；`docs/portfolio.md:68` 的 `93.3% coverage`；
+  `docs/portfolio.md:68` 的 `thirteen CI jobs (fourteen runs on a tag — the test job is a 3.12/3.13 matrix)`；
+  另加 `docs/portfolio.md:48` 的 `Eleven tools over stdio`。
 - **谁在检**：**没人**。核法一：`grep -rn "portfolio" scripts/*.py tests/*.py .github/workflows/*.yml`
   → 零命中。`docs/portfolio.md` 不在 `check-release-numbers.py` 的 `VERIFY_DOCUMENTS`，
   不在 `check-version-claims.py` 的 `OUTWARD_DIRECTORIES`，不在 `check-doc-citations.py` 的
@@ -118,18 +118,19 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   同行的 `27 个 skip` 与 `（25 条）`/`（2 条）` 的理由拆分；
   `docs/how-to-verify.zh-CN.md:148` 的同两个数（理由只有一种写法）。
 - **谁在检**：**没人**——但原因不是「门禁没提到这一页」，而是**门禁主动放过了它**。
-  `check-release-numbers.py` 的 `_OTHER_ENVIRONMENT`（`:206`）把「**没**取第三方样本」这类
-  块整块跳过（`:403`）：那是另一个环境的测量，不是这次发布声称的那次。
+  `scripts/check-release-numbers.py` 的 `_OTHER_ENVIRONMENT`（`scripts/check-release-numbers.py:206`）把「**没**取第三方样本」这类
+  块整块跳过（`scripts/check-release-numbers.py:403`）：那是另一个环境的测量，不是这次发布声称的那次。
   核法二：我 import 了这个脚本，在内存里把 `1664 passed` 改成 `2999 passed`、
   把 `31 skipped` 改成 `77 skipped`，`extract()` 读出来的族
-  **一行都没变**（仍然是 `:147` 的 tests.total/fast/slow 与 `:172` 的 suite 三项）；
+  **一行都没变**（仍然是 `docs/how-to-verify.md:147` 的 tests.total/fast/slow 与 `docs/how-to-verify.md:172` 的 suite 三项）；
   跑整条门禁（`scripts/check-release-numbers.py`）退出码仍是 0。
 - **陈旧了会怎样**：**静默**。套件每加一个测试，这一行的三个数就全错；
   而这一行恰恰是「读者照着跑一遍、对不上数字」时会去看的那一行。
   **差多远**：这一行写 `1664 passed`，而报告记的那次测量是 `1731 passed`，
   这棵树上现在收集到的是 **1744**（1595 快 + 149 集成）——**这一行落后了 80 个测试**，
-  而 `:172` 那一行（被守着的）只落后 13 个。**同一张表，一行被守着、一行没有。**
-  **另一扇窗口正在把这两页的散文改成标记，但改的是 `:147` 与 `:172`（有标记键的那几处），
+  而 `docs/how-to-verify.md:172` 那一行（被守着的）只落后 13 个。**同一张表，一行被守着、一行没有。**
+  **另一扇窗口正在把这两页的散文改成标记，但改的是 `docs/how-to-verify.md:147` 与
+  `docs/how-to-verify.md:172`（有标记键的那几处），
   这一行没有对应的键**——`suite.*` 键记的是「取了样本」那一次的测量，
   「没取样本」那一次是**另一个口径**，现在没有键能记它。
 - **附带发现（中优先级）**：英文版把 27 条 skip 拆成**两种理由**（25 + 2），
@@ -142,11 +143,12 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 ### B3 ★★ `docs/outreach/publish-review.md` 的汇总列 —— 对外门禁认不出的写法
 
 - **是什么数**：`docs/outreach/publish-review.md:50-53` 最右列的 `1,695 / 93.3%`（共 4 处），
-  `:342` 与 `:406` 的 `1,695 / 93.3%`。
+  `docs/outreach/publish-review.md:342` 与 `docs/outreach/publish-review.md:406` 的 `1,695 / 93.3%`。
 - **谁在检**：**没人**。`docs/outreach/` 确实在 `check-version-claims.py` 的
   `OUTWARD_DIRECTORIES` 里，但 outward 规则**只认带单位的写法**：
-  `_TEST_COUNT`（`:142`）要 `1,695 tests` 或 `1,695 个测试`；
-  `_COVERAGE_PCT`（`:163`）要附近出现 `coverage` / `覆盖率` 字样。
+  `TESTS_STATED`（`scripts/check-version-claims.py:203`）要 `N tests`；
+  中文写法 `N 个测试` 由 `OUTWARD_TESTS_CN`（`scripts/check-version-claims.py:142`）认；
+  `COVERAGE_STATED`（`scripts/check-version-claims.py:189`）要附近出现 `coverage` / `覆盖率` 字样。
   `1,695 / 93.3%` 两者都不满足。
   核法二：我 import 了 `check-version-claims.py`，把 `publish-review.md` 内存里的
   `1,695` 全改成 `1,999`，再跑 `check_outward_numbers()` →
@@ -157,8 +159,8 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   （`~1,540` 是「修正前」；第 3 列是同一栏的「替换后」措辞）——两列都被反引号包着，
   按 outward 规则的**设计**豁免（见 §5.3），**不是缺口**；
   **缺口是最右列**：`1,695 / 93.3%` 没有反引号（不是引文），却因为**写法**没人认。
-  `:342` 与 `:406` 是同样的两处散文。
-  （对照：`docs/outreach/project-brief.md:50` 与 `:87` 现在写的是 `1,733`，**被 outward 规则守得住**。
+  `docs/outreach/publish-review.md:342` 与 `docs/outreach/publish-review.md:406` 是同样的两处散文。
+  （对照：`docs/outreach/project-brief.md:50` 与 `docs/outreach/project-brief.md:87` 现在写的是 `1,733`，**被 outward 规则守得住**。
   也就是说同一批对外素材里，被守的那两页是对的，没被守的这张审阅表是错的。）
 - **该怎么做**：**另设门禁**（扩 outward 规则的写法，让 `N / P%` 这种「数 / 覆盖率」也算），
   或**改写**成能被认出的写法（`1,695 tests, 93.3% coverage`）。
@@ -190,7 +192,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
 
 - **是什么数**：`docs/portfolio.md:48` 的 `Eleven tools over stdio`；
   `docs/HANDOVER.md:29` 的 `eleven tools`；`docs/status.md:256` 的 `十一个工具`。
-- **谁在检**：**部分**。`check-version-claims.py` 的 `mcp_tool_count()`（`:1337`）
+- **谁在检**：**部分**。`check-version-claims.py` 的 `mcp_tool_count()`（`scripts/check-version-claims.py:1337`）
   读 `src/dexatlas/mcp/server.py` 数 `@server.tool`，但它只在 `check_outward_counts()`
   里用，而那个函数**只对 `OUTWARD_DIRECTORIES` 跑**（`docs/outreach/`、`docs/case-studies/`、
   `docs/proposals/`）。`docs/case-studies/api-integration.md` 的第 48、285、295 行
@@ -199,11 +201,12 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   `docs/portfolio.md`、`docs/HANDOVER.md`、
   `docs/status.md` 的那三处**没人守**。
   核法一：`grep -rn "portfolio\|HANDOVER" scripts/check-version-claims.py` → 不在 `OUTWARD_DIRECTORIES` 里。
-  （一处小例外：`docs/case-studies/api-integration.md:34` 的 `eleven read-only tools`
-  也不被认——`MCP_TOOLS_STATED` 要求数字后面紧跟 `tools`——但同一页第 48、285、295 行认得住。）
+  一处小例外：`docs/case-studies/api-integration.md:34` 的 `eleven read-only tools` 也不被认；
+  `MCP_TOOLS_STATED`（`scripts/check-version-claims.py:166`）要求数字后面紧跟 `tools`。
+  但同一页第 48、285、295 行认得住。
 - **陈旧了会怎样**：**静默**。今天 11 个，是对的；给 MCP 加一个只读工具，那三处就错了。
 - **该怎么做**：**加键或扩门禁**。`refresh-report-figures.py` 的 `render_figures()`
-  （`:1116`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
+  （`scripts/refresh-report-figures.py:1108`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
   加一个 `mcp.tools` 是同一形状的事；或者把 `check_outward_counts()` 的适用范围
   从 `OUTWARD_DIRECTORIES` 放宽到「任何写了工具数的文档」。
 
@@ -221,16 +224,16 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   调用点，§7 会红而 glossary 不会。
 - **该怎么做**：**加键或扩门禁**（让 glossary 引用 §7 的那个数，而不是复述它）。
   `docs/glossary.md` 自己就是「只管词不管数」的页——**这正好是它的设计**，
-  所以这里更像是**设计违规**：它在 `:199` 明说「手抄会立刻过期；这一页只管词不管数」，
-  却在 `:186` 手抄了一个数。**最省事的修法是把 `:186` 的数字改成指向 §7 的引用。**
+  所以这里更像是**设计违规**：它在 `docs/glossary.md:199` 明说「手抄会立刻过期；这一页只管词不管数」，
+  却在 `docs/glossary.md:186` 手抄了一个数。**最省事的修法是把 `docs/glossary.md:186` 的数字改成指向 §7 的引用。**
 
 ### B7 ★ 分析出证条数：跑一次的结果被写进了「当前行为」的文档
 
 - **是什么数**：`docs/analysis-provenance.md:398-402` 那张五个样本的分析表
-  （类/方法/交叉引用/证据/字符串/资源/反编译成功）；`:411` 的 `五个样本、40 条证据，三种 kind`；
-  `:850` 的 `在这 5 个自建样本上，JADX 一次都没失败`。
-- **谁在检**：**没人**。`check-doc-citations.py` 的 `DOCS` 里有 `docs/analysis-provenance.md`
-  （`:117`），但它检的是**行号引用**，不检这张表的数；
+  （类/方法/交叉引用/证据/字符串/资源/反编译成功）；`docs/analysis-provenance.md:411` 的 `五个样本、40 条证据，三种 kind`；
+  `docs/analysis-provenance.md:850` 的 `在这 5 个自建样本上，JADX 一次都没失败`。
+- **谁在检**：**没人**。`scripts/check-doc-citations.py` 的 `DOCS` 白名单（`scripts/check-doc-citations.py:116`）
+  里有 `docs/analysis-provenance.md`，但它检的是**行号引用**，不检这张表的数；
   `check-version-claims.py` 的 outward 规则不覆盖 `docs/`（只覆盖 `docs/outreach/`、
   `docs/case-studies/`、`docs/proposals/`）。
 - **陈旧了会怎样**：**静默**。这些数是**当前代码**在五个样本上的产出——
@@ -356,10 +359,10 @@ E4 与 E5 是对照组：它们证明这套漂移实验**能**抓到漂移，所
 |---|---|---|
 | 第 2 栏 | `` `~1,540 automated tests, 93.1% coverage` `` | **故意的**：它是「修正前」的旧措辞，按 outward 规则的**设计**豁免（`BACKTICKED`：反引号包着的是「被替换掉的旧措辞」）。这是 C2，不是缺口 |
 | 第 3 栏 | `` `1,695 automated tests, 93.3% coverage` `` | **同一类豁免**：它也被反引号包着（我查了 `quoted_spans()`：第 50–53 行的反引号区间覆盖了第 3 栏）。所以**不是规则没认出来，是它被当成引文放过了** |
-| **第 4 栏（最右）** | `1,695 / 93.3%`（**没有反引号**） | **这才是缺口**：`_TEST_COUNT`（`:142`）要 `1,695 tests` 或 `1,695 个测试`，`_COVERAGE_PCT`（`:163`）要附近出现 `coverage`/`覆盖率`——`1,695 / 93.3%` 两者都不满足 |
-| `:342`、`:406` | `1,695 / 93.3%`（散文，无反引号） | 同上：**写法**不被认 |
+| **第 4 栏（最右）** | `1,695 / 93.3%`（**没有反引号**） | **这才是缺口**：`TESTS_STATED`（`scripts/check-version-claims.py:203`）要 `1,695 tests` 或 `1,695 个测试`，`COVERAGE_STATED`（`scripts/check-version-claims.py:189`）要附近出现 `coverage`/`覆盖率`——`1,695 / 93.3%` 两者都不满足 |
+| `docs/outreach/publish-review.md:342`、`docs/outreach/publish-review.md:406` | `1,695 / 93.3%`（散文，无反引号） | 同上：**写法**不被认 |
 
-**结论**：第 4 栏与 `:342`/`:406` 才是真缺口（B3 说的就是这三类）。
+**结论**：第 4 栏与 `docs/outreach/publish-review.md:342`/`docs/outreach/publish-review.md:406` 才是真缺口（B3 说的就是这三类）。
 第 3 栏虽然也是 `1,695`，但它被反引号豁免是**规则的既定设计**
 （`tests/test_version_claims.py:1081` 记着这个豁免）——修 B3 时**不要动第 3 栏的写法**，
 动了反而会把「引文」变成「声明」，那是有意为之的区分。
@@ -391,6 +394,13 @@ E4 与 E5 是对照组：它们证明这套漂移实验**能**抓到漂移，所
 
 - 一次**只读**的全库审计，产出了本报告（`docs/reports/handwritten-numbers-audit.md`，本窗口唯一的新文件）。
 - 核法本身是可复跑的：§5.2 的内存漂移实验（不改磁盘）＋ §5.1 的 grep 清单。
+- **本报告自己的引用经得起引用检查器**：把它临时挂进 `check-doc-citations.py` 的 `DOCS`
+  名单跑一遍（内存里挂，磁盘不改），`drifted: 0`、`unresolved: 0`。
+  做法是**行号与符号分开写**：行号引它所在的那个文件（`scripts/check-version-claims.py:203`），
+  符号提到**它所在的文件**（`TESTS_STATED`）；并把每一处裸写行号（`:142`）补成完整路径。
+  顺带查出一处**引错了文件**：`_TEST_COUNT` 与 `_COVERAGE_PCT` 属于
+  `scripts/check-release-numbers.py`，不属于 `scripts/check-version-claims.py`；
+  outward 规则用的是后者里的 `TESTS_STATED` 与 `COVERAGE_STATED`——已改正。
 - 门禁跑过并全绿：`ruff check .`、`ruff format --check .`、`mypy`、
   `vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80`（退出 0）、
   `scripts/check-doc-citations.py`（`drifted: 0`）、`scripts/check-version-claims.py --base auto`（退出 0）、
@@ -412,13 +422,14 @@ E4 与 E5 是对照组：它们证明这套漂移实验**能**抓到漂移，所
 - **没改任何既有文件**。B1–B10 全部只记在本报告里。
 - **没跑 `scripts/refresh-report-figures.py`**，没跑 `pytest --cov`（并发测量会互相污染覆盖率）。
 - **没动两页「怎么复核」**（`docs/how-to-verify.md` / `.zh-CN.md`）——散文改标记是另一扇窗口的事。
-  **但请主会话注意 B2**：那一扇改的是 `:147` 与 `:172`（有标记键的那几处），
-  **`:171` / `:148` 那个「另一个环境」的数没有键可挂**，两扇之间是个洞。
+  **但请主会话注意 B2**：那一扇改的是 `docs/how-to-verify.md:147` 与 `docs/how-to-verify.md:172`（有标记键的那几处），
+  **`docs/how-to-verify.md:171` / `docs/how-to-verify.zh-CN.md:148` 那个「另一个环境」的数没有键可挂**，两扇之间是个洞。
 - **没动社交预览卡片**（`scripts/make-social-preview.py` 与 `.github/social-preview.*`）——
   另一扇窗口在收进机制。
 - **没动 `docs/reports/README.md`**（报告索引）——主会话统一登记。
 - **没动 `scripts/` 与 `tests/`**：本报告没有新增门禁，也没有改门禁。
   §3 与 §6 里的「该怎么做」是**建议**，每一条都注明了理由；要不要做、怎么做，由主会话定。
 - **B3 的 §5.3 疑点已经查清**（不是留给主会话的悬念）：`publish-review.md` 表格的第 2、3 栏
-  被反引号包着 → 按 outward 规则的**设计**豁免；**缺口只在最右栏与 `:342`/`:406`**，
+  被反引号包着 → 按 outward 规则的**设计**豁免；**缺口只在最右栏与
+  `docs/outreach/publish-review.md:342`/`docs/outreach/publish-review.md:406`**，
   因为 `1,695 / 93.3%` 这个**写法**不在规则的认法里。详见 §5.3。

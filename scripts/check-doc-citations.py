@@ -24,6 +24,25 @@ a symbol the file only mentions has to be mentioned in the lines. Naming a
 class and citing the lines where it is built is a concrete claim, and it can
 be checked exactly.
 
+*Which value* — when the sentence around it states a number, the lines it
+names have to carry that number. "1694 passed" cited at
+``phase1-execution-report.md:879`` is a claim about the line 879, and a line
+that says "1710 passed" does not say it. The check names both numbers when
+they differ, so the fix is a number and not a hunt.
+
+A number is only compared when the sentence says enough for the comparison
+to mean something: a count with the word it counts ("1694 passed"), a
+percentage ("93.3%") or a fingerprint ("sha256:18f3ab15…"). A bare number is
+not one — a table row numbered ``1`` and a status code ``404`` are labels.
+A number that is a limit ("≥16/20"), a section ("§3"), a quotation, or
+part of a version ("2.11.1") is not one either.
+
+The value findings are reported and they do not fail the check yet. A number
+in a document is a snapshot of a measurement, and every measurement writes
+new numbers: the outward texts are refreshed by hand after it, and that
+refresh is the release session's work. What the checker owes it is the two
+numbers side by side — the one the sentence says and the one the line holds.
+
 What it does not check
 ----------------------
 
@@ -62,6 +81,9 @@ checked: the file has to define it in the range, or the range has to be
 inside the body it opens. Any other anchor is a fragment of the source —
 ``def version(``, ``@app.get("/projects"`` — and has to appear in the range
 verbatim, whitespace aside.
+A citation that names a symbol is not compared with a value as well: a
+number in the same sentence then counts what the symbol holds — "28 checks
+in ``_rest_requests()``" — rather than being written on the cited line.
 
 Which tree a citation is about
 ------------------------------
@@ -218,6 +240,9 @@ DOCS: list[pathlib.Path] = [
     # mechanism does not cover.
     REPO / "docs" / "reports" / "citation-anchor-declarations.md",
     REPO / "docs" / "reports" / "handwritten-numbers-audit.md",
+    # The report of the batch that taught the checker to compare the values a
+    # citation states with the values on the lines it names.
+    REPO / "docs" / "reports" / "citation-value-comparison.md",
     *sorted((REPO / "docs" / "releases").glob("*.md")),
     *sorted((REPO / "docs" / "reports").glob("*-github-release-body.md")),
 ]
@@ -571,6 +596,8 @@ class Clause:
     citations: tuple[Citation, ...]
     #: For every citation, the names it claims to locate.
     claims: tuple[tuple[str, ...], ...]
+    #: For every citation, the values the sentence states about it.
+    values: tuple[tuple[StatedValue, ...], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -597,6 +624,9 @@ class Report:
     findings: tuple[Finding, ...]
     #: The citations that declare what their range holds.
     declared: int = 0
+    #: How many citations had a value of their own compared against the
+    #: lines they name.
+    valued: int = 0
     #: For every tree a document was read against: its name, how many
     #: documents it described and how many citations it answered for.
     trees: tuple[tuple[str, int, int], ...] = ()
@@ -610,7 +640,24 @@ class Report:
 
     @property
     def drifted(self) -> tuple[Finding, ...]:
-        return tuple(f for f in self.findings if f.kind not in {"unresolved", "ambiguous"})
+        """The citations whose symbol is no longer where the document says it is."""
+        return tuple(
+            f for f in self.findings if f.kind not in {"unresolved", "ambiguous", "value drifted"}
+        )
+
+    @property
+    def value_findings(self) -> tuple[Finding, ...]:
+        """The citations whose value is no longer on the line they name.
+
+        These are reported and they do not fail the check yet. A number in
+        a document is a snapshot of a measurement, and a measurement writes
+        new numbers every time it runs: the outward texts are refreshed by
+        hand after it, and the refresh is the release session's work, not
+        the checker's. Reporting the two numbers — the one the sentence
+        says and the one the line holds — is what makes the refresh
+        possible.
+        """
+        return tuple(f for f in self.findings if f.kind == "value drifted")
 
 
 @functools.cache
@@ -1065,17 +1112,20 @@ def document_clauses(document: pathlib.Path, tree: Tree = WORKING_COPY) -> list[
     """Every clause of a document, with its citations and the symbols it names."""
     text = document.read_text(encoding="utf-8")
     resolved = resolve_citations(text)
+    ignored = ignored_regions(text, resolved)
+    clause_ranges = list(clauses(text))
+    owned = stated_values_by_citation(text, resolved, ignored, clause_ranges, tree)
     found: list[Clause] = []
-    for start, end in clauses(text):
+    for start, end in clause_ranges:
         clause = text[start:end]
         names = span_names(clause)
         brackets = bracket_ranges(clause)
-        inside = [item for item in resolved if start <= item.match.start() < end]
-        if not inside:
+        inside_ = [item for item in resolved if start <= item.match.start() < end]
+        if not inside_:
             continue
         citations: list[Citation] = []
         citation_spans: list[tuple[int, int]] = []
-        for item in inside:
+        for item in inside_:
             options = candidates(item.rel)
             citations.append(
                 Citation(
@@ -1099,9 +1149,161 @@ def document_clauses(document: pathlib.Path, tree: Tree = WORKING_COPY) -> list[
                 line=text[:start].count("\n") + 1,
                 citations=tuple(citations),
                 claims=tuple(claims),
+                values=tuple(owned.get(item.match.start(), ()) for item in inside_),
             )
         )
     return found
+
+
+def ignored_regions(text: str, resolved: list[Resolved]) -> list[tuple[int, int]]:
+    """The parts of a document whose numbers are not claims.
+
+    A citation names a line, not a value. A fenced block is sample output.
+    A heading names a section, and the number in it is the section's number.
+    """
+    regions = [(item.match.start(), item.match.end()) for item in resolved]
+    regions.extend(fenced_regions(text))
+    regions.extend(match.span() for match in re.finditer(r"(?m)^#{1,6}[ \t].*$", text))
+    return regions
+
+
+def unit_of(text: str, start: int, clause_ranges: list[tuple[int, int]]) -> tuple[int, int]:
+    """The extent of the unit a citation sits in.
+
+    A citation in a table row belongs to the whole row: a row is one
+    statement, and a comma in one cell does not end it. A citation in a
+    sentence belongs to its clause.
+    """
+    line_start = text.rfind("\n", 0, start) + 1
+    line_end = text.find("\n", start)
+    if line_end < 0:
+        line_end = len(text)
+    if text[line_start:line_end].lstrip().startswith("|"):
+        return line_start, line_end
+    for clause_start, clause_end in clause_ranges:
+        if clause_start <= start < clause_end:
+            return clause_start, clause_end
+    return start, start
+
+
+def stated_values_by_citation(
+    text: str,
+    resolved: list[Resolved],
+    ignored: list[tuple[int, int]],
+    clause_ranges: list[tuple[int, int]],
+    tree: Tree = WORKING_COPY,
+) -> dict[int, tuple[StatedValue, ...]]:
+    """The values every citation owns.
+
+    A table row is read cell by cell. The number a row states in one cell
+    is the claim of the citation in the cell beside it — a provenance
+    table says "this number came from there". A number in the *same* cell
+    as a citation is that citation's own claim. A number in a cell that
+    has no citation beside it belongs to no citation at all.
+
+    A sentence that is not a table row is read by proximity: the number
+    is the claim of the citation it was written next to.
+    """
+    grouped: dict[tuple[int, int], list[Resolved]] = {}
+    for item in resolved:
+        grouped.setdefault(unit_of(text, item.match.start(), clause_ranges), []).append(item)
+    owned: dict[int, tuple[StatedValue, ...]] = {}
+    for (unit_start, unit_end), items in grouped.items():
+        unit = text[unit_start:unit_end]
+        if names_another_tree(unit, tree.ref):
+            # The unit quotes another tree: its numbers are not a claim
+            # about the tree this document is read against.
+            continue
+        blanked = list(unit)
+        for region_start, region_end in ignored:
+            for index in range(
+                max(0, region_start - unit_start), min(len(blanked), region_end - unit_start)
+            ):
+                blanked[index] = " "
+        # The measurement's markers are markup: a number between two of them
+        # is still the number that goes with the word next to it. They are
+        # replaced by spaces, so that every offset in the text stays where it
+        # was.
+        for match in FIGURES.finditer(unit):
+            for index in range(match.start(), match.end()):
+                blanked[index] = " "
+        stated = stated_values("".join(blanked))
+        if not stated:
+            continue
+        spans = [(item.match.start() - unit_start, item.match.end() - unit_start) for item in items]
+        cells = table_cells(unit) if unit.lstrip().startswith("|") else []
+        for index, item in enumerate(items):
+            values = values_for_citation(stated, cells, spans, index)
+            if values:
+                owned[item.match.start()] = tuple(values)
+    return owned
+
+
+def table_cells(row: str) -> list[tuple[int, int]]:
+    """The cells of a table row, with where each of them starts and ends.
+
+    A ``|`` inside a backticked span does not separate two cells: the
+    release appendix writes a whole table row inside a quotation.
+    """
+    spans = [match.span() for match in SPAN.finditer(row)]
+    cells: list[tuple[int, int]] = []
+    start = 0
+    index = 0
+    while index < len(row):
+        if spans and index == spans[0][0]:
+            index = spans[0][1]
+            spans.pop(0)
+            continue
+        if row[index] == "|":
+            cells.append((start, index))
+            start = index + 1
+        index += 1
+    cells.append((start, len(row)))
+    return cells
+
+
+def values_for_citation(
+    stated: list[tuple[int, StatedValue]],
+    cells: list[tuple[int, int]],
+    citation_spans: list[tuple[int, int]],
+    index: int,
+) -> list[StatedValue]:
+    """The values that belong to one citation."""
+    start = citation_spans[index][0]
+    if not cells:
+        best: list[StatedValue] = []
+        for position, value in stated:
+            distances = [
+                min(abs(position - other_start), abs(position - other_end))
+                for other_start, other_end in citation_spans
+            ]
+            if distances[index] == min(distances):
+                best.append(value)
+        return best
+    cell = next(
+        (
+            number
+            for number, (cell_start, cell_end) in enumerate(cells)
+            if cell_start <= start < cell_end
+        ),
+        None,
+    )
+    if cell is None:
+        return []
+    here = [value for position, value in stated if cells[cell][0] <= position < cells[cell][1]]
+    if here:
+        return here
+    if cell == 0:
+        return []
+    # The cell beside it is the claim; only the first citation of the cell
+    # is the source the claim is about.
+    left = cells[cell - 1]
+    if any(
+        other < index and cells[cell][0] <= citation_spans[other][0] < cells[cell][1]
+        for other in range(len(citation_spans))
+    ):
+        return []
+    return [value for position, value in stated if left[0] <= position < left[1]]
 
 
 def claimed_names(
@@ -1146,6 +1348,468 @@ def holds_content(line: str) -> bool:
     fetches two fixtures, and that line is a comment.
     """
     return bool(line.strip())
+
+
+#: A number: ``1694``, ``1,182,356``, ``93.3``.
+#:
+#: The thousands separator has to be followed by three digits, or the
+#: separator is a comma between two numbers and belongs to neither.
+NUMBER = r"\d+(?:,\d{3})*(?:\.\d+)?"
+
+#: A percentage: ``93.3%``.
+PERCENT = re.compile(rf"(?<![\w.])({NUMBER})\s*%")
+
+#: A count and the word it counts: ``1694 passed``, ``7136 / 7650 lines``.
+#:
+#: The word is what makes the number a *value* rather than a label: a table
+#: that says ``| 1 |`` counts its rows, it does not state a measurement, and
+#: a contract table that says ``200 / 404`` states status codes, not a number
+#: that a line of the source is supposed to carry. A number without a word
+#: behind it is therefore not compared.
+COUNT = re.compile(rf"(?<![\w.-])({NUMBER})((?:\s*/\s*{NUMBER})*)\s+([A-Za-z][A-Za-z0-9_-]+)")
+
+#: A number word and the word it counts: ``Two third-party integration fixtures``.
+WORD_COUNT = re.compile(
+    r"(?<![\w])(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)"
+    r"\s+([A-Za-z][A-Za-z0-9_-]+)",
+    re.IGNORECASE,
+)
+
+#: A fingerprint: ``sha256:18f3ab15…``.
+#:
+#: Eight hex characters at least, and at least one of them a digit: a word
+#: made of the letters ``a``-``f`` is not a digest.
+DIGEST = re.compile(r"(?<![\w.])((?:sha256:)?[0-9a-f]{8,})(?![\w.])", re.IGNORECASE)
+
+#: A quotation: ``「two live runs」``, ``"ten jobs"``.
+#:
+#: A number inside one is what somebody else said. A document that quotes
+#: the number it is talking about is not making a claim about its own
+#: citation.
+QUOTED = re.compile(r"「[^」]*」|\"[^\"\n]*\"|'[^'\n]*'")
+
+#: The number words, and the number each of them states.
+NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+}
+
+#: How many values a claim may state and still be a claim about a number.
+#:
+#: A provenance row states what a line holds: "1694 passed + 0 xfailed +
+#: 1 skipped". A sentence that states five numbers is telling a story, and
+#: the checker cannot know which of them the cited line is about. Such a
+#: claim is not compared — a false report is worse than a missed one.
+MAX_CLAIMED_VALUES = 4
+
+#: A tree a clause names: a tag like ``v1.0.0`` or a commit like ``75976e0``.
+#:
+#: A fingerprint is not a tree, and a run of seven digits is a number.
+NAMED_TREE = re.compile(r"(?<![\w.-])(?<!sha256:)(v\d+\.\d+\.\d+|[0-9a-f]{7,40})(?![\w.])")
+
+#: The Chinese measure words a count is written with: ``两个``, ``三次``, ``五行``.
+#:
+#: A numeral that is not followed by one of these is not a count: ``一方``
+#: in "first-party code" is not the number one.
+CHINESE_MEASURES = "个次条行项份张轮天秒篇台块组批件套名位只本页章节回遍趟种款"
+
+#: The Chinese numerals a count may be written in, and the number each of
+#: them states. The documents are bilingual: a Chinese report states a count
+#: as ``两个`` and an English release body states the same count as ``Two``.
+CHINESE_NUMERALS = {
+    "零": 0,
+    "一": 1,
+    "两": 2,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
+}
+
+#: The words that may sit between a number and the word it counts.
+#:
+#: They are not units: "400,000 and the amended limit" states a number and
+#: then continues the sentence, and reading "and" as the word the number
+#: counts would compare a limit against a conjunction.
+NOT_UNITS = {
+    "all",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "before",
+    "between",
+    "but",
+    "by",
+    "each",
+    "every",
+    "for",
+    "from",
+    "had",
+    "has",
+    "have",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "least",
+    "less",
+    "more",
+    "most",
+    "no",
+    "not",
+    "of",
+    "on",
+    "or",
+    "other",
+    "our",
+    "out",
+    "over",
+    "own",
+    "per",
+    "same",
+    "since",
+    "so",
+    "such",
+    "than",
+    "that",
+    "the",
+    "their",
+    "then",
+    "this",
+    "to",
+    "too",
+    "under",
+    "until",
+    "via",
+    "very",
+    "was",
+    "were",
+    "when",
+    "while",
+    "which",
+    "who",
+    "with",
+    "within",
+    "without",
+}
+
+#: The characters that say a number is a limit rather than a measurement:
+#: ``≥16/20`` is the acceptance bar, not the number the run produced.
+COMPARISON = "≥≤><≤≥"
+
+#: The characters that say a number belongs to something else: ``§3`` is a
+#: section, ``= 75%`` is the number the sentence itself worked out.
+BELONGS_TO = "§=第"
+
+#: The characters that may sit between a number and the word it counts.
+THOUSANDS = re.compile(r"(?<=\d),(?=\d)")
+
+
+#: The markers the measurement script writes a number between.
+#:
+#: The execution report holds its numbers between them: ``1710`` is written
+#: ``<!--fig:suite.passed-->1710<!--/fig-->``. The markers are markup, not
+#: content, and a number that sits between two of them is still the number
+#: that sits next to the word it counts.
+FIGURES = re.compile(r"<!--/?fig(?::[^>]*)?-->")
+
+
+def strip_figures(text: str) -> str:
+    """The text with the measurement's figure markers taken out."""
+    return FIGURES.sub(" ", text)
+
+
+@dataclass(frozen=True)
+class StatedValue:
+    """One value the sentence around a citation states."""
+
+    #: The value as the sentence writes it: ``1694``, ``93.3%``, ``Two``.
+    text: str
+    #: The value as a number: ``1694``, ``93.3``, ``2``.
+    number: str
+    #: The word the number is measured in: ``passed``, ``tests``, ``lines``.
+    unit: str
+    #: Whether the value is a fingerprint rather than a count.
+    digest: bool = False
+
+    @property
+    def kind(self) -> str:
+        """What kind of claim the value makes."""
+        if self.digest:
+            return "digest"
+        if self.unit == "%":
+            return "percent"
+        return "count"
+
+
+def is_limit(text: str, position: int) -> bool:
+    """Whether the number at a position is a limit rather than a measurement.
+
+    ``≥16/20`` is the bar a run has to clear; it is not a number any line
+    is supposed to carry. A limit is the one number in a sentence that is
+    true whatever the run produced.
+    """
+    before = text[:position].rstrip()
+    return bool(before) and before[-1] in COMPARISON
+
+
+def belongs_to_something_else(text: str, position: int) -> bool:
+    """Whether the number at a position belongs to something else.
+
+    ``§3`` names a section, ``第 3 节`` names a section in Chinese, and
+    ``= 75%`` is the number the sentence itself worked out. None of them
+    is a number that a cited line has to carry.
+    """
+    before = text[:position].rstrip()
+    if not before:
+        return False
+    return before[-1] in BELONGS_TO
+
+
+def quoted_spans(text: str) -> list[tuple[int, int]]:
+    """The backticked spans of a text."""
+    return [match.span() for match in SPAN.finditer(text)]
+
+
+def inside(span: int, spans: list[tuple[int, int]]) -> bool:
+    """Whether an offset lies inside one of the spans."""
+    return any(start <= span < end for start, end in spans)
+
+
+def stated_values(text: str) -> list[tuple[int, StatedValue]]:
+    """The values a text states, with where in the text it states them.
+
+    Only values that a line of the source could carry are returned: a
+    percentage, a count with the word it counts, and a fingerprint. A bare
+    number is not one — a table row numbered ``1`` and a status code
+    ``404`` are labels, and comparing them would report drift where
+    there is none.
+
+    A number inside a backticked span is a quotation or a piece of code,
+    not a claim: a document that quotes what another document says is not
+    making a claim about its own citation. A fingerprint is the one
+    exception — it is a value in its own right, not a quotation.
+    """
+    found: list[tuple[int, StatedValue]] = []
+    quoted = quoted_spans(text)
+    quotations = [match.span() for match in QUOTED.finditer(text)]
+    for match in PERCENT.finditer(text):
+        if is_limit(text, match.start()) or belongs_to_something_else(text, match.start()):
+            continue
+        if inside(match.start(), quoted) or inside(match.start(), quotations):
+            continue
+        found.append((match.start(), StatedValue(match.group(0).strip(), match.group(1), "%")))
+    for match in COUNT.finditer(text):
+        if is_limit(text, match.start()) or belongs_to_something_else(text, match.start()):
+            continue
+        if inside(match.start(), quoted) or inside(match.start(), quotations):
+            continue
+        unit = match.group(3)
+        if len(unit) < 2 or unit.lower() in NOT_UNITS:
+            # ``120 s`` is a duration and ``120 files`` is a count, but a
+            # single letter is as likely to be a stray initial as a unit.
+            continue
+        numbers = re.findall(NUMBER, match.group(1) + match.group(2))
+        offset = match.start(1)
+        for number in numbers:
+            found.append(
+                (
+                    offset,
+                    StatedValue(f"{number} {unit}", THOUSANDS.sub("", number), unit),
+                )
+            )
+            offset += len(number)
+    for match in WORD_COUNT.finditer(text):
+        if is_limit(text, match.start()) or belongs_to_something_else(text, match.start()):
+            continue
+        if inside(match.start(), quoted) or inside(match.start(), quotations):
+            continue
+        unit = match.group(2)
+        if len(unit) < 2 or unit.lower() in NOT_UNITS:
+            continue
+        number = NUMBER_WORDS[match.group(1).lower()]
+        found.append((match.start(), StatedValue(match.group(0), str(number), unit)))
+    for match in DIGEST.finditer(text):
+        digest = match.group(1)
+        if not any(character.isdigit() for character in digest):
+            continue
+        found.append((match.start(), StatedValue(digest, digest, "", True)))
+    return found
+
+
+def bare_numbers(text: str) -> list[str]:
+    """The numbers a text carries, with the thousands separators removed."""
+    return re.findall(NUMBER, THOUSANDS.sub("", text))
+
+
+def number_word(number: str) -> str | None:
+    """The English word a number is written as, if there is one."""
+    for word, value in NUMBER_WORDS.items():
+        if str(value) == number:
+            return word
+    return None
+
+
+def range_kinds(text: str) -> set[str]:
+    """The kinds of value a range of lines carries.
+
+    A count, a percentage and a fingerprint are three different claims,
+    and a line that states none of them cannot contradict one.
+    """
+    kinds: set[str] = set()
+    if bare_numbers(text):
+        kinds.add("count")
+    if PERCENT.search(text):
+        kinds.add("percent")
+    for match in DIGEST.finditer(text):
+        if any(character.isdigit() for character in match.group(1)):
+            kinds.add("digest")
+            break
+    return kinds
+
+
+def anchored_number(text: str, unit: str) -> str | None:
+    """The number a text states for a word.
+
+    The word may sit before the number (``"failed": 1``) or after it
+    (``1694 passed``), and the two orders are both common in the documents
+    that carry these numbers.
+    """
+    text = strip_figures(text)
+    pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(unit)}(?![A-Za-z0-9_])")
+    for match in pattern.finditer(text):
+        after = re.match(rf"[\"'`\]\*]*\s*[:=]?\s*({NUMBER})", text[match.end() :])
+        if after:
+            return THOUSANDS.sub("", after.group(1))
+        before = re.search(rf"({NUMBER})\s*[:=]?\s*[\"'`\]\*]*\s*$", text[: match.start()])
+        if before:
+            return THOUSANDS.sub("", before.group(1))
+    return None
+
+
+def value_present(value: StatedValue, target: str) -> bool:
+    """Whether a line of the source carries the value a sentence states.
+
+    The word the number is measured in decides it. A line that carries the
+    word and a *different* number is not the line the sentence means: that
+    is the drift this check exists for. A line that does not carry the word
+    at all is compared by the number alone, because the word may be written
+    in the other language.
+    """
+    target = strip_figures(target)
+    if value.digest:
+        return value.number.lower() in target.lower()
+    if value.unit and value.unit != "%":
+        stated = anchored_number(target, value.unit)
+        if stated is not None:
+            return stated == value.number
+    numbers = bare_numbers(target)
+    if value.number in numbers:
+        return True
+    if chinese_number_present(value.number, target):
+        return True
+    word = number_word(value.number)
+    if word is None:
+        return False
+    return bool(re.search(rf"(?<![A-Za-z0-9_]){word}(?![A-Za-z0-9_])", target, re.IGNORECASE))
+
+
+def chinese_number_present(number: str, target: str) -> bool:
+    """Whether a Chinese numeral states the number a sentence states.
+
+    The numeral has to be a count: it has to be followed by the measure
+    word Chinese counts are written with. ``两个`` is two, ``一方`` in
+    "first-party code" is not a number at all.
+    """
+    if not number.isdigit():
+        return False
+    for character, value in CHINESE_NUMERALS.items():
+        if str(value) != number:
+            continue
+        if re.search(rf"(?<![0-9.]){character}[{CHINESE_MEASURES}]", target):
+            return True
+    return False
+
+
+def value_lines(lines: tuple[str, ...], value: StatedValue) -> list[int]:
+    """The lines of a file that carry a value."""
+    found = []
+    for number, line in enumerate(lines, 1):
+        if value_present(value, line):
+            found.append(number)
+    return found
+
+
+def carries_the_way(value: StatedValue, line: str) -> bool:
+    """Whether a line carries a value the way the sentence writes it.
+
+    A line that carries the word the number goes with is the line the
+    sentence means: "1710 passed" is the suite result. A line that carries
+    only the digits is not — a number that appears in five places points at
+    none of them.
+    """
+    if value.digest:
+        return value.number.lower() in line.lower()
+    if value.unit and value.unit != "%":
+        stated = anchored_number(line, value.unit)
+        if stated is not None:
+            return stated == value.number
+    return False
+
+
+def carries_the_count(value: StatedValue, line: str) -> bool:
+    """Whether a line writes a count as a count rather than as digits.
+
+    Chinese writes a count with a measure word -- ``9 个文件`` -- and so
+    does the number in a sentence that counts things: "Two third-party
+    integration fixtures" is two, and the line that says ``两个`` says it
+    too. A line that carries the digits alone does not: a number that
+    appears in five places points at none of them.
+    """
+    if value.digest:
+        return False
+    if chinese_number_present(value.number, line):
+        return True
+    word = number_word(value.number)
+    if word is not None and re.search(
+        rf"(?<![A-Za-z0-9_]){word}(?![A-Za-z0-9_])", line, re.IGNORECASE
+    ):
+        return True
+    return bool(re.search(rf"(?<![0-9.]){re.escape(value.number)}\s*[{CHINESE_MEASURES}]", line))
+
+
+def nearest_value_line(lines: tuple[str, ...], value: StatedValue, cited: int) -> int | None:
+    """The line of a file that carries a value, the closest one to a citation.
+
+    The check on a symbol reports the line it is at, so that the fix is a
+    line number. The line has to carry the value the way the sentence
+    writes it: a line that carries only the digits does not say which of
+    them the sentence means.
+    """
+    for carries in (carries_the_way, carries_the_count):
+        found = [number for number, line in enumerate(lines, 1) if carries(value, line)]
+        if found:
+            return min(found, key=lambda line: abs(line - cited))
+    return None
 
 
 def check_citation(citation: Citation) -> list[Finding]:
@@ -1304,6 +1968,77 @@ def document_orphan_declarations(document: pathlib.Path) -> list[Finding]:
         )
         for orphan in orphans
     ]
+def check_values(citation: Citation, values: tuple[StatedValue, ...]) -> list[Finding]:
+    """The findings of one citation's values.
+
+    A sentence that states a number and cites the line it was read from
+    makes a claim that can be checked exactly: the line has to carry the
+    number. When it carries a different one, the citation has drifted, and
+    the two numbers are both named so that the fix is obvious.
+
+    Three verdicts, in the order they are decided:
+
+    * the cited line carries the number — the claim holds;
+    * the cited line carries the same word and a different number — the
+      claim is contradicted, and the two numbers are reported;
+    * the cited line carries no number at all — the claim points at a
+      line that does not hold it.
+    """
+    if not values:
+        return []
+    lines = citation.lines()
+    if lines is None:
+        return []
+    if len(values) > MAX_CLAIMED_VALUES:
+        # A claim that states this many numbers is prose.
+        return []
+    target = "\n".join(lines[citation.start - 1 : citation.end])
+    kinds = range_kinds(target)
+    present = [value for value in values if value_present(value, target)]
+    findings: list[Finding] = []
+    for value in values:
+        if value in present:
+            continue
+        stated = anchored_number(target, value.unit) if value.unit not in {"", "%"} else None
+        if stated is not None:
+            detail = (
+                f"the sentence says `{value.text}`, the cited line says `{stated} {value.unit}`"
+            )
+        elif kinds and value.kind not in kinds:
+            # The range states values, but none of this kind: it is not
+            # making a different claim about this number.
+            continue
+        elif present:
+            # The range carries other values of this claim: it is the
+            # place those came from, and this number is about elsewhere.
+            continue
+        else:
+            detail = f"the sentence says `{value.text}`, the cited line does not carry it"
+        elsewhere = nearest_value_line(lines, value, citation.start)
+        if elsewhere is not None:
+            detail += f"; the file says it at line {elsewhere}"
+        findings.append(Finding(citation.where, "value drifted", detail, citation.text))
+    return findings
+
+
+def names_another_tree(text: str, ref: str | None) -> bool:
+    """Whether a clause is about a tree other than the one it is read against.
+
+    A review document quotes a release tree and says so; the checker reads
+    that document's citations out of the tree the document declares, and a
+    number quoted from another tree is not a claim about this one.
+    """
+    if ref is None:
+        return False
+    for match in NAMED_TREE.finditer(text):
+        named = match.group(1)
+        if not any(character.isalpha() for character in named):
+            # A run of digits is a number, not a tree.
+            continue
+        if named == ref or ref.startswith(named) or named.startswith(ref):
+            continue
+        return True
+    return False
 
 
 def check_clause(clause: Clause) -> list[Finding]:
@@ -1353,6 +2088,15 @@ def check_clause(clause: Clause) -> list[Finding]:
                     citation.text,
                 )
             )
+    for citation, names, values in zip(clause.citations, clause.claims, clause.values, strict=True):
+        if is_compared(citation, names):
+            # The citation already has a check of its own: the sentence
+            # names a symbol, and the number in it counts what that symbol
+            # holds rather than being written on the cited line.
+            continue
+        if names_another_tree(citation.text, citation.tree.ref):
+            continue
+        findings.extend(check_values(citation, values))
     return findings
 
 
@@ -1528,12 +2272,19 @@ def check_documents(documents: list[pathlib.Path]) -> Report:
     declared = sum(
         1 for clause in clauses_found for citation in clause.citations if citation.anchors
     )
+    valued = sum(
+        1
+        for clause in clauses_found
+        for citation, values in zip(clause.citations, clause.values, strict=True)
+        if values and citation.target is not None
+    )
     return Report(
         citations=citations,
         named=named,
-        road_sign=citations - named,
+        road_sign=citations - named - valued,
         declared=declared,
         findings=tuple(findings),
+        valued=valued,
         trees=tuple((label, counts[label][0], counts[label][1]) for label in sorted(counts)),
         subject=subject_digest(documents, trees),
     )
@@ -1545,6 +2296,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"citations: {report.citations}")
     print(f"  naming a symbol: {report.named}")
+    print(f"  comparing a value: {report.valued}")
     print(f"  pointing only at a location: {report.road_sign}")
     print(f"  declaring what they point at: {report.declared}")
     print("trees:")
@@ -1557,9 +2309,19 @@ def main(argv: list[str] | None = None) -> int:
     print(f"drifted: {len(report.drifted)}")
     for finding in report.drifted:
         print(f"  {finding.render()}")
-    if report.findings:
-        print(f"\n{len(report.findings)} citation(s) no longer say what they say.")
+    print(f"values not matching: {len(report.value_findings)}")
+    for finding in report.value_findings:
+        print(f"  {finding.render()}")
+    if report.drifted or report.unresolved:
+        print(
+            f"\n{len(report.drifted) + len(report.unresolved)} citation(s) no longer say what they say."
+        )
         return 1
+    if report.value_findings:
+        print(
+            f"\n{len(report.value_findings)} citation(s) name a value the cited line does "
+            "not carry. They are reported, not counted as drift."
+        )
     print("\nEvery citation still says what it says.")
     return 0
 

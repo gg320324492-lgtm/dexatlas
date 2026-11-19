@@ -88,7 +88,7 @@ F3 无命令可用、tag 树里 hash 是占位符，三条都是读材料读不�
 > **第 1 步与第 6 步的耗时不能与材料的数比**：材料 §3.1 写的是
 > `git clone https://github.com/gg320324492-lgtm/dexatlas.git`（**走网络**），
 > 本轮按任务的「不联网」约束改成了**从本地克隆**（`--no-hardlinks`），因此
-> 0.5 秒；[读者实走演练](reader-dry-run.md:74) 的 46 秒是**网络克隆**的实测。
+> 0.5 秒；[读者实走演练](reader-dry-run.md) 的 46 秒是**网络克隆**的实测。
 > 同理，第 6 步的 16 秒是**uv 缓存已热**时的数（冷缓存 + 走网络的那次是
 > 218 秒，见同文件 :74）。**本轮不判 A7 的耗时**（它要的是读者自己那台的数）。
 
@@ -462,7 +462,7 @@ jadx:sources                    → {"resolved": true, "reason": "E:\\…\\.dexa
 ```
 
 `path=None` 是**内部 Python API**（`LocatorResolver.resolve(...)`）的说法 ——
-它出现在 [M8 演练](m8-install-rehearsal.md:48) 的实测表里（`path=None`，那一行写的是
+它出现在 [M8 演练](m8-install-rehearsal.md) 的实测表里（`path=None`，那一行写的是
 「`LocatorResolver.resolve(...)`（Python API）」），那里说的
 确实是 Python API。
 
@@ -483,7 +483,7 @@ jadx:sources                    → {"resolved": true, "reason": "E:\\…\\.dexa
 
 ### X-3 【发送前清单】那条「tag 树含本轮全部材料修正」的检查，判语已经与事实不符
 
-**材料怎么说**：[发送前清单](m10-invitation-sender-checklist.md:146) 那条勾选项写着：
+**材料怎么说**：[发送前清单](m10-invitation-sender-checklist.md) 那条勾选项写着：
 
 > **查过是什么样：** 第一条**只应列出「填 hash 这一步」动过的文件**——邀请函 §2、
 > 验收记录模板 §1 的 commit hash 栏，以及随之改判据的发送清单与准备清单；
