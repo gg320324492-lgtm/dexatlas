@@ -877,7 +877,7 @@ how-to-verify ✓、发版说明 ✓）。本轮把这三份的现状查了一�
 
 **（二）两页 how-to-verify 里有一句已经陈旧的说法，而它正对着读者。**
 
-`docs/how-to-verify.md:201` 与 `docs/how-to-verify.zh-CN.md:178` 都写着：
+两页 how-to-verify（英文页与中文页）里都写着这么一句（这里引原文而不引行号 —— 那两页的行号会随改动漂移 ✓）：
 
 > **这条门禁只扫四份文件**（`scripts/check-doc-citations.py` 里的 `DOCS` 清单）：
 > `docs/analysis-provenance.md`、`docs/architecture/public-contracts.md`、
