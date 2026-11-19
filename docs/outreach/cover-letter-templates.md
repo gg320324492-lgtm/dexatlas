@@ -98,11 +98,10 @@ I can start with a short scoping pass (fixed fee) and give you a written plan
 with milestones before any implementation begins.
 
 **Availability and contact:** I work in the `Asia/Shanghai` time zone and am
-available on weekdays, 10:00-18:00 (`UTC+8`). I aim to reply within one
-business day during those hours; messages sent at other times are answered
-on the next working day. Write to <hello@dexatlas.example> or reply here on
-the platform. *(Placeholder contact during the development phase - replace
-with a live mailbox before sending.)*
+available on weekdays, 10:00-18:00 (`UTC+8`). Write to
+<hello@dexatlas.example> or reply here on the platform.
+*(Placeholder contact during the development phase - replace with a live
+mailbox before sending.)*
 
 Best regards,
 {{your name}}
@@ -162,11 +161,10 @@ I can start with a short scoping pass (fixed fee) that produces the written
 scope, the evaluation set, and a budget plan before implementation begins.
 
 **Availability and contact:** I work in the `Asia/Shanghai` time zone and am
-available on weekdays, 10:00-18:00 (`UTC+8`). I aim to reply within one
-business day during those hours; messages sent at other times are answered
-on the next working day. Write to <hello@dexatlas.example> or reply here on
-the platform. *(Placeholder contact during the development phase - replace
-with a live mailbox before sending.)*
+available on weekdays, 10:00-18:00 (`UTC+8`). Write to
+<hello@dexatlas.example> or reply here on the platform.
+*(Placeholder contact during the development phase - replace with a live
+mailbox before sending.)*
 
 Best regards,
 {{your name}}

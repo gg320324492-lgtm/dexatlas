@@ -137,9 +137,8 @@ captured as values and surfaced in the report instead of aborting the run.
 ## Availability and contact
 
 I work in the `Asia/Shanghai` time zone and am available on weekdays,
-10:00-18:00 (`UTC+8`). During those hours I aim to reply within one business
-day; messages sent outside them are answered on the next working day.
-Contact: <hello@dexatlas.example> or the platform's message thread.
+10:00-18:00 (`UTC+8`). Contact: <hello@dexatlas.example> or the platform's
+message thread.
 *(Placeholder contact during the development phase - replace with a live
 mailbox before publishing.)*
 
