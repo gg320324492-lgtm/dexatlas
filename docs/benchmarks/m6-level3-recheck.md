@@ -173,7 +173,7 @@ no-apktool 配置 Analyze 的工作区**（`_analyse_samples` 路由，后端路
 | FM-3 枚举不完整 | 6（q041、q046） | `1a1509c`：INSTRUCTIONS 要求完整 JVM 描述符 `Class.name(descriptor)` | 层级 0：q041/q046 PASS（判分要求可满足，`must_contain` 的 JVM 描述符存在）。层级 1：DexAtlas fail（scripted 断言里没有枚举） | **判分要求本身可行；枚举行为属模型作答粒度，需层级 2，且失败分析已标注「不保证可达」** |
 | FM-4 检索词不命中 | 5（q029、q034） | 未直接修复（检索层未改）；`find_resource_declarations` 只覆盖资源类 | 层级 0：q029/q034 PASS（真实 API 能取到常量）。层级 1：DexAtlas fail，scripted 检索词策略与真实模型不同 | **本次无法判定修复效果；q029/q034 是层级 2 复测的重点观察题** |
 | （附）FM-5 harness 未移除后端 | 3（q066） | `b956260`：按题面配置真实 Analyze | 层级 1：DexAtlas q066 由负转正，工作区确实缺失 jadx | **已消除（harness 层）** |
-| （附）FM-6 工具缺口 | 3（q083） | `1a1509c`：新增 `find_resource_declarations`，planner RESOURCES/GENERAL 意图均可调用 | 层级 0：q083 PASS（API 能给出 `res/values/strings.xml`）。层级 1：DexAtlas q083 fail——scripted agent 不调用该工具（脚本只调 `list_projects` 类无参工具），工具对 scripted 不可见 | **工具已接入 agent 工具面（`tool_executor.py:243`）；是否被真实模型使用需层级 2** |
+| （附）FM-6 工具缺口 | 3（q083） | `1a1509c`：新增 `find_resource_declarations`，planner RESOURCES/GENERAL 意图均可调用 | 层级 0：q083 PASS（API 能给出 `res/values/strings.xml`）。层级 1：DexAtlas q083 fail——scripted agent 不调用该工具（脚本只调 `list_projects` 类无参工具），工具对 scripted 不可见 | **工具已接入 agent 工具面（`tool_executor.py:251-253` `anchor: find_resource_declarations`）；是否被真实模型使用需层级 2** |
 | （附）FM-7 格式不符 | 2（q039、q022 各 1 轮） | `1a1509c`：INSTRUCTIONS 要求完整描述符 | 层级 0：q039/q022 PASS。层级 1：fail（scripted 无格式概念） | **需层级 2 验证 prompt 约束力** |
 | （附）FM-8 基础设施超时 | 1（q039 1 轮） | 未改（属运行期风险） | 不适用（零模型） | 留待层级 2 运行记录 |
 

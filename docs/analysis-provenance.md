@@ -694,7 +694,9 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   > 才知道，所以任何静态工具都拿不到「运行时被调用的实现」。
 
 - **交叉引用靠遍历字节码，没有缓存。** Androguard 4.x 移除了 xref 缓存
-  （`tools/androguard/adapter.py:7-9`），所以每条边都是扫指令得到的。
+  （`tools/androguard/adapter.py:7-9`
+  `anchor: Cross-references are recovered by walking bytecode`），
+  所以每条边都是扫指令得到的。
   这条遍历有硬上限：`DEFAULT_METHOD_LIMIT = 200_000`、
   `DEFAULT_INSTRUCTION_LIMIT = 5_000_000`、`DEFAULT_STRING_LIMIT = 50_000`
   （`tools/androguard/adapter.py:58-62`）。**这三个上限是「一次分析」的预算，
