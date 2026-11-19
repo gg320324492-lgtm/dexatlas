@@ -126,7 +126,7 @@ class PreviewError(Exception):
 
 #: The outcomes a test can have in a measurement. A measurement is complete
 #: when every test in the tree has one of them.
-SUITE_NAMES = ("passed", "failed", "skipped", "xfailed", "xpassed")
+SUITE_NAMES = ("passed", "failed", "skipped", "xfailed", "xpassed", "deselected")
 
 
 @dataclass(frozen=True)

@@ -1306,7 +1306,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:130125336028aac74008c1e1348dac8a4163ac5689d584d3f45541eaa5283550",
+  "source_fingerprint": "sha256:88e350594269fadc461097db2ad58cc32eb136352409c98fa610454f4253873f",
   "suite": {
     "failed": 5,
     "passed": 1753,
@@ -1316,7 +1316,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     ],
     "xfailed": 0,
     "xfailed_tests": [],
-    "xpassed": 0
+    "xpassed": 0,
+    "deselected": 16
   },
   "tests": {
     "fast": 1626,
