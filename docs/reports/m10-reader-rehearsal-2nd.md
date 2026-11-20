@@ -201,7 +201,7 @@
 
 **材料怎么说**：读者包 §3.8 把它写成一行命令，注释写着「列工具清单」——
 `uv run --no-sync dexatlas-mcp                               # 起 MCP server（列工具清单）`
-（这行命令在 `v1.0.0` 那棵树的读者包第 314 行；材料后来换成了协议级的两条，现行材料在 `docs/reports/m10-reader-package.md:498`）。
+（这行命令在 `v1.0.0` 那棵树的读者包第 314 行；材料后来换成了协议级的两条，现行材料在 `docs/reports/m10-reader-package.md:508`——树已前进，本节记的是预演当时的值）。
 
 **实际发生**：这条命令**不产生任何输出**。空 stdin 跑一遍，stdout 一个字节都没有，
 退出码 0：
@@ -256,7 +256,8 @@ tool count: 11
 **这是本轮最重要的一条。**
 
 邀请函 §2 里那一串 hash 已经填好了（工作区里是
-`docs/reports/m10-invitation-final.md` §2（写这份预演时是 2715aef ✓）：
+`docs/reports/m10-invitation-final.md` §2（写这份预演时是 2715aef ✓——**当时
+（本轮 tag 之前）**的事实；tag 重打后邀请函 §2 已更新，见下）：
 `commit 2715aefda06c3cbbc055a9edf795535e71464068`）。但**填 hash 的那个提交
 `commit 2edaed92d3c835bf202c0ccc84a10ba4e1eaeb9b`——tag 重打后邀请函 §2 已更新；本节记的是预演当时的值 ✓
 `7a416bd` 在 tag 之后**——`v1.0.0` 指的是 `2715aef`，而 `2715aef` 的树里：
@@ -434,7 +435,7 @@ G3 想要的结论**正好相反**，而且没有任何一处提示「这一节�
 
 读者包 §9.1 G1 写：「再确认**工作区里没有留下半成品项目**」，命令是
 `uv run dexatlas projects`，预期「`No projects yet. …`——**列表是空的**」
-（`docs/reports/m10-reader-package.md:561`）。
+（`docs/reports/m10-reader-package.md:833`——树已前进，本节记的是预演当时的值）。
 
 但 §9.1 是**附录**，排在 §3.3–§3.6 之后，而 §3.3 已经分析过 demo.apk 了。
 在**同一个工作区**里跑：

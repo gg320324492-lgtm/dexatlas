@@ -31,10 +31,10 @@
 
 `` `src/dexatlas/cli/main.py:289-291` `anchor: version` ``
 
-声明是一个反引号跨度，内容以 `anchor:` 开头（`scripts/check-doc-citations.py:426`
+声明是一个反引号跨度，内容以 `anchor:` 开头（`scripts/check-doc-citations.py:429`
 `anchor: DECLARATION = re.compile`）。裸名字走结构化查法
-（`scripts/check-doc-citations.py:1904` `anchor: def check_anchor_name`），
-其余走字面查法（`scripts/check-doc-citations.py:1936`
+（`scripts/check-doc-citations.py:1907` `anchor: def check_anchor_name`），
+其余走字面查法（`scripts/check-doc-citations.py:1939`
 `anchor: def check_anchor_fragment`）。
 
 试点在契约表（`docs/architecture/public-contracts.md:22`
@@ -107,7 +107,7 @@ findings**（怎么验的见 §6）。
    `<!--fig:coverage.weak_modules-->`。
 
 **为什么片段也不算漂**：检查器比的是「这段文字**逐字**在不在被引的范围里」
-（`scripts/check-doc-citations.py:1936` `anchor: def check_anchor_fragment`）。
+（`scripts/check-doc-citations.py:1939` `anchor: def check_anchor_fragment`）。
 代码往上挪十行，片段一个字都不用改；而行号要改——行号正是机器能验的东西。
 片段被改写时，机器会报出来。
 

@@ -1,6 +1,6 @@
 # DexAtlas 当前状态
 
-**最后更新：** 2026-11-18 · **对应版本：** v1.0.0（tag 2026-11-17；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** v1.0.0 已发布（2026-11-17，见[发版说明](releases/v1.0.0.md)）；下一阶段是 M10 独立验收（**尚未发起**；逐里程碑状态见 §4.0）
+**最后更新：** 2026-11-20 · **对应版本：** v1.0.0（tag 2026-11-17，重打至 `6e90317`；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** v1.0.0 已发布（2026-11-17，见[发版说明](releases/v1.0.0.md)）；M10 独立验收**已通过**（2026-11-20，外部验收人执行，[验收记录](reports/m10-acceptance-review.md)：40 项 39 通过 / 0 不通过，重评 GitHub 97.5% / Upwork 96.3%，均 ≥90%；逐里程碑状态见 §4.0）
 
 这份文档回答两个问题：**现在在哪**，**还剩什么**。
 
@@ -10,7 +10,7 @@
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
-- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)与[复评](reports/portfolio-readiness-2026-11-15-recheck.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收尚未开始
+- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)与[复评](reports/portfolio-readiness-2026-11-15-recheck.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收已通过（[验收记录](reports/m10-acceptance-review.md)，重评 97.5% / 96.3%）
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---
@@ -129,11 +129,11 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 这一版关掉了原来五项里的四项。先说还开着的，再说这一轮新发现的。
 
-### 4.0 Phase 3 进度（截至 2026-11-17）
+### 4.0 Phase 3 进度（截至 2026-11-20）
 
 Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表只列**已合入
 本分支**的产物，并写明每项还差什么；没有证据的一律标未开始或未验证。**M10
-独立验收尚未开始，Phase 3 的退出标准未全部达成（M6 层级 2 修复后三轮完整重测仍未达标——逐轮 15/16/18、合计 49/60 = 81.7%，低于 90% 合计线；B3 准备度与 B2 独立验收仍在推进），`v1.0.0`（tag 2026-11-17）已发布，发版说明见 [docs/releases/v1.0.0.md](releases/v1.0.0.md)。**（文中的 B1 验收线，英文说明见 [Architecture → Glossary](architecture/README.md#glossary)。）
+独立验收已通过（2026-11-20，[验收记录](reports/m10-acceptance-review.md)：40 项 39 通过 / 0 不通过 / 0 未验证，19 项阻断项全过；按原权重重评 GitHub 97.5% / Upwork 96.3%，均 ≥90% 达成）。Phase 3 的退出标准中，M6 层级 2 的 B1 验收线仍未达成——修复后三轮完整重测 49/60 = 81.7%（逐轮 15/16/18），低于 90% 合计线，按验收方案定稿走「方案 3：现状披露」，不再追加修复轮；B1 未关闭是当前唯一未达成的计划门槛。`v1.0.0`（tag 2026-11-17，现指向 `6e90317`）已发布，发版说明见 [docs/releases/v1.0.0.md](releases/v1.0.0.md)。**（文中的 B1 验收线，英文说明见 [Architecture → Glossary](architecture/README.md#glossary)。）
 
 | 里程碑 | 状态 | 证据 / 还差什么 |
 |---|---|---|
@@ -142,7 +142,7 @@ Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表
 | M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例可下载报告/证据包附件已落盘（[attachments/](case-studies/attachments/)，2026-11-16 由文档内命令生成、`verify_package` 校验通过）；案例与代码逐项核对完成（2026-11-16）：三案例声称的命令、样例哈希、计数与证据记录均实跑核对一致，MCP 工具数等过期表述已纠正，API 报告丢失 APK 档案事实与重复分析 `created_at` 漂移两处真实缺陷已带红→绿回归修复 |
 | M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**已修复并合入**（d90baff，全命令 `--workspace/-w`、install.md 修正）；M8-4（三后端全失败但 manifest 可解析仍退出 0）已按[提案](proposals/exit-code-partial-read.md)修复：新增退出码 6（EXIT_NO_INDEX），0–5 语义不变（1f6ef05） |
 | M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；Upwork 英文素材为**草稿，未发布**（[outreach/](outreach/project-brief.md)） |
-| M10 独立验收 | **准备包就绪，验收未开始** | 40 项验收检查表（[m10-acceptance-pack.md](reports/m10-acceptance-pack.md)）、读者一站式入口（[m10-reader-package.md](reports/m10-reader-package.md)）与作者侧自动化自查（[m10-selfcheck.md](reports/m10-selfcheck.md)，43/43 通过；退出码 6 落地后 F1 期望滞后已修复并带回归测试）已合入；独立复现、准备度重评与 release candidate 未开始，需真实独立读者执行。准备度自评见[复评增补](reports/portfolio-readiness-2026-11-15-recheck.md) |
+| M10 独立验收 | **已通过（2026-11-20）** | [验收记录](reports/m10-acceptance-review.md)：外部独立验收人（未参与实现）在 `2edaed9`（当时的 `v1.0.0`）上从 clone 走完推荐安装路线 + 完整案例，40 项判定 **39 通过 / 0 不通过 / 0 未验证**，19 项阻断项全过，无需作者补步；客户视角三问（输入与结论、引用可核查、事实与线索区分）均成立，红旗十条全未命中；按原权重重评 **GitHub 97.5% / Upwork 96.3%**，均 ≥90%。留 5 条非阻断材料建议（记录模板预填 hash、历史 hash 时间限定、Docker 命令的 Git Bash 提示、徽章与发版说明的口径说明、邀请函重复说明收敛）。**注意**：验收之后 tag 因测量记账门禁修复重打过三次（现指 `6e90317`），验收钉死的 commit 与当前 tag 不一致——处置待作者决策。准备度自评见[复评增补](reports/portfolio-readiness-2026-11-15-recheck.md) |
 
 4.1 起是此前记录、仍未关闭的缺口。
 

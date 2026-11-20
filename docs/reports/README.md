@@ -95,6 +95,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [m10-invitation-sender-checklist.md](m10-invitation-sender-checklist.md) | 发起人**发出邀请前**要逐条走完的清单：填邀请函剩下的空格、钉定验收 commit、确认三个后端在位、跑自查。**它不替发起人执行任何动作**——不打 tag、不推送、不发送。 | 邀请函要发出去之前，发起人自己照着走一遍时看它。 |
 | [m10-invitation-readiness.md](m10-invitation-readiness.md) | 邀请函定稿后的**就绪记录**：发出前必须做的十步、还差什么、谁来做，并写明本轮**没有发送任何东西**。 | 要发 M10 邀请函之前，先看它还差什么。 |
 | [m10-materials-alignment.md](m10-materials-alignment.md) | M10 材料与仓库现状的**逐条对账表**：57 条事实性陈述 → 真值来源 → 判定（一致 / 已改 / 待最终同步）。**作者侧对账记录，不是验收结论**——40 个验收项仍全部「未验证」。 | 判断材料是否还自相矛盾、或要复核某个数字是从哪儿来时看它。 |
+| [m10-acceptance-review.md](m10-acceptance-review.md) | **M10 独立验收记录（已执行）**：外部独立验收人在 commit `2edaed9`（`v1.0.0`）上从 clone 走完整链路——40 项判定 **39 通过 / 0 不通过 / 0 未验证**，19 项阻断项全过；按原权重重评 **GitHub 97.5% / Upwork 96.3%**（≥90% 达成）；**结论：通过（Pass）**；另留 5 条非阻断材料建议。 | 要看独立验收的判定明细、评分依据与遗留建议时看它。 |
 
 ## 5. v1.0.0 发版材料
 

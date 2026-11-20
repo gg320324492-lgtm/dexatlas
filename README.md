@@ -16,7 +16,10 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 
 > The badges are one measurement of the whole tree. On a machine without the
 > third-party samples, `pytest` reports skips — that is
-> `scripts/fetch-fixtures.sh` not having been run, not a failure. What was
+> `scripts/fetch-fixtures.sh` not having been run, not a failure. The tests
+> badge counts the tests that **passed**; the total collected is slightly
+> larger — the difference is one by-design skip (a POSIX-only launcher test
+> on Windows) plus outcomes the summary counts separately. What was
 > measured, and how to reproduce it, is in the
 > [execution report](docs/reports/phase1-execution-report.md).
 

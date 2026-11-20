@@ -9,8 +9,8 @@
 >
 > 编写日期：2026-11-15 · 初稿基准：`ff5c4cc`（本文件在独立分支提交）·
 > **当前版本对应 v1.0.0 发版 commit**——即读者 `git checkout v1.0.0` 得到的那个
-> 提交，也就是**随函发出的那份邀请函** §2 钉定的验收 commit（仓库里同名文件是
-> 填 hash 之前的版本，以随函发出的那一份为准）
+> 提交，也就是**随函发出的那份邀请函** §2 钉定的验收 commit（为什么仓库里同名
+> 邀请函可能是填 hash 前的版本、以随函那份为准，完整解释见邀请函抬头）
 > · 评分基线：[作品集准备度评估](portfolio-readiness-2026-11-15.md)
 > （GitHub 约 75% / Upwork 约 65%，人工基线，不是接单概率；
 > [复评](portfolio-readiness-2026-11-15-recheck.md)的 77.5% / 68.75% 是同一组
@@ -200,8 +200,8 @@
 | 时间 | 冷缓存（含 clone、依赖、后端下载）首次 10–20 分钟；暖缓存（JDK/uv 已装）到第一份报告**按 1.5–2 分钟预留** | **1.5–2 分钟是预算档位，不是实测值**——两处实测锚点的口径不同、都比它快：[M8 演练](m8-install-rehearsal.md)「空目录 → 第一份报告，暖缓存」**约 30 秒**（同一次**首次分析本身 6.8 秒**）；[读者实走演练](reader-dry-run.md) 实测冷缓存 **10 分 28 秒**、clone + `uv sync` **4 分 24 秒**、「重建 `.venv` → 第一份报告」**8 秒**。**做快于 30 秒不是卡点** |
 
 **固定版本。** 验收针对验收发起人钉定的 commit（本轮为 v1.0.0 发版 commit，
-完整 hash 写在**随函发出的那份邀请函**的 §2 里；仓库里同名文件是填 hash 之前的
-版本，以随函发出的那一份为准）。
+完整 hash 写在**随函发出的那份邀请函**的 §2 里；为什么仓库里同名邀请函可能是
+填 hash 前的版本、以随函那份为准，完整解释见邀请函抬头）。
 不要用移动的 `main` 分支做验收；所有记录都写清 commit hash。
 
 ### 3.2 路线 A：uv（推荐，可完成 CLI、案例、测试和契约检查）
@@ -282,7 +282,10 @@ JADX / Apktool 可用；分析加导出约 10 秒；`out/` 下出现四份文件
 Docker 路线下校验证据包：
 
 ```bash
-docker run --rm -v "$PWD/out:/out" dexatlas python -c \
+# Git Bash 下必须加 MSYS_NO_PATHCONV=1，否则 MSYS 会把 -v 后面的路径
+# 改写成 Windows 路径，容器内就找不到 /out/evidence.zip（读者实测踩过）。
+# PowerShell / CMD 不需要这个前缀。
+MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD/out:/out" dexatlas python -c \
   "from pathlib import Path; from dexatlas.reports.evidence_package import verify_package, verify_citations; p=Path('/out/evidence.zip'); m=verify_package(p); print(verify_citations(p, m))"
 ```
 

@@ -294,6 +294,9 @@ TREE_DOCUMENTS: dict[str, str] = {
     "docs/reports/denominator-and-tree-pass.md": "d43369b",
     "docs/reports/local-vs-ci-gates.md": "9e1aa61",
     "docs/reports/english-reader-review-2.md": "2c456e0",
+    # The independent acceptance record: its line references belong to the
+    # tree it accepted (v1.0.0 = 2edaed9, named in its own metadata row).
+    "docs/reports/m10-acceptance-review.md": "2edaed9",
 }
 
 #: The document that carries a tree's measurement record. The record holds the

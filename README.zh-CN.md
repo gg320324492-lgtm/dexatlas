@@ -13,8 +13,10 @@
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录，同样由
-> `scripts/refresh-report-figures.py` 写回——**不要手改**。测的是什么、怎么复现，
-> 见[执行报告](docs/reports/phase1-execution-report.md)。
+> `scripts/refresh-report-figures.py` 写回——**不要手改**。Tests 徽章数的是
+> **通过**的测试；树上收集的总数略多——差的是一条按设计跳过的测试
+>（Windows 上的 POSIX launcher 测试）与汇总单列的预期结果。测的是什么、
+> 怎么复现，见[执行报告](docs/reports/phase1-execution-report.md)。
 
   <sub>[下面这张卡片上每一个数，以及它是从哪个文件读出来的](docs/reports/social-preview-howto.md)</sub>
 
