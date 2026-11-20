@@ -127,6 +127,10 @@ def test_the_measurement_tells_its_processes_which_data_file_to_write(
 
     monkeypatch.setattr(script, "measure_tests", fake_measure_tests)
     monkeypatch.setattr(script, "run", lambda *args, **kwargs: None)
+    # The code run asks the collector how many tests the ignored file holds;
+    # a collector that is not running answers "none" rather than crashing on
+    # a command that never ran.
+    monkeypatch.setattr(script, "collected_page_checks", lambda: 0)
 
     script.measure_code_tests()
 
@@ -467,6 +471,141 @@ def test_a_run_that_could_not_measure_the_tree_reports_failure(
 
     assert code != 0, (
         "a run that could not measure the tree reported success: the measurement gate cannot fail"
+    )
+
+
+def _stub_runs_around_the_real_code_run(
+    script: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    total: int,
+    passed: int,
+    skipped: int,
+    ignored: int,
+) -> None:
+    """Stub the runs *around* the real ``measure_code_tests``.
+
+    The code run's summary line carries the tests it ran and the tests the
+    ``-k`` deselected; the page self-checks it ``--ignore``s never reach it.
+    ``ignored`` is what pytest's collector says the ignored file holds. The
+    real ``measure_code_tests`` has to add that count back itself: the
+    accounting below compares its outcome against ``total``.
+    """
+    monkeypatch.setattr(
+        script,
+        "measure_tests",
+        lambda args, env=None, **_: script.Outcome(
+            counts={
+                "passed": passed,
+                "failed": 0,
+                "skipped": skipped,
+                "xfailed": 0,
+                "xpassed": 0,
+                "error": 0,
+                "deselected": 0,
+            },
+            failures=(),
+        ),
+    )
+    monkeypatch.setattr(script, "run", lambda *args, **kwargs: None)
+    monkeypatch.setattr(script, "collected_page_checks", lambda: ignored)
+    # The self-check rounds add the tests the code run left out back into
+    # the suite, the way the real page-check round does for the ignored
+    # file's tests.
+    monkeypatch.setattr(
+        script,
+        "measure_report_checks",
+        lambda candidate, report_path: script.Outcome(
+            counts={"passed": ignored, "failed": 0, "skipped": 0, "xfailed": 0},
+            failures=(),
+        ),
+    )
+    monkeypatch.setattr(
+        script,
+        "measure_status_checks",
+        lambda *args: script.Outcome(counts={"passed": 0, "failed": 0, "skipped": 0, "xfailed": 0}),
+    )
+    monkeypatch.setattr(
+        script,
+        "read_coverage",
+        lambda: script.Coverage(files={"cli/main.py": [10, 1]}, statements=10, missing=1),
+    )
+    # The script checks that the coverage run and the tree name the same
+    # modules, so the tree is the one the stubbed coverage measured.
+    monkeypatch.setattr(script, "source_statements", lambda: {"cli/main.py": 10})
+    monkeypatch.setattr(
+        script,
+        "collected_tests",
+        lambda marker: (1, total) if marker == "slow" else (total - 1, total),
+    )
+    monkeypatch.setattr(script, "collected_at_tag", lambda tag: None)
+    monkeypatch.setattr(script, "missing_prerequisites", lambda: [])
+    monkeypatch.setattr(script, "source_fingerprint", lambda: "sha256:recorded")
+    monkeypatch.setattr(
+        script,
+        "code_facts",
+        lambda: {"api_endpoints": 1, "cli_commands": 1, "sample_apks": 1},
+    )
+
+
+def test_the_tests_the_code_run_ignores_are_still_accounted_for(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A test the code run set aside with ``--ignore`` did not vanish.
+
+    The how-to-verify pages' self-checks are left out of the code run with
+    ``--ignore`` on their file, so pytest never collects them and its
+    summary line carries none of them. The accounting that compared the run
+    against the tree the collector found read their absence as tests that
+    went unmeasured, threw the measurement away and refused to write the
+    figures -- on a tree the run had, in fact, measured, because those very
+    checks are measured on their own and added up with the rest.
+
+    The run has to add the count of the ignored file back before it asks
+    whether the tree was measured.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_runs_around_the_real_code_run(
+        script, monkeypatch, total=4, passed=2, skipped=1, ignored=1
+    )
+
+    code = script.main(["--report", str(report)])
+
+    assert code == 0, (
+        "the run threw the measurement away: the tests the code run ignored were "
+        "not added back to the accounting, and the gate read a measured tree as "
+        "an unmeasured one"
+    )
+    written = script.read_record(report.read_text(encoding="utf-8"))
+    assert written["suite"]["passed"] == 3, written["suite"]
+    assert written["tests"]["total"] == 4
+
+
+def test_the_accounting_cannot_count_an_ignored_file_that_no_longer_has_tests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ignored count comes from the collector, not from a constant.
+
+    A count typed into the script would survive the file it describes: a
+    file whose tests are all gone would still add its old count to the
+    accounting, and the gate would accept a measurement of a smaller tree.
+    The count is asked of pytest's collector, the same collector the tree
+    count comes from, so the two cannot drift.
+    """
+    script = _figure_script()
+    report = tmp_path / "phase1-execution-report.md"
+    report.write_text(_gate_report(script, _gate_record()), encoding="utf-8")
+    _stub_runs_around_the_real_code_run(
+        script, monkeypatch, total=4, passed=2, skipped=1, ignored=0
+    )
+
+    code = script.main(["--report", str(report)])
+
+    assert code != 0, (
+        "a run that ignored tests it did not count reported success: the accounting "
+        "must read the ignored count from the collector, not from a constant"
     )
 
 

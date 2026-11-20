@@ -486,6 +486,39 @@ def collected_tests(marker: str) -> tuple[int, int]:
     return int(match.group(1)), int(match.group(2) or match.group(1))
 
 
+def collected_page_checks() -> int:
+    """How many tests the page self-checks' file collects, today.
+
+    The code run leaves the file out with ``--ignore``: pytest never collects
+    its tests, so its summary line carries none of them, and the accounting
+    that compares the run against the tree the collector found would read
+    their absence as tests that went unmeasured. The collector is asked for
+    the same file the ``--ignore`` names, so the two counts cannot drift: a
+    file that has stopped collecting tests reports zero here and zero in the
+    accounting.
+    """
+    result = run(
+        sys.executable,
+        "-m",
+        "pytest",
+        "--collect-only",
+        "-q",
+        "-p",
+        "no:cacheprovider",
+        PAGE_CHECKS_FILE,
+    )
+    match = COLLECTED.search(result.stdout)
+    if match:
+        return int(match.group(1))
+    if "no tests collected" in result.stdout or "file or directory not found" in result.stderr:
+        # The file holds no tests any more, or is gone from the tree: there
+        # is nothing to add back, and a count of zero says so honestly.
+        return 0
+    raise SystemExit(
+        f"could not read pytest's collection count for {PAGE_CHECKS_FILE}:\n{result.stdout[-2000:]}"
+    )
+
+
 def outcome_counts(output: str, what: str = "the run's output") -> dict[str, int]:
     r"""Read pytest's final summary: how many tests passed, skipped, xfailed.
 
@@ -752,7 +785,10 @@ def measure_code_tests() -> Outcome:
     numbers, so a report that is out of date makes them fail, and counting that
     failure would describe a tree as broken when it is merely out of date. They
     are measured on their own afterwards, against a report that is already
-    consistent, and the two results are added up.
+    consistent, and the two results are added up. The same holds for the
+    how-to-verify pages' self-checks, which are left out with ``--ignore``
+    because their file is what they read: the count of what was left out is
+    recorded on the outcome, so the accounting below can add it back.
 
     The run is subprocess-aware: the coverage configuration is written to a
     file, ``COVERAGE_PROCESS_START`` points every Python that starts while it
@@ -803,6 +839,15 @@ def measure_code_tests() -> Outcome:
         what="the suite",
     )
     run(sys.executable, "-m", "coverage", "combine", f"--rcfile={rc_path}", env=measurement_env())
+    # The tests the ``--ignore`` set aside were never collected, so the
+    # summary line does not carry them -- and the accounting below, which
+    # checks the run against the tree pytest collects, would read their
+    # absence as a tree that went unmeasured. They are the pages' own
+    # self-checks: they are measured on their own (``measure_page_checks``)
+    # and added up with the rest, so they are accounted for too. A count of
+    # zero means the file holds no tests any more, and says so honestly.
+    ignored = collected_page_checks()
+    outcome.counts["deselected"] = outcome.counts.get("deselected", 0) + ignored
     return outcome
 
 
