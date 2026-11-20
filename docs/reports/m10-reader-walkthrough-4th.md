@@ -72,7 +72,7 @@
 **原文（逐字）：**
 
 > `docs/reports/phase1-execution-report.md:76`：
-> 「| 测试数 | <!--fig:tests.total-->1775<!--/fig-->（<!--fig:tests.fast-->1626<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |」
+> 「| 测试数 | <!--fig:tests.total-->1795<!--/fig-->（<!--fig:tests.fast-->1646<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |」
 
 > `docs/reports/m10-acceptance-pack.md:641-642`（§6.3 门禁现状表）：
 > 「`tests/test_docs.py` 全量：**全部通过**（用例数随树变化，本包不写死个数——以你在验收 commit 上跑出来的为准）；报告的测试数/文件表/指纹与当前树一致。」

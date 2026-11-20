@@ -206,7 +206,7 @@ CI job），**而且它是对外的当前声明**（读者会照着它去核对�
   但同一页第 48、285、295 行认得住。
 - **陈旧了会怎样**：**静默**。今天 11 个，是对的；给 MCP 加一个只读工具，那三处就错了。
 - **该怎么做**：**加键或扩门禁**。`refresh-report-figures.py` 的 `render_figures()`
-  （`scripts/refresh-report-figures.py:1228`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
+  （`scripts/refresh-report-figures.py:1273`）已有 `cli.commands` / `api.endpoints` / `samples.apks` 三个「代码事实」键，
   加一个 `mcp.tools` 是同一形状的事；或者把 `check_outward_counts()` 的适用范围
   从 `OUTWARD_DIRECTORIES` 放宽到「任何写了工具数的文档」。
 
