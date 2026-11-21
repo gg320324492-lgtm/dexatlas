@@ -9,7 +9,7 @@
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1790%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Tests](https://img.shields.io/badge/tests-1788%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录，同样由
@@ -35,7 +35,7 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 没能运行的分析报告。
 
 > [!IMPORTANT]
-> **当前状态：早期开发——v1.0.0 已发布（tag 2026-11-17，
+> **当前状态：早期开发——v1.0.1 已发布（v1.0.0 于 2026-11-17 打 tag，
 > 见[发版说明](docs/releases/v1.0.0.md)）；Phase 3 的交付物已发布，但退出标准未全部达成
 > （M6、M8 与 M10 的验收仍未关闭）。** CLI、分析内核与报告
 > 流水线在 `v0.1.0` 发布，此后每个版本都在交付。MCP server、证据优先的 Agent 与

@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1790%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Tests](https://img.shields.io/badge/tests-1788%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
@@ -50,7 +50,7 @@ still yields a manifest, an index and a report that says which steps did not run
 > records are the [comparison report](docs/benchmarks/comparison.md) and the
 > [M4 end-to-end run record](docs/reports/m4-e2e-run.md).
 >
-> **Status: early development — v1.0.0 released (tag 2026-11-17); Phase 3's
+> **Status: early development — v1.0.1 released; v1.0.0 was tagged 2026-11-17. Phase 3's
 > deliverables are released, but its exit criteria are not all met (M6, M8 and M10
 > are still open).** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in

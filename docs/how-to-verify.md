@@ -169,7 +169,7 @@ uv run --no-sync pytest -q
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `<N> passed, <M> skipped`（退出码 0）。skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh` 与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`。这一行量的是**另一种跑法**，具体条数随这棵树的测试数变，所以这里不写死 |
-| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1790<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
+| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1788<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -214,11 +214,11 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 
 ```text
 facts:
-  tags: handover-2026-11-10, phase1-acceptance-2026-10-21, v0.1.0, v0.1.1, v0.1.2, v0.1.3, v0.2.0, v1.0.0
-  package version: 1.0.0
-  changelog: 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
-  newest release: v1.0.0
-documents read: <!--fig:documents.count-->125<!--/fig-->
+  tags: handover-2026-11-10, phase1-acceptance-2026-10-21, v0.1.0, v0.1.1, v0.1.2, v0.1.3, v0.2.0, v1.0.0, v1.0.1
+  package version: 1.0.1
+  changelog: 1.0.1, 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
+  newest release: v1.0.1
+documents read: <!--fig:documents.count-->126<!--/fig-->
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked

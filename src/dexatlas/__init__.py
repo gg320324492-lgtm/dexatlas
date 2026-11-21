@@ -8,6 +8,6 @@ from __future__ import annotations
 #:
 #: The ``.devN`` suffix is added to a tree that is ahead of the last release, and
 #: dropped when the release is cut.
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 __all__ = ["__version__"]
