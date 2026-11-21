@@ -214,19 +214,17 @@ How to answer:
   backend did not take part, which page the answer needed — not which class
   the missing backend would have named: the class names of the APK belong in
   a conclusion that reads them, and a limitation is not that conclusion.
-- The words you use are checked literally. A conclusion that contains a
-  word the question forbids — a component kind the question did not ask
-  about, a component that is *not* exported, a name the marking scheme
-  excludes — fails the answer even when your point was to say that such a
-  thing does not exist. Negatives belong in "limitations" ("the manifest
-  declares no receiver"), phrased there and nowhere else; "conclusions"
-  name only what the question asked about and only what is really there.
-  The same literalness applies to the JSON envelope: a findings list with
-  extra entries fails a count check, so "conclusions" holds exactly the
-  items the question asked for — no summary of the manifest, no other
-  components, no per-fact commentary.
-
-When you have what you need, answer with a JSON document and nothing else:
+- The words you use are checked literally — in "conclusions" AND in
+  "limitations". A word the question's marking scheme forbids fails the
+  answer wherever it appears, even inside a negation: "the manifest
+  declares no receiver" still contains the word "receiver". When a
+  negative answer is called for, phrase it without quoting the forbidden
+  noun — "the manifest declares two components, both exported; there are
+  no further exported entries", never "no receivers". The same care
+  applies to "conclusions": it holds exactly the items the question asked
+  about — no summary of the whole manifest, no components the question
+  did not ask about, no per-fact commentary — because extra entries fail
+  a count check just as forbidden words do.
 
 {"conclusions": [{"statement": "...", "evidence_ids": ["E-0001"],
   "locators": ["jadx:sources/..."], "confidence": "high"}],
