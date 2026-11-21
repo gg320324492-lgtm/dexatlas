@@ -10,6 +10,7 @@ from dexatlas.mcp.errors import no_manifest, unknown_project
 from dexatlas.mcp.schemas import (
     Completeness,
     ComponentView,
+    EvidenceCatalogEntry,
     ManifestView,
     PermissionView,
     ProjectList,
@@ -95,6 +96,7 @@ def project_status(analyzer: Analyzer, project_id: str) -> ProjectStatus:
     published = analyzer.store.get_published_run(project_id)
     runs = analyzer.store.list_runs(project_id)
 
+    evidence_rows = analyzer.store.list_evidence(project_id)
     return ProjectStatus(
         project=summary(project),
         completeness=Completeness(
@@ -105,6 +107,12 @@ def project_status(analyzer: Analyzer, project_id: str) -> ProjectStatus:
         ),
         published_run=run_summary(published) if published is not None else None,
         runs=[run_summary(run) for run in runs],
+        evidence_catalog=[
+            EvidenceCatalogEntry(
+                id=row.id, kind=str(row.kind.value), summary=row.summary
+            )
+            for row in evidence_rows
+        ],
     )
 
 

@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | <!--fig:tests.total-->1791<!--/fig-->（<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7170<!--/fig-->/<!--fig:coverage.total-->7684<!--/fig--> 行） | ≥80% |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7177<!--/fig-->/<!--fig:coverage.total-->7691<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -882,7 +882,7 @@ uv run python scripts/refresh-report-figures.py
 ```bash
 uv run pytest          # 收集 <!--fig:tests.total-->1791<!--/fig--> 个：<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7170<!--/fig-->/<!--fig:coverage.total-->7684<!--/fig--> 行）
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7177<!--/fig-->/<!--fig:coverage.total-->7691<!--/fig--> 行）
                       # 完整环境下的结果：<!--fig:suite.passed-->1790<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
@@ -1052,12 +1052,12 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/storage.py": [396, 11],
       "mcp/__init__.py": [2, 0],
       "mcp/errors.py": [21, 1],
-      "mcp/schemas.py": [181, 0],
+      "mcp/schemas.py": [187, 0],
       "mcp/security.py": [28, 3],
       "mcp/server.py": [57, 12],
       "mcp/tools/__init__.py": [1, 0],
       "mcp/tools/evidence.py": [29, 1],
-      "mcp/tools/projects.py": [45, 4],
+      "mcp/tools/projects.py": [46, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
       "mcp/tools/symbols.py": [71, 1],
@@ -1086,7 +1086,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 514,
-    "statements": 7684
+    "statements": 7691
   },
   "history": {
     "v0.1.0": {
@@ -1103,7 +1103,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:cf8de8a8591c55e1905eeaa17247393d6b87934a3f05bfd33af5b5e037c47786",
+  "source_fingerprint": "sha256:90b05e301b3c4e33f39f719a46d453805d2ec8531728e007aedddb7894f6e662",
   "suite": {
     "failed": 0,
     "passed": 1790,

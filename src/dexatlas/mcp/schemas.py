@@ -148,6 +148,21 @@ class RunSummary(BaseModel):
     duration_seconds: float | None = None
 
 
+class EvidenceCatalogEntry(BaseModel):
+    """One evidence record, as an id and a summary a reader can pick from.
+
+    ``get_project_status`` carries this catalogue so a caller can see which
+    evidence ids exist before reading any of them — the ids are assigned in
+    the order the analysis wrote its records, and a caller that guesses the
+    numbering (or assumes the first record is the status itself) will read
+    past the record it needs.
+    """
+
+    id: str
+    kind: str
+    summary: str
+
+
 class ProjectStatus(BaseModel):
     """Everything one project is, and how much of it there is."""
 
@@ -162,6 +177,14 @@ class ProjectStatus(BaseModel):
 
     runs: list[RunSummary] = Field(default_factory=list)
     """Every run of this project, newest first."""
+
+    evidence_catalog: list[EvidenceCatalogEntry] = Field(default_factory=list)
+    """Every evidence record of the published analysis, as id + kind + summary.
+
+    The catalogue is the map a caller needs before paging through
+    ``get_evidence``: the ids are not positional guesses, they are stated
+    here with what each record says.
+    """
 
 
 class PermissionView(BaseModel):
