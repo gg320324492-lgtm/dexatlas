@@ -60,7 +60,12 @@ questions with cited evidence, or in a local web workbench.
   what a scripted (non-model) baseline can and cannot show. Documentation
   figures are generated from the code by scripts, not edited by hand: the
   README's test/coverage badges and the report's numbers are recomputed, and
-  the release notes' test counts are pinned to archived measurements.
+  the release notes' test counts are pinned to archived measurements. The
+  agent's measured record on the frozen 20-question set: 51/60 = 85.0% over
+  three rounds with GLM-5.3-Flash (17/20 every round, 90.9–97.5% evidence
+  grounding), and 49/60 = 81.7% with MiniMax-M3.1-Flash — both below the
+  project's own ≥90% three-round bar, disclosed as such rather than claimed
+  as met.
 - **Runtime isolation.** Untrusted DEX parsing runs in a separate worker
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.

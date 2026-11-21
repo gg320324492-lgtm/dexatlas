@@ -80,6 +80,11 @@ still yields a manifest, an index and a report that says which steps did not run
 > plan investment stopped for good and M6 moved to the state-of-record disclosure plan (see the
 > [round-2 record](docs/benchmarks/m6-level2-narrow-verify2.md) and the
 > [round-3 record](docs/benchmarks/m6-level2-narrow-verify3.md));
+> a 2026-11-21 supplementary run with a different model (GLM-5.3-Flash, via a
+> local gateway, same frozen 20 questions) scored **51/60 = 85.0% (17/20 in
+> every round)** — every round above the ≥80% per-round line, the combined
+> ≥90% line still not met (see the
+> [GLM record](docs/benchmarks/m6-level2-glm.md));
 > M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
@@ -495,6 +500,13 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   scans found nothing across all traces. Per the plan's failure handling the
   round stopped there, no full retest and no further fix round followed, and
   the state-of-record disclosure plan is the final settlement for M6
+- **[M6 level-2 supplementary run — GLM-5.3-Flash](docs/benchmarks/m6-level2-glm.md)** —
+  a different model (via a local OpenAI-compatible gateway) on the same frozen
+  20 questions, three rounds × 3 configurations, all traces committed and the
+  figures recomputed by script: DexAtlas **51/60 = 85.0% (17/20 in every
+  round)** — every round above the ≥80% per-round line, the combined ≥90% line
+  still not met; A 30.0%, B 35.0%; 949,093 tokens. Reported separately from the
+  MiniMax baseline, never combined with it
 - **[Task set](docs/benchmarks/task-set.md)** — the questions the comparisons ask, how
   an answer is judged, and how a second person confirms that an expected answer is
   right without running anything
