@@ -1,6 +1,8 @@
 """A backend that was stopped part-way says so — and says what it left behind.
 
-The M10 reader rehearsal (``docs/reports/invitation-reader-rehearsal.md``, gap M-2)
+The M10 reader rehearsal (gap M-2, recorded in
+``docs/reports/evidence-incomplete-backend-wording.md``; the rehearsal
+document itself was removed in the 2026-11-21 de-platformisation cleanup)
 recorded a report that carried two ``verified`` records about the same backend,
 wording that contradicted each other:
 

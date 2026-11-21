@@ -9,7 +9,7 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1789%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Tests](https://img.shields.io/badge/tests-1790%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
@@ -83,8 +83,9 @@ still yields a manifest, an index and a report that says which steps did not run
 > M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
-> the GitHub side with the outreach materials still unpublished; M10 (independent
-> acceptance, release candidate) has its preparation pack ready but has not run.
+> the GitHub side (the outreach materials were removed in the 2026-11-21
+> de-platformisation cleanup); M10 (independent acceptance, release candidate)
+> passed on 2026-11-20.
 > See the [Roadmap](#roadmap) and
 > [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md).
 > Nothing on this page claims a feature that does not yet run.
@@ -629,7 +630,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan — the milestone stays open |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit code is implemented as exit code 6 (`EXIT_NO_INDEX`) and written into the [public contract table](docs/architecture/public-contracts.md) |
-| M9 | GitHub showcase (this page) and outreach materials | **showcase done; materials unpublished** — this page is in place; the outreach materials are not published |
+| M9 | GitHub showcase (this page) and outreach materials | **showcase done; materials removed** — this page is in place; the outreach materials were removed in the 2026-11-21 de-platformisation cleanup |
 | M10 | independent acceptance, re-scoring, release candidate | **passed (2026-11-20)** — an independent reviewer walked the full chain from clone; 39/40 checks passed, re-scored at 97.5% / 96.3%. The acceptance materials were removed in the 2026-11-21 de-platformisation cleanup |
 
 This plan originally made `v1.0.0` conditional on all its exit criteria passing; `v1.0.0`

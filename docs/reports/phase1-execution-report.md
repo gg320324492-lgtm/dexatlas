@@ -883,7 +883,7 @@ uv run python scripts/refresh-report-figures.py
 uv run pytest          # 收集 <!--fig:tests.total-->1791<!--/fig--> 个：<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1789<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1790<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1103,10 +1103,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:9a804969541ee833ba51c81c67411c84dbc22475c6143c9ecd499d3c7ab9c170",
+  "source_fingerprint": "sha256:3fc6841e08db45d15304be063e1a77baf3aeaafbbdb8cc211ff82b6d24c76076",
   "suite": {
-    "failed": 1,
-    "passed": 1789,
+    "failed": 0,
+    "passed": 1790,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
