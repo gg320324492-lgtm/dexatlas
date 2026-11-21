@@ -177,39 +177,28 @@ REPORT_EXCLUSIONS: dict[str, str] = {
     "phase1-findings-ledger.md": "发现台账快照，行号按其文首声明的基线 8df894b 写；待回锚。",
     "phase1-review-report.md": "Phase 1 评审报告的历史快照，行号按写作当时的树取值；待回锚。",
     "phase3-baseline.md": "Phase 3 基线报告，行号按其声明的基线 6b08684 写；待回锚。",
+    # -- Records of the M10 acceptance material and the de-platformisation
+    #    cleanup: their citations name documents that were removed with the
+    #    cleanup, and their line numbers belong to the trees they audited.
+    "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag 那棵树（文首声明，历史记录）；待回锚。",
+    "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值（历史记录）；待回锚。",
+    "handwritten-numbers-audit.md": "手写数审计，行号按其审计树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
+    "unguarded-numbers-gates.md": "无守数门禁记录，其 B9 语句与素材侧条目随去平台化清理移除。",
+    "m8-4-note-and-c17.md": "M8-4 备注与 C17 登记，行号按写作当时树取值。",
+    "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值。",
+    "platform-gate-inventory.md": "平台门禁清单记录，行号按其核对树取值。",
+    "evidence-package-isolation.md": "证据包隔离核对，行号按其核对树取值。",
+    "citation-value-comparison.md": "引用值比对记录，行号按其核对树取值。",
+    "c17-markers-everywhere.md": "C17 落地记录，行号按其写作树取值。",
+    "v1.1.0-candidate-c10-manifest.md": "C10/C16 登记报告，行号按其写作树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
     # -- M10 acceptance materials: pinned to the trees they accepted.
-    "m10-acceptance-pack.md": "M10 验收包，初稿基准 ff5c4cc（文首声明）；行号按该树写，待回锚。",
-    "m10-number-traceability.md": "数字溯源报告，表格数值是基线 78102a8 的快照（文首声明），行号同基线；待回锚。",
-    "m10-materials-alignment.md": "M10 材料对账报告，行号按其复核树 0104ccb 写；待回锚。",
-    "m10-reader-walkthrough.md": "第一轮读者走查，行号基准 HEAD=599ab67（文首声明）；待回锚。",
-    "m10-reader-walkthrough-2nd.md": "第二轮读者走查，行号基准 02e6d9c（文首声明）；待回锚。",
-    "m10-reader-walkthrough-3rd.md": "第三轮读者走查，行号基准 c6bf3f7（文首声明）；待回锚。",
-    "m10-reader-walkthrough-4th.md": "第四轮读者走查，材料定稿树 81336a5（文内声明）；待回锚。",
-    "m10-reader-kit.md": "读者工具包的审计报告，行号按写作当时树取值（未声明基线）；待回锚。",
-    "m10-invitation-readiness.md": "邀请函就绪复核，行号按其复核时树（v1.0.0 tag = b71bf30）取值；待回锚。",
-    "m10-invitation-final.md": "邀请函成稿引用的 commit/行号按 2edaed9 树写；待回锚。",
-    "m10-review-record-template.md": "验收记录模板，示例 hash 按 2edaed9 树写（文内声明以随函邀请函为准）；待回锚。",
     # -- Release-week records: pinned to the trees they recorded.
-    "release-notes-consistency.md": "发布文本一致性复核，基线 78102a8（§0 声明，含被污染工作副本的说明）；引用对象行号按该树写，待回锚。",
     "changelog-vs-release-notes.md": "CHANGELOG 对账，行号基准 d2c5f35（文首声明）；待回锚。",
-    "v1.0.0-release-checklist.md": "发版清单，行号按 53358c5 树写；待回锚。",
-    "v1.0.0-release-runbook.md": "发版 runbook，行号按 277d0fa 树写；待回锚。",
-    "v1.0.0-release-commit-draft.md": "发版提交草案，行号按 a4e7af5 树写；待回锚。",
     "v1.0.0-ci-run-record.md": "CI run 记录，行号按其记录的 run 当时树取值；待回锚。",
-    "reader-dry-run.md": "读者干跑记录，file:line 明确针对 v1.0.0 tag 那棵树（文首声明）；待按 tag 树回锚。",
-    "release-process-dry-run.md": "发版流程演练，行号按其演练树（.scratch 干净副本）取值；待回锚。",
     # -- November 2026 audit round: each names its review tree in its header.
-    "ci-gate-coverage.md": "CI 门禁覆盖审计，复核树 062c4b5（文首声明）；待回锚。",
     "coverage-guard-audit.md": "覆盖率守护审计，引用基线 8868e30（文首声明）；待回锚。",
-    "new-pages-crosscheck.md": "新页校对，基线 e5060af（文首声明）；待回锚。",
     "readme-map-audit.md": "README 地图审计，基线 062c4b5（文首声明）；待回锚。",
     "handover-tails-audit.md": "交接尾巴核对，核对树 0a8e02e（文首声明）；待回锚。",
-    "final-outward-consistency.md": "对外文本一致性复核，行号按其复核树 d43369b 写；待回锚。",
-    "english-reader-review.md": "英文读者终检第一轮，行号按写作当时树取值（未声明基线）；待回锚。",
-    "stale-number-scan.md": "过期数扫描（第一轮），行号按写作当时树取值（未声明基线）；待回锚。",
-    "outreach-recheck.md": "对外素材复核，行号按 48a56b5 树写；待回锚。",
-    "outreach-final-review.md": "对外素材终审，行号按其 worktree 基线 78102a8 写（文内声明）；待回锚。",
-    "outreach-publish-checklist.md": "发布清单核对，行号按写作当时树取值；待回锚。",
     "github-repo-metadata-proposal.md": "仓库元数据提案，行号按其复核时远端 main=8f9ddca 写；待回锚。",
     # -- Design/analysis reports written against a since-moved tree.
     "figures-coverage-design.md": "数字自动覆盖的设计报告，行号按 2026-11-18 当时树写（未声明基线）；其多处引用已随后续提交位移，待回锚。",
@@ -217,7 +206,6 @@ REPORT_EXCLUSIONS: dict[str, str] = {
     "case-studies-third-package.md": "第三案例包报告，行号按 c3586d8 树写；待回锚。",
     "m8-install-rehearsal.md": "M8 安装演练报告，行号按 e4f3011 树写；待回锚。",
     "glossary-pass.md": "术语表工作记录，行号按 75976e0 树写；待回锚。",
-    "portfolio-readiness-2026-11-18.md": "作品集准备度评估，评估基准 75976e0（文首声明该 tag 已被重打）；待回锚。",
     # -- This candidates list itself: it cites benchmark files by line, and
     #    those lines belong to the trees the candidates were written on.
     "v1.1.0-candidates.md": "候选清单本身引用多处基准文件行号，按写作当时树取值；其 C13 节自述了这一缺口，待统一回锚。",
@@ -276,27 +264,18 @@ DOCS: list[pathlib.Path] = collect_documents()
 #: in, and this is where the checker learns it. The value is a git ref: the
 #: tree the document's citations are read out of.
 #:
-#: The release body is the one document that says so out loud -- its appendix
-#: header reads "Line numbers refer to the v1.0.0 release tree". Without this
-#: registry the checker read that document's citations out of the working
-#: copy, so it checked the release tree's numbers against a tree that had
-#: moved on since the release, and it had no way to say so.
+#: The release body that used to sit here was removed in the 2026-11-21
+#: de-platformisation cleanup; the November 2026 review reports remain. The
+#: ref is the commit each report names where it declares its basis; the report
+#: has to quote that tree's measurement fingerprint, and the citations are
+#: read out of that tree.
 TREE_DOCUMENTS: dict[str, str] = {
-    "docs/reports/v1.0.0-github-release-body.md": "v1.0.0",
     # The November 2026 review reports. The ref is the commit each report
     # names where it declares its basis; the report has to quote that tree's
     # measurement fingerprint, and the citations are read out of that tree.
-    "docs/reports/outreach-first-read.md": "48a56b5",
     "docs/reports/readme-image-consistency.md": "3ef6676",
     "docs/reports/case-studies-client-read.md": "9e1aa61",
-    "docs/reports/round-two-fresh-read.md": "ec52527",
-    "docs/reports/stale-number-scan-2.md": "9e1aa61",
-    "docs/reports/denominator-and-tree-pass.md": "d43369b",
     "docs/reports/local-vs-ci-gates.md": "9e1aa61",
-    "docs/reports/english-reader-review-2.md": "2c456e0",
-    # The independent acceptance record: its line references belong to the
-    # tree it accepted (v1.0.0 = 2edaed9, named in its own metadata row).
-    "docs/reports/m10-acceptance-review.md": "2edaed9",
 }
 
 #: The document that carries a tree's measurement record. The record holds the

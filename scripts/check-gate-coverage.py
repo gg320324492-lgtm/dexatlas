@@ -49,7 +49,6 @@ GATES: dict[str, str] = {
     "scripts/check-contract-records.py": "the live contract check against the record in section 7",
     "scripts/check-doc-citations.py": "every file:line citation in the documentation",
     "scripts/check-gate-coverage.py": "that every gate is run by something",
-    "scripts/check-m10-snapshot.py": "the M10 self-check against its snapshot",
     "scripts/check-platform-gates.py": "that the local gates and the CI gates agree",
     "scripts/check-release-numbers.py": "the release numbers the outward texts state",
     "scripts/check-unguarded-numbers.py": "the hand-written numbers in the documents against the tree",

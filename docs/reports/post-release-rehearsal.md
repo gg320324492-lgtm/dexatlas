@@ -5,7 +5,7 @@
 既有文件 —— 本文件是本轮**唯一新增**的文件。
 
 - **日期**：2026-11-18
-- **对象**：[v1.0.0-release-checklist.md](v1.0.0-release-checklist.md) §3 步骤 8
+- **对象**：v1.0.0-release-checklist.md §3 步骤 8
   （`docs/reports/v1.0.0-release-checklist.md:220`）—— 这条路径是这一轮才补上的，
   此前清单里一个字都没有
 - **演练树**：`E:\Dexatlas\.claude\worktrees\vibrant-benz-e30712`，分支
@@ -13,7 +13,7 @@
 - **基线**：GitHub 上 `v1.0.0` 的实际发布状态（已发布；tag 在 Release 发布之后被**重打过
   5 次**，每一次都让上一次的 CI 结论作废），以及 2026-11-17～18 这一轮真实的操作记录
   （[v1.0.0-ci-run-record.md](v1.0.0-ci-run-record.md)、
-  [release-process-dry-run.md](release-process-dry-run.md)）
+  release-process-dry-run.md）
 - **本轮的动作**：全部只读。命令的存在性用 `grep` 核，行为用读源码核；没有执行任何会
   产生副作用的命令，没有联网
 

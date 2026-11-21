@@ -7,7 +7,7 @@
 > **那一棵树**（即 `src/dexatlas/core/evidence.py` 的 `add_error`）。此后若有人再动
 > 这段代码，按 `CLAUDE.md` 第 4 步用 `scripts/remap-citations.py` 重映射即可。
 >
-> **来源：** M10 读者视角预演（[invitation-reader-rehearsal.md](invitation-reader-rehearsal.md)）
+> **来源：** M10 读者视角预演（invitation-reader-rehearsal.md）
 > 的 **M-2** 节。那一节记的是一份**超时运行**的报告里挂着两条互相打架的
 > `verified` 证据；本报告处理的是其中一条（`E-0007`）的文案。
 

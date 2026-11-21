@@ -653,13 +653,6 @@ jobs:
         run: uv sync --extra dev --frozen
       - name: M10 self-check
         run: uv run --no-sync python scripts/m10_selfcheck.py
-      # The snapshot in docs/reports/m10-selfcheck.md is the record of one
-      # run of that script: how many checks passed, how many failed, and
-      # which checks they were. Nobody compared it with the script, so the
-      # document could describe a run the script no longer makes and the
-      # job stayed green -- the job only ever asked the script.
-      - name: The snapshot against the script
-        run: uv run --no-sync python scripts/check-m10-snapshot.py
 
   # Every gate in this repository is supposed to be run by something: a job
   # in this file, or a test in tests/. A gate nobody runs is a document, not

@@ -33,12 +33,11 @@ the workbench. M4 passed its source review and acceptance on 2026-11-14
 
 Phase 3 was delivered in v1.0.0. The next planned work:
 [`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) was rewritten on
-2026-11-15 around GitHub portfolio value and scoped Upwork deliverables.
-M5–M10 now cover baseline reconciliation, bounded agent workflows, portable
+2026-11-15 around portfolio value and scoped deliverables.
+M5–M10 covered baseline reconciliation, bounded agent workflows, portable
 evidence packages, installation/reliability, presentation assets and independent
-acceptance. None has been accepted; native/dynamic analysis and plugin/SDK
-expansion are deferred. The [readiness assessment](reports/portfolio-readiness-2026-11-15.md)
-explains the scoring and its limits.
+acceptance. Native/dynamic analysis and plugin/SDK
+expansion are deferred.
 
 The plan is in [`docs/roadmap/phase2-plan.md`](roadmap/phase2-plan.md), and
 the status page — in Chinese — is [`docs/status.md`](status.md). The

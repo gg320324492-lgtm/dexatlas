@@ -13,8 +13,8 @@
 > **本文是什么**：一次**只读**复核的产物。它站在「一个客户 / 一个要评估这个项目的人」
 > 的位置上，把 `docs/case-studies/` 的三篇走查、案例索引、四个证据包，以及
 > `docs/reports/case-studies-run-correspondence.md`、
-> `docs/reports/case-studies-third-package.md`、`docs/outreach/` 五份素材
-> （其中 `publish-review.md` 是内部核对记录，不外发）、
+> `docs/reports/case-studies-third-package.md`、当时的五份对外素材
+> （已随 2026-11-21 的去平台化清理移除）、
 > `docs/portfolio.md`、`docs/service-commitments.md` 放在一起读一遍，
 > 回答一个问题：**读完这些材料，客户会不会数错、会不会被误导？**
 >
@@ -48,7 +48,7 @@
 | 「demo 与 api-integration 共用一次运行」这件事说清了吗？ | **说清了，而且能被字节级证明**。四处材料都写明是两个 run id、两次分析；实测两个包的 `report.md` / `report.html` 各只差 2 行（run id 与 Analysis time） | §3.4 |
 | 包里的东西与文档说的对得上吗？ | **对得上**：12 个 manifest 条目的 sha256 与字节数全部核对通过；散装报告与包内 `reports/` 逐字节相同；包内 `apk_sha256` 与仓库里三个 APK 的实际 sha256 一致 | §3.1–§3.3 |
 | 有过度承诺吗？ | **没有**。三篇走查都写了「不能证明什么」，证据边界清楚 | §3.9 |
-| 英文读者会不会读错？ | **会，有 4 处**（与 `english-reader-review-2.md` 同一把尺子：「他读完会不会相信一件不成立的事」） | §4 |
+| 英文读者会不会读错？ | **会，有 4 处**（与已移除的英文读者终检第二记录同一把尺子：「他读完会不会相信一件不成立的事」） | §4 |
 | 发现条数 | **11 条**：严重 2 / 中 4 / 低 5 | §2、§3 |
 
 **最要紧的三条：**
@@ -71,10 +71,9 @@
 **怎么当客户。** 本轮读了：`docs/case-studies/README.md`、三篇走查、
 `attachments/` 下 16 个文件（4 个 zip 全部解压）、两份实测报告
 （`case-studies-run-correspondence.md`、`case-studies-third-package.md`）、
-`docs/outreach/` 五份素材、`docs/portfolio.md`、`docs/service-commitments.md`，
+当时的五份对外素材（已移除）、`docs/portfolio.md`、`docs/service-commitments.md`，
 以及 CHANGELOG、`docs/releases/v1.0.0.md`、
-`docs/reports/v1.0.0-github-release-body.md`、`docs/reports/final-outward-consistency.md`、
-`docs/reports/outreach-final-review.md`、`docs/reports/next-engagements.md`、
+已发布的 Release 正文与对外一致性报告（均随 2026-11-21 的去平台化清理移除）、
 `docs/status.md` 里提到案例材料的段落。
 
 **做了哪些实测。**
@@ -94,7 +93,7 @@
 因此本文**不**评价报告里那些由脚本生成的数字（测试数、覆盖率、源指纹），
 也**不**评价主会话正在重测量的那四份文件。
 
-**判据。** 与 `english-reader-review-2.md` 同一把尺子：**他读完会不会相信一件不成立的事**。
+**判据。** 与英文读者终检（记录已随 2026-11-21 去平台化清理移除）同一把尺子：**他读完会不会相信一件不成立的事**。
 每条发现给三样东西：原文（逐字）→ 客户会怎么数 / 怎么误读 → 建议改法。
 按后果排序。
 
@@ -279,7 +278,7 @@ CHANGELOG 是这批材料里最像「对外文案」的一份。客户读到「�
    >   16 个（4 个证据包 + 12 份散装报告），四个包的 `run_id` 两两不同。
    >   四个包的 `verify_package` 与 `verify_citations` 均通过。
 
-2. v1.0.0 那条末尾加一句限定语（与 `english-reader-review-2.md` §6 的「两棵树」尺子一致）：
+2. v1.0.0 那条末尾加一句限定语（与英文读者终检的「两棵树」尺子一致）：
 
    > （本条记录的是 v1.0.0 发版时的附件集：9 个文件、3 个证据包。2026-11-18 起
    > 附件集已换过一轮，见 [Unreleased]。）
@@ -364,9 +363,8 @@ api-integration 包是同一份字节的两次分析）。`examples/` 下另有
 
 ### 2.6 【中】已发布的 GitHub Release 正文与仓库里的发版说明，仍说 nine files / three packages / two analyses
 
-**原文（逐字）**
-
-`docs/reports/v1.0.0-github-release-body.md:88-94`：
+**原文（逐字，引自当时已发布的 Release 正文草稿；该记录已随 2026-11-21 的
+去平台化清理移除）**
 
 ```
   rewritten case studies with their attachments committed under
@@ -398,12 +396,12 @@ api-integration 包是同一份字节的两次分析）。`examples/` 下另有
 analyses」——两句话今天都不成立，而且「two analyses」在仓库里是**被明文推翻过**的结论。
 仓库里的 `docs/releases/v1.0.0.md` 是同一句话的中文对照。
 
-按 `english-reader-review-2.md` §6 的「两棵树」尺子，这些文档记录的是**发版树**的状态，
+按英文读者终检的「两棵树」尺子，这些文档记录的是**发版树**的状态，
 它们需要的是一句限定语，而不是改数——改了数就和已发布的 tag 对不上了。
 
 **建议改法**
 
-- `docs/releases/v1.0.0.md` 与 `docs/reports/v1.0.0-github-release-body.md` 各加一句：
+- `docs/releases/v1.0.0.md` 与已发布的 Release 正文各加一句：
 
   > (As of the `v1.0.0` tag: nine files, three evidence packages, covering two
   > analyses. The attachment set was replaced on 2026-11-18 — four packages,
@@ -415,14 +413,12 @@ analyses」——两句话今天都不成立，而且「two analyses」在仓库
 
 ---
 
-### 2.7 【中低】`final-outward-consistency.md` 的「数字一致」结论与它引用的句子都已过期
+### 2.7 【中低】对外一致性报告的「数字一致」结论与它引用的句子都已过期
 
-**原文（逐字）**
-
-`docs/reports/final-outward-consistency.md:56`：
+**原文（逐字，引自当时的对外一致性报告；该记录已随 2026-11-21 的去平台化清理移除）**
 
 ```
-| 案例附件 **9 个文件** / **3 个证据包** / 覆盖 **2 份分析** | `CHANGELOG.md:262`–`:266`（9 个文件、三个证据包、两个 project id）；`docs/releases/v1.0.0.md:57`–`:61`（nine files、两个 project id）；`docs/reports/v1.0.0-github-release-body.md:92`–`:94`（nine files，**未提覆盖几份分析**）、`:235`；`docs/portfolio.md:108`–`:110`（「the same analysis」）；`docs/status.md:134`（未给数） | `docs/case-studies/README.md`（三案例、三样本、三包、两份分析）；`docs/case-studies/attachments/` 实为 9 个文件、3 个 zip | 数字一致；**「三包只覆盖两分析」仅 `docs/case-studies/README.md` 披露** → 见 §3 第 20 条 |
+| 案例附件 **9 个文件** / **3 个证据包** / 覆盖 **2 份分析** | `CHANGELOG.md:262`–`:266`（9 个文件、三个证据包、两个 project id）；`docs/releases/v1.0.0.md:57`–`:61`（nine files、两个 project id）；已发布的 Release 正文（nine files，**未提覆盖几份分析**；已移除）；`docs/portfolio.md:108`–`:110`（「the same analysis」）；`docs/status.md:134`（未给数） | `docs/case-studies/README.md`（三案例、三样本、三包、两份分析）；`docs/case-studies/attachments/` 实为 9 个文件、3 个 zip | 数字一致；**「三包只覆盖两分析」仅 `docs/case-studies/README.md` 披露** → 见 §3 第 20 条 |
 ```
 
 **客户会怎么数 / 怎么误读**
@@ -482,8 +478,8 @@ evidence packages were made from — one package per analysis.
 **客户会怎么数 / 怎么误读**
 
 客户打开 `attachments/` 数到 16 个文件，而索引给的是「四个包 + 十二份报告」——
-要把两个数加起来才知道 16。内部文档 `docs/outreach/publish-review.md:125`
-写了「共 16 个文件」，但那是内部记录、客户看不到。
+要把两个数加起来才知道 16。素材侧的内部核对记录（已随 2026-11-21 的
+去平台化清理移除）写了「共 16 个文件」，但客户看不到。
 
 **建议改法**：改成 `— **four packages, twelve report files, sixteen files in all**`。
 
@@ -585,10 +581,10 @@ once. Both definitions stay in the symbol index, each with its own locator.
   并把四个 run id 逐个列出；
 - `docs/case-studies/api-integration.md:230-234`：明写「same bytes, same counts,
   different run id and different timing」；
-- `docs/outreach/project-brief.md:127-135`：明写「四个证据包是四次不同的分析……
+- 对外的项目简介素材（已移除）：明写「四个证据包是四次不同的分析……
   demo 与 api-integration 两个包分析的是同一份 APK 的两次运行」，
   并补了「不是客户案例」的边界；
-- `docs/outreach/publish-review.md:139-155`：把字节级比对写了出来；
+- 素材核对记录（已移除）：把字节级比对写了出来；
 - **实测**：`demo-report.md` 与 `api-integration-report.md` 的 diff 只有 2 行
   （`**Run:**` 一行、`| Analysis time |` 一行），`.html` 同样 2 行；
   `.json` 的差异是 run id、时间戳与 `duration_seconds`。
@@ -662,8 +658,7 @@ once. Both definitions stay in the symbol index, each with its own locator.
 
 ### 3.12 对外文案的「四包四跑」口径彼此一致 ✓
 
-`docs/outreach/project-brief.md:120-135`、`docs/outreach/cover-letter-templates.md:29-36`、
-`docs/outreach/publish-review.md:125-155`、`:351-355` 说的是同一件事：
+当时的对外素材（项目简介、提案信模板、素材核对记录，均已移除）说的是同一件事：
 **四个包、四次分析、三个一方样本、demo 与 api-integration 是同一份样本的两次运行、
 不是客户案例**。四处没有互相打架 ✓。
 
@@ -676,7 +671,7 @@ and the MCP server」——三篇走查 ✓，「第二次独立的分析」与�
 
 ---
 
-## 4. 英文读者专项（与 `english-reader-review-2.md` 同一把尺子）
+## 4. 英文读者专项（与英文读者终检同一把尺子）
 
 那把尺子是：**「他读完会不会相信一件不成立的事」**，外加「直接用了而没有一句解释的黑话」。
 
@@ -752,7 +747,7 @@ docs/case-studies/attachments/
 **做了什么**
 
 - 只读复核 `docs/case-studies/` 全部材料 + `docs/reports/` 两份案例实测报告 +
-  `docs/outreach/` 五份素材 + `docs/portfolio.md` + `docs/service-commitments.md` +
+  当时的五份对外素材（已移除）+ `docs/portfolio.md` + `docs/service-commitments.md` +
   CHANGELOG / 发版说明 / 已发布 Release 正文草稿 / 三份内部一致性报告 / `docs/status.md`
   里提到案例的段落；
 - 解压 4 个证据包，对 12 个 manifest 条目逐个重算 sha256 与字节数（12/12 通过）；
@@ -815,8 +810,8 @@ uv run --no-sync python .scratch/linkcheck.py             # broken: 0（含本�
 | §2.3 | CHANGELOG 以现在时写「三个证据包 / 9 个文件」 | `## [Unreleased]` 的 `### Added` 加一条（附件集扩到四个包、16 个文件、四次分析）；v1.0.0 那条末尾加限定语，指向 [Unreleased] | `CHANGELOG.md` |
 | §2.4 | api 走查 §3.5 末句与上一句互相否定 | 末句改为「The run it reports is the one §3.2's upload started; this upload added no analysis of its own.」 | [api-integration.md](../case-studies/api-integration.md) |
 | §2.5 | 第三个案例包报告把「四个包」写成了「`examples/` 里四个 APK」 | 改为「三个不同的 APK，`demo.apk` 出现两次」，并点名 `examples/` 下另有两个未进案例材料的样本 | [case-studies-third-package.md](case-studies-third-package.md) |
-| §2.6 | 发版说明与 Release 正文仍说 nine files / three packages / two analyses | 两处各加一句限定语：v1.0.0 tag 时是那个样子，2026-11-18 附件集换过一轮 | [v1.0.0.md](../releases/v1.0.0.md)、[v1.0.0-github-release-body.md](v1.0.0-github-release-body.md) |
-| §2.7 | `final-outward-consistency.md` 的「数字一致」结论与它引用的句子都已过期 | §1 的表上方加限定语；那一行的判定注明「按 v1.0.0 发版树」；§5.2 第 6 条补上当前状态 | [final-outward-consistency.md](final-outward-consistency.md) |
+| §2.6 | 发版说明与 Release 正文仍说 nine files / three packages / two analyses | 两处各加一句限定语：v1.0.0 tag 时是那个样子，2026-11-18 附件集换过一轮 | [v1.0.0.md](../releases/v1.0.0.md) |
+| §2.7 | `final-outward-consistency.md` 的「数字一致」结论与它引用的句子都已过期 | §1 的表上方加限定语；那一行的判定注明「按 v1.0.0 发版树」；§5.2 第 6 条补上当前状态 | final-outward-consistency.md |
 | §2.8 | 「四次分析」没有一处说明它是「有包的那四次」 | 案例索引补一句：三篇走查引用 7 次运行，四次是出包的那几次 | [README.md](../case-studies/README.md) |
 | §2.9 | 索引只写「四个包 + 十二份报告」 | 改为「four packages, twelve report files, sixteen files in all」 | 同上 |
 | §2.10 | 「on screen 8」指向不明 | 改为「in the workbench's report screen」 | [demo-app-walkthrough.md](../case-studies/demo-app-walkthrough.md) |

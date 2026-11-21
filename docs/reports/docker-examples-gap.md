@@ -19,7 +19,7 @@
 
 1. **事实成立**：镜像里确实没有 `examples/`——`Dockerfile` 只 COPY 了四样文件加 `src/`
    （[Dockerfile:32-37](../../Dockerfile#L32)）。今天在镜像里跑仓库自带案例**只能挂卷**，
-   唯一一条被验证跑通的命令写在 [m10-reader-package.md:164-166](m10-reader-package.md#L164)。
+   唯一一条被验证跑通的命令写在 m10-reader-package.md:164-166。
 2. **但 C6 的前提只对了一半**：本项目**没有发布预构建镜像**——`.github/workflows/` 下只有
    `ci.yml` 一个文件，其 docker 段只有 build 与 run 两步（[ci.yml:436-444](../../.github/workflows/ci.yml#L436)）；
    README 给的也是 `docker build`（[README.md:362](../../README.md#L362)）。所以今天"客户拉了镜像"
@@ -104,7 +104,7 @@ Try 'dexatlas analyze --help' for help.
 
 降级说明：本机 `dexatlas backends` 实测为 jadx `not installed`、apktool `not installed`、
 androguard 4.1.4 `available`，所以 classes 5→4、resource strings 1→0——与材料里的 A6 预告一致
-（[m10-reader-package.md:143-145](m10-reader-package.md#L143)）。镜像里三个后端都在
+（m10-reader-package.md:143-145）。镜像里三个后端都在
 （实走演练记录：jadx 1.5.2 / apktool 2.11.1 / androguard 4.1.4，[reader-dry-run.md:72](reader-dry-run.md#L72)），
 计数应为 5/8/23/21/1。
 
@@ -117,7 +117,7 @@ androguard 4.1.4 `available`，所以 classes 5→4、resource strings 1→0—�
 | `MSYS_NO_PATHCONV=1` + 绝对路径 | 原样 |
 
 这条对两个方案都关键：**绝对路径 + Git Bash 会把容器路径改写成 Windows 路径**（准备包已经踩过并写进了
-[m10-reader-package.md:169-171](m10-reader-package.md#L169)）；而**相对路径不受影响**。
+m10-reader-package.md:169-171）；而**相对路径不受影响**。
 镜像 `WORKDIR` 是 `/app`（[Dockerfile:24](../../Dockerfile#L24)），所以样本若在镜像内的 `/app/examples`，
 `analyze examples/demo-app/demo.apk` 这条**相对路径**命令在 Git Bash / PowerShell / CMD 上都干净。
 
@@ -161,8 +161,8 @@ docker:
 
 | 位置 | 现状 |
 |---|---|
-| [m10-reader-package.md:160-171](m10-reader-package.md#L160) | 已明确写"镜像里没有 `examples/`"，给出两卷挂载命令 + Git Bash 坑 |
-| [m10-acceptance-pack.md:250-251](m10-acceptance-pack.md#L250) | 只有构建时间口径，**没有**容器内分析命令 |
+| m10-reader-package.md:160-171 | 已明确写"镜像里没有 `examples/`"，给出两卷挂载命令 + Git Bash 坑 |
+| m10-acceptance-pack.md:250-251 | 只有构建时间口径，**没有**容器内分析命令 |
 | [docs/install.md:50-82](../../docs/install.md#L50) | Docker 段只有 build / backends / 起 API 三条命令，**没有**容器内分析命令 |
 | [docs/install.md:159-172](../../docs/install.md#L159) | 五个样本 + `uv run` 用法（宿主路线），不是容器路线 |
 | [reader-dry-run.md:72](reader-dry-run.md#L72) | 已记录："镜像里**没有 `examples/`**……材料 §3.2 路线 B 只给到 `backends` 检查，**没告诉读者怎么在容器里分析 APK**——读者得自己想出两个挂载才能跑出案例" |
@@ -186,13 +186,13 @@ docker:
 3. `docs/install.md` 的 Docker 段补一条命令。
 4. 复测构建时间（新口径），并把新数字写回所有引用旧口径的地方：
    [m8-install-rehearsal.md:15](m8-install-rehearsal.md#L15)、[reader-dry-run.md:72](reader-dry-run.md#L72)、
-   [reader-dry-run.md:117](reader-dry-run.md#L117)、[m10-reader-package.md:154-155](m10-reader-package.md#L154)、
-   [m10-acceptance-pack.md:250-251](m10-acceptance-pack.md#L250)、[m10-acceptance-pack.md:336](m10-acceptance-pack.md#L336)、
-   [m10-materials-alignment.md:129](m10-materials-alignment.md#L129)（G5）与 [m10-materials-alignment.md:268](m10-materials-alignment.md#L268)、
-   [m10-reader-walkthrough-4th.md:259-260](m10-reader-walkthrough-4th.md#L259)。
+   [reader-dry-run.md:117](reader-dry-run.md#L117)、m10-reader-package.md:154-155、
+   m10-acceptance-pack.md:250-251、m10-acceptance-pack.md:336、
+   m10-materials-alignment.md:129（G5）与 m10-materials-alignment.md:268、
+   m10-reader-walkthrough-4th.md:259-260。
    **（已做。新口径在 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)；写回时**只改口径陈述**——
    [m8-install-rehearsal.md](m8-install-rehearsal.md)、[reader-dry-run.md](reader-dry-run.md)、
-   [m10-reader-walkthrough-4th.md](m10-reader-walkthrough-4th.md) 这三份是**测量记录**，
+   m10-reader-walkthrough-4th.md 这三份是**测量记录**，
    记的是当时某台机器上发生过什么，把数换掉就是篡改记录，不改。）**
 
 **代价**
@@ -218,8 +218,8 @@ docker:
 **要改什么**：把容器内分析的命令写进安装文档，并让准备包与 install.md **逐字一致**（C6 判据 (b)）。
 
 - 现状下 install.md 的 Docker 段（[install.md:50-82](../../docs/install.md#L50)）**完全没有**容器内分析命令。
-- 需要补的就是 [m10-reader-package.md:164-166](m10-reader-package.md#L164) 那三行命令，加
-  [m10-reader-package.md:169-171](m10-reader-package.md#L169) 的 MSYS 说明，逐字搬进 install.md。
+- 需要补的就是 m10-reader-package.md:164-166 那三行命令，加
+  m10-reader-package.md:169-171 的 MSYS 说明，逐字搬进 install.md。
 
 **代价**：零构建改动、零复测、零镜像风险；半天内可完成。
 
@@ -249,7 +249,7 @@ docker:
 **结论**
 
 1. C6 的事实前提成立：当前镜像跑仓库自带案例必须挂两个卷，唯一一条被验证跑通的命令见
-   [m10-reader-package.md:164-166](m10-reader-package.md#L164)。
+   m10-reader-package.md:164-166。
 2. 但"客户拉了镜像也跑不了案例"的说法要修正：本项目不发布预构建镜像，"拉镜像"= clone 后本地 build，
    客户手上本来就有样本。缺的是**不用挂卷的命令**与**对"镜像里能跑案例"的验证**。
 3. 三个案例研究跑的三个样本（`demo-app` / `obfuscated-app` / `multidex-app`）都在 `examples/` 里，
@@ -265,7 +265,7 @@ docker:
 
 **若本轮不安排镜像重建**（复测构建时间需要一次冷缓存构建 ≈ 18–20 分钟机时），则退一步做方案 B 的最小版：
 （**后续没有走这条路**：新口径改由 CI 实测，见 [c6-build-time-from-ci.md](c6-build-time-from-ci.md)）
-把 [m10-reader-package.md:164-171](m10-reader-package.md#L164) 那段逐字抄进 install.md 的 Docker 段，
+把 m10-reader-package.md:164-171 那段逐字抄进 install.md 的 Docker 段，
 并把两处命令收敛到同一个脚本引用上。C6 因此从"读者卡住"降级为"读者要多绕一步"，方案 A 留到能复测构建时间的那一轮再做。
 
 **为什么 A 优于 B**：本项目的纪律是"证据先于断言"。镜像能跑案例这条承诺，应该由 CI 里的一条命令来守，

@@ -76,8 +76,8 @@
 
 **依据**
 
-这不是新发现。`docs/reports/english-reader-review-2.md:855` 与
-`docs/reports/portfolio-readiness-2026-11-18.md:429-431` 已经把这两行列为「必须改」，
+这不是新发现。此前两轮评审（英文读者终检第二轮与作品集准备度评估，两份记录已随
+2026-11-21 的去平台化清理移除）已经把这两行列为「必须改」，
 写明「改成 1620，与 phase1-execution-report.md:76 同源」；此后测量又从 1620 走到 1632，
 但这两行**仍停在 1612**。两次评审都提了，两次都没改——本次复核按重复发现记为严重。
 
@@ -144,7 +144,7 @@
 
 - 全仓 `grep -rn "social.preview|social_preview" --include="*.py" --include="*.yml" --include="*.yaml" --include="*.toml" --include="*.cfg"`
   **零命中**——CI 的六个 job 里没有任何一个看这张图。
-- `scripts/check-doc-citations.py` 的 `DOCS` 列表（`:87-96`）只有
+- `scripts/check-doc-citations.py` 的文档收集（当时的 `DOCS` 列表）只有
   `docs/analysis-provenance.md`、`docs/architecture/public-contracts.md`、
   `docs/reports/phase1-execution-report.md`、`docs/benchmarks/large-apk.md`、
   `docs/releases/*.md`、`docs/reports/*-github-release-body.md`——
@@ -370,7 +370,7 @@
 
 `bounded` 是这个项目里防止读者把 agent 输出当结论的唯一那个词。中文版没有它，还把
 单数写成了复数——中文读者读到的承诺比英文读者更强。
-`docs/reports/english-reader-review.md:184`（第 12 条：吹过头）与
+此前的英文读者终检（记录已随 2026-11-21 的去平台化清理移除）与
 `docs/reports/github-repo-metadata-proposal.md:235`（§8 第 13 项：改中文那行）
 都已经指出过，仍未改。
 
@@ -596,7 +596,7 @@ Tests 徽章指向同一份报告的 §2.1（分层策略）；在卡片正上�
 
 | # | 位置 | 事实 | 说明 |
 |---|---|---|---|
-| A | `docs/outreach/publish-review.md:22` | 「一方代码覆盖率 \| 93.3%（**7,117 / 7,631** 行）」 | 覆盖行数是上一轮的（现为 7135/7650）；该文件是「对外素材核对基准」表 |
+| A | 当时的对外素材核对记录（已随 2026-11-21 去平台化清理移除） | 「一方代码覆盖率 \| 93.3%（**7,117 / 7,631** 行）」 | 覆盖行数是上一轮的；该文件是「对外素材核对基准」表 |
 | B | `docs/releases/v1.0.0.md:90-91`、`docs/how-to-verify.md:168` | 写「1632 passed + 0 xfailed + 0 skipped」 | 与记录块（`phase1-execution-report.md` 的 `<!--report-figures:...-->`，suite 段 failed=1 / passed=1631）矛盾，见 1.2 |
 | C | `docs/roadmap/ROADMAP.md:3` | tagline 仍是「Powered by AI Agents.」 | 见 1.10 |
 | D | `docs/reports/social-preview-howto.md:66` | 绘图脚本不入库 | 见 1.3；建议随 1.3 的方案一并入库 |

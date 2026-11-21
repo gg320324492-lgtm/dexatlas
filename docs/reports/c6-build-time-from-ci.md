@@ -93,12 +93,12 @@ run `44324097977` 的日志，`CACHED` 的计数都是 **0**。
 | [v1.1.0-candidates.md](v1.1.0-candidates.md#L697)（C6 一行） | 「按演练实测 Docker 构建无层缓存 1099 秒」 | 改成「已完成」+ 新口径的出处（本文） |
 | [docker-examples-gap.md](docker-examples-gap.md)（§0 结论 3 与 §2 方案 A 的代价表） | 「冷缓存口径约 18–20 分钟机时」「加 COPY 后的构建时间：未构建镜像」 | 标明那是**当时的待办**，并指向本文 |
 | [docker-image-samples.md](docker-image-samples.md)（§6 第 6 条「C6 的另一条判据没有做」） | 「本轮没有重建镜像，构建时间口径还是旧的那份」 | 改成「已做」，数字取自本文 §1 |
-| [m10-reader-package.md](m10-reader-package.md)（§3.2 路线 B） | 「约 2–20 分钟（2 分 16 秒 / 1099 秒）」 | 加一句标明**测的是读者本机**，并给出 CI 的那一段 |
-| [m10-acceptance-pack.md](m10-acceptance-pack.md)（§3.3） | 同上 | 同上 |
-| [m10-materials-alignment.md](m10-materials-alignment.md)（G5 行） | 「两个口径 2 分 16 秒 / 1099 秒」 | 补上第三段（CI 的 46 秒）与本文的出处 |
+| m10-reader-package.md（§3.2 路线 B） | 「约 2–20 分钟（2 分 16 秒 / 1099 秒）」 | 加一句标明**测的是读者本机**，并给出 CI 的那一段 |
+| m10-acceptance-pack.md（§3.3） | 同上 | 同上 |
+| m10-materials-alignment.md（G5 行） | 「两个口径 2 分 16 秒 / 1099 秒」 | 补上第三段（CI 的 46 秒）与本文的出处 |
 
 **没有改的**（它们是**测量记录**，不是口径）：[m8-install-rehearsal.md](m8-install-rehearsal.md)、
-[reader-dry-run.md](reader-dry-run.md)、[m10-reader-walkthrough-4th.md](m10-reader-walkthrough-4th.md)。
+[reader-dry-run.md](reader-dry-run.md)、m10-reader-walkthrough-4th.md。
 这三份记的是**当时某台机器上发生过什么**，把里面的数换成 CI 的数就是篡改记录，
 而不是「把口径写回去」。
 
@@ -125,7 +125,7 @@ run `44324097977` 的日志，`CACHED` 的计数都是 **0**。
    每个引用旧口径的地方现在指向哪里。
 4. **引用重锚**——本轮动了几个被引用的文件，引用检查器报的 6 处漂移已改；
    三份**活着的**文档（[docs/glossary.md](../glossary.md)、
-   [m10-reader-kit.md](m10-reader-kit.md)、
+   m10-reader-kit.md、
    [figures-coverage-design.md](figures-coverage-design.md)）里指向它们的 18 处引用也改了。
    `scripts/check-doc-citations.py`：**drifted: 0**。
 

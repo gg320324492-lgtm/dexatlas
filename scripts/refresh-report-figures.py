@@ -284,6 +284,16 @@ STATUS_CHECK = "test_status_page"
 #: keyword, because their names are shared with half the suite.
 PAGE_CHECKS_FILE = "tests/test_how_to_verify.py"
 
+#: The social-preview gate reads the report's measurement record and redraws
+#: the cards from it, so a record that has gone stale makes it fail -- and
+#: the only thing that un-stales the record is a complete measurement, which
+#: this run is. Left inside the code run it deadlocked the refresh: the gate
+#: failed on the stale record, the failing test stopped the run, the stop
+#: kept the stale record, and the gate failed again. It is measured with the
+#: report's own self-checks instead: after the record has been written, on
+#: the tree that has it.
+SOCIAL_CHECK_FILE = "tests/test_social_preview.py"
+
 #: How many times the refresh may re-measure the self-checks before it gives up.
 #:
 #: The first candidate carries the code tests' counts alone, so a self-check
@@ -381,6 +391,7 @@ class Refresh:
     status_text: str | None = None
     status_checks: Outcome = Outcome(counts={})
     page_checks: Outcome = Outcome(counts={})
+    social_checks: Outcome = Outcome(counts={})
 
 
 class SummaryUnreadable(Exception):
@@ -493,7 +504,7 @@ def collected_page_checks() -> int:
     its tests, so its summary line carries none of them, and the accounting
     that compares the run against the tree the collector found would read
     their absence as tests that went unmeasured. The collector is asked for
-    the same file the ``--ignore`` names, so the two counts cannot drift: a
+    the same files the ``--ignore`` names, so the two counts cannot drift: a
     file that has stopped collecting tests reports zero here and zero in the
     accounting.
     """
@@ -506,6 +517,7 @@ def collected_page_checks() -> int:
         "-p",
         "no:cacheprovider",
         PAGE_CHECKS_FILE,
+        SOCIAL_CHECK_FILE,
     )
     match = COLLECTED.search(result.stdout)
     if match:
@@ -829,8 +841,12 @@ def measure_code_tests() -> Outcome:
             # against a candidate page (``measure_page_checks``): they read
             # the figures the measurement is about to write, so a page that
             # is out of date is the refresh's problem, not the code's.
+            # The social-preview gate joins them for the same reason -- see
+            # ``SOCIAL_CHECK_FILE``.
             "--ignore",
             PAGE_CHECKS_FILE,
+            "--ignore",
+            SOCIAL_CHECK_FILE,
             "-k",
             f"not {REPORT_CHECK} and not {STATUS_CHECK}",
         ],
@@ -875,6 +891,26 @@ def measure_report_checks(candidate: str, report_path: Path) -> Outcome:
             ["--cov=dexatlas", "-k", REPORT_CHECK],
             env=env,
             what="the report's self-checks",
+        )
+
+
+def measure_social_checks(report_path: Path) -> Outcome:
+    """Measure the social-preview gate against the report on disk.
+
+    The gate reads the report's measurement record and redraws the cards from
+    it, so it is measured *after* the record has been written -- the same
+    phase as the report's own self-checks, and for the same reason: a gate
+    that reads the record cannot run against a record that does not exist
+    yet. Its coverage data file is private to this run, like the other
+    self-check rounds'.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        env = measurement_env()
+        env["COVERAGE_FILE"] = str(Path(directory) / ".coverage")
+        return measure_tests(
+            ["--cov=dexatlas", SOCIAL_CHECK_FILE],
+            env=env,
+            what="the social-preview gate",
         )
 
 
@@ -1888,6 +1924,7 @@ def converge(
     status_text: str | None = None,
     status_path: Path | None = None,
     page_texts: dict[str, str] | None = None,
+    social_checks_requested: bool = False,
 ) -> Refresh:
     """Bring the report and its self-checks into agreement, within one run.
 
@@ -1930,6 +1967,7 @@ def converge(
     checks = Outcome(counts={})
     status_checks = Outcome(counts={})
     page_checks = Outcome(counts={})
+    social_checks = Outcome(counts={})
     for round_number in range(1, MAX_ROUNDS + 1):
         checks = measure_report_checks(candidate, report_path)
         if status_candidate is not None and status_path is not None:
@@ -1938,10 +1976,18 @@ def converge(
             )
         if page_candidates:
             page_checks = measure_page_checks(candidate, page_candidates)
+        # The social gate is measured against the report as it would be
+        # written, so the candidate goes to disk first: the gate reads the
+        # record from the file, not from a string.
+        if social_checks_requested:
+            social_checks = measure_social_checks(report_path)
         new_coverage = read_coverage()
         new_suite = add_counts(
-            add_counts(add_counts(code.counts, checks.counts), status_checks.counts),
-            page_checks.counts,
+            add_counts(
+                add_counts(add_counts(code.counts, checks.counts), status_checks.counts),
+                page_checks.counts,
+            ),
+            social_checks.counts,
         )
         new_skipped = union_ids(code.skipped, checks.skipped, status_checks.skipped)
         new_xfailed = union_ids(code.xfailed, checks.xfailed, status_checks.xfailed)
@@ -1960,6 +2006,7 @@ def converge(
                 status_text=status_candidate,
                 status_checks=status_checks,
                 page_checks=page_checks,
+                social_checks=social_checks,
             )
         suite, coverage = new_suite, new_coverage
         skipped_tests, xfailed_tests = new_skipped, new_xfailed
@@ -1989,6 +2036,7 @@ def converge(
         status_text=status_candidate,
         status_checks=status_checks,
         page_checks=page_checks,
+        social_checks=social_checks,
     )
 
 
@@ -2078,6 +2126,17 @@ def display_path(path: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # A change line quotes the document it came from, and the documents carry
+    # characters a GBK console cannot encode (the check marks in a quoted
+    # table row, for one). A console that cannot encode them should not turn
+    # a finished measurement into a crash after the work is done.
+    import contextlib
+    import sys as _sys
+
+    for stream in (_sys.stdout, _sys.stderr):
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+
     parser = argparse.ArgumentParser(
         description="Refresh the generated figures in the Phase 1 execution report."
     )
@@ -2214,6 +2273,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  {tag}: {entry['tests'] if entry else 'not measured'} tests")
 
     print("Running the suite with coverage (this takes a couple of minutes)...")
+    social_checks_requested = report_path == REPORT_PATH
     if report_path == REPORT_PATH:
         # Only a run that writes this checkout's report needs the slot: two of
         # them would fight over it, the second to finish writing the numbers
@@ -2316,6 +2376,7 @@ def main(argv: list[str] | None = None) -> int:
                 status_text,
                 status_path,
                 page_texts,
+                social_checks_requested=report_path == REPORT_PATH,
             )
         except SummaryUnreadable as failure:
             return abort(failure, ledger)
@@ -2325,6 +2386,7 @@ def main(argv: list[str] | None = None) -> int:
         status_updated = refresh.status_text
         status_checks = refresh.status_checks
         page_checks = refresh.page_checks
+        social_checks = refresh.social_checks
         if refresh.converged:
             print(
                 f"  the self-checks agree with the refreshed report "
@@ -2339,6 +2401,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  the status page's self-checks: {status_checks.describe()}")
         if page_texts:
             print(f"  the how-to-verify pages' self-checks: {page_checks.describe()}")
+        if social_checks_requested:
+            print(f"  the social-preview gate: {social_checks.describe()}")
 
         # Every test in the tree has to have an outcome for the run to describe
         # the tree. A test that neither passed, failed, skipped nor was

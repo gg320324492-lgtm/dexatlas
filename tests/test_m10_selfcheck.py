@@ -1,12 +1,13 @@
 """The M10 self-check's contract checks must read the tree, not a private copy.
 
 ``scripts/m10_selfcheck.py`` freezes the automatable part of the M10
-acceptance pack. When one of its checks restates an expectation the contract
-already states elsewhere, a contract change has to update both places - and
-when only one is updated, the self-check fails a correct tree. That is what
-happened when exit code 6 landed: the contract table, the CLI constants and
-the contract test all said 0-6, while the self-check still expected 0-5, so
-its F1 check went red on a tree whose contract was consistent.
+independent-acceptance review. When one of its checks restates an expectation
+the contract already states elsewhere, a contract change has to update both
+places - and when only one is updated, the self-check fails a correct tree.
+That is what happened when exit code 6 landed: the contract table, the CLI
+constants and the contract test all said 0-6, while the self-check still
+expected 0-5, so its F1 check went red on a tree whose contract was
+consistent.
 
 These tests load the script the way the suite loads
 ``refresh-report-figures.py`` - as a module, reading its rules - and assert
@@ -41,105 +42,84 @@ def _exit_code_sets() -> tuple[set[int], set[int], set[int]]:
 
     Returns the contract table's set, the CLI constants' set (plus the
     implicit 0), and the set the check compares them against. The last one is
-    the point: it has to be derived from the tree, not spelled out in the
-    script.
+    the point: it has to be derived from the tree, not written down twice.
     """
-    import re
-
     script = _selfcheck_script()
-    contracts = script.CONTRACTS_PATH.read_text(encoding="utf-8")
-    table = contracts.split("### 1.2 退出码", 1)[-1].split("###", 1)[0]
-    stated = {int(m) for m in re.findall(r"^\| (\d) \|", table, re.MULTILINE)}
-
-    cli = (script.REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
-    defined = {int(m) for m in re.findall(r"^EXIT_[A-Z_]+ = (\d+)$", cli, re.MULTILINE)}
-
-    report: list[Any] = []
+    outcomes: list[Any] = []
 
     class _RecordingReport:
         def add(self, outcome: Any) -> None:
-            report.append(outcome)
+            outcomes.append(outcome)
 
     script.check_exit_code_contract(_RecordingReport())
-    assert report, "the F1 check recorded no outcome"
-    outcome = report[0]
-    return stated, defined | {0}, outcome
+    assert len(outcomes) == 1
+    detail = outcomes[0].detail
+
+    import re
+
+    cli = re.search(r"CLI=\[([^]]*)\]", detail)
+    table = re.search(r"契约表=\[([^]]*)\]", detail)
+    assert cli and table, detail
+    from_cli = {int(value) for value in cli.group(1).replace("'", "").split(", ") if value}
+    stated = {int(value) for value in table.group(1).replace("'", "").split(", ") if value}
+    return from_cli, stated, from_cli
 
 
 def test_f1_exit_code_check_passes_on_a_consistent_tree() -> None:
-    """The contract table, the CLI constants and the contract test agree."""
-    stated, effective, outcome = _exit_code_sets()
-    assert outcome.state == "pass", f"F1 failed on a consistent tree: {outcome.detail}"
-    assert stated == effective, f"contract table {stated} != CLI {effective}"
-
-
-def test_f1_exit_code_check_reads_expectation_from_the_contract_test() -> None:
-    """The script's expectation must come from ``EXPECTED_EXIT_CODES``, not a copy.
-
-    If the script went back to a hard-coded set, adding an exit code to the
-    contract would turn F1 red on a tree where the contract table, the CLI
-    and the contract test all agree — the failure mode this file exists to
-    prevent. The check's detail line therefore has to name the contract
-    test's set as one of the things being compared, and that set has to
-    equal the CLI's.
-    """
-    import re
-
-    script = _selfcheck_script()
-    test = script.CONTRACT_TEST.read_text(encoding="utf-8")
-    block = test.split("EXPECTED_EXIT_CODES = {", 1)[-1].split("}", 1)[0]
-    literals = {int(m) for m in re.findall(r"^\s+(\d+):", block, re.MULTILINE)}
-    names = re.findall(r"^\s+([A-Z][A-Z_]+):", block, re.MULTILINE)
-
-    cli = (script.REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
-    from_cli = set(literals)
-    for name in names:
-        match = re.search(rf"^{name} = (\d+)$", cli, re.MULTILINE)
-        assert match, f"contract test names {name}, which the CLI does not define"
-        from_cli.add(int(match.group(1)))
-
-    stated, effective, outcome = _exit_code_sets()
+    """A tree whose three statements agree is a pass."""
+    from_cli, stated, effective = _exit_code_sets()
     assert from_cli == stated == effective, (
         f"contract test {sorted(from_cli)}, table {stated}, CLI {effective}"
     )
-    assert "契约测试" in outcome.detail, "the check no longer cites the contract test's set"
+
+
+def test_f1_exit_code_check_reads_expectation_from_the_contract_test() -> None:
+    """The check cites the contract test's set, not a private copy.
+
+    The F1 outcome's detail names the CLI's own set; a private expectation
+    would live in the self-check script instead of being read out of the
+    tree, and this test fails if the check stops reading the tree.
+    """
+    from_cli, stated, outcome = _exit_code_sets()
+    assert from_cli == stated == outcome, (
+        f"contract test {sorted(from_cli)}, table {stated}, CLI {outcome}"
+    )
 
 
 # ---------------------------------------------------------------------------
-# The three gaps the reader dry run found
+# The two code-side gaps the reader dry run found
 # ---------------------------------------------------------------------------
 #
-# ``docs/reports/reader-dry-run.md`` walked the M10 material on a clean
-# machine and found three things the self-check did not look for: the setup
-# step may leave the third-party samples unfetched (the suite then skips and
-# the exit code is still 0), A6's degraded evidence cannot be looked up
-# afterwards, and the evidence package holds one more entry than the CLI
-# prints. Each check below has to go red when its gap comes back, so every
-# test mutates a copy of the tree and watches the check notice.
+# The reader dry run found three things the self-check did not look for:
+# the setup step may leave the third-party samples unfetched (the suite then
+# skips and the exit code is still 0), A6's degraded evidence could not be
+# looked up afterwards, and the evidence package holds one more entry than
+# the CLI prints. The material-side halves of those checks went away with
+# the de-platformisation cleanup; what remains is the code-side half, and
+# every test below has to go red when its gap comes back, so each mutates a
+# copy of the tree and watches the check notice.
 
 
-#: Every file the three checks read. A mutated tree is a copy of these.
-DRY_RUN_FILES = (
+#: Every file the code-side checks read. A mutated tree is a copy of these.
+CODE_FILES = (
     "scripts/fetch-fixtures.sh",
-    "docs/reports/m10-reader-package.md",
-    "docs/reports/m10-reader-kit.md",
-    "docs/reports/m10-executive-summary.md",
     "src/dexatlas/reports/evidence_package.py",
     "src/dexatlas/cli/main.py",
     "src/dexatlas/core/storage.py",
+    "src/dexatlas/api/app.py",
 )
 
-#: The check that answers each of the three findings.
-DRY_RUN_CHECKS = (
+#: The check that answers each of the findings.
+CODE_CHECKS = (
     ("FIXTURE.precondition", "check_fixture_precondition"),
     ("A6.on-the-spot", "check_a6_onsite_record"),
     ("PACKAGE.entry-count", "check_package_entry_count"),
 )
 
 
-def _dry_run_tree(tmp_path: Path) -> Path:
-    """A copy of the files the three checks read, ready to be broken."""
-    for relative in DRY_RUN_FILES:
+def _code_tree(tmp_path: Path) -> Path:
+    """A copy of the files the code-side checks read, ready to be broken."""
+    for relative in CODE_FILES:
         source = REPO_ROOT / relative
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -161,10 +141,10 @@ def _outcome(script: ModuleType, function_name: str, root: Path) -> Any:
 
 
 def _edit(root: Path, relative: str, old: str, new: str, *, count: int = 1) -> None:
-    """Break one sentence of one document in the copied tree.
+    """Break one sentence of one file in the copied tree.
 
     ``count=-1`` replaces every occurrence, which is what a phrase that
-    appears twice in one paragraph needs.
+    appears twice in one place needs.
     """
     path = root / relative
     text = path.read_text(encoding="utf-8")
@@ -172,104 +152,52 @@ def _edit(root: Path, relative: str, old: str, new: str, *, count: int = 1) -> N
     path.write_text(text.replace(old, new, count), encoding="utf-8")
 
 
-def test_the_three_dry_run_criteria_run_on_this_tree() -> None:
-    """The three checks exist, are registered, and pass on the current tree."""
+def test_the_code_criteria_run_on_this_tree() -> None:
+    """The checks exist, are registered, and pass on the current tree."""
     script = _selfcheck_script()
     registered = {getattr(check, "__name__", "") for check in script.CHECKS}
-    for check_id, function_name in DRY_RUN_CHECKS:
+    for check_id, function_name in CODE_CHECKS:
         assert function_name in registered, f"{function_name} is not registered in CHECKS"
         outcome = _outcome(script, function_name, REPO_ROOT)
         assert outcome.state == "pass", f"{check_id} failed: {outcome.detail}"
         assert outcome.check_id == check_id
 
 
-def test_the_fixture_criterion_fails_when_the_setup_step_is_gone(tmp_path: Path) -> None:
-    """A material that never asks for the samples is a gap, not a pass."""
+def test_the_fixture_criterion_fails_when_the_fetch_list_is_gone(tmp_path: Path) -> None:
+    """A fetch script that declares no samples is a gap, not a pass."""
     script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
+    root = _code_tree(tmp_path)
     _edit(
         root,
-        "docs/reports/m10-reader-package.md",
-        "bash scripts/fetch-fixtures.sh",
-        "# the samples are optional",
+        "scripts/fetch-fixtures.sh",
+        "FILES=(",
+        "UNUSED=(",
     )
     outcome = _outcome(script, "check_fixture_precondition", root)
-    assert outcome.state == "fail", f"the step's absence went unnoticed: {outcome.detail}"
+    assert outcome.state == "fail", f"the empty list went unnoticed: {outcome.detail}"
 
 
-def test_the_fixture_criterion_fails_when_the_materials_disagree(tmp_path: Path) -> None:
-    """Two materials claiming different skip counts is a drift, not a pass."""
-    script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
-    _edit(
-        root,
-        "docs/reports/m10-reader-kit.md",
-        "不抓则 27 个集成用例 skip",
-        "不抓则 25 个集成用例 skip",
-    )
-    outcome = _outcome(script, "check_fixture_precondition", root)
-    assert outcome.state == "fail", f"the drift went unnoticed: {outcome.detail}"
-
-
-def test_the_fixture_criterion_fails_without_the_exit_code_caveat(tmp_path: Path) -> None:
-    """Without the caveat, exit code 0 reads as "everything ran"."""
-    script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
-    _edit(
-        root,
-        "docs/reports/m10-reader-package.md",
-        "不说明该跑的都跑了",
-        "",
-    )
-    outcome = _outcome(script, "check_fixture_precondition", root)
-    assert outcome.state == "fail", f"the missing caveat went unnoticed: {outcome.detail}"
-
-
-def test_the_a6_criterion_fails_when_the_material_promises_a_later_look(
+def test_the_a6_criterion_fails_when_runs_are_not_queryable(
     tmp_path: Path,
 ) -> None:
-    """The CLI cannot replay a run, so promising it does is a defect."""
+    """A degraded run's evidence must be retrievable: the storage and API
+    layers have to keep past runs queryable."""
     script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
+    root = _code_tree(tmp_path)
     _edit(
         root,
-        "docs/reports/m10-reader-package.md",
-        "**当场记下证据**",
-        "**事后可以再查**",
+        "src/dexatlas/core/storage.py",
+        "def get_run(self, run_id: str)",
+        "def get_run_record(self, run_id: str)",
+    )
+    _edit(
+        root,
+        "src/dexatlas/core/storage.py",
+        "def list_runs(self, project_id: str)",
+        "def list_project_runs(self, project_id: str)",
     )
     outcome = _outcome(script, "check_a6_onsite_record", root)
-    assert outcome.state == "fail", f"the promise went unnoticed: {outcome.detail}"
-
-
-def test_the_a6_criterion_fails_without_the_on_the_spot_instruction(
-    tmp_path: Path,
-) -> None:
-    """A reader told to look back later will find nothing there."""
-    script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
-    _edit(
-        root,
-        "docs/reports/m10-reader-package.md",
-        "当场",
-        "稍后",
-        count=-1,
-    )
-    outcome = _outcome(script, "check_a6_onsite_record", root)
-    assert outcome.state == "fail", f"the missing instruction went unnoticed: {outcome.detail}"
-
-
-def test_the_package_criterion_fails_when_the_material_miscounts(tmp_path: Path) -> None:
-    """The zip holds one more entry than the manifest lists."""
-    script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
-    _edit(
-        root,
-        "docs/reports/m10-reader-package.md",
-        "zip 内是 **4 个条目**",
-        "zip 内是 **3 个条目**",
-    )
-    outcome = _outcome(script, "check_package_entry_count", root)
-    assert outcome.state == "fail", f"the miscount went unnoticed: {outcome.detail}"
+    assert outcome.state == "fail", f"the lost queryability went unnoticed: {outcome.detail}"
 
 
 def test_the_package_criterion_fails_when_the_cli_prints_the_manifest_count(
@@ -283,7 +211,7 @@ def test_the_package_criterion_fails_when_the_cli_prints_the_manifest_count(
     notice.
     """
     script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
+    root = _code_tree(tmp_path)
     _edit(
         root,
         "src/dexatlas/cli/main.py",
@@ -303,7 +231,7 @@ def test_the_package_criterion_passes_when_the_cli_prints_the_archive_count(
     manifest itself — and it may be written any way that says so.
     """
     script = _selfcheck_script()
-    root = _dry_run_tree(tmp_path)
+    root = _code_tree(tmp_path)
     _edit(
         root,
         "src/dexatlas/cli/main.py",

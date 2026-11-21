@@ -13,7 +13,7 @@
 
 ## 摘要
 
-- 复核范围：本地 6 道门禁（见 [v1.0.0-release-checklist.md](v1.0.0-release-checklist.md) §8.1）与
+- 复核范围：本地 6 道门禁（见 v1.0.0-release-checklist.md §8.1）与
   CI 的 10 个 job（[ci.yml](../../.github/workflows/ci.yml)）。
 - **查出 37 处平台差异**：**35 处**会让两个平台给出不同的答案（本地绿 / CI 红，或反过来），
   另有 **2 处方向相反**（本地比 CI 更严，见 §3）。

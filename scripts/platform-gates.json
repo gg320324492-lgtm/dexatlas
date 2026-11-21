@@ -8,24 +8,31 @@
     "coverage_gaps -- the scripts that run in only one of the two places. 'ci_only' runs in a workflow and nowhere in the local gate list; 'local_only' runs in neither a workflow nor the test suite, so only a person runs it.",
     "local_gates -- the local gate list, each entry naming the CI job that runs the same gate. A gate in this list with no CI job would be a gate nobody else runs."
   ],
-
   "ci_jobs": {
     "lint": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-version-claims.py"],
+      "gate_scripts": [
+        "scripts/check-version-claims.py"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "ruff check / ruff format --check / mypy / vulture / check-version-claims.py",
       "note": "CI installs --extra dev --extra mcp and then runs 'uv run' *without* --no-sync, so uv re-resolves and synges the environment at every step; the local gate list installs --all-extras and runs with --no-sync. The installed set is the same either way -- uv's 'uv run' does not remove the extras that were synced (measured on uv 0.11.21) -- but the command is not the same, and a re-lock inside a CI checkout is a difference the local run never sees."
     },
     "test": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/fetch-fixtures.sh", "scripts/install-backends.sh"],
+      "gate_scripts": [
+        "scripts/fetch-fixtures.sh",
+        "scripts/install-backends.sh"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "uv run --no-sync pytest -q"
     },
     "test-partial-backends": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/fetch-fixtures.sh", "scripts/install-backends.sh"],
+      "gate_scripts": [
+        "scripts/fetch-fixtures.sh",
+        "scripts/install-backends.sh"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "uv run --no-sync pytest -q",
       "note": "The same suite with DEXATLAS_JADX_PATH emptied: the JADX-dependent tests are the ones that stop running, so this job's pass count is lower than the full job's for a reason that is not a failure."
@@ -61,27 +68,36 @@
     },
     "contracts-without-jadx": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-contract-records.py", "scripts/verify-public-contracts.py"],
+      "gate_scripts": [
+        "scripts/check-contract-records.py",
+        "scripts/verify-public-contracts.py"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "uv run --no-sync python scripts/check-contract-records.py --expect without-jadx",
       "note": "This job used to be a defect and the inventory said so: it runs scripts/check-contract-records.py, which runs the live contract check itself, and that check keeps its workspace in tempfile.gettempdir() (scripts/verify-public-contracts.py), so the job wrote into the runner's system temporary directory while its sibling job (contracts) wrote into the workspace. The redirect was added on 2026-11-19 -- the same 'Keep generated files in .scratch' step the contracts job has, before the install step -- and the claim is 'yes' now. A 'yes' claim is the one that makes the property enforced rather than documented: should the step be removed, the check says the tree and the inventory disagree."
     },
     "m10-selfcheck": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-m10-snapshot.py", "scripts/m10_selfcheck.py"],
+      "gate_scripts": [
+        "scripts/m10_selfcheck.py"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "uv run --no-sync python scripts/m10_selfcheck.py"
     },
     "gate-coverage": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-gate-coverage.py"],
+      "gate_scripts": [
+        "scripts/check-gate-coverage.py"
+      ],
       "temp_redirect": "exempt",
       "reason": "the script reads the repository's scripts and workflows and writes nothing, so it has no temporary files to move",
       "local_counterpart": "uv run --no-sync python scripts/check-gate-coverage.py"
     },
     "social-preview": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/make-social-preview.py"],
+      "gate_scripts": [
+        "scripts/make-social-preview.py"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "uv run --no-sync python scripts/make-social-preview.py",
       "note": "CI runs --check, which compares the numbers; locally the script writes the card. The card's bytes are not compared -- the two platforms have different fonts and the images differ by design."
@@ -99,68 +115,83 @@
     },
     "release-numbers": {
       "runs_on": "ubuntu-latest",
-      "gate_scripts": ["scripts/check-release-numbers.py", "scripts/check-unguarded-numbers.py"],
+      "gate_scripts": [
+        "scripts/check-release-numbers.py",
+        "scripts/check-unguarded-numbers.py"
+      ],
       "temp_redirect": "yes",
       "local_counterpart": "the hand-written numbers: uv run --no-sync python scripts/check-unguarded-numbers.py; the outward release numbers are checked only in CI"
     }
   },
-
   "platform_tests": {
     "tests/test_backend_discovery.py::test_the_launcher_choice_is_a_rule_about_the_platform": {
       "kind": "parameterised",
-      "platforms": ["posix", "windows"],
+      "platforms": [
+        "posix",
+        "windows"
+      ],
       "reason": "the launcher rule is about the platform it names, not the one it runs on: the rule is asserted for both names on both platforms",
       "verdict": "legitimate",
       "note": "This is the shape that closes a gap instead of describing one."
     },
     "tests/test_backend_discovery.py::test_jadx_prefers_the_launcher_this_platform_executes": {
       "kind": "branching",
-      "platforms": ["posix", "windows"],
+      "platforms": [
+        "posix",
+        "windows"
+      ],
       "reason": "the launcher this platform executes is the one it prefers; the other platform's rule is asserted by the parameterised test above",
       "verdict": "legitimate",
       "note": "It runs on both platforms but asserts something different on each, so the two platforms do not verify each other's branch. The parameterised test is what covers the other side."
     },
     "tests/test_backend_timeout.py::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work": {
       "kind": "skipped-on",
-      "platforms": ["posix"],
+      "platforms": [
+        "posix"
+      ],
       "reason": "the launcher tree is exercised natively above: a POSIX equivalent of the batch file has to be built as a shell script, which only exists on a POSIX platform",
       "verdict": "legitimate",
       "note": "One of the two reasons the two platforms report different pass counts. It runs on CI and not on the developer's Windows machine."
     },
     "tests/test_backend_timeout.py::test_a_windows_launcher_is_stopped_with_its_work": {
       "kind": "skipped-on",
-      "platforms": ["windows"],
+      "platforms": [
+        "windows"
+      ],
       "reason": "a batch file is a Windows launcher: the shape the timeout has to handle (a cmd.exe whose child is the work) only exists there",
       "verdict": "legitimate",
       "note": "The other half of the pair. It runs on the developer's machine and not on CI."
     }
   },
-
   "platform_sensitive_code": {
     "scripts/refresh-report-figures.py::try_measurement_slot": {
-      "constructs": ["os.name"],
+      "constructs": [
+        "os.name"
+      ],
       "reason": "the measurement lock is msvcrt on Windows and fcntl elsewhere; both are non-blocking, so a busy slot is reported as busy rather than waited for",
       "verdict": "legitimate"
     },
     "scripts/render-demo.py::_posix": {
-      "constructs": ["sys.platform"],
+      "constructs": [
+        "sys.platform"
+      ],
       "reason": "the MSYS bash that Git for Windows ships opens /g/x, not G:\\x, so the path is rewritten for that shell only",
       "verdict": "legitimate",
       "note": "Not a gate -- it captures the demo. It is listed because it is the one script under scripts/ that is Windows-shaped on purpose."
     },
     "scripts/verify-public-contracts.py::<module>": {
-      "constructs": ["tempfile.gettempdir"],
+      "constructs": [
+        "tempfile.gettempdir"
+      ],
       "reason": "the live check's workspace lives in the platform's temporary directory, which is why the CI jobs that run it have to redirect TMPDIR",
       "verdict": "legitimate",
       "note": "This is the line the contracts-without-jadx job's redirect bears on: it runs the same live check by proxy, and its redirect was missing until 2026-11-19 — it is the one the platform-gate inventory found."
     }
   },
-
   "coverage_gaps": {
     "ci_only": [
       "scripts/check-contract-records.py",
       "scripts/check-gate-coverage.py",
-      "scripts/check-m10-snapshot.py",
       "scripts/check-release-numbers.py",
       "scripts/fetch-fixtures.sh",
       "scripts/install-backends.sh",
@@ -181,62 +212,83 @@
       "not_platform_but_the_same_table": "The lint job installs a different set of extras than the local gate list does. That is an environment difference, not a platform one, and it is the same kind of thing: a gate that runs in two places that are not quite the same."
     }
   },
-
   "local_gates": [
     {
       "name": "the test suite",
       "command": "uv run --no-sync pytest -q",
       "script": null,
-      "ci_jobs": ["test", "test-partial-backends", "m3-comparison"]
+      "ci_jobs": [
+        "test",
+        "test-partial-backends",
+        "m3-comparison"
+      ]
     },
     {
       "name": "lint, format, types, dead code",
       "command": "uv run --no-sync ruff check . && uv run --no-sync ruff format --check . && uv run --no-sync mypy && uv run --no-sync vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80",
       "script": null,
-      "ci_jobs": ["lint"]
+      "ci_jobs": [
+        "lint"
+      ]
     },
     {
       "name": "the citation checker",
       "command": "uv run --no-sync python scripts/check-doc-citations.py",
       "script": "scripts/check-doc-citations.py",
-      "ci_jobs": ["test", "test-partial-backends"]
+      "ci_jobs": [
+        "test",
+        "test-partial-backends"
+      ]
     },
     {
       "name": "the version claims",
       "command": "uv run --no-sync python scripts/check-version-claims.py --base auto",
       "script": "scripts/check-version-claims.py",
-      "ci_jobs": ["lint"]
+      "ci_jobs": [
+        "lint"
+      ]
     },
     {
       "name": "the hand-written numbers in the documents",
       "command": "uv run --no-sync python scripts/check-unguarded-numbers.py",
       "script": "scripts/check-unguarded-numbers.py",
-      "ci_jobs": ["lint"]
+      "ci_jobs": [
+        "lint"
+      ]
     },
     {
       "name": "the measurement",
       "command": "uv run --no-sync python scripts/refresh-report-figures.py",
       "script": "scripts/refresh-report-figures.py",
-      "ci_jobs": ["measurement"],
+      "ci_jobs": [
+        "measurement"
+      ],
       "note": "CI runs it with --check, and only on a tag push."
     },
     {
       "name": "the M10 self-check",
       "command": "uv run --no-sync python scripts/m10_selfcheck.py",
       "script": "scripts/m10_selfcheck.py",
-      "ci_jobs": ["m10-selfcheck"]
+      "ci_jobs": [
+        "m10-selfcheck"
+      ]
     },
     {
       "name": "the live contract check",
       "command": "uv run --no-sync python scripts/verify-public-contracts.py",
       "script": "scripts/verify-public-contracts.py",
-      "ci_jobs": ["contracts"]
+      "ci_jobs": [
+        "contracts"
+      ]
     },
     {
       "name": "the platform gate reconciliation",
       "command": "uv run --no-sync python scripts/check-platform-gates.py",
       "script": "scripts/check-platform-gates.py",
-      "ci_jobs": ["test", "test-partial-backends"],
+      "ci_jobs": [
+        "test",
+        "test-partial-backends"
+      ],
       "note": "It runs in the test suite, so it runs wherever the suite runs. This is the mechanism half of the method: the reconciliation is not a command a person has to remember."
     }
   ]

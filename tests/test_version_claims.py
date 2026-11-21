@@ -969,12 +969,10 @@ def test_the_checker_finds_a_claim_in_a_tree_that_has_no_git(
 # -- the outward materials -------------------------------------------------
 
 #: The documents that state the project's numbers to the outside world.
+#:
+#: The outreach materials were removed in the 2026-11-21 de-platformisation
+#: cleanup; the case studies and the proposals still state the numbers.
 OUTWARD_DOCUMENTS = (
-    "docs/outreach/cover-letter-templates.md",
-    "docs/outreach/project-brief.md",
-    "docs/outreach/publish-review.md",
-    "docs/outreach/scope-ai-mcp.md",
-    "docs/outreach/scope-backend-automation.md",
     "docs/case-studies/README.md",
     "docs/case-studies/api-integration.md",
     "docs/case-studies/demo-app-walkthrough.md",
@@ -1040,7 +1038,7 @@ def test_a_wrong_test_count_in_an_outward_material_is_a_finding() -> None:
     """A test count that is not the measured one is caught."""
     checker = _checker()
     findings = _outward_findings(
-        checker, [("docs/outreach/project-brief.md", "1,500 automated tests, 93.3% coverage\n")]
+        checker, [("docs/case-studies/README.md", "1,500 automated tests, 93.3% coverage\n")]
     )
 
     assert "outward-tests" in _kinds(findings)
@@ -1060,7 +1058,7 @@ def test_a_coverage_that_differs_by_a_fraction_is_not_a_finding() -> None:
     figures = {"coverage.pct": "92.9%", "tests.total": "1690"}
 
     findings = checker.check_outward_numbers(
-        [("docs/outreach/project-brief.md", "1,690 automated tests, 93.3% coverage\n")],
+        [("docs/case-studies/README.md", "1,690 automated tests, 93.3% coverage\n")],
         figures,
         "1.0.0",
     )
@@ -1068,7 +1066,7 @@ def test_a_coverage_that_differs_by_a_fraction_is_not_a_finding() -> None:
 
     # A difference that is not a fraction is still a finding.
     findings = checker.check_outward_numbers(
-        [("docs/outreach/project-brief.md", "1,690 automated tests, 99.0% coverage\n")],
+        [("docs/case-studies/README.md", "1,690 automated tests, 99.0% coverage\n")],
         figures,
         "1.0.0",
     )
@@ -1080,7 +1078,7 @@ def test_a_wrong_test_count_in_the_chinese_form_is_a_finding() -> None:
     checker = _checker()
     findings = _outward_findings(
         checker,
-        [("docs/outreach/publish-review.md", "| 测试总数 | 1,500（1,441 快 + 147 集成） |\n")],  # noqa: RUF001
+        [("docs/case-studies/obfuscated-app.md", "| 测试总数 | 1,500（1,441 快 + 147 集成） |\n")],  # noqa: RUF001
     )
 
     assert "outward-tests" in _kinds(findings)
@@ -1091,7 +1089,7 @@ def test_a_wrong_mcp_tool_count_in_an_outward_material_is_a_finding() -> None:
     checker = _checker()
     findings = _outward_findings(
         checker,
-        [("docs/outreach/project-brief.md", "Read-only MCP server. Ten tools over stdio.\n")],
+        [("docs/case-studies/README.md", "Read-only MCP server. Ten tools over stdio.\n")],
     )
 
     assert "outward-mcp-tools" in _kinds(findings)
@@ -1101,7 +1099,7 @@ def test_a_wrong_sample_count_in_an_outward_material_is_a_finding() -> None:
     """The number of first-party samples is checked against the studies."""
     checker = _checker()
     findings = _outward_findings(
-        checker, [("docs/outreach/project-brief.md", "They cover four first-party samples.\n")]
+        checker, [("docs/case-studies/README.md", "They cover four first-party samples.\n")]
     )
 
     assert "outward-samples" in _kinds(findings)
@@ -1118,7 +1116,7 @@ def test_a_quoted_number_in_an_outward_material_is_not_a_finding() -> None:
         checker,
         [
             (
-                "docs/outreach/publish-review.md",
+                "docs/case-studies/obfuscated-app.md",
                 "The wording was `1,540 automated tests, 93.1% coverage`.\n",
             )
         ],
@@ -1132,7 +1130,7 @@ def test_a_number_of_an_earlier_release_in_an_outward_material_is_not_a_finding(
     checker = _checker()
     findings = _outward_findings(
         checker,
-        [("docs/outreach/project-brief.md", "Coverage was previously 89.2% coverage.\n")],
+        [("docs/case-studies/README.md", "Coverage was previously 89.2% coverage.\n")],
     )
 
     assert findings == [], "\n".join(finding.render() for finding in findings)

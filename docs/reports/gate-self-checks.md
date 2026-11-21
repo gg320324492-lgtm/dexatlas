@@ -329,7 +329,7 @@ v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的
 因为它是生成物的整份拷贝，会跟着测量一起漂」。这条例外是 `outward-number-parity.md` §6.1
 写的。它当时是个合理的判断，后来被证伪了：那个标记**不是**生成物的拷贝，是**示意**。
 而测量脚本自己**不写**围栏里的标记（`live_figures()` 把代码块与行内代码都剔掉，
-见 `scripts/refresh-report-figures.py:1469`），所以门禁跟测量脚本的尺子本来就不一致。
+见 `scripts/refresh-report-figures.py:1505` `anchor: live_figures`），所以门禁跟测量脚本的尺子本来就不一致。
 
 **改法**：用**同一把尺子**——`scripts/refresh-report-figures.py` 的 `CODE_BLOCK` 与
 `INLINE_CODE` 两个正则，**直接引用**它（`scripts/check-release-numbers.py:470` 的

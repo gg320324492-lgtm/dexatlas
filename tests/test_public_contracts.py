@@ -767,13 +767,15 @@ CONTRACT_CHECK_SECTIONS = {"_rest_requests": 28, "mcp_checks": 6, "cli_checks": 
 CONTRACT_CHECK_TOTAL = 49
 
 #: The materials that repeat the number, and the count they have to repeat.
+#:
+#: The GitHub release body was removed in the 2026-11-21 de-platformisation
+#: cleanup; the CHANGELOG and the release notes still carry the count.
 MATERIALS_THAT_STATE_THE_COUNT = (
     "CHANGELOG.md",
     "docs/architecture/public-contracts.md",
     "docs/how-to-verify.md",
     "docs/how-to-verify.zh-CN.md",
     "docs/releases/v1.0.0.md",
-    "docs/reports/v1.0.0-github-release-body.md",
 )
 
 #: A statement of the split: "28 REST + 6 MCP + 15 CLI".

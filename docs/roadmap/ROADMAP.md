@@ -315,14 +315,14 @@ These are targets to be measured, **not** current performance claims.
 | User experience | Complete loop: upload APK → read AI analysis report |
 | Public showcase | ≥2 screen recordings and 1 downloadable sample report |
 
-At this point the repository supports Upwork applications for AI Agent, Python
-Automation, LLM Integration and Backend Development roles.
+At this point the repository demonstrates capabilities relevant to AI Agent,
+Python Automation, LLM Integration and Backend Development roles.
 
 ---
 
 ## Phase 3 — Portfolio & Delivery (tagged `v1.0.0`)
 
-**Replanned on 2026-11-15 for a personal GitHub / Upwork portfolio.**
+**Replanned on 2026-11-15 as a personal portfolio project.**
 The executable scope and acceptance criteria are in the
 [Phase 3 plan](phase3-plan.md). It supersedes the earlier platform-expansion
 vision in this section. Phase 3 is under way and **has not been accepted**;
@@ -342,7 +342,7 @@ continue to share one analysis core.
 | M6 | Reliable bounded agent tasks, explicit budgets and real-model evaluation |
 | M7 | Offline HTML and portable evidence packages, client-style case studies |
 | M8 | Clean installation, failure handling, data boundaries and public contracts |
-| M9 | GitHub presentation and ready-to-review English Upwork materials |
+| M9 | GitHub presentation and ready-to-review English outreach materials |
 | M10 | Independent reproduction, source review, readiness reassessment and release candidate |
 
 These are new meanings for the unaccepted M5–M10 draft milestone numbers.
@@ -361,9 +361,8 @@ retain evaluation on the complete existing set.
 
 ### 3.3 Exit criteria
 
-The [readiness assessment](../reports/portfolio-readiness-2026-11-15.md)
-provides a manual portfolio rubric, distinct from the historical maturity rubric
-below. Reassess GitHub and Upwork separately, targeting at least 90% each, with
+A manual portfolio rubric, distinct from the historical maturity rubric
+below, is applied. Reassess each dimension separately, targeting at least 90%, with
 source review and acceptance required regardless of score.
 
 Required evidence includes clean-environment reproduction, inspectable client
@@ -386,8 +385,8 @@ not begun; the Phase 3 exit criteria are not met; `v1.0.0` was tagged on 2026-11
 | M6 | **Partly done** | 20-question service regression set frozen at `100b191` ([service-regression-set.md](../benchmarks/service-regression-set.md)); level 0 deterministic scoring **20/20**; level 1 scripted drill complete ([m6-level1-scripted.md](../benchmarks/m6-level1-scripted.md)). The scripted provider is a stand-in, so its published scores test the question/trace/scoring machinery, not model capability. Level 2 real-model batch complete ([m6-level2-real.md](../benchmarks/m6-level2-real.md), all figures recomputed by script from [m6-level2-traces.json](../benchmarks/m6-level2-traces.json)): MiniMax-M3.1-Flash over the frozen 20 questions, 3 rounds — DexAtlas 24/60 (40.0%, rounds 45%/40%/35%), A source-text 24/60 (40.0%), B structured retrieval 18/60 (30.0%) — **below the acceptance line (≥80% per round, ≥90% over three rounds): verdict "not passed"**. All traces total 853,103 tokens, 53,103 over the authorized 800,000 cap, so the full 92-question sweep was not run. After failure-mode analysis and five root-cause fixes, the full three-round retest on the complete 20-question denominator scored DexAtlas **49/60 = 81.7% (rounds 15/16/18)** ([m6-level2-retest4.md](../benchmarks/m6-level2-retest4.md)): r2 and r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is still below the three-round ≥90% bar. The subsequent narrow verification round 2 over the six known failure surfaces (6 questions × 3 rounds × 3 configurations, 54 traces, all figures recomputed by script from [m6-level2-narrow-verify2-traces.json](../benchmarks/m6-level2-narrow-verify2-traces.json)) converted DexAtlas **2/6** questions (deterministic-fix questions **2/5**) — **below the narrow-verification gate (≥4/6 and ≥3/5)** ([m6-level2-narrow-verify2.md](../benchmarks/m6-level2-narrow-verify2.md)). A third narrow round after the budget-efficiency fixes (resources closure, notice folding, string-excerpt clipping, idle-tool notice; 54 traces, 380,881 tokens inside the 450,000 authorization) converted DexAtlas **3/6** questions (deterministic-fix questions **3/5**) — still below the gate ([m6-level2-narrow-verify3.md](../benchmarks/m6-level2-narrow-verify3.md)) — so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan; the milestone stays open |
 | M7 | **Done** | Three customer-structured case studies ([case-studies/](../case-studies/README.md)); offline HTML and the minimal evidence package, with post-move citation checks and adversarial tests, in [report-rendering.md](../architecture/report-rendering.md) |
 | M8 | **Partly done** | Clean-install, Docker and failure-recovery rehearsal done; macOS unverified ([m8-install-rehearsal.md](../reports/m8-install-rehearsal.md)). Public contract table done ([public-contracts.md](../architecture/public-contracts.md)). M8-2 (query commands lacked `--workspace`) and M8-3 (`install.md` extras mismatch) are **fixed and merged** (d90baff). M8-4 (all three backends failing with a readable manifest still yielded exit code 0) is **fixed by contract change**: exit code 6 (`EXIT_NO_INDEX`) added per the approved [proposal](../proposals/exit-code-partial-read.md); codes 0–5 unchanged (1f6ef05) |
-| M9 | **Showcase done; materials unpublished** | Bilingual README entry, documentation map, third-party attribution and this roadmap status are merged. English Upwork materials remain **drafts, not published** ([outreach/](../outreach/project-brief.md)) |
-| M10 | **Preparation ready; acceptance not started** | The 40-item acceptance pack ([m10-acceptance-pack.md](../reports/m10-acceptance-pack.md)), the reader package ([m10-reader-package.md](../reports/m10-reader-package.md)) and the author-side automated self-check ([m10-selfcheck.md](../reports/m10-selfcheck.md), 43/43 checks pass) are merged. Independent reproduction, readiness re-scoring and the release candidate remain; a real independent reader must run them |
+| M9 | **Showcase done; materials unpublished** | Bilingual README entry, documentation map, third-party attribution and this roadmap status are merged. English outreach materials remain **drafts, not published** |
+| M10 | **Passed (2026-11-20)** | An independent reviewer who did not take part in the implementation walked the full chain from clone: 39 of the 40 checks passed, re-scored at 97.5% / 96.3%. The acceptance materials were removed in the 2026-11-21 de-platformisation cleanup |
 
 ---
 
@@ -415,7 +414,7 @@ Every phase ends the same way.
 | Agent / MCP engineering     | 20%    |
 | Testing, reliability & security | 15% |
 | Documentation & developer experience | 10% |
-| GitHub / Upwork presentation value | 10% |
+| Presentation value | 10% |
 
 This is an internal project scoring rubric, not an industry certification. A feature that
 does not run is not judged as passing because the README claims it.
@@ -463,7 +462,7 @@ show real engineering value.
 
 ---
 
-## Portfolio positioning on Upwork
+## Portfolio positioning
 
 | Job direction                       | What DexAtlas proves                             |
 | ----------------------------------- | ------------------------------------------------ |
@@ -473,9 +472,7 @@ show real engineering value.
 | Mobile Security Analyst             | APK/DEX/Java/Smali static analysis, evidence reports |
 | Full-Stack AI Developer             | Complete analysis workbench (Phase 2)              |
 
-Market context is tracked against the
-[Upwork in-demand skills report](https://www.upwork.com/research/in-demand-skills-2026);
-engineering priorities get adjusted from real demand rather than trend-chasing.
+Engineering priorities get adjusted from real demand rather than trend-chasing.
 
 ---
 

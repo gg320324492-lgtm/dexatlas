@@ -50,7 +50,6 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INVENTORY = REPO_ROOT / "scripts" / "unguarded-numbers.json"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-M10_SNAPSHOT = REPO_ROOT / "docs" / "reports" / "m10-selfcheck.md"
 REAL_TRACES = REPO_ROOT / "docs" / "benchmarks" / "comparison-real-traces.json"
 
 
@@ -258,24 +257,6 @@ def report_figures() -> dict[str, float]:
     return numbers
 
 
-def m10_counts() -> dict[str, float]:
-    """What the M10 self-check snapshot records.
-
-    The snapshot is written by hand, but ``scripts/check-m10-snapshot.py``
-    compares it against the self-check script that runs, so the number in it
-    is the number the script produces.
-    """
-    snapshot = sibling("check-m10-snapshot.py")
-    summary = snapshot.recorded_summary(M10_SNAPSHOT.read_text(encoding="utf-8"))
-    if summary is None:
-        return {}
-    passed, failed, _ = summary
-    return {
-        "m10_automated_passed": float(passed),
-        "m10_automated_total": float(passed + failed),
-    }
-
-
 def trace_assertions() -> dict[str, float]:
     """What the committed benchmark traces carry.
 
@@ -339,7 +320,6 @@ def facts() -> dict[str, float]:
         values["mcp_tools"] = float(tools)
     for key, value in report_figures().items():
         values[f"report_{key}"] = value
-    values.update(m10_counts())
     values.update(trace_assertions())
     static_checks = contract_static_checks()
     if static_checks is not None:

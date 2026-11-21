@@ -9,7 +9,7 @@
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1793%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Tests](https://img.shields.io/badge/tests-1789%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录，同样由
@@ -57,7 +57,7 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 > 停止投入、M6 转入方案 3 现状披露（见[二轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify2.md)
 > 与[三轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify3.md)）；M8（干净安装、契约与
 > 导出安全）的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧
-> 已完成、Upwork 素材未发布；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
+> 已完成；M10（独立验收、发布候选）准备包已就绪、验收尚未执行。
 > 详见[路线图](#路线图)与
 > [`docs/roadmap/phase3-plan.md`](docs/roadmap/phase3-plan.md)。
 > 本文档不会声称任何尚未实际可运行的功能。
@@ -124,7 +124,7 @@ DexAtlas 要解决的正是这个问题：
 
 完整内容、退出清单与评审机制：**[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**。
 
-[第三阶段计划](docs/roadmap/phase3-plan.md)以 GitHub 可复现展示与 Upwork 有范围的交付为目标；
+[第三阶段计划](docs/roadmap/phase3-plan.md)以 GitHub 可复现展示与有范围的交付展示为目标；
 原生/动态分析和插件生态延后，不再是本阶段退出条件。
 
 阶段推进依据证据而非日历。每个阶段以一次源码评审结束，下一阶段的任务清单由评审结果
@@ -450,21 +450,9 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[Phase 2 任务清单](docs/reports/phase2-issue-list.md)** —— 推迟的发现，每条带两个方案和推荐
 - **[退出码提案](docs/proposals/exit-code-partial-read.md)** —— 退出码 6（「跑完了，但没读到任何
   代码」）背后的提案；落地后仍保留提案原文
-- **[M10 邀请发送清单](docs/reports/m10-invitation-sender-checklist.md)** —— 发起 M10 独立验收
-  邀请前自己要走完的每一步：带命令的条目，以及编写时实测到了什么
-  （读者要做的部分在邀请函成稿与读者验收包里）
-
-### 对外材料——作品集与外包素材
+### 对外材料——作品集与交付素材
 
 - **[作品集描述](docs/portfolio.md)** —— 放进客户简报的一段话，以及它背后的细节
-- **[Upwork 项目条目](docs/outreach/project-brief.md)** —— 作品集条目草稿：已就位，尚未发布
-- **[发布前核对](docs/outreach/publish-review.md)** —— 发布前对四份 Upwork 素材做的核对，
-  以及它改了什么（内部核对记录，不对外、不作附件、不随提案发送）
-- **[对外发布点检清单](docs/reports/outreach-publish-checklist.md)** —— 那四份素材发出前的
-  最后一次点检：逐条查什么，以及本轮没有做什么（内部清单，不随提案发送）
-- **[Cover letter 模板](docs/outreach/cover-letter-templates.md)** —— 两个服务方向各一封提案信
-- **[服务范围：证据优先的 AI / MCP 集成](docs/outreach/scope-ai-mcp.md)** —— 该方向的一页纸范围说明
-- **[服务范围：Python 后端与自动化](docs/outreach/scope-backend-automation.md)** —— 该方向的一页纸范围说明
 
 ## 作者贡献与第三方引擎
 
@@ -520,8 +508,8 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 24/60 = 40.0% 低于三轮合计 ≥54/60（≥90%）线）；执行层修复后，三轮完整[复测](docs/benchmarks/m6-level2-retest4.md) DexAtlas 49/60 = 81.7%（逐轮 15/16/18，trace 1,182,356 tokens）——r2/r3 达单轮 ≥16/20 线、r1 未达，81.7% 仍低于三轮合计 ≥54/60（≥90%）的验收门槛；修复后的[窄验证二轮](docs/benchmarks/m6-level2-narrow-verify2.md)在六个已知失败面上转通过 2/6 题（确定性子集 2/5），低于窄验证门槛（≥4/6 与 ≥3/5）；预算效率四项修复后的[窄验证三轮](docs/benchmarks/m6-level2-narrow-verify3.md)（54 条 trace，380,881 tokens，在 450,000 授权之内）转通过 3/6（确定性子集 3/5），仍低于门槛，故按方案停止投入、M6 转入方案 3 现状披露，里程碑保持未收口 |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |
-| M9 | GitHub 展示入口（本页）与 Upwork 素材 | **展示入口已完成；素材未发布** —— 本页与[项目简介](docs/outreach/project-brief.md)草稿已就位；Upwork 素材未发布 |
-| M10 | 独立验收、重新评分、发布候选 | **准备包已就绪；验收未执行** —— [准备包](docs/reports/m10-acceptance-pack.md)已就位；独立复现与重新评分尚未开始 |
+| M9 | GitHub 展示入口（本页）与对外素材 | **展示入口已完成；素材未发布** —— 本页与[项目简介](docs/portfolio.md)已就位；对外素材未发布 |
+| M10 | 独立验收、重新评分、发布候选 | **已通过（2026-11-20）** —— 外部独立验收人从 clone 走完全链路，40 项判定 39 过，重评 97.5% / 96.3%。验收材料已随 2026-11-21 的去平台化清理移除 |
 
 本计划原本以退出标准全部通过为 `v1.0.0` 的前提；`v1.0.0` 已于 2026-11-17 按现状披露
 口径发布，M6、M8 与 M10 的验收仍未关闭（见 [`docs/status.md`](docs/status.md)）——阶段推进靠

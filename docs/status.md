@@ -1,6 +1,6 @@
 # DexAtlas 当前状态
 
-**最后更新：** 2026-11-20 · **对应版本：** v1.0.0（tag 2026-11-17，重打至 `6e90317`；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** v1.0.0 已发布（2026-11-17，见[发版说明](releases/v1.0.0.md)）；M10 独立验收**已通过**（2026-11-20，外部验收人执行，[验收记录](reports/m10-acceptance-review.md)：40 项 39 通过 / 0 不通过，重评 GitHub 97.5% / Upwork 96.3%，均 ≥90%；逐里程碑状态见 §4.0）
+**最后更新：** 2026-11-20 · **对应版本：** v1.0.0（tag 2026-11-17，重打至 `6e90317`；M4 已评审通过，详见[评审报告](reports/m4-review.md)）· **当前阶段：** v1.0.0 已发布（2026-11-17，见[发版说明](releases/v1.0.0.md)）；M10 独立验收**已通过**（2026-11-20，外部验收人执行：40 项 39 通过 / 0 不通过，重评 97.5% / 96.3%，均 ≥90%；验收记录随 2026-11-21 的去平台化清理移除；逐里程碑状态见 §4.0）
 
 这份文档回答两个问题：**现在在哪**，**还剩什么**。
 
@@ -10,7 +10,7 @@
 - 「这个项目现在成熟到什么程度」在[成熟度评估](reports/phase1-maturity-assessment.md)里
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
-- 「作为 GitHub / Upwork 作品集还差什么」见[准备度评估](reports/portfolio-readiness-2026-11-15.md)与[复评](reports/portfolio-readiness-2026-11-15-recheck.md)；[Phase 3 计划](roadmap/phase3-plan.md)已按此目标重写，实施进度与证据见 §4.0，M10 独立验收已通过（[验收记录](reports/m10-acceptance-review.md)，重评 97.5% / 96.3%）
+- [Phase 3 计划](roadmap/phase3-plan.md)的实施进度与证据见 §4.0，M10 独立验收已通过（2026-11-20，重评 97.5% / 96.3%）
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---
@@ -20,7 +20,7 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · v0.2.0（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） · **v1.0.0**（2026-11-17 已发布，见[发版说明](releases/v1.0.0.md)） |
-| 测试 | <!--fig:tests.total-->1795<!--/fig--> 个（<!--fig:tests.fast-->1646<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1791<!--/fig--> 个（<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
 | CI | **13 个 workflow job、tag 上 14 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 13 次）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
@@ -133,7 +133,7 @@ v0.1.1 到 v0.1.3 修的是同一类问题的三个实例：**一个看起来像
 
 Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表只列**已合入
 本分支**的产物，并写明每项还差什么；没有证据的一律标未开始或未验证。**M10
-独立验收已通过（2026-11-20，[验收记录](reports/m10-acceptance-review.md)：40 项 39 通过 / 0 不通过 / 0 未验证，19 项阻断项全过；按原权重重评 GitHub 97.5% / Upwork 96.3%，均 ≥90% 达成）。Phase 3 的退出标准中，M6 层级 2 的 B1 验收线仍未达成——修复后三轮完整重测 49/60 = 81.7%（逐轮 15/16/18），低于 90% 合计线，按验收方案定稿走「方案 3：现状披露」，不再追加修复轮；B1 未关闭是当前唯一未达成的计划门槛。`v1.0.0`（tag 2026-11-17，现指向 `6e90317`）已发布，发版说明见 [docs/releases/v1.0.0.md](releases/v1.0.0.md)。**（文中的 B1 验收线，英文说明见 [Architecture → Glossary](architecture/README.md#glossary)。）
+独立验收已通过（2026-11-20，外部验收人执行：40 项 39 通过 / 0 不通过 / 0 未验证，19 项阻断项全过；按原权重重评 97.5% / 96.3%，均 ≥90% 达成）。Phase 3 的退出标准中，M6 层级 2 的 B1 验收线仍未达成——修复后三轮完整重测 49/60 = 81.7%（逐轮 15/16/18），低于 90% 合计线，按验收方案定稿走「方案 3：现状披露」，不再追加修复轮；B1 未关闭是当前唯一未达成的计划门槛。`v1.0.0`（tag 2026-11-17，现指向 `6e90317`）已发布，发版说明见 [docs/releases/v1.0.0.md](releases/v1.0.0.md)。**（文中的 B1 验收线，英文说明见 [Architecture → Glossary](architecture/README.md#glossary)。）
 
 | 里程碑 | 状态 | 证据 / 还差什么 |
 |---|---|---|
@@ -141,8 +141,8 @@ Phase 3 按[作品集计划](roadmap/phase3-plan.md)的 M5–M10 推进。下表
 | M6 服务回归集 | **未收口（B1 验收线未达）** | 20 题已冻结在 `100b191`（[service-regression-set.md](benchmarks/service-regression-set.md)）；层级 0 确定性判分 **20/20**（零模型）；层级 1 scripted 演练完成（[m6-level1-scripted.md](benchmarks/m6-level1-scripted.md)）——scripted 是替身模型，成绩原样公开，只证明发题/trace/判分管线端到端可用，不是模型能力基线；层级 2 真实模型批次已完成（[m6-level2-real.md](benchmarks/m6-level2-real.md)，全部数字由脚本从 [m6-level2-traces.json](benchmarks/m6-level2-traces.json) 重算）：MiniMax-M3.1-Flash 对冻结 20 题独立跑 3 轮，DexAtlas 24/60（40.0%，逐轮 45%/40%/35%）、A 源码文本 24/60（40.0%）、B 结构化检索 18/60（30.0%）——**未达验收线（每轮 ≥80%、三轮合计 ≥90%），验收结论「未通过」**；全部 trace 合计 853,103 tokens，超出本次授权的 800,000 上限 53,103，92 题全量轮因此未执行。诚实边界：agent 当前默认配置在该冻结集上未达验收线，服务承诺范围待失败模式分析后重定。失败模式分析已完成（[m6-level2-failure-analysis.md](benchmarks/m6-level2-failure-analysis.md)），修复后第一轮复测 DexAtlas 15/20（[m6-level2-retest.md](benchmarks/m6-level2-retest.md)）；五项根因修复后的第二轮复测（20 题完整分母，首轮 18 题 + 追加授权补跑 2 题，token 355,623）**DexAtlas 16/20 = 80.0%，达到验收线**（[m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)，A 7/20、B 7/20；层级 1 复验确认修复未破坏 scripted 路径，见 [m6-level1-recheck-after-fixes.md](benchmarks/m6-level1-recheck-after-fixes.md)）；三轮完整复测（[m6-level2-retest3.md](benchmarks/m6-level2-retest3.md)，全部数字由 `scripts/m6_level2_retest3_report.py` 从 [m6-level2-retest3-traces-r1/r2/r3.json](benchmarks/m6-level2-retest3-traces-r1.json) 重算，token 1,080,116 在 1,200,000 授权内）：DexAtlas 逐轮 17/15/17（合计 49/60 = 81.7%）——**未达验收线（每轮 ≥80% 且三轮合计 ≥90%）：r2 75.0% 低于单轮线，三轮合计 81.7% 低于 90% 线，验收结论「未达标」**，按冻结纪律只能修正系统或缩小并重述服务承诺后重测，不得删题换通过率。；执行层修复成套落地（limitations 纳入判分、预算耗尽单列 outcome、端点故障重试启用、XML 泄漏容错、C2 并集放宽到单词查询）后先做 6 题 × 3 轮窄验证（[m6-level2-narrow-verify-incomplete.md](benchmarks/m6-level2-narrow-verify-incomplete.md)，由 `scripts/m6_level2_narrow_verify_audit.py` 从 53 条已捕获 trace 生成，**运行不完整**：原授权 400,000 tokens，追加至 406,000 后仍超支，实际 410,256 tokens，第 54 条 trace 未跑）：6 题中 4 题转化（每题 ≥2 轮正确），确定性修复子集 4/5。窄闸门在已捕获轮次上达标，但**这不是 54-trace 判定**；修复后的完整结论以三轮完整重测为准（[m6-level2-retest4.md](benchmarks/m6-level2-retest4.md)，全部数字由 `scripts/m6_level2_retest4_report.py` 从 [m6-level2-retest4-traces-r1/r2/r3.json](benchmarks/m6-level2-retest4-traces-r1.json) 重算生成）：DexAtlas 逐轮 15/20、16/20、18/20，三轮合计 49/60 = 81.7%，**仍未达 B1 验收线（每轮 ≥16/20 且三轮合计 ≥54/60）**——r1 低于单轮线，合计低于 90% 线；三轮 trace 合计 1,182,356 tokens，在 1,200,000 授权之内，无熔断中止、无 not-run。与修复前复测合计分相同（49/60），失败构成已从执行层故障转为判分不过与个别题预算耗尽/errored。B1 保持未关闭。针对首轮窄验证暴露失败面的四项修复（协议泄漏纠偏重试、partial 措辞对齐、api-key 常量池检索引导、descriptor 连写模板）之后的窄验证二轮（[m6-level2-narrow-verify2.md](benchmarks/m6-level2-narrow-verify2.md)，由 `scripts/m6_level2_narrow_verify2_report.py` 从 [m6-level2-narrow-verify2-traces.json](benchmarks/m6-level2-narrow-verify2-traces.json) 重算，6 题 × 3 轮 × 3 配置 = 54 条 trace 完整，代码 `9b25835`）：DexAtlas 转通过 2/6、确定性修复题 2/5，**未达窄验证判据（≥4/6 且 ≥3/5）**；实测 420,826 tokens 超授权上限 410,000 达 10,826，超出如实记录。按验收方案 §2.2 停止投入，**转方案 3（现状披露）**。预算效率四项修复（resources 收口、notice 折叠、string excerpt 截断、空转软提示）与行裁剪机制落地后的窄验证三轮（[m6-level2-narrow-verify3.md](benchmarks/m6-level2-narrow-verify3.md)，由 `scripts/m6_level2_narrow_verify3_report.py` 从 [m6-level2-narrow-verify3-traces.json](benchmarks/m6-level2-narrow-verify3-traces.json) 重算，54 条 trace 完整，代码 `9f0dae3`）：DexAtlas 转通过 3/6、确定性修复题 3/5，**仍未达窄验证判据**；实测 380,881 tokens，在 450,000 授权内，无熔断中止；按 [m6-verify3-plan.md](benchmarks/m6-verify3-plan.md) §7 停止，不再追加修复轮或模型调用，**方案 3 为最终定稿路径**。 |
 | M7 客户交付包 | **交付项完成** | 三个案例按「问题/范围/操作/证据/结论/限制/下一步」重写（[case-studies/](case-studies/README.md)）；离线 HTML 与最小证据包（`analyze --html`、`export`）、迁移后引用校验与反向测试见[报告渲染说明](architecture/report-rendering.md)。逐例可下载报告/证据包附件已落盘（[attachments/](case-studies/attachments/)，2026-11-16 由文档内命令生成、`verify_package` 校验通过）；案例与代码逐项核对完成（2026-11-16）：三案例声称的命令、样例哈希、计数与证据记录均实跑核对一致，MCP 工具数等过期表述已纠正，API 报告丢失 APK 档案事实与重复分析 `created_at` 漂移两处真实缺陷已带红→绿回归修复 |
 | M8 安装与契约 | **部分完成** | 干净安装、Docker、故障恢复演练完成，macOS 未验证（[m8-install-rehearsal.md](reports/m8-install-rehearsal.md)）；公共契约表完成（[public-contracts.md](architecture/public-contracts.md)）；M8-2（查询命令缺 `--workspace`）与 M8-3（install.md 的 extras 组合不一致）**已修复并合入**（d90baff，全命令 `--workspace/-w`、install.md 修正）；M8-4（三后端全失败但 manifest 可解析仍退出 0）已按[提案](proposals/exit-code-partial-read.md)修复：新增退出码 6（EXIT_NO_INDEX），0–5 语义不变（1f6ef05） |
-| M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；Upwork 英文素材为**草稿，未发布**（[outreach/](outreach/project-brief.md)） |
-| M10 独立验收 | **已通过（2026-11-20）** | [验收记录](reports/m10-acceptance-review.md)：外部独立验收人（未参与实现）在 `2edaed9`（当时的 `v1.0.0`）上从 clone 走完推荐安装路线 + 完整案例，40 项判定 **39 通过 / 0 不通过 / 0 未验证**，19 项阻断项全过，无需作者补步；客户视角三问（输入与结论、引用可核查、事实与线索区分）均成立，红旗十条全未命中；按原权重重评 **GitHub 97.5% / Upwork 96.3%**，均 ≥90%。留 5 条非阻断材料建议（记录模板预填 hash、历史 hash 时间限定、Docker 命令的 Git Bash 提示、徽章与发版说明的口径说明、邀请函重复说明收敛）。**注意**：验收之后 tag 因测量记账门禁修复重打过三次（现指 `6e90317`），验收钉死的 commit 与当前 tag 不一致——处置待作者决策。准备度自评见[复评增补](reports/portfolio-readiness-2026-11-15-recheck.md) |
+| M9 展示与素材 | **展示入口已完成；素材未发布** | 双语 README 首屏、文档地图、第三方归属表与路线图状态已合入；对外英文素材为**草稿，未发布** |
+| M10 独立验收 | **已通过（2026-11-20）** | 外部独立验收人（未参与实现）在 `2edaed9`（当时的 `v1.0.0`）上从 clone 走完推荐安装路线 + 完整案例，40 项判定 **39 通过 / 0 不通过 / 0 未验证**，19 项阻断项全过，无需作者补步；客户视角三问（输入与结论、引用可核查、事实与线索区分）均成立，红旗十条全未命中；按原权重重评 **97.5% / 96.3%**，均 ≥90%。**tag 漂移已处置（2026-11-21）**：验收之后 tag 因测量记账门禁修复重打过三次（现指 `6e90317`）；作者决定**追认现有 tag**，验收结论覆盖到 `6e90317`，不重跑。验收材料与记录随项目去平台化清理移除（2026-11-21）。 |
 
 4.1 起是此前记录、仍未关闭的缺口。
 
@@ -376,7 +376,7 @@ MCP 11 项全部正常，agent 提问端点按设计返回 503 + `agent_not_conf
 | ≥2 个完整案例研究 | **完成**——demo-app 从分析到证据链的完整走查；混淆样本走查（含 multi-DEX 附录），全部引用当次真实运行输出与证据 id（M7 之后已扩为 3 篇，含 API 集成走查） | [case-studies/](case-studies/README.md) |
 | 公开 benchmark 摘要 | 已有（v0.2.0 前完成） | [benchmarks/comparison.md](benchmarks/comparison.md) · [comparison-real.md](benchmarks/comparison-real.md) |
 | 可下载示例分析报告 | 已有（屏 8 导出，实测与渲染器逐字节一致） | workbench 报告导出 · `dexatlas analyze -o` |
-| Upwork 风格 portfolio 描述 | **完成**——面向潜在客户：能做什么、技术亮点、适用场景、快速试用，全英文 | [portfolio.md](portfolio.md) |
+| 面向客户的 portfolio 描述 | **完成**——能做什么、技术亮点、适用场景、快速试用，全英文 | [portfolio.md](portfolio.md) |
 
 demo 时长的结论（2026-11-14 更新）：60–90 秒端到端版已重录完成（84.8 秒，见上表），
 替代早先 8.8 秒的短素材；Agent 屏使用项目自带的 scripted 演示 provider（无密钥），

@@ -167,40 +167,6 @@
       "note": "散文改标记（另一扇窗口）之后，这句话由测量统一写 —— 门禁改认标记"
     },
     {
-      "id": "outreach-summary",
-      "path": "docs/outreach/publish-review.md",
-      "pattern": "(?P<tests>[\\d,]+)\\s*/\\s*(?P<pct>[\\d.]+)%",
-      "groups": {
-        "tests": "report_tests_total",
-        "pct": "report_coverage_pct"
-      }
-    },
-    {
-      "id": "outreach-quoted-texts",
-      "path": "docs/outreach/publish-review.md",
-      "pattern": "\\| `(?P<tests>[\\d,]+) (?:automated )?tests",
-      "groups": {
-        "tests": "report_tests_total"
-      }
-    },
-    {
-      "id": "outreach-truth-column",
-      "path": "docs/outreach/publish-review.md",
-      "pattern": "\\| (?P<tests>[\\d,]+) \\|\\s*$",
-      "groups": {
-        "tests": "report_tests_total"
-      }
-    },
-    {
-      "id": "status-m10-selfcheck",
-      "path": "docs/status.md",
-      "pattern": "(?P<passed>\\d+)/(?P<total>\\d+) 通过",
-      "groups": {
-        "passed": "m10_automated_passed",
-        "total": "m10_automated_total"
-      }
-    },
-    {
       "id": "contract-static-checks",
       "path": "docs/glossary.md",
       "pattern": "静态条数\\*\\*是脚本里 `check\\(\\)` 调用点的数目（(?P<number>\\d+)）",

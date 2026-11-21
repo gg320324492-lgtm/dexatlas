@@ -45,8 +45,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   核对报告：[清单的第四个键](docs/reports/c16-manifest-fourth-key.md)；
   回归测试：`tests/test_evidence_package_isolation.py`（新增 2 条，先红后绿）。
 - **证据包只装本次分析自己的文件。** `dexatlas export` 的打包器此前把「被证据引用到的任意文件」从反编译目录复制进包，既不解析链接，也不问那个文件是不是反编译器写的产物——反编译树里一个指向树外的链接会被当成分析的一个源文件原样复制给客户。现在复制之前先过两道：文件必须在反编译树之内（链接已解析），且位于反编译器写的两棵树之一（`sources/` 或 `resources/`）；不满足的文件不进包，引用仍留在证据里，并由 `verify_citations` 记为未解析而不是假装带上了。清单的声明层由下一条（`schema_version = 2` 的第四键）落地。核对报告：[证据包的隔离边界](docs/reports/evidence-package-isolation.md)；回归测试：`tests/test_evidence_package_isolation.py`（5 条，其中 3 条在旧实现下变红）。
-- 自查判据条数在材料里的表述随之更新：`docs/reports/m10-selfcheck.md`、
-  `docs/reports/m10-invitation-sender-checklist.md`、`docs/reports/ci-gate-coverage.md`、
+- 自查判据条数在材料里的表述随之更新（M10 自查快照与发送清单已随 2026-11-21
+  的去平台化清理移除；`docs/reports/ci-gate-coverage.md` 同批移除）、
   `docs/status.md`、`docs/how-to-verify.md` 与 `docs/how-to-verify.zh-CN.md`。
   验收包本身的 40 个验收项未变。
 
@@ -352,7 +352,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   2026-11-18 起附件集已换过一轮——4 个证据包、16 个文件、4 次分析，
   见 [Unreleased]。）
 - **v1.0.0 发版流程本地 dry-run 报告。** 按
-  [发版前检查清单](docs/reports/v1.0.0-release-checklist.md) 完成一次本地预演
+  发版前检查清单（已随 2026-11-21 的去平台化清理移除）完成一次本地预演
   （不创建 tag、不发布、不改版本号）：7 步流程逐项核对、5 项阻断与 4 项披露的
   当日状态核对、新缺口清单（发版说明 `docs/releases/v1.0.0.md` 未落盘、契约表
   未记录退出码 6、清单 ROADMAP 引用悬空、status.md M8 行过时、install.md
@@ -365,7 +365,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   单题 24,000 闸不放松、判分七条红线零改动），并固化停止条件——窄验证
   不达标即按验收方案三选一定稿服务承诺范围，不再追加修复轮或模型调用。
   方案定稿，不含任何测量结果。
-- **M10 独立验收自查脚本与自查报告。** 把[验收准备包](docs/reports/m10-acceptance-pack.md)
+- **M10 独立验收自查脚本与自查报告。** 把验收准备包（已随 2026-11-21 的去平台化清理移除）
   40 项中可自动化的 40 项检查写成 `scripts/m10_selfcheck.py`（仅读仓库、
   无第三方依赖，`uv run --no-sync python scripts/m10_selfcheck.py` 运行，
   退出码 0 表示无失败项；`--json` 输出机器可读结果）：验收包结构完整性、
@@ -373,7 +373,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   报告 `<!--fig:-->` 标记一致性、退出码/MCP 工具/报告 schema/证据包
   `not_included`/HTML 离线渲染等契约静态核对、门禁命令可执行性；40 项
   人工判定项逐项标注原因留待读者执行。自查记录见
-  `docs/reports/m10-selfcheck.md`；[读者验收包](docs/reports/m10-reader-package.md)
+  自查快照（已移除）；读者验收包（已移除）
   末尾增加指向自查报告的入口。M10 验收材料定稿：验收包按最新代码状态修订
   （邀请函钉定 commit、读者包补降级路径与工作区提示），读者彩排三项高优发现
   修复（案例正文与验收包同步）。M10 **独立验收尚未开始**——验收包已成稿并

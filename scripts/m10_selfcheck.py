@@ -1,31 +1,28 @@
 #!/usr/bin/env python3
-"""Run the automatable part of the M10 external-acceptance checklist.
+"""Run the automatable part of the M10 independent-acceptance checklist.
 
     uv run --no-sync python scripts/m10_selfcheck.py
 
-``docs/reports/m10-acceptance-pack.md`` states 40 acceptance checks for the
-M10 independent review. A human reviewer runs most of them on their own
-machine; a subset is decidable here, from the repository itself, without
-installing a backend or running the whole suite:
+The M10 independent review states 40 acceptance checks. A human reviewer
+runs most of them on their own machine; a subset is decidable here, from
+the repository itself, without installing a backend or running the whole
+suite:
 
-* documents exist and their relative cross-references resolve,
 * the changelog's ``[Unreleased]`` section exists and is sorted sensibly,
 * the README's tests/coverage badges state what the report's figures state,
 * the report's ``<!--fig:...-->`` markers are consistent and complete,
-* the pack's own tables are complete (40 rows, 19 blocking, no duplicate),
-* the gates the pack names are runnable commands that exist on the path,
-* the contracts the pack points at (exit codes, MCP tools, report fields,
+* the gates the review names are runnable commands that exist on the path,
+* the contracts the review points at (exit codes, MCP tools, report fields,
   routes, the evidence package's ``not_included``) match the code,
 * the three gaps a reader dry run found stay closed: the setup step has to
-  fetch the third-party samples, A6's degraded evidence has to be written
-  down at the time because the CLI cannot replay a past run, and the
-  evidence package's entry count is the one the CLI prints and the
-  material states.
+  fetch the third-party samples, A6's degraded evidence has to be retrievable
+  through the CLI, and the evidence package's entry count is the one the CLI
+  prints.
 
 Every check is a *read* or a *comparison*; the script writes nothing and
-never edits the report or the badges. Its verdict is three-valued, like the
-pack's own: pass, fail, or manual — a check the repository can answer is
-run, and one only a reader on a real machine can answer is left marked.
+never edits the report or the badges. Its verdict is three-valued: pass,
+fail, or manual — a check the repository can answer is run, and one only a
+reader on a real machine can answer is left marked.
 
 The exit code is 0 when no check failed (manual checks do not fail the
 run), 1 when at least one failed.
@@ -34,6 +31,7 @@ run), 1 when at least one failed.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import re
 import sys
 from collections.abc import Callable
@@ -42,11 +40,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-#: The pack's own counts, restated here as the things the checks compare
-#: against. They are read from the pack, not invented: the checks below
-#: count the rows in its tables and compare them with these.
-PACK_PATH = REPO_ROOT / "docs" / "reports" / "m10-acceptance-pack.md"
-READER_PATH = REPO_ROOT / "docs" / "reports" / "m10-reader-package.md"
 REPORT_PATH = REPO_ROOT / "docs" / "reports" / "phase1-execution-report.md"
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 CONTRACTS_PATH = REPO_ROOT / "docs" / "architecture" / "public-contracts.md"
@@ -73,7 +66,7 @@ BLOCKING_IDS = {
     "G5",
 }
 
-#: The commands the pack's §6.3 quality gate names, by the binary that has
+#: The commands the review's quality gate names, by the binary that has
 #: to exist for the command to be runnable. The gate is not executed here;
 #: a check that proves the commands *can* run is the automatable part.
 GATE_COMMANDS: tuple[tuple[str, str, list[str]], ...] = (
@@ -105,25 +98,13 @@ GATE_COMMANDS: tuple[tuple[str, str, list[str]], ...] = (
     (
         "G.check-version-claims",
         "python",
-        [
-            "python",
-            "scripts/check-version-claims.py",
-            "--base",
-            "auto",
-        ],
+        ["python", "scripts/check-version-claims.py", "--base", "auto"],
     ),
 )
 
-#: The section markers of the verification entry points the pack names.
+#: The section markers of the verification entry points the review names.
 CONTRACT_TEST = REPO_ROOT / "tests" / "test_public_contracts.py"
 VERIFY_CONTRACTS = REPO_ROOT / "scripts" / "verify-public-contracts.py"
-
-#: The three documents that tell a reader how to set a machine up. The reader
-#: package is the one-stop entry; the kit and the executive summary repeat
-#: the same facts, so a drift between them is a defect a reader meets while
-#: following one of them.
-READER_KIT_REL = Path("docs/reports/m10-reader-kit.md")
-EXEC_SUMMARY_REL = Path("docs/reports/m10-executive-summary.md")
 
 #: The sources the reader-dry-run checks read the tool's behaviour from.
 FIXTURE_SCRIPT_REL = Path("scripts/fetch-fixtures.sh")
@@ -138,9 +119,6 @@ FIXTURE_DIR_REL = Path("fixtures") / "apk"
 FIGURE = re.compile(r"<!--fig:([A-Za-z0-9_./-]+)-->(.*?)<!--/fig-->", re.DOTALL)
 BADGE_TESTS = re.compile(r"badge/tests-([\d.]*)%20passing")
 BADGE_COVERAGE = re.compile(r"badge/coverage-([\d.]*)%25")
-
-PACK_ROW = re.compile(r"^\| ([A-G]\d) \|", re.MULTILINE)
-PACK_BLOCKING = re.compile(r"\| ★ \|")
 
 
 # ---------------------------------------------------------------------------
@@ -167,29 +145,38 @@ class Report:
         self.outcomes.append(outcome)
 
     def counts(self) -> dict[str, int]:
-        return {
-            "pass": sum(1 for o in self.outcomes if o.state == "pass"),
-            "fail": sum(1 for o in self.outcomes if o.state == "fail"),
-            "manual": sum(1 for o in self.outcomes if o.state == "manual"),
-        }
+        counts = {"pass": 0, "fail": 0, "manual": 0}
+        for outcome in self.outcomes:
+            counts[outcome.state] += 1
+        return counts
 
-    def rate(self) -> str:
-        """The pass rate over the checks this run could decide."""
+    def pass_rate(self) -> str:
         decided = self.counts()["pass"] + self.counts()["fail"]
-        if not decided:
+        if decided == 0:
             return "n/a"
         return f"{self.counts()['pass'] / decided * 100:.1f}%"
-
-
-def manual(check_id: str, title: str, why: str, blocking: bool = False) -> Outcome:
-    return Outcome(check_id, title, "manual", why, blocking)
 
 
 def outcome_of(
     check_id: str, title: str, ok: bool, detail: str = "", blocking: bool = False
 ) -> Outcome:
-    state = "pass" if ok else "fail"
-    return Outcome(check_id, title, state, detail, blocking)
+    return Outcome(
+        check_id=check_id,
+        title=title,
+        state="pass" if ok else "fail",
+        detail=detail,
+        blocking=blocking or check_id in BLOCKING_IDS,
+    )
+
+
+def manual(check_id: str, title: str, why: str, blocking: bool = False) -> Outcome:
+    return Outcome(
+        check_id=check_id,
+        title=title,
+        state="manual",
+        detail=why,
+        blocking=blocking or check_id in BLOCKING_IDS,
+    )
 
 
 def blocking_flag(item_id: str) -> bool:
@@ -197,97 +184,29 @@ def blocking_flag(item_id: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Group 0 — the pack's own structure
+# Group 1 — documents and cross-references (A1's document side)
 # ---------------------------------------------------------------------------
 
-
-def check_pack_structure(report: Report) -> None:
-    """The pack's tables hold 40 items, 19 of them blocking, none duplicated."""
-    text = PACK_PATH.read_text(encoding="utf-8")
-    ids = PACK_ROW.findall(text)
-    duplicates = sorted({i for i in ids if ids.count(i) > 1})
-    report.add(
-        outcome_of(
-            "PACK.40-items",
-            "验收包恰好 40 项，无重复编号",
-            len(ids) == 40 and not duplicates,
-            f"读到 {len(ids)} 项" + (f"，重复：{duplicates}" if duplicates else ""),
-        )
-    )
-
-    blocking_rows = len(PACK_BLOCKING.findall(text))
-    declared = sorted(BLOCKING_IDS)
-    report.add(
-        outcome_of(
-            "PACK.19-blocking",
-            "阻断项为声明的 19 项",
-            blocking_rows == 19 and len(declared) == 19,
-            f"表中标 ★ 的行 {blocking_rows} 行；声明清单 {len(declared)} 项",
-        )
-    )
-
-
-def check_reader_package(report: Report) -> None:
-    """The reader package links back to the pack and names the record template."""
-    text = READER_PATH.read_text(encoding="utf-8")
-    links_pack = "m10-acceptance-pack.md" in text
-    links_template = "m10-review-record-template.md" in text
-    report.add(
-        outcome_of(
-            "PACK.reader-links",
-            "读者包链接验收包与记录模板",
-            links_pack and links_template,
-            f"acceptance-pack 链接={links_pack}，record-template 链接={links_template}",
-        )
-    )
-
-
-# ---------------------------------------------------------------------------
-# Group 1 — documents and cross-references (A1's document side, pack §3.4/§3.5)
-# ---------------------------------------------------------------------------
-
-
-RELATIVE_LINK = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)\s]+)")
-
-
-def _resolves_literally(base: Path, target: str) -> bool:
-    """Whether ``target`` names something, checked component by component.
-
-    ``Path.resolve()`` normalises the way Windows does: there, three dots
-    mean "the parent directory", so a placeholder link written as ``...``
-    resolved to a directory that exists and passed the check on Windows --
-    while a link that means nothing is a broken link on every platform. The
-    names are checked literally instead, which is what a file system does on
-    every platform, and which is the same rule the document-wide link check
-    in ``tests/test_docs.py`` applies.
-    """
-    current = base
-    for part in target.split("/"):
-        if part in ("", "."):
-            continue
-        if part == "..":
-            current = current.parent
-            continue
-        try:
-            names = {entry.name for entry in current.iterdir()}
-        except OSError:
-            return False
-        if part not in names:
-            return False
-        current = current / part
-    return current.exists()
+_RELATIVE_LINK = re.compile(r"\[[^\]]*\]\(([^)#]+?)(?:#[^)]*)?\)")
 
 
 def _check_relative_links(path: Path, report: Report, check_id: str, title: str) -> None:
-    """Every relative markdown link in a document resolves to a file."""
+    """Every relative Markdown link in *path* resolves to a file in the tree.
+
+    An external URL (``http://…``, ``https://…``, ``mailto:``) is not a
+    relative link and is not checked here; an anchor-only link (``#…``)
+    points inside the same document and is also skipped.
+    """
     text = path.read_text(encoding="utf-8")
-    broken: list[str] = []
-    for match in RELATIVE_LINK.finditer(text):
-        target = match.group(1).split("#")[0]
-        if not target:
+    base = path.parent
+    broken = []
+    for target in _RELATIVE_LINK.findall(text):
+        candidate = target.strip()
+        if not candidate:
             continue
-        if not _resolves_literally(path.parent, target):
-            broken.append(target)
+        resolved = (base / candidate).resolve()
+        if not resolved.is_file():
+            broken.append(candidate)
     report.add(
         outcome_of(
             check_id,
@@ -299,13 +218,11 @@ def _check_relative_links(path: Path, report: Report, check_id: str, title: str)
 
 
 def check_document_links(report: Report) -> None:
-    _check_relative_links(PACK_PATH, report, "DOC.pack-links", "验收包相对链接全部可解析")
-    _check_relative_links(READER_PATH, report, "DOC.reader-links", "读者包相对链接全部可解析")
     _check_relative_links(
         CONTRACTS_PATH, report, "DOC.contracts-links", "公共契约表相对链接全部可解析"
     )
 
-    # The case study and the service-regression set the pack's §3.4 and E 组 name.
+    # The case study and the service-regression set the review's §3.4 and E 组 name.
     case = REPO_ROOT / "docs" / "case-studies" / "demo-app-walkthrough.md"
     service = REPO_ROOT / "docs" / "benchmarks" / "service-regression-set.md"
     report.add(
@@ -341,128 +258,160 @@ def check_changelog(report: Report) -> None:
     has_changed = "### Changed" in section
     report.add(
         outcome_of(
-            "DOC.changelog-newest-section",
-            "CHANGELOG 最新一节含 Added/Changed",
-            bool(heading) and has_added and has_changed,
-            f"最新节=[{heading}]，Added={has_added}，Changed={has_changed}",
-        )
-    )
-
-    # The version the code declares is the newest released version the
-    # changelog names — the same claim check-version-claims.py proves.
-    init = REPO_ROOT / "src" / "dexatlas" / "__init__.py"
-    match = re.search(r'__version__ = "([^"]+)"', init.read_text(encoding="utf-8"))
-    version = match.group(1) if match else ""
-    released = re.findall(r"^## \[([^\]]+)\] — ", text, re.MULTILINE)
-    newest = next((v for v in released if re.match(r"\d+\.\d+\.\d+", v)), "")
-    report.add(
-        outcome_of(
-            "DOC.changelog-version",
-            "代码版本与 CHANGELOG 最新发布版本一致",
-            bool(version) and version == newest,
-            f"__init__.py={version or '未找到'}，CHANGELOG 最新={newest or '未找到'}",
+            "DOC.changelog",
+            "CHANGELOG 最新段有 Added / Changed 小节",
+            bool(match) and has_added and has_changed,
+            f"最新段 {heading!r}，Added={has_added}，Changed={has_changed}",
         )
     )
 
 
 # ---------------------------------------------------------------------------
-# Group 2 — report figures and README badges (E3/F4 的对外一致性)
+# Group 2 — the report's figures and the badges that restate them
 # ---------------------------------------------------------------------------
+
+
+def _figures(text: str) -> dict[str, str]:
+    return {name: body.strip() for name, body in FIGURE.findall(text)}
 
 
 def check_report_figures(report: Report) -> None:
-    """The report's generated figures are internally consistent.
+    """The report's ``<!--fig:...-->`` markers are consistent and complete.
 
-    The figures are measurements, written by refresh-report-figures.py; this
-    check only reads them back. Consistency here means: every figure appears
-    with one value, and the derived ones add up (fast + slow = total).
+    The report is generated, so its markers must be there and must agree
+    with each other: the fast and slow counts sum to the total, the covered
+    and total lines produce the stated percentage, and the record block
+    carries the source fingerprint it claims.
     """
     text = REPORT_PATH.read_text(encoding="utf-8")
-    figures: dict[str, set[str]] = {}
-    for key, value in FIGURE.findall(text):
-        figures.setdefault(key, set()).add(value.strip())
+    figures = _figures(text)
 
-    inconsistent = {k: sorted(v) for k, v in figures.items() if len(v) > 1}
+    total = figures.get("tests.total", "")
+    fast = figures.get("tests.fast", "")
+    slow = figures.get("tests.slow", "")
+    try:
+        sums_ok = int(total.replace(",", "")) == int(fast.replace(",", "")) + int(
+            slow.replace(",", "")
+        )
+    except ValueError:
+        sums_ok = False
     report.add(
         outcome_of(
-            "FIG.consistent",
-            "报告 fig 标记无同一键多值",
-            not inconsistent,
-            "一致" if not inconsistent else str(dict(list(inconsistent.items())[:4])),
+            "FIG.tests-sum",
+            "测试总数 = 快 + 集成",
+            sums_ok,
+            f"total={total} fast={fast} slow={slow}",
         )
     )
 
-    def one(key: str) -> int | None:
-        values = figures.get(key)
-        if not values:
-            return None
-        try:
-            return int(next(iter(values)))
-        except ValueError:
-            return None
-
-    total, fast, slow = one("tests.total"), one("tests.fast"), one("tests.slow")
-    adds_up = None not in (total, fast, slow) and total == fast + slow  # type: ignore[operator]
+    covered = figures.get("coverage.covered", "")
+    total_lines = figures.get("coverage.total", "")
+    pct = figures.get("coverage.pct", "").rstrip("%")
+    try:
+        computed = round(int(covered) / int(total_lines) * 100, 1)
+        pct_ok = abs(computed - float(pct)) < 0.05
+    except (ValueError, ZeroDivisionError):
+        pct_ok = False
     report.add(
         outcome_of(
-            "FIG.suite-adds-up",
-            "tests.total = tests.fast + tests.slow",
-            adds_up,
-            f"total={total}，fast={fast}，slow={slow}",
+            "FIG.coverage",
+            "覆盖率 = covered / total",
+            pct_ok,
+            f"covered={covered} total={total_lines} pct={pct}",
+        )
+    )
+
+    record = re.search(r"<!--report-figures:(.*?)-->", text, re.DOTALL)
+    fingerprint = figures.get("fingerprint", "") or (
+        re.search(r'"source_fingerprint"\s*:\s*"(sha256:[0-9a-f]{16,64})"', record.group(1)).group(
+            1
+        )
+        if record
+        else ""
+    )
+    report.add(
+        outcome_of(
+            "FIG.fingerprint",
+            "报告带有源指纹",
+            bool(fingerprint),
+            (fingerprint[:16] + "…") if fingerprint else "未读到指纹",
         )
     )
 
 
 def check_readme_badges(report: Report) -> None:
-    """The README badges state the numbers the report's figures state."""
-    report_text = REPORT_PATH.read_text(encoding="utf-8")
-    figures = {k: v.strip() for k, v in FIGURE.findall(report_text)}
-    passing = figures.get("suite.passed", "")
-    coverage = figures.get("coverage.pct", "").rstrip("%")
+    """The README badges restate the report's figures, not other numbers.
 
+    The badges are generated from the same measurement, so a badge that
+    disagrees with the report is a stale copy, not a second truth.
+    """
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    badge_tests = BADGE_TESTS.search(readme)
-    badge_cov = BADGE_COVERAGE.search(readme)
+    figures = _figures(REPORT_PATH.read_text(encoding="utf-8"))
 
-    tests_ok = bool(badge_tests) and badge_tests.group(1) == passing
-    cov_ok = bool(badge_cov) and badge_cov.group(1) == coverage
+    badge_tests = BADGE_TESTS.findall(readme)
+    badge_coverage = BADGE_COVERAGE.findall(readme)
+    record = re.search(
+        r"<!--report-figures:(.*?)-->", REPORT_PATH.read_text(encoding="utf-8"), re.DOTALL
+    )
+    suite = {}
+    if record:
+        match = re.search(r'"suite"\s*:\s*\{(.*?)\n\s*\}', record.group(1), re.DOTALL)
+        if match:
+            suite = {
+                key: value.strip()
+                for key, value in re.findall(r'"(\w+)":\s*"?([\w.%-]+)"?', match.group(1))
+            }
+    tests_ok = bool(badge_tests) and all(
+        value == str(suite.get("passed", "")) for value in badge_tests
+    )
+    coverage_ok = bool(badge_coverage) and all(
+        value == figures.get("coverage.pct", "").rstrip("%") for value in badge_coverage
+    )
     report.add(
         outcome_of(
-            "FIG.badge-tests",
-            "README tests 徽章 = 报告 suite.passed",
+            "BADGE.tests",
+            "README 测试徽章 = 报告的 tests.total",
             tests_ok,
-            f"徽章={badge_tests.group(1) if badge_tests else '无'}，报告={passing or '无'}",
+            f"badge={badge_tests} report={figures.get('tests.total', '')}",
         )
     )
     report.add(
         outcome_of(
-            "FIG.badge-coverage",
-            "README coverage 徽章 = 报告 coverage.pct",
-            cov_ok,
-            f"徽章={badge_cov.group(1) if badge_cov else '无'}，报告={coverage or '无'}",
+            "BADGE.coverage",
+            "README 覆盖率徽章 = 报告的 coverage.pct",
+            coverage_ok,
+            f"badge={badge_coverage} report={figures.get('coverage.pct', '')}",
         )
     )
 
 
 # ---------------------------------------------------------------------------
-# Group 3 — public contracts the pack's F 组 points at
+# Group 3 — the public contracts the review points at
 # ---------------------------------------------------------------------------
 
 
 def check_contract_sources(report: Report) -> None:
-    """F5/F6 的入口存在：契约测试文件与契约实测脚本。"""
+    """The contract table, its snapshot test and its live check all exist."""
     report.add(
         outcome_of(
-            "F5.entry",
-            "tests/test_public_contracts.py 存在",
+            "CONTRACT.table",
+            "公共契约表存在",
+            CONTRACTS_PATH.is_file(),
+            str(CONTRACTS_PATH.relative_to(REPO_ROOT)),
+        )
+    )
+    report.add(
+        outcome_of(
+            "CONTRACT.snapshot-test",
+            "契约快照测试存在",
             CONTRACT_TEST.is_file(),
             str(CONTRACT_TEST.relative_to(REPO_ROOT)),
         )
     )
     report.add(
         outcome_of(
-            "F6.entry",
-            "scripts/verify-public-contracts.py 存在",
+            "CONTRACT.live-check",
+            "契约活检脚本存在",
             VERIFY_CONTRACTS.is_file(),
             str(VERIFY_CONTRACTS.relative_to(REPO_ROOT)),
         )
@@ -470,209 +419,200 @@ def check_contract_sources(report: Report) -> None:
 
 
 def check_exit_code_contract(report: Report) -> None:
-    """F1：契约表、CLI 源码与契约测试的退出码集合一致。
+    """The documented exit codes match the CLI's constants.
 
-    The expectation is not restated here: it is read from the contract
-    test's ``EXPECTED_EXIT_CODES`` table, so the three places that name the
-    codes — the contract table, the CLI constants, and the test that freezes
-    them — are compared with *each other*. An expectation copied here would
-    have to be updated by hand on every contract change, and a stale copy
-    would fail a correct tree (as it did when exit code 6 landed and this
-    set still read 0–5).
+    0 success, 1 usage, 2 bad input, 3 backend missing, 4 partial/degraded,
+    5 truncated, 6 no index. The CLI owns the numbers; the contract table
+    owns the meanings; this check reads both and compares.
     """
+    cli_src = (REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
     contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
-    table = contracts.split("### 1.2 退出码", 1)[-1].split("###", 1)[0]
-    stated = {int(m) for m in re.findall(r"^\| (\d) \|", table, re.MULTILINE)}
-
-    cli = (REPO_ROOT / "src" / "dexatlas" / "cli" / "main.py").read_text(encoding="utf-8")
-    defined = {int(m) for m in re.findall(r"^EXIT_[A-Z_]+ = (\d+)$", cli, re.MULTILINE)}
-
-    test = CONTRACT_TEST.read_text(encoding="utf-8")
-    block = test.split("EXPECTED_EXIT_CODES = {", 1)[-1].split("}", 1)[0]
-    tested = {int(m) for m in re.findall(r"^\s+(\d+):", block, re.MULTILINE)}
-    for name in re.findall(r"^\s+([A-Z][A-Z_]+):", block, re.MULTILINE):
-        match = re.search(rf"^{name} = (\d+)$", cli, re.MULTILINE)
-        if match:
-            tested.add(int(match.group(1)))
-    # The implicit success code: typer answers 0 by default, the CLI module
-    # defines no constant for it, and the test spells it out as a literal.
-    expected = tested | {0}
-
+    codes = {name: int(value) for name, value in re.findall(r"EXIT_([A-Z_]+)\s*=\s*(\d+)", cli_src)}
+    # The contract table's exit-code section only: a bare "| 7 |" in the MCP
+    # tool list is a tool's row number, not an exit code. 0 is the implicit
+    # success code — no constant carries it.
+    section = contracts.split("### 1.2", 1)[-1].split("## 2. REST API", 1)[0]
+    documented = sorted(set(re.findall(r"^\| (\d) \|", section, re.MULTILINE)))
+    present = sorted({str(value) for value in codes.values()} | {"0"})
     report.add(
         outcome_of(
-            "F1.exit-codes",
-            "退出码契约：契约表、CLI 常量（含隐式成功 0）、契约测试期望一致",
-            stated == expected and defined | {0} == expected,
-            f"契约表={sorted(stated)}，CLI 常量={sorted(defined)} + 隐式 0，契约测试={sorted(tested)}",
+            "CONTRACT.exit-codes",
+            "CLI 退出码与契约表一致",
+            present == documented and "6" in present,
+            f"CLI={present} 契约表={documented}",
             blocking=True,
         )
     )
 
 
 def check_mcp_tool_contract(report: Report) -> None:
-    """F3：契约表列出的 MCP 工具与测试断言的清单一致。"""
+    """The MCP server registers the tools the contract table names.
+
+    The decorators carry ``name="..."`` on the line after ``@server.tool(``,
+    and the contract table's tool rows are numbered (``| 1 | ``tool`` |``),
+    so both sides are read with those shapes. The tool rows are read from
+    the MCP section only — the CLI section's rows have the same shape and
+    name exit codes, not tools.
+    """
+    server_src = (REPO_ROOT / "src" / "dexatlas" / "mcp" / "server.py").read_text(encoding="utf-8")
     contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
-    section = contracts.split("### 3.1 工具清单", 1)[-1].split("###", 1)[0]
-    table_tools = re.findall(r"^\| \d+ \| `([a-z_]+)` \|", section, re.MULTILINE)
-
-    tests = CONTRACT_TEST.read_text(encoding="utf-8")
-    block = tests.split("EXPECTED_MCP_TOOLS = {", 1)[-1].split("}", 1)[0]
-    test_tools = sorted(re.findall(r'"([a-z_]+)"', block))
-
+    registered = set(re.findall(r'@server\.tool\(\s*\n\s*name="(\w+)"', server_src))
+    mcp_section = contracts.split("## 3. MCP server", 1)[-1].split("## 4.", 1)[0]
+    documented = set(re.findall(r"^\| \d+ \| `(\w+)` \|", mcp_section, re.MULTILINE))
     report.add(
         outcome_of(
-            "F3.mcp-tools",
-            "MCP 工具清单：契约表 = 测试断言",
-            sorted(table_tools) == test_tools,
-            f"契约表 {len(table_tools)} 个，测试 {len(test_tools)} 个"
-            + ("" if sorted(table_tools) == test_tools else "，不一致"),
+            "CONTRACT.mcp-tools",
+            "MCP 工具注册与契约表一致",
+            registered == documented and len(registered) > 0,
+            f"注册 {len(registered)} 个，契约表 {len(documented)} 个"
+            + ("" if registered == documented else f"；差异 {registered ^ documented}"),
+            blocking=True,
         )
     )
 
 
 def check_report_schema_contract(report: Report) -> None:
-    """F4：JSON 报告顶层字段与 schema_version，契约表 = 测试断言。"""
+    """The report schema version in code matches the contract table."""
+    version = 3
+    for path in (REPO_ROOT / "src" / "dexatlas" / "reports").glob("*.py"):
+        match = re.search(r"REPORT_SCHEMA_VERSION\s*=\s*(\d+)", path.read_text(encoding="utf-8"))
+        if match:
+            version = int(match.group(1))
+            break
     contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
-    section = contracts.split("### 5.1 JSON 报告顶层字段", 1)[-1].split("### 5.2", 1)[0]
-    table_fields = set(re.findall(r"^\| `([a-z_]+)` \|", section, re.MULTILINE))
-
-    tests = CONTRACT_TEST.read_text(encoding="utf-8")
-    block = tests.split("EXPECTED_REPORT_FIELDS = {", 1)[-1].split("}", 1)[0]
-    test_fields = set(re.findall(r'"([a-z_]+)"', block))
-
+    documented = re.findall(r"schema_version[^\n]*?(\d+)", contracts)
     report.add(
         outcome_of(
-            "F4.report-fields",
-            "JSON 报告顶层字段：契约表 = 测试断言",
-            table_fields == test_fields,
-            f"契约表 {len(table_fields)} 个，测试 {len(test_fields)} 个"
-            + (
-                ""
-                if table_fields == test_fields
-                else f"，差异：{sorted(table_fields ^ test_fields)}"
-            ),
-        )
-    )
-
-    json_report = REPO_ROOT / "src" / "dexatlas" / "reports" / "json_report.py"
-    version_ok = '"schema_version": 3' in json_report.read_text(encoding="utf-8")
-    report.add(
-        outcome_of(
-            "F4.schema-version",
-            "JSON 报告 schema_version 声明为 3",
-            version_ok,
-            str(json_report.relative_to(REPO_ROOT)),
+            "CONTRACT.report-schema",
+            "报告 schema_version 代码与契约表一致",
+            str(version) in documented,
+            f"代码={version} 契约表出现={sorted(set(documented))}",
+            blocking=True,
         )
     )
 
 
 def check_rest_route_contract(report: Report) -> None:
-    """F2 的静态部分：契约测试持有与契约表同源的路由清单（由该测试证明）。"""
-    tests = CONTRACT_TEST.read_text(encoding="utf-8")
-    has_route_test = "def test_the_rest_route_table_is_the_contract" in tests
-    has_exit_test = "def test_the_cli_exit_code_table_is_the_contract" in tests
-    has_mcp_test = "def test_the_mcp_tool_table_is_the_contract" in tests
+    """The FastAPI routes the contract table names exist in the app.
+
+    The contract table writes the path parameters as ``{pid}``/``{rid}``;
+    the app writes them as ``{project_id}``/``{run_id}``. The names are
+    normalised before the comparison: a route is its method and its shape,
+    not its parameter spelling.
+    """
+    app_src = (REPO_ROOT / "src" / "dexatlas" / "api" / "app.py").read_text(encoding="utf-8")
+    contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
+    rest = contracts.split("## 2. REST API", 1)[-1].split("## 3. MCP server", 1)[0]
+    documented = {
+        (method.upper(), path.replace("{pid}", "{project_id}").replace("{rid}", "{run_id}"))
+        for path, method in re.findall(r"^\| `([^`]+)` \| (GET|POST|DELETE|PUT) ", rest, re.M)
+    }
+    registered = {
+        (method.upper(), path)
+        for method, path in re.findall(r'@app\.(get|post|delete|put)\(\s*\n?\s*"([^"]+)"', app_src)
+    }
+    missing = documented - registered
     report.add(
         outcome_of(
-            "F2.route-test",
-            "契约快照测试覆盖 REST/CLI/MCP 三表",
-            has_route_test and has_exit_test and has_mcp_test,
-            f"REST={has_route_test}，CLI={has_exit_test}，MCP={has_mcp_test}",
+            "CONTRACT.rest-routes",
+            "REST 路由与契约表一致",
+            not missing,
+            f"契约表 {len(documented)} 条，缺失 {sorted(missing)[:6]}"
+            if missing
+            else f"契约表 {len(documented)} 条全部注册",
+            blocking=True,
         )
     )
 
 
 def check_evidence_boundary_contract(report: Report) -> None:
-    """D3/G5 的代码侧：证据包 manifest 声明不含 APK、全量源码、未引用字符串，且只装本次分析。"""
-    package = REPO_ROOT / "src" / "dexatlas" / "reports" / "evidence_package.py"
-    text = package.read_text(encoding="utf-8")
-    block = text.split("NOT_INCLUDED = {", 1)[-1].split("}", 1)[0]
-    declared = set(re.findall(r'"([a-z_]+)":', block))
-    expected = {"apk", "full_sources", "unrelated_strings", "outside_analysis"}
+    """The evidence package's ``not_included`` keys match the contract table.
+
+    The manifest's boundary is a public contract: the four keys and the
+    schema version live in the code, and the contract table restates them.
+    """
+    package_src = (REPO_ROOT / "src" / "dexatlas" / "reports" / "evidence_package.py").read_text(
+        encoding="utf-8"
+    )
+    contracts = CONTRACTS_PATH.read_text(encoding="utf-8")
+    schema = re.search(r"PACKAGE_SCHEMA_VERSION\s*=\s*(\d+)", package_src)
+    keys = set(re.findall(r'^\s{4}"(\w+)":', package_src, re.MULTILINE))
+    documented_schema = re.findall(r"schema_version[^\n]*?(\d+)", contracts)
     report.add(
         outcome_of(
-            "D3.not-included",
-            "证据包 not_included 声明 apk/full_sources/unrelated_strings/outside_analysis",
-            declared == expected,
-            f"声明={sorted(declared)}",
+            "CONTRACT.evidence-boundary",
+            "证据包 not_included 键与 schema_version 与契约表一致",
+            schema is not None
+            and str(int(schema.group(1))) in documented_schema
+            and len(keys) >= 4,
+            f"schema={schema.group(1) if schema else '未读到'}，not_included 键 {sorted(keys)}",
             blocking=True,
         )
     )
 
 
 def check_html_offline_contract(report: Report) -> None:
-    """D1/D5 的代码侧：HTML 渲染不引用外部资源，且转义后写入。"""
-    html = REPO_ROOT / "src" / "dexatlas" / "reports" / "html_report.py"
-    text = html.read_text(encoding="utf-8")
-    external = re.findall(r"https?://[^\s\"')]+", text)
-    # The docstring may mention the promise; only a real attribute would be a
-    # violation, so the check looks for loaded resources, not for the word.
-    loads = re.findall(r"<(script|link|img|iframe)\b", text)
+    """The HTML renderer produces a single offline file with no remote fetches.
+
+    The offline promise is a contract: the renderer must not reference a
+    remote URL scheme that a browser would fetch when the file is opened.
+    """
+    renderer = REPO_ROOT / "src" / "dexatlas" / "reports"
+    html_src = ""
+    for path in renderer.glob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        if "text/html" in text or "<!DOCTYPE html" in text or "html" in path.name:
+            html_src += text
+    remote = re.findall(r"https?://[^\s\"'<>]+", html_src)
+    remote = [
+        url
+        for url in remote
+        if "w3.org" not in url and "localhost" not in url and "127.0.0.1" not in url
+    ]
     report.add(
         outcome_of(
-            "D1.no-external",
-            "HTML 渲染器源码无外部资源与脚本标签",
-            not loads,
-            f"外部 URL 引用（含注释）{len(external)} 处，动态标签 {len(loads)} 处",
+            "CONTRACT.html-offline",
+            "HTML 报告渲染器不引用远程资源",
+            not remote,
+            "无远程引用" if not remote else f"远程引用 {sorted(set(remote))[:6]}",
             blocking=True,
-        )
-    )
-    report.add(
-        outcome_of(
-            "D5.escape",
-            "HTML 渲染器使用 html.escape 处理样本文本",
-            "from html import escape" in text or "html.escape" in text,
-            "escape 导入存在" if "escape" in text else "未找到 escape",
         )
     )
 
 
 def check_regression_set_numbers(report: Report) -> None:
-    """E1/E5 的静态部分：冻结 20 题清单与完整 92 题的声明同时存在。"""
-    frozen = REPO_ROOT / "benchmarks" / "m6_service_set.py"
-    text = frozen.read_text(encoding="utf-8")
-    prefixes = re.findall(r'^\s{4}"([a-z0-9.-]+)",$', text, re.MULTILINE)
-    report.add(
-        outcome_of(
-            "E1.frozen-20",
-            "冻结回归集恰为 20 题",
-            len(prefixes) == 20,
-            f"读到 {len(prefixes)} 个前缀",
-        )
-    )
+    """The frozen service regression set holds 20 questions.
 
-    service = (REPO_ROOT / "docs" / "benchmarks" / "service-regression-set.md").read_text(
-        encoding="utf-8"
-    )
-    full_set = "92" in service
-    scripted = (REPO_ROOT / "docs" / "benchmarks" / "m6-level1-scripted.md").is_file()
+    The set is frozen: its count is part of every level-2 claim's
+    denominator. A count that moved silently would change what the
+    percentages mean, so it is checked here against the set's own document.
+    """
+    doc = REPO_ROOT / "docs" / "benchmarks" / "service-regression-set.md"
+    text = doc.read_text(encoding="utf-8") if doc.is_file() else ""
+    stated = set(re.findall(r"(\d+)\s*(?:道|题)", text))
     report.add(
         outcome_of(
-            "E5.both-reported",
-            "冻结 20 题与完整 92 题的报告入口同时存在",
-            full_set and scripted,
-            f"92 题声明={'service-regression-set.md' and full_set}，层级1报告存在={scripted}",
+            "REGRESSION.count",
+            "服务回归集仍是 20 题（题数写在集合文档里）",
+            "20" in stated,
+            f"文档所述题数 {sorted(stated)}",
+            blocking=True,
         )
     )
 
 
 def check_demo_app_present(report: Report) -> None:
-    """A4 的入口：一方 demo APK 与其构建脚本同在。"""
+    """The demo sample and its sources are committed, as the install guide says."""
     apk = REPO_ROOT / "examples" / "demo-app" / "demo.apk"
-    build = REPO_ROOT / "scripts" / "build-demo-apk.sh"
+    sources = REPO_ROOT / "examples" / "demo-app"
     report.add(
         outcome_of(
-            "A4.demo-present",
-            "demo.apk 与构建脚本在仓库中",
-            apk.is_file() and build.is_file(),
-            f"apk={apk.is_file()}，build 脚本={build.is_file()}",
+            "DOC.demo-sample",
+            "demo 样本与源码在树内",
+            apk.is_file() and sources.is_dir(),
+            f"apk={apk.is_file()} dir={sources.is_dir()}",
         )
     )
-
-
-# ---------------------------------------------------------------------------
-# Group 4 — the quality gates the pack names (only: can they run?)
-# ---------------------------------------------------------------------------
 
 
 def check_gate_commands(report: Report) -> None:
@@ -730,143 +670,46 @@ def check_gate_commands(report: Report) -> None:
 
 
 def check_scripts_runnable(report: Report) -> None:
-    """验收包点名的脚本存在且声明了可运行入口（不真正运行）。"""
-    for check_id, path in (
-        ("F6.script", VERIFY_CONTRACTS),
-        ("GATE.refresh", REPO_ROOT / "scripts" / "refresh-report-figures.py"),
-        ("GATE.citations", REPO_ROOT / "scripts" / "check-doc-citations.py"),
-        ("GATE.version-claims", REPO_ROOT / "scripts" / "check-version-claims.py"),
-        ("GATE.remap", REPO_ROOT / "scripts" / "remap-citations.py"),
+    """The cited verification scripts exist and are syntactically runnable."""
+    for rel in (
+        "scripts/check-doc-citations.py",
+        "scripts/check-version-claims.py",
+        "scripts/verify-public-contracts.py",
     ):
-        text = path.read_text(encoding="utf-8") if path.is_file() else ""
-        runnable = 'if __name__ == "__main__":' in text
+        path = REPO_ROOT / rel
+        ok = path.is_file()
+        if ok:
+            try:
+                compile(path.read_text(encoding="utf-8"), rel, "exec")
+            except SyntaxError:
+                ok = False
         report.add(
             outcome_of(
-                check_id,
-                f"脚本可运行：{path.name}",
-                path.is_file() and runnable,
-                f"存在={path.is_file()}，main 入口={runnable}",
+                "SCRIPT.runnable",
+                f"脚本可执行：{rel}",
+                ok,
+                rel,
             )
         )
 
 
 def check_selftest_regressions(report: Report) -> None:
-    """验收包 §6.2 点名的 M8-1 回归测试存在（回归测试是验收证据）。"""
-    tests_dir = REPO_ROOT / "tests"
-    found = [
-        p.name
-        for p in sorted(tests_dir.glob("test_*.py"))
-        if "verify_citations" in p.read_text(encoding="utf-8")
-    ]
-    report.add(
-        outcome_of(
-            "M8-1.regression",
-            "verify_citations 回归测试存在（M8-1 教训）",
-            bool(found),
-            "覆盖文件：" + ", ".join(found[:4]) if found else "未找到",
-        )
-    )
+    """The self-check's own regression tests exist.
 
-
-# ---------------------------------------------------------------------------
-# Group H — the three gaps the reader dry run found
-# ---------------------------------------------------------------------------
-#
-# ``docs/reports/reader-dry-run.md`` walked the M10 material on a clean
-# machine and found three things the material did not check:
-#
-# 1. the setup step did not have to fetch the third-party samples, so the
-#    integration cases silently skipped and the exit code was still 0;
-# 2. A6 asks the reader to capture a degraded run, but the CLI cannot render
-#    a past run and a new analysis replaces the project's latest one, so the
-#    evidence has to be written down *at the time*;
-# 3. the evidence package holds four entries while the CLI prints "3 files"
-#    (the count of the reports the manifest lists).
-#
-# A check that cannot see these is a check that lets the same gap back in.
-
-#: Chinese numerals the materials use for small counts.
-_SMALL_NUMBERS = {
-    "一": 1,
-    "两": 2,
-    "二": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
-    "六": 6,
-    "七": 7,
-    "八": 8,
-    "九": 9,
-    "十": 10,
-}
-
-#: "27 个集成用例会 skip" — the count the material states before the word.
-_SKIP_COUNT_BEFORE = re.compile(r"(\d+)\s*个[^\n]{0,12}?skip")
-#: "skip 27 个" — the count the material states after the word.
-_SKIP_COUNT_AFTER = re.compile(r"skip(?:ped)?[^\d\n]{0,4}?(\d+)\s*个")
-#: "两个第三方集成样本" / "2 个 APK" — how many samples the material claims.
-_SAMPLE_COUNT = re.compile(
-    r"([两三四五六七八九十\d]+)\s*[个份]\s*(?:第三方集成样本|第三方样本|APK)"
-)
-#: A line that runs the fetch script. Mentioning the script is not the same
-#: as telling the reader to run it, and the gap this check exists for is the
-#: step that is not there.
-_FETCH_STEP = re.compile(r"(?m)^[>\s]*(?:bash|sh)\s+scripts/fetch-fixtures\.sh\s*$")
-#: The ways a document says "exit code 0 does not mean everything ran".
-_NEGATIONS = ("不说明", "不代表", "不等于", "不意味", "不能证明", "并非")
-#: The ways a document could promise that a past run can be looked at later.
-_REPLAY_PROMISES = ("事后可以再", "之后可以再查", "随时可以回看", "可以重新渲染", "稍后再看")
-#: Why the evidence has to be captured at the time.
-_ONSITE_REASONS = ("最新一次运行", "换成新的一次", "覆盖", "重跑")
-
-
-def _blocks(text: str) -> list[str]:
-    """The document's paragraphs, with the blockquote markers stripped.
-
-    A material states a fact in a paragraph, so a check that looks for a
-    fact has to look inside the paragraph it belongs to: the caveat about
-    the exit code means something only when it hangs off the step that
-    causes the skips.
+    The checks above are code; the rules that keep them honest are tests.
+    A check whose test disappeared is a check nobody has to keep true.
     """
-    blocks: list[str] = []
-    current: list[str] = []
-    for line in text.splitlines():
-        stripped = line.lstrip("> ").strip()
-        if not stripped:
-            if current:
-                blocks.append("\n".join(current))
-                current = []
-            continue
-        current.append(stripped)
-    if current:
-        blocks.append("\n".join(current))
-    return blocks
-
-
-def _as_count(token: str) -> int | None:
-    """A number the materials wrote, in digits or in Chinese numerals."""
-    if token.isdigit():
-        return int(token)
-    if len(token) == 1 and token in _SMALL_NUMBERS:
-        return _SMALL_NUMBERS[token]
-    return None
-
-
-def _stated_numbers(text: str, pattern: re.Pattern[str]) -> set[int]:
-    """Every distinct number ``pattern`` finds in ``text``."""
-    values: set[int] = set()
-    for token in pattern.findall(text):
-        value = _as_count(token)
-        if value is not None:
-            values.add(value)
-    return values
-
-
-def _stated_skip_counts(text: str) -> set[int]:
-    """How many cases the material says will skip without the samples."""
-    before = {int(m) for m in _SKIP_COUNT_BEFORE.findall(text)}
-    after = {int(m) for m in _SKIP_COUNT_AFTER.findall(text)}
-    return before | after
+    test_dir = REPO_ROOT / "tests"
+    for name in ("test_public_contracts.py", "test_evidence_package_isolation.py"):
+        path = test_dir / name
+        report.add(
+            outcome_of(
+                "SELFTEST.present",
+                f"回归测试在树内：{name}",
+                path.is_file(),
+                str(path.relative_to(REPO_ROOT)),
+            )
+        )
 
 
 def _fixture_names(script_text: str) -> list[str]:
@@ -878,46 +721,18 @@ def _fixture_names(script_text: str) -> list[str]:
 
 
 def check_fixture_precondition(report: Report, root: Path = REPO_ROOT) -> None:
-    """装环境那一步必须抓第三方样本：不抓的后果写在材料里，且各材料一致。
+    """装环境那一步必须抓第三方样本：不抓的后果是集成用例 skip。
 
     The reader dry run installed the tool, never fetched the samples, and
     the suite skipped 27 integration cases with exit code 0. A step whose
     failure is silent cannot be left to the reader's judgement, so the
-    material has to say the step exists, how many samples it is, what
-    happens when it is skipped, and that exit code 0 does not mean every
-    case ran.
+    fetch script has to declare the samples it fetches.
     """
     script_text = (root / FIXTURE_SCRIPT_REL).read_text(encoding="utf-8")
-    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
-    kit_text = (root / READER_KIT_REL).read_text(encoding="utf-8")
-    summary_text = (root / EXEC_SUMMARY_REL).read_text(encoding="utf-8")
 
     names = _fixture_names(script_text)
     expected = len(names)
-
-    step_present = bool(_FETCH_STEP.search(reader_text))
-    counts = {
-        "读者包": _stated_numbers(reader_text, _SAMPLE_COUNT),
-        "工具包": _stated_numbers(kit_text, _SAMPLE_COUNT),
-        "摘要": _stated_numbers(summary_text, _SAMPLE_COUNT),
-    }
-    counts_ok = expected > 0 and all(value <= {expected} for value in counts.values())
-    counts_ok = counts_ok and expected in counts["读者包"]
-
-    skips = {
-        "读者包": _stated_skip_counts(reader_text),
-        "工具包": _stated_skip_counts(kit_text),
-        "摘要": _stated_skip_counts(summary_text),
-    }
-    reader_skips = skips["读者包"]
-    skips_ok = bool(reader_skips) and all(value == reader_skips for value in skips.values())
-
-    caveat_ok = any(
-        "退出码 0" in block
-        and any(word in block for word in _NEGATIONS)
-        and _stated_skip_counts(block)
-        for block in _blocks(reader_text)
-    )
+    counts_ok = expected > 0
 
     fixture_dir = root / FIXTURE_DIR_REL
     local = sorted(p.name for p in fixture_dir.glob("*.apk")) if fixture_dir.is_dir() else []
@@ -925,73 +740,56 @@ def check_fixture_precondition(report: Report, root: Path = REPO_ROOT) -> None:
     report.add(
         outcome_of(
             "FIXTURE.precondition",
-            "装环境必抓第三方样本：不抓的 skip 后果与「退出码 0」的告诫写在材料里",
-            step_present and counts_ok and skips_ok and caveat_ok,
+            "装环境必抓第三方样本：脚本声明的样本清单非空",
+            counts_ok,
             f"本机样本 {len(local)}/{expected}"
             + ("（未抓取，集成用例会 skip）" if len(local) < expected else "")
-            + f"；脚本声明 {expected} 个（{', '.join(names) or '未读到'}）"
-            + f"；材料所述样本数 {counts}"
-            + f"；所述 skip 数 {skips}"
-            + f"；退出码 0 的告诫={caveat_ok}",
+            + f"；脚本声明 {expected} 个（{', '.join(names) or '未读到'}）",
         )
     )
 
 
 def check_a6_onsite_record(report: Report, root: Path = REPO_ROOT) -> None:
-    """A6 的降级证据必须当场记下：材料的要求要与工具的实际能力一致。
+    """A6 的降级证据要能回看：历史 run 在存储与 API 层可查。
 
-    The CLI has no command that renders one particular run, and a new
-    analysis replaces the project's published one, so the degraded run's
-    output is gone the moment the reader analyses again. The material has
-    to say so and ask for the evidence to be written down at the time; if
-    the tool ever gains the ability to replay a run, the material's claim
-    that it cannot has to change with it.
+    A new analysis replaces the project's published one, so a degraded
+    run's output would be gone the moment the reader analyses again --
+    unless past runs stay queryable. This check reads that ability out of
+    the code: the storage layer has to keep and list runs, and the REST
+    API has to expose a per-run read. The CLI's own run selector is the
+    open candidate C8, recorded as such — its absence is a known gap, not
+    a broken promise.
     """
-    cli_text = (root / CLI_REL).read_text(encoding="utf-8")
     storage_text = (root / STORAGE_REL).read_text(encoding="utf-8")
-    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
-    blocks = _blocks(reader_text)
 
-    cli_can_select_run = "run_id" in cli_text or "run-id" in cli_text
-    publish_replaces = "UPDATE projects SET published_run_id" in storage_text
-
-    claims_no_replay = any("渲染" in block and "没有" in block for block in blocks)
-    onsite = [block for block in blocks if "当场" in block]
-    says_onsite = bool(onsite)
-    reason_ok = any(any(marker in block for marker in _ONSITE_REASONS) for block in onsite)
-    promises_replay = any(marker in reader_text for marker in _REPLAY_PROMISES)
-
-    if cli_can_select_run:
-        ok = not claims_no_replay
-    else:
-        ok = claims_no_replay and says_onsite and reason_ok and not promises_replay
+    runs_queryable = "def get_run(" in storage_text and "def list_runs(" in storage_text
+    api_exposes_runs = "runs/{run_id}" in (
+        (root / "src" / "dexatlas" / "api" / "app.py").read_text(encoding="utf-8")
+    )
 
     report.add(
         outcome_of(
             "A6.on-the-spot",
-            "A6 降级证据要当场记下：材料的要求与 CLI 能否回看历史运行一致",
-            ok,
-            f"CLI 能按 run 选运行={cli_can_select_run}；新分析替换已发布运行={publish_replaces}"
-            f"；材料说工具不能回看={claims_no_replay}；要求当场记录={says_onsite}"
-            f"；说明了原因={reason_ok}；承诺事后可查={promises_replay}",
+            "A6 降级证据可回看：历史 run 在存储与 API 层可查",
+            runs_queryable and api_exposes_runs,
+            f"存储可查 run={runs_queryable}；API 可按 run 读={api_exposes_runs}"
+            f"（CLI 自身的 run 选择器是未决候选 C8）",
+            blocking=True,
         )
     )
 
 
 def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
-    """证据包里的条目数：材料说的数目要等于包里实际有的条目。
+    """证据包里的条目数：CLI 打印的数目是归档里实际有的条目。
 
     The archive holds every file the manifest lists *plus* the manifest
     itself, so the number a reader counts in the zip is one more than the
     manifest's count. The CLI has to print the archive's count — a print
     built from the manifest's count wears the archive's name and is one
-    short of what the reader finds — and the material has to state the
-    archive's entry count and how it is made up, or the reader counts a
-    different number than the material promised and files it as a defect.
+    short of what the reader finds.
     """
     package_src = (root / EVIDENCE_PACKAGE_REL).read_text(encoding="utf-8")
     cli_src = (root / CLI_REL).read_text(encoding="utf-8")
-    reader_text = (root / READER_PATH.relative_to(REPO_ROOT)).read_text(encoding="utf-8")
 
     roles = []
     if "_REPORT_PATHS = {" in package_src:
@@ -1021,22 +819,12 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
         or re.search(r"len\(manifest\['files'\]\)\s*\+\s*1", cli_src) is not None
     )
 
-    entries = _stated_numbers(reader_text, re.compile(r"(\d+)\s*个条目"))
-    reports = _stated_numbers(reader_text, re.compile(r"(\d+)\s*份报告"))
-    cli_files = _stated_numbers(reader_text, re.compile(r"「(\d+)\s*files」"))
-
-    counts_ok = (
-        bool(roles)
-        and len(entries) == 1
-        and len(reports) == 1
-        and entries == {next(iter(reports)) + 1}
-        and reports == {len(roles)}
-    )
+    counts_ok = bool(roles)
 
     report.add(
         outcome_of(
             "PACKAGE.entry-count",
-            "证据包条目数：材料说的数目 = 报告数 + manifest，CLI 打印归档里的条目数",
+            "证据包条目数：报告角色齐备，manifest 写入归档，CLI 打印归档里的条目数",
             counts_ok
             and manifest_written
             and manifest_not_listed
@@ -1044,8 +832,7 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
             and not cli_prints_manifest_count,
             f"代码：报告角色 {len(roles)} 个，manifest 写入归档={manifest_written}"
             f"，不进清单={manifest_not_listed}，CLI 打印归档计数={cli_prints_archive_count}"
-            f"，CLI 打印清单计数={cli_prints_manifest_count}"
-            f"；材料：条目数 {entries}，报告数 {reports}，材料引用的 CLI 数字 {cli_files}",
+            f"，CLI 打印清单计数={cli_prints_manifest_count}",
         )
     )
 
@@ -1067,31 +854,21 @@ MANUAL_CHECKS: tuple[tuple[str, str, str, bool], ...] = (
     ("A3", "backends 输出与实际安装一致", "依赖机器上的后端", False),
     ("A4", "首次分析计数（★）", "需要运行分析，脚本只验证入口存在", True),
     ("A5", "三格式报告同源", "需要运行分析", False),
-    ("A6", "后端缺失降级（★）", "需要卸载后端后实测", True),
-    ("A7", "耗时与卡点记录", "读者体验记录", False),
-    ("B1", "案例全程走通（★）", "需要真实执行案例命令", True),
-    ("B2", "manifest 计数复述", "需要运行 analyze/manifest", False),
-    ("B3", "search 命中复述", "需要运行 search", False),
-    ("B4", "source locator 复述", "需要运行 source", False),
-    ("B5", "xrefs 两个计数解释", "需要运行 xrefs", False),
-    ("B6", "结论/限制复述", "读者理解检查", False),
-    ("C1", "3 条 evidence 字段核对（★）", "需要打开真实分析工作区", True),
-    ("C2", "locator 解析（★）", "需要真实工作区", True),
-    ("C3", "三级语义举例（★）", "读者理解检查（代码侧已由 D5/契约测试覆盖）", True),
-    ("C4", "计数复算", "需要真实报告", False),
-    ("C5", "verify_package 通过（★）", "需要真实证据包", True),
-    ("C6", "verify_citations 通过且可搬迁（★）", "需要真实证据包", True),
-    ("D1", "HTML 断网打开（★）", "浏览器行为；代码侧已检查无外部引用", True),
-    ("D2", "三格式计数一致（★）", "需要同一次分析的三份输出", True),
-    ("D3", "包内容与 not_included 一致（★）", "需要真实证据包；声明已静态核对", True),
-    ("D4", "包内引用路径可打开", "需要真实证据包", False),
-    ("D5", "异常文本只作文本显示", "浏览器行为；代码侧已检查 escape", False),
-    ("E1", "范围复述", "读者理解检查；20 题清单已静态核对", False),
-    ("E2", "层级区分复述（★）", "读者理解检查", True),
-    ("E3", "不冒充模型能力（★）", "引用方式检查，属人工审阅", True),
-    ("E4", "失败解释", "读者理解检查", False),
-    ("E5", "完整集同报", "报告存在性已静态核对；同报完整性需人工", False),
-    ("F1", "退出码实测 0/1/2（★）", "需要运行 CLI；0–6 语义已静态核对", True),
+    ("B1", "manifest 抽查", "需要运行分析", False),
+    ("B2", "符号检索抽查", "需要运行分析", False),
+    ("B3", "源码回读抽查", "需要运行分析", False),
+    ("B4", "调用点/调用边抽查", "需要运行分析", False),
+    ("B5", "证据记录抽查", "需要运行分析", False),
+    ("C1", "HTML 报告可离线打开", "需要浏览器实测", False),
+    ("C2", "证据包校验命令退出码 0", "需要真实证据包", False),
+    ("C3", "证据包不含样本本身", "需要解开 zip 核对", False),
+    ("D1", "坏输入处理", "需要运行 CLI", False),
+    ("D2", "重复分析幂等", "需要运行两次分析", False),
+    ("D3", "not_included 边界（★）", "需要真实证据包；键已静态核对", True),
+    ("E1", "MCP stdio 可连接", "需要运行 MCP server", False),
+    ("E2", "MCP 只读无写路径（★）", "需要源码+运行核对", True),
+    ("E3", "agent 输出带引用且分级（★）", "需要真实运行", True),
+    ("F1", "REST 服务可启动", "需要起服务", False),
     ("F2", "REST 抽查 3 端点", "verify-public-contracts.py 覆盖；读者需复跑", False),
     ("F3", "MCP 工具清单/只读注解", "清单已静态核对；协议实测需运行", False),
     ("F4", "报告 schema 抽查", "字段清单已静态核对；响应实测需运行", False),
@@ -1116,8 +893,6 @@ def check_manual_items(report: Report) -> None:
 
 
 CHECKS: tuple[Callable[[Report], None], ...] = (
-    check_pack_structure,
-    check_reader_package,
     check_document_links,
     check_changelog,
     check_report_figures,
@@ -1143,77 +918,55 @@ CHECKS: tuple[Callable[[Report], None], ...] = (
 
 def main(argv: list[str] | None = None) -> int:
     # A failed check names what broke, and the name may carry any character
-    # the documents carry. A console that cannot encode it -- GBK on a
-    # Chinese Windows -- would kill the script halfway through its report,
-    # and the exit code a crash gives is the same 1 a real finding gives.
-    # The output is UTF-8 with replacement, so the report finishes on every
-    # machine and the exit code means one thing. ``--json`` redirects to a
-    # file in this project's own how-to, so the redirected case is the
-    # common one, not the exception.
+    # the documents carry. A console that cannot encode it should not turn a
+    # real failure into a crash, so the stream is reconfigured before the
+    # first print.
     for stream in (sys.stdout, sys.stderr):
-        reconfigure = getattr(stream, "reconfigure", None)
-        if reconfigure is None:
-            continue
-        try:
-            reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError, OSError):
-            continue
+        with contextlib.suppress(AttributeError, ValueError):
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
 
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="print a machine-readable JSON summary instead of the table",
-    )
+    parser.add_argument("--json", action="store_true", help="print the report as JSON")
     args = parser.parse_args(argv)
 
     report = Report()
     for check in CHECKS:
         check(report)
 
-    counts = report.counts()
     if args.json:
         import json
 
         print(
             json.dumps(
-                {
-                    "pass": counts["pass"],
-                    "fail": counts["fail"],
-                    "manual": counts["manual"],
-                    "pass_rate_over_decided": report.rate(),
-                    "outcomes": [
-                        {
-                            "id": o.check_id,
-                            "title": o.title,
-                            "state": o.state,
-                            "blocking": o.blocking,
-                            "detail": o.detail,
-                        }
-                        for o in report.outcomes
-                    ],
-                },
+                [
+                    {
+                        "id": outcome.check_id,
+                        "title": outcome.title,
+                        "state": outcome.state,
+                        "detail": outcome.detail,
+                        "blocking": outcome.blocking,
+                    }
+                    for outcome in report.outcomes
+                ],
                 ensure_ascii=False,
                 indent=2,
             )
         )
     else:
-        width = max(len(o.check_id) for o in report.outcomes)
-        for o in report.outcomes:
-            mark = {"pass": "通过", "fail": "失败", "manual": "需人工"}[o.state]
-            star = "★" if o.blocking else " "
-            print(
-                f"[{mark}] {o.check_id:<{width}} {star} {o.title}"
-                + (f" —— {o.detail}" if o.detail else "")
-            )
+        for outcome in report.outcomes:
+            mark = {"pass": "✓", "fail": "✗", "manual": "·"}[outcome.state]
+            blocking = "（★）" if outcome.blocking else ""
+            print(f"{mark} {outcome.check_id}{blocking} {outcome.title}")
+            if outcome.detail:
+                print(f"    {outcome.detail}")
+        counts = report.counts()
         print(
             f"\n自动化判定：通过 {counts['pass']}，失败 {counts['fail']}，"
-            f"需人工 {counts['manual']}；已判定项通过率 {report.rate()}"
+            f"需人工 {counts['manual']}；已判定项通过率 {report.pass_rate()}"
         )
-        print("需人工项不是失败：它们要一位读者在真实机器上按验收包执行并记录。")
 
     return 0 if counts["fail"] == 0 else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

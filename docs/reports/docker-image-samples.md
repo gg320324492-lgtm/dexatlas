@@ -203,8 +203,8 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
      `analyze examples/demo-app/demo.apk` 与四个计数的断言。
    两条都不需要 Docker，因此不会给 CI 增加分钟级的开销。
 2. **本轮不影响源码指纹**：指纹的范围是 `src/` 与 `tests/` 下的 `.py`、
-   `pyproject.toml` 与测量脚本自己（`scripts/refresh-report-figures.py:953-976`
-   的 `fingerprint_files`）。本轮改动的文件一个都不在这个范围里，所以主会话正在跑
+   仓库配置文件与测量脚本自己（指纹收集函数见
+   `scripts/refresh-report-figures.py:989-1013` `anchor: fingerprint_files`）。本轮改动的文件一个都不在这个范围里，所以主会话正在跑
    的那轮测量**不会被本轮作废**。
 3. **`docs/status.md` 的 job 计数是陈旧的**（那一节写「九个 workflow job」，表里十行，
    `ci.yml` 里十三个 job 定义）。这是另一处改动带来的陈旧，本轮只改了表里 docker

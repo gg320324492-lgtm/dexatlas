@@ -387,41 +387,45 @@ def test_the_exit_code_is_the_same_on_any_console(
 
 
 def test_the_release_documents_are_checked() -> None:
-    """The release notes and the release body are on the checker's list.
+    """The release notes are on the checker's list.
 
-    The release body carries the appendix that says where every number of a
-    release came from. Those line numbers drifted for a long time — nobody
-    was checking them, because the document was not on this list.
+    The release body was removed in the 2026-11-21 de-platformisation
+    cleanup; the release notes remain, and they still have to be checked.
     """
     checker = _checker()
     names = {document.name for document in checker.DOCS}
 
-    assert "v1.0.0-github-release-body.md" in names, "the release body is not checked"
     assert "v1.0.0.md" in names, "the release notes are not checked"
 
 
-def test_a_drifted_citation_in_the_release_body_fails_the_check(
+def test_a_drifted_citation_in_a_checked_document_fails_the_check(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A line number in the release appendix that no longer holds is drift.
+    """A line number in a checked document that no longer holds is drift.
 
-    The appendix is a table of "number in the body | source". Corrupting one
-    of its line numbers has to turn the check red: a table of claims that
-    nothing checks is a table of guesses.
+    The checked documents cite line numbers. Corrupting one of them has to
+    turn the check red: a citation that nothing checks is a guess. The
+    release notes carry no ``file:line`` citation (they link by name), so
+    the corruption is exercised on a report that does.
     """
     checker = _checker()
-    body = REPO_ROOT / "docs" / "reports" / "v1.0.0-github-release-body.md"
-    text = body.read_text(encoding="utf-8")
-    corrupted = text.replace("docs/status.md:37", "docs/status.md:3737", 1)
-    assert corrupted != text, "the release body does not cite docs/status.md:37"
+    source = REPO_ROOT / "docs" / "reports" / "c6-build-time-from-ci.md"
+    text = source.read_text(encoding="utf-8")
 
-    document = tmp_path / "body.md"
+    match = re.search(r"([a-zA-Z0-9/_.-]+\.md):(\d+)", text)
+    assert match, "the report carries no file:line citation"
+    target, line = match.group(1), match.group(2)
+
+    corrupted = text.replace(f"{target}:{line}", f"{target}:{line}0", 1)
+    assert corrupted != text
+
+    document = tmp_path / "report.md"
     document.write_text(corrupted, encoding="utf-8")
     monkeypatch.setattr(checker, "DOCS", [document])
 
     assert checker.main() == 1
     written = capsys.readouterr().out
-    assert "docs/status.md:3737" in written, "the corrupted line number was not the finding"
+    assert f"{target}:{line}0" in written, "the corrupted line number was not the finding"
 
 
 def _a_word_on_one_line_only(lines: list[str]) -> tuple[str, int]:
@@ -684,25 +688,23 @@ def test_a_tree_that_is_not_in_the_checkout_is_a_finding(
     assert "no such tree" in kinds, [finding.render() for finding in report.findings]
 
 
-def test_the_release_body_is_read_out_of_the_release_tree() -> None:
-    """The release body says its line numbers refer to the v1.0.0 tree.
+def test_the_documents_read_out_of_declared_trees_are_clean() -> None:
+    """The documents that declare a tree are read out of the tree they name.
 
-    It is the one document in the repository that describes a tree other than
-    the one it is read from, and the checker has to say which tree it read
-    each citation out of.
+    A document whose line numbers belong to another tree has to be read out
+    of that tree; a citation that drifted or could not be resolved says the
+    tree was read wrong.
     """
     checker = _checker()
     report = checker.check_documents(checker.DOCS)
 
-    trees = {label: citations for label, _documents, citations in report.trees}
-    assert trees.get("the v1.0.0 tree"), (
-        f"the release body was not read out of the release tree: {report.trees}"
-    )
+    declared = {checker.relative_path(document) for document in checker.DOCS}
+    declared &= set(checker.TREE_DOCUMENTS)
+    assert declared, "no document declares a tree"
     # The value findings are a separate class: they say what a number in the
-    # document states against the number the line holds, and the release
-    # body's appendix has some of those. What this test is about is the
-    # tree, and a citation that drifted or could not be resolved would say
-    # that the tree was read wrong.
+    # document states against the number the line holds. What this test is
+    # about is the tree, and a citation that drifted or could not be resolved
+    # would say that the tree was read wrong.
     assert not report.drifted, [finding.render() for finding in report.drifted]
     assert not report.unresolved, [finding.render() for finding in report.unresolved]
 
@@ -751,20 +753,15 @@ def test_the_round_reports_are_read_out_of_the_trees_they_declare() -> None:
     """
     checker = _checker()
     names = (
-        "outreach-first-read.md",
         "readme-image-consistency.md",
         "case-studies-client-read.md",
-        "round-two-fresh-read.md",
-        "stale-number-scan-2.md",
-        "denominator-and-tree-pass.md",
         "local-vs-ci-gates.md",
-        "english-reader-review-2.md",
     )
     documents = [checker.REPO / "docs" / "reports" / name for name in names]
     report = checker.check_documents(documents)
 
     trees = {label for label, _documents, _citations in report.trees}
-    for ref in ("2c456e0", "3ef6676", "48a56b5", "9e1aa61", "d43369b", "ec52527"):
+    for ref in ("3ef6676", "9e1aa61"):
         assert f"the {ref} tree" in trees, (
             f"the {ref} tree was not among the trees the check read against: {sorted(trees)}"
         )

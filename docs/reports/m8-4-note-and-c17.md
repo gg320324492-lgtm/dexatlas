@@ -48,7 +48,7 @@ M8 演练报告的 §6 里，M8-4 那一节的标题是：
 
 > 「原 M8 演练记录（`m8-install-rehearsal.md:138`–`:145`）是当时的实况，
 > **需加一句「已在 1.0.0 解决」或改指新契约**」
-> —— [`docs/reports/m10-number-traceability.md:247`](m10-number-traceability.md#L247)
+> —— `docs/reports/m10-number-traceability.md:247`
 
 **这一条一直没有落地。** 本窗口把它落了。
 

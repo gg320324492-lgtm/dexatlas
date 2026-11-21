@@ -409,7 +409,7 @@ graph viewer.
 - At least two complete case studies
 - A public benchmark summary
 - A downloadable example analysis report
-- An Upwork-oriented portfolio description
+- A portfolio description
 
 ### M4 exit criteria
 
