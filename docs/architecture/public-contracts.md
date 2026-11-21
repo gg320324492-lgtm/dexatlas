@@ -205,7 +205,7 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 | # | 工具 | 参数 | 返回 | 实现 |
 |---|---|---|---|---|
 | 1 | `list_projects` | `offset≥0=0`、`limit(1..200)=50` | `ProjectList{projects:[ProjectSummary],total,offset,limit}` | `src/dexatlas/mcp/server.py:106-124` |
-| 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[]}` | `src/dexatlas/mcp/server.py:126-139` |
+| 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[],evidence_catalog[]}` | `src/dexatlas/mcp/server.py:126-139` |
 | 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:141-152` |
 | 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:154-174` |
 | 5 | `get_class_source` | `project_id`、`class_name`、`offset≥0=0`、`limit(1..200000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:178-200` |
@@ -440,7 +440,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `list_tools()` 恰为 §3.1 的十一个名字 | ✅ |
 | 每个工具都带 `read_only_hint=True` | ✅ |
 | `list_projects` → `{projects,total,offset,limit}` | ✅ |
-| `get_project_status` → `{project,completeness,published_run,runs}`，completeness 四键齐全 | ✅ |
+| `get_project_status` → `{project,completeness,published_run,runs,evidence_catalog}`，completeness 四键齐全 | ✅ |
 | `search_symbols` → `{symbols,total,offset,limit}` | ✅ |
 | `get_class_source` → `found/reason/kind/text/provenance/candidates` 六键 | ✅ |
 

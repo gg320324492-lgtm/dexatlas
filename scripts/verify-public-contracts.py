@@ -477,7 +477,8 @@ def mcp_checks() -> None:
     )
     check(
         "get_project_status shape",
-        set(answer["status"]) == {"project", "completeness", "published_run", "runs"}
+        set(answer["status"])
+        == {"project", "completeness", "published_run", "runs", "evidence_catalog"}
         and set(answer["status"]["completeness"])
         == {"complete", "missing_backends", "truncated", "errors"},
         str(answer["status"])[:200],

@@ -108,9 +108,7 @@ def project_status(analyzer: Analyzer, project_id: str) -> ProjectStatus:
         published_run=run_summary(published) if published is not None else None,
         runs=[run_summary(run) for run in runs],
         evidence_catalog=[
-            EvidenceCatalogEntry(
-                id=row.id, kind=str(row.kind.value), summary=row.summary
-            )
+            EvidenceCatalogEntry(id=row.id, kind=str(row.kind.value), summary=row.summary)
             for row in evidence_rows
         ],
     )
