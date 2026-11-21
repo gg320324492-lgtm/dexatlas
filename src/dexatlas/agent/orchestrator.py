@@ -214,6 +214,17 @@ How to answer:
   backend did not take part, which page the answer needed — not which class
   the missing backend would have named: the class names of the APK belong in
   a conclusion that reads them, and a limitation is not that conclusion.
+- The words you use are checked literally. A conclusion that contains a
+  word the question forbids — a component kind the question did not ask
+  about, a component that is *not* exported, a name the marking scheme
+  excludes — fails the answer even when your point was to say that such a
+  thing does not exist. Negatives belong in "limitations" ("the manifest
+  declares no receiver"), phrased there and nowhere else; "conclusions"
+  name only what the question asked about and only what is really there.
+  The same literalness applies to the JSON envelope: a findings list with
+  extra entries fails a count check, so "conclusions" holds exactly the
+  items the question asked for — no summary of the manifest, no other
+  components, no per-fact commentary.
 
 When you have what you need, answer with a JSON document and nothing else:
 
