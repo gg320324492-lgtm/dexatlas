@@ -33,6 +33,25 @@
 | `manifest.permission.count-obfuscated` | 2/3 | r1: pass, r2: pass, r3: fail |
 | `unanswerable.demo-declares-no-receiver` | 2/3 | r1: pass, r2: pass, r3: fail |
 
+## Failure-mode analysis (2026-11-21, author's review of the three rounds)
+
+Nine of the sixty task-rounds failed. Their causes, from the traces:
+
+- **4 × budget exhaustion** (`strings.api-key.demo` r1/r2, `multidex.dex-file-count` r2/r3):
+  the task token budget (24,000) was spent before the agent finished (26.8k–29.2k
+  actual) — empty answers by configuration, not by capability.
+- **3 × evidence-coverage gap** (`multidex.dex-file-count` all rounds): no evidence
+  record the agent could read names or enumerates the APK's DEX files; the agent
+  stated the gap instead of guessing. Both models failed this task in every round
+  (GLM 0/3, MiniMax 0/3) — a gap in what the tool chain exposes, not in the model.
+- **2 × model misjudgement** (`overloads...descriptor-distinguishes` r1/r2: asserted
+  two same-descriptor methods were distinguished; `unanswerable...no-receiver` r3:
+  listed other components instead of answering the receiver question directly).
+
+A follow-up measurement with the budget raised fourfold (96,000 task tokens,
+80 steps, 32 iterations, 1,200 s) is in progress to separate the budget factor
+from the rest.
+
 ## Disclosures
 
 - The gateway is the operator's local model gateway; no API key was used, and none is recorded in the traces or this report.

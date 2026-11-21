@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | <!--fig:tests.total-->1791<!--/fig-->（<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行） | ≥80% |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7170<!--/fig-->/<!--fig:coverage.total-->7684<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -882,8 +882,8 @@ uv run python scripts/refresh-report-figures.py
 ```bash
 uv run pytest          # 收集 <!--fig:tests.total-->1791<!--/fig--> 个：<!--fig:tests.fast-->1642<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7157<!--/fig-->/<!--fig:coverage.total-->7671<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1788<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7170<!--/fig-->/<!--fig:coverage.total-->7684<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1790<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1041,13 +1041,13 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "config/settings.py": [34, 1],
       "core/__init__.py": [3, 0],
       "core/calls.py": [32, 0],
-      "core/evidence.py": [113, 1],
+      "core/evidence.py": [118, 1],
       "core/ingest.py": [88, 3],
-      "core/locators.py": [306, 17],
+      "core/locators.py": [313, 17],
       "core/methods.py": [218, 10],
       "core/models.py": [343, 5],
       "core/paths.py": [36, 2],
-      "core/pipeline.py": [522, 32],
+      "core/pipeline.py": [523, 32],
       "core/runs.py": [70, 1],
       "core/storage.py": [396, 11],
       "mcp/__init__.py": [2, 0],
@@ -1086,7 +1086,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 514,
-    "statements": 7671
+    "statements": 7684
   },
   "history": {
     "v0.1.0": {
@@ -1103,10 +1103,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:db1ee71af4bdd5cac7c9dc3364fb1b24e23d9c000f96209d040bd830a7487197",
+  "source_fingerprint": "sha256:cf8de8a8591c55e1905eeaa17247393d6b87934a3f05bfd33af5b5e037c47786",
   "suite": {
-    "failed": 2,
-    "passed": 1788,
+    "failed": 0,
+    "passed": 1790,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"

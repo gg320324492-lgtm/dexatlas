@@ -39,6 +39,11 @@ from dexatlas.core.methods import descriptor_arguments, dex_class_name
 #: workspace holds of the same classes.
 DEX_BACKEND = "androguard"
 
+#: The archive reader: it reads the APK's own metadata (hash, size, the DEX
+#: member inventory) before any backend runs. Its locators name the APK, not
+#: a place inside an output tree.
+APK_READER = "apk-reader"
+
 #: The backends that write an output tree into the workspace, and the name of
 #: that directory.
 #:
@@ -82,6 +87,9 @@ class LocatorKind(StrEnum):
 
     TOOL_ERROR = "tool_error"
     """A backend failure. It names no place, and needs none."""
+
+    APK_METADATA = "apk_metadata"
+    """A fact read from the APK archive itself (hash, size, DEX inventory)."""
 
 
 class ResolutionReason(StrEnum):
@@ -174,6 +182,8 @@ def parse_locator(locator: str) -> ParsedLocator:
     tool, separator, rest = locator.partition(":")
     if not separator or not tool:
         raise InvalidLocatorError(f"{locator!r} has no tool in front of its place")
+    if tool == APK_READER:
+        return ParsedLocator(tool, rest, None, LocatorKind.APK_METADATA)
     if tool not in OUTPUT_BACKENDS and tool != DEX_BACKEND:
         raise InvalidLocatorError(
             f"{tool!r} is not a backend this project reads locators from",
@@ -272,6 +282,12 @@ class LocatorResolver:
                 True,
                 ResolutionReason.TOOL_ERROR,
                 f"{parsed.tool} did not complete, and that failure is the fact",
+            )
+        if parsed.kind is LocatorKind.APK_METADATA:
+            return Resolution(
+                True,
+                ResolutionReason.RESOLVED,
+                f"the APK's own metadata, read by {parsed.tool} before any backend ran",
             )
         if parsed.kind in _DEX_KINDS:
             return self._resolve_dex(parsed)

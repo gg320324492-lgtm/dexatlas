@@ -375,6 +375,33 @@ class EvidenceBuilder:
                 },
             )
 
+    def add_dex_files(self) -> None:
+        """Record the APK's DEX-file inventory — the multidex fact.
+
+        The archive reader counts the DEX members before any backend runs, and
+        the DEX reader's locators name them; without this record an agent
+        reading the evidence cannot answer "how many DEX files does this APK
+        hold" — the count travels only as a locator argument, which no
+        evidence read exposes. The provenance is the APK itself: the archive
+        is read directly, not through a backend.
+        """
+        dex_files = list(self.dex_files)
+        if not dex_files:
+            return
+        self.add(
+            kind=EvidenceKind.OBSERVATION,
+            level=EvidenceLevel.VERIFIED,
+            summary=f"The APK holds {len(dex_files)} DEX file(s): {', '.join(dex_files)}",
+            provenance=[
+                Provenance(
+                    tool="apk-reader",
+                    apk_sha256=self.apk_sha256,
+                    locator="apk-reader:zip-entries",
+                )
+            ],
+            detail={"dex_files": dex_files, "count": len(dex_files)},
+        )
+
     def add_exported_components(self, components: Sequence[ManifestComponent]) -> None:
         """Record exported components — the highest-signal manifest observation.
 

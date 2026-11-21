@@ -226,6 +226,13 @@ class Analyzer:
             resource_references: list[ResourceReference] = []
             dex_classes: list[ClassRef] = []
 
+            # The DEX-file inventory is read from the archive before any
+            # backend runs, and it is the fact the multidex questions ask
+            # about; without this record an agent reading the evidence cannot
+            # see the count (the locators carry the names, but no evidence
+            # read exposes them).
+            builder.add_dex_files()
+
             if include_apktool:
                 _check_cancelled(cancellation)
                 manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)

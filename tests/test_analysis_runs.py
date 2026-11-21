@@ -354,8 +354,12 @@ def test_a_re_analysis_replaces_the_snapshot_as_a_whole(
     assert _published_symbols(analyzer, project_id) == ["com.fake.Second"]
     evidence = _published_evidence(analyzer, project_id)
     assert evidence
-    assert all("com.fake.Second" in summary for summary in evidence)
+    # The DEX inventory is an APK-level fact (added by the pipeline before any
+    # backend runs): it names no class, and it is the same APK in both runs.
+    # Every class-naming record must name the new run's class only.
     assert not any("com.fake.First" in summary for summary in evidence)
+    class_records = [s for s in evidence if "com.fake." in s]
+    assert class_records and all("com.fake.Second" in s for s in class_records)
     assert analyzer.store.get_published_run_id(project_id) == second.run.id
 
 
