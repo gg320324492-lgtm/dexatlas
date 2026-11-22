@@ -11,6 +11,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/tests-1806%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
 [![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
+[![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 
 > 徽章数字与[英文版 README](README.md)同源，取自同一份测量记录，同样由
 > `scripts/refresh-report-figures.py` 写回——**不要手改**。Tests 徽章数的是
@@ -49,15 +51,18 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 > （DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 40.0% 低于
 > 三轮合计 ≥54/60（≥90%）线；见
 > [M6 层级 2 运行记录](docs/benchmarks/m6-level2-real.md)）；执行层修复后的三轮完整
-> 复测 49/60 = 81.7%（逐轮 15/16/18），仍低于三轮合计 ≥54/60（≥90%）的验收门槛；2026-11-21
-> 用另一模型（GLM-5.3-Flash，本地网关，同一冻结 20 题）追加三轮，**51/60 = 85.0%（逐轮均
-> 17/20）**——逐轮线全部达成、合计线仍未达（见[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)）；见
+> 复测 49/60 = 81.7%（逐轮 15/16/18），仍低于三轮合计 ≥54/60（≥90%）的验收门槛（见
 > [复测记录](docs/benchmarks/m6-level2-retest4.md)）；修复后的窄验证在六个已知失败面上
 > （6 题 × 3 轮 × 3 配置）转通过 **2/6** 题（确定性子集 2/5），未达窄验证门槛（≥4/6 与
 > ≥3/5）；预算效率四项修复（resources 收口、notice 折叠、string excerpt 截断、空转软提示）
 > 之后的第三轮窄验证转通过 **3/6**（确定性子集 3/5），两轮窄验证均低于门槛，故按方案
 > 停止投入、M6 转入方案 3 现状披露（见[二轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify2.md)
-> 与[三轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify3.md)）；M8（干净安装、契约与
+> 与[三轮窄验证记录](docs/benchmarks/m6-level2-narrow-verify3.md)）；2026-11-21
+> 用另一模型（GLM-5.3-Flash，本地网关，同一冻结 20 题）追加三轮，**51/60 = 85.0%（逐轮均
+> 17/20）**——逐轮线全部达成、合计线仍未达（见[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)）；
+> 2026-11-22 用 DeepSeek-V4.1-Flash（同一冻结 20 题，放宽预算）跑出 **56/60 = 93.3%
+> （逐轮 18/20/20；DexAtlas 18/20/18）**——逐轮线与三轮合计线均达成，B1 关闭（见
+> [DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)）。M8（干净安装、契约与
 > 导出安全）的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧
 > 已完成（对外素材已随 2026-11-21 的去平台化清理移除）；M10（独立验收、发布候选）
 > 已于 2026-11-20 通过。
@@ -182,6 +187,8 @@ uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.Foo.bar(Ljava/lang/String;)V"
 uv run dexatlas export <project-id> -o evidence-package.zip
+uv run dexatlas runs <project-id>     # 同一 APK 的各次分析批次（加 --run <run-id> 看单条记录）
+uv run dexatlas render <project-id> <run-id> -o rendered-run/   # 单次批次的报告 + 证据包，落成文件
 ```
 
 `analyze` 示例指向 `examples/demo-app/demo.apk` —— 这是**仓库自带的**真实
@@ -404,6 +411,13 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   在 450,000 的授权内（未触发熔断），且所有 trace 的关键扫描都没有发现异常。
   按方案的失败处理，本轮就此打住：没有全量复测，也没有再开一轮修复，
   现状披露方案是 M6 的最终收口方式
+- **[M6 层级 2 追加评测——GLM-5.3-Flash](docs/benchmarks/m6-level2-glm.md)** —— 换一个模型
+  （经本地 OpenAI 兼容网关）对同一冻结 20 题跑三轮 × 3 配置，trace 全部留存、
+  数字由脚本重算：DexAtlas **53/60 = 88.3%（逐轮 17/18/18）**——每轮都在 ≥80% 逐轮线
+  之上，三轮合计 ≥90% 线仍未达；A 30.0%、B 30.0%。与 MiniMax 基线分开陈述，不混排
+- **[M6 层级 2 验收评测——DeepSeek-V4.1-Flash](docs/benchmarks/m6-level2-deepseek.md)** ——
+  同一冻结 20 题、放宽预算，三轮 × 3 配置：DexAtlas **56/60 = 93.3%（逐轮 18/20/20；
+  DexAtlas 18/20/18）**——两条验收线均达成，B1 关闭。与 GLM、MiniMax 两轮分开陈述
 - **[M3 题目集](docs/benchmarks/task-set.md)** —— 对比实验问的题目、答案如何判分、
   以及第二个人如何在不跑任何东西的情况下确认一个期望答案是对的
 - **[覆盖率数字测在哪棵树上](docs/reports/phase1-execution-report.md)** —— 执行报告带着
