@@ -181,11 +181,9 @@ REPORT_EXCLUSIONS: dict[str, str] = {
     #    cleanup: their citations name documents that were removed with the
     #    cleanup, and their line numbers belong to the trees they audited.
     "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag 那棵树（文首声明，历史记录）；待回锚。",
-    "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值（历史记录）；待回锚。",
     "handwritten-numbers-audit.md": "手写数审计，行号按其审计树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
     "unguarded-numbers-gates.md": "无守数门禁记录，其 B9 语句与素材侧条目随去平台化清理移除。",
     "m8-4-note-and-c17.md": "M8-4 备注与 C17 登记，行号按写作当时树取值。",
-    "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值。",
     "platform-gate-inventory.md": "平台门禁清单记录，行号按其核对树取值。",
     "evidence-package-isolation.md": "证据包隔离核对，行号按其核对树取值。",
     "citation-value-comparison.md": "引用值比对记录，行号按其核对树取值。",
@@ -257,6 +255,8 @@ def collect_documents(root: pathlib.Path = REPO) -> list[pathlib.Path]:
 
 #: The documents whose citations are checked.
 DOCS: list[pathlib.Path] = collect_documents()
+
+#: The trees some documents describe, and the ref each one names.
 
 #: The trees some documents describe, and the ref each one names.
 #:
