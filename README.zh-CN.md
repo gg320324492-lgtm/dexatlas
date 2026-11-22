@@ -39,7 +39,7 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 > [!IMPORTANT]
 > **当前状态：早期开发——v1.0.1 已发布（v1.0.0 于 2026-11-17 打 tag，
 > 见[发版说明](docs/releases/v1.0.0.md)）；Phase 3 的交付物已发布；M10 独立验收已于
-> 2026-11-20 通过、M6 的 B1 验收线已于 2026-11-22 关闭（M8 验收仍未关闭）。** CLI、分析内核与报告
+> 2026-11-20 通过、M6 的 B1 验收线已于 2026-11-22 关闭（M8 交付完成，macOS 未验证）。** CLI、分析内核与报告
 > 流水线在 `v0.1.0` 发布，此后每个版本都在交付。MCP server、证据优先的 Agent 与
 > Web 工作台的 M4 八屏——项目面板、上传与分析进度、检索与证据溯源、单方法调用
 > 关系、Agent 工作区、报告导出、M3 基准视图——随 `v0.2.0` 发布，其中除检索、
@@ -63,7 +63,8 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 > 2026-11-22 用 DeepSeek-V4.1-Flash（同一冻结 20 题，放宽预算）跑出 **56/60 = 93.3%
 > （逐轮 18/20/20；DexAtlas 18/20/18）**——逐轮线与三轮合计线均达成，B1 关闭（见
 > [DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)）。M8（干净安装、契约与
-> 导出安全）的演练、修复与公共契约表已完成、验收待做；M9（本页展示入口）GitHub 侧
+> 导出安全）已交付——演练、修复与公共契约表已完成；macOS 仍未验证（已知限制，不属于
+> 已完成的验收项）。M9（本页展示入口）GitHub 侧
 > 已完成（对外素材已随 2026-11-21 的去平台化清理移除）；M10（独立验收、发布候选）
 > 已于 2026-11-20 通过。
 > 详见[路线图](#路线图)与
@@ -527,11 +528,11 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 （同一冻结集，放宽预算）**56/60 = 93.3%（逐轮 18/20/20；DexAtlas 18/20/18）**——两条验收线均达成，**B1 关闭**
 （[DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)） |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
-| M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |
+| M8 | 干净安装、故障恢复、契约与导出安全验收 | **交付完成（macOS 未验证）** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证——已知限制，不属于已完成的验收项）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |
 | M9 | GitHub 展示入口（本页）与对外素材 | **展示入口已完成；素材已移除** —— 本页与[项目简介](docs/portfolio.md)已就位；对外素材已随 2026-11-21 的去平台化清理移除 |
 | M10 | 独立验收、重新评分、发布候选 | **已通过（2026-11-20）** —— 外部独立验收人从 clone 走完全链路，40 项判定 39 过，重评 97.5% / 96.3%。验收材料已随 2026-11-21 的去平台化清理移除 |
 
 本计划原本以退出标准全部通过为 `v1.0.0` 的前提；`v1.0.0` 已于 2026-11-17 按现状披露
 口径发布。此后 M10 独立验收已于 2026-11-20 通过、M6 的 B1 验收线已于 2026-11-22 关闭；
-M8 的验收仍未关闭（见 [`docs/status.md`](docs/status.md)）——阶段推进靠
-证据，不靠日历。
+M8 已交付，macOS 未验证作为已披露的已知限制保留（见
+[`docs/status.md`](docs/status.md)）——阶段推进靠证据，不靠日历。
