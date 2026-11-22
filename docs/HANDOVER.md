@@ -95,14 +95,15 @@ pass.** Read the skip count in the summary line, not just the exit code.
 
 ## 3. What to do next
 
-Phase 2 (M0–M4) is **complete** — all five milestones delivered, M4's review
-passed on 2026-11-14, and v0.2.0 shipped the lot. Phase 3 was delivered in
-v1.0.0; the remaining follow-ups (independent acceptance, readiness
-re-scoring) are tracked in docs/status.md; follow the revised
-[`docs/roadmap/phase3-plan.md`](roadmap/phase3-plan.md) (M5–M10), starting
-with baseline reconciliation. The milestone numbers have new meanings; do not
-start the old plugin/native expansion list. Read [`docs/status.md`](status.md)
-for the current state and its open gaps.
+Phase 2 (M0–M4) and Phase 3 (M5–M10) are **complete** — M4's review passed
+on 2026-11-14 (v0.2.0), M6's B1 acceptance line closed on 2026-11-22, M10's
+independent acceptance passed on 2026-11-20, and v1.0.1 shipped the
+documentation/measurement follow-up. The current work is **Phase 4** —
+portfolio closure, software design and Workbench UI — scoped by
+[`docs/roadmap/phase4-plan.md`](roadmap/phase4-plan.md) (final decision
+A + D + G, milestones M11–M15). The project freezes after Phase 4 unless real
+user signals arrive. Read [`docs/status.md`](status.md) for the current state
+and its open gaps.
 
 ### Smaller things that are still open
 

@@ -185,6 +185,7 @@ REPORT_EXCLUSIONS: dict[str, str] = {
     #    citation naming a removed file cannot be checked at all; these stay
     #    out until their citations are rewritten against surviving files.
     "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag（0104ccb）那棵树（文首声明，历史记录）；其引用的 m10-acceptance-pack / m10-invitation-final / m10-reader-package 已随去平台化清理移除，工作副本路径解析失败，保持排除。",
+    "figures-auto-write-landing.md": "测量数字自动覆盖的实现报告，行号按其写作树取值；status.md 后续插入 Phase 4 导航行使被引行 +1 偏移，待回锚。",
     "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值；其引用的发布清单与演练目标文件已随去平台化清理移除（2026-11-21）。（核实：37 条引用的锚点跨树——scripts 侧锚 e55ad07、checklist 侧锚 3e943b5——且文中引用的两个指纹均非任一候选树的落盘指纹，无法登记）",
     "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值；其引用的发布清单与演练记录已随去平台化清理移除（2026-11-21），工作副本路径解析失败，保持排除。",
     "handwritten-numbers-audit.md": "手写数审计，行号按其审计树 0b98843 取值；其引用的 outreach 素材与 M10 材料已在去平台化清理中移除，工作副本路径解析失败，保持排除。",

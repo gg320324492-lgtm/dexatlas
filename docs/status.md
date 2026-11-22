@@ -11,6 +11,7 @@
 - 「评审挖出来、还没修的」在[Phase 2 issue 清单](reports/phase2-issue-list.md)里
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
 - [Phase 3 计划](roadmap/phase3-plan.md)的实施进度与证据见 §4.0，M10 独立验收已通过（2026-11-20，重评 97.5% / 96.3%）
+- [Phase 4 执行单](roadmap/phase4-plan.md)（最终决策 A + D + G）定义作品集收尾、软件设计与 Workbench UI 的范围；完成后默认进入 Portfolio Freeze
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---

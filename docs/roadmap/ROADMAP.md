@@ -7,13 +7,16 @@ This document is the working contract for how DexAtlas grows. It is a plan, not 
 promise of features — the README describes what actually ships, this file describes
 what comes next.
 
-- **Current phase:** Phase 2 delivered; M4 source review and acceptance passed
-  on 2026-11-14. Phase 3 is complete: M5–M7 delivered, M6's B1 acceptance line
+- **Current phase:** Phase 3 delivered — M5–M7 shipped, M6's B1 acceptance line
   closed on 2026-11-22, M8 delivered (macOS unverified, as disclosed), M9
-  showcase shipped, M10 independent acceptance passed on 2026-11-20. v1.0.1
-  (2026-11-21) is the documentation/measurement follow-up. Per-milestone evidence is in [§3.4](#34-progress-2026-11-15); see
-  [current status](../status.md) and the [Phase 3 plan](phase3-plan.md).
-- **Plan version:** 2026-11-15 (Phase 3 scope revision; prior phase history retained)
+  showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.1
+  (2026-11-21) is the documentation/measurement follow-up. Per-milestone evidence
+  is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
+  [Phase 3 plan](phase3-plan.md). The project is now in **Phase 4** — portfolio
+  closure, software design and Workbench UI — scoped by
+  [phase4-plan.md](phase4-plan.md) (final decision A + D + G; the project freezes
+  after Phase 4 unless real user signals arrive).
+- **Plan version:** 2026-11-23 (Phase 4 execution order added; Phase 3 history retained)
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
