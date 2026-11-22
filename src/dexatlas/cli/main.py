@@ -65,6 +65,12 @@ from dexatlas.reports.evidence_package import build_evidence_package, package_fi
 from dexatlas.reports.html_report import render_html
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
+from dexatlas.reports.run_render import (
+    EVIDENCE_ARCHIVE,
+    RunRenderError,
+    render_run,
+    render_run_summary_lines,
+)
 
 app = typer.Typer(
     name="dexatlas",
@@ -962,6 +968,156 @@ def xrefs(
             f"  [dim]{row.dex_name or '-'}"
             f"{f'@{row.instruction_offset}' if row.instruction_offset >= 0 else ''}[/dim]"
         )
+
+
+@app.command()
+def runs(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    run_id: Annotated[
+        str | None,
+        typer.Option("--run", help="Show one run's record, by its id (run_<16 hex>)."),
+    ] = None,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            min=1,
+            help="Maximum runs to list. 1 or more; the CLI applies no upper bound.",
+        ),
+    ] = 20,
+    workspace: WorkspaceOption = None,
+) -> None:
+    """List a project's analysis runs, or show one run's own record.
+
+    A project is the APK; a run is one attempt at analysing it. The project's
+    counts describe the *published* run — the last one that completed — and a
+    run that failed or was cancelled published nothing. The record shown here
+    is the attempt's own: which tools took part and at which versions, how it
+    ended, and every error it recorded.
+
+    ``--run`` answers with one run instead of the listing, so a run that
+    failed stays readable after the next analysis has replaced the project's
+    latest one. Run ids look like [bold]run_0123456789abcdef[/bold]; the
+    published run is marked in the listing.
+    """
+    _use_workspace(workspace, must_exist=True)
+    analyzer = Analyzer()
+    _require_project(analyzer, project_id)
+    if run_id is not None:
+        run = analyzer.store.get_run(run_id)
+        if run is None or run.project_id != project_id:
+            err_console.print(
+                f"[red]No such run:[/red] {run_id}\n"
+                f"Run ids look like [bold]run_{'0' * 16}[/bold] — 'run_' followed by "
+                "16 hex characters. Run `dexatlas runs "
+                f"{project_id}` to list this project's runs."
+            )
+            raise ExitCode(code=EXIT_BAD_REQUEST)
+        published = analyzer.store.get_published_run_id(project_id)
+        console.print(f"[bold]{run.id}[/bold]  {run.status.value} / {run.completeness.value}")
+        console.print(
+            f"  apk sha256  {run.apk_sha256}\n"
+            f"  started     {run.started_at.isoformat()}\n"
+            f"  finished    {run.finished_at.isoformat() if run.finished_at else DASH}\n"
+            f"  duration    "
+            f"{f'{run.duration_seconds:.1f}s' if run.duration_seconds is not None else DASH}\n"
+            f"  published   {'yes' if run.id == published else 'no'}\n"
+            f"  tools       "
+            + (", ".join(f"{k}={v or DASH}" for k, v in sorted(run.tool_versions.items())) or DASH)
+        )
+        if not run.errors:
+            console.print("  errors      none")
+        else:
+            console.print(f"  errors      {len(run.errors)}")
+            for error in run.errors:
+                err_console.print(f"    [yellow]{error.code.value}[/yellow] {error}")
+        return
+
+    rows = analyzer.store.list_runs(project_id)
+    if not rows:
+        err_console.print(
+            f"[yellow]No runs for {project_id}.[/yellow] A run is one analysis attempt; "
+            "run `dexatlas analyze` first."
+        )
+        raise ExitCode(code=EXIT_EMPTY)
+    published = analyzer.store.get_published_run_id(project_id)
+    table = Table(title=f"Analysis runs of {project_id}", header_style="bold")
+    table.add_column("Run")
+    table.add_column("Status")
+    table.add_column("Completeness")
+    table.add_column("Started")
+    table.add_column("Duration", justify="right")
+    table.add_column("Published", justify="center")
+    for run in rows[:limit]:
+        table.add_row(
+            run.id,
+            run.status.value,
+            run.completeness.value,
+            run.started_at.strftime("%Y-%m-%d %H:%M:%S"),
+            f"{run.duration_seconds:.1f}s" if run.duration_seconds is not None else DASH,
+            "yes" if run.id == published else "",
+        )
+    console.print(table)
+    hidden = len(rows) - min(len(rows), limit)
+    if hidden > 0:
+        console.print(_not_shown(hidden, "run"))
+
+
+@app.command()
+def render(
+    project_id: Annotated[str, typer.Argument(help="Project id.")],
+    run_id: Annotated[str, typer.Argument(help="The run to render (run_<16 hex>).")],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Directory to write the render into (created; must be empty or absent).",
+        ),
+    ],
+    workspace: WorkspaceOption = None,
+) -> None:
+    """Render one recorded run into a directory a reader can archive.
+
+    This reads the run's own snapshot — no analysis runs, no backend is
+    started. The directory receives the three report formats that snapshot
+    describes, the evidence package ``export`` writes (as
+    ``evidence/evidence-package.zip``), and the run's own record as
+    ``run.json``.
+
+    Only a run that completed and is still the project's published one can be
+    rendered: a later analysis replaces the published snapshot, and a run
+    that failed or was cancelled published nothing to render. A render of a
+    past run therefore answers from what the workspace still holds, and says
+    so rather than presenting a newer snapshot under an older run's name.
+    """
+    _use_workspace(workspace, must_exist=True)
+    analyzer = Analyzer()
+    _require_project(analyzer, project_id)
+    if output.exists() and any(output.iterdir()):
+        err_console.print(
+            f"[red]Output directory is not empty:[/red] {output}\n"
+            "A render writes a self-contained directory; point --output at a "
+            "path that does not exist yet, or at an empty directory."
+        )
+        raise ExitCode(code=EXIT_BAD_REQUEST)
+
+    try:
+        summary = render_run(analyzer, project_id, run_id, output)
+    except RunRenderError as exc:
+        err_console.print(f"[red]Cannot render {run_id}:[/red] {exc}")
+        raise ExitCode(code=EXIT_BAD_REQUEST) from exc
+    except Exception as exc:
+        err_console.print(f"[red]Could not render {run_id}:[/red] {exc}")
+        raise ExitCode(code=EXIT_FAILED) from exc
+
+    console.print(f"[bold green]{mark(OK)}[/bold green] {summary['run_id']} rendered")
+    for line in render_run_summary_lines(summary):
+        console.print(f"  {line}")
+    console.print(
+        f"[dim]verify it: python -c 'from dexatlas.reports.evidence_package import "
+        f'verify_package; verify_package(r"{output / EVIDENCE_ARCHIVE}")\'[/dim]'
+    )
 
 
 def main() -> None:

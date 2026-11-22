@@ -180,7 +180,7 @@ findings**（怎么验的见 §6）。
 
 | 文档 | 原来指着 | 现在指着 | 依据 |
 |---|---|---|---|
-| `docs/proposals/exit-code-partial-read.md` | main.py 的 91–123 行 | `src/dexatlas/cli/main.py:93-135` `anchor: EXIT_NO_INDEX` | 五个退出码常量现在在 93–135；新常量 `EXIT_NO_INDEX = 6` 在 135 |
+| `docs/proposals/exit-code-partial-read.md` | main.py 的 91–123 行 | `src/dexatlas/cli/main.py:93-141` `anchor: EXIT_NO_INDEX` | 五个退出码常量现在在 93–135；新常量 `EXIT_NO_INDEX = 6` 在 135 |
 | 同上 | main.py 的 161–174 行 | `src/dexatlas/cli/main.py:173-186` `anchor: def _truncated(result: AnalysisResult) -> bool:` | 判定函数 `_truncated` 现在在 173–186 |
 | `docs/benchmarks/m6-level2-failure-analysis.md` | model.py 的 345 行（2 处） | `benchmarks/model.py:430` `anchor: check` | `check()` 现在在 430 |
 | 同上 | systems.py 的 234 行（2 处） | `benchmarks/comparison/systems.py:244` `anchor: grounded=False` | 断言现在在 244 |
@@ -193,7 +193,7 @@ findings**（怎么验的见 §6）。
 
 | 文档 | 原来指着 | 现在指着 | 依据 |
 |---|---|---|---|
-| `docs/proposals/exit-code-partial-read.md` | main.py 的 334–352 行（2 处） | `src/dexatlas/cli/main.py:401-402` `anchor: exit_code = 0` | 「成功分支给 0」就是 `exit_code = 0`，现在在 402 |
+| `docs/proposals/exit-code-partial-read.md` | main.py 的 334–352 行（2 处） | `src/dexatlas/cli/main.py:401-408` `anchor: exit_code = 0` | 「成功分支给 0」就是 `exit_code = 0`，现在在 408 |
 | 同上 | main.py 的 354–369 行 | `src/dexatlas/cli/main.py:404-420` `anchor: output.write_text(render_markdown(result), encoding="utf-8")` | 报告写出的那几行现在在 404–420 |
 | 同上 | main.py 的 71–78 行 | `src/dexatlas/cli/main.py:72-81` `anchor: epilog=(` | epilog 现在到 81 行 |
 | 同上 | install.md 的 206–223 行 | `docs/install.md:254-266` `anchor: ### Exit codes` | 原来指着取 fixture 的脚本，不是退出码表 |

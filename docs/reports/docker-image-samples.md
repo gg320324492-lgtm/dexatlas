@@ -121,7 +121,7 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 ```
 
 预期 stdout 的形状（**宿主**上同一套源码、同一份样本的实测输出；
-`project.class_count` 等四个计数打印在 `src/dexatlas/cli/main.py:359-366`）：
+`project.class_count` 等四个计数打印在 `src/dexatlas/cli/main.py:365-372`）：
 
 ```text
 ✓ apk_80a8fe0e81204c9f — 4 classes, 8 methods, 23 call sites, 21 call edges, 0 resource strings (1.0s)

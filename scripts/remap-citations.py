@@ -115,11 +115,19 @@ def _anchors(checker, document: Path) -> dict[tuple[str, int, int], tuple[int, i
     a citation that says "``class_source_document`` / ``method_source_document``"
     has to keep holding both of them, and a range that moved onto the first
     and left the second behind says something narrower than it used to.
+
+    A citation that names nothing but declares what it holds —
+    ``anchor: app = typer.Typer(`` — is placed by the fragment it quotes: the
+    checker verifies that fragment against the lines, so the same fragment
+    locates the lines the citation has to hold. A fragment that is already
+    inside the cited range is not a drift; one that has moved is.
     """
     anchors: dict[tuple[str, int, int], tuple[int, int]] = {}
     for clause in checker.document_clauses(document):
         for citation, names in zip(clause.citations, clause.claims, strict=True):
-            if citation.target is None or not names:
+            if citation.target is None:
+                continue
+            if not names and not citation.anchors:
                 continue
             lines = checker.file_lines(citation.target)
             positions: list[int] = []
@@ -136,6 +144,40 @@ def _anchors(checker, document: Path) -> dict[tuple[str, int, int], tuple[int, i
                     continue
                 where = _where(checker, citation.target, anchor, citation)
                 if not where:
+                    continue
+                positions.extend(where)
+                drifted = True
+            for fragment in citation.anchors:
+                quoted = " ".join(fragment.split())
+                if checker.ANCHOR_NAME.match(fragment):
+                    # A symbol name, not a fragment of code: place it the way
+                    # the names loop would, so a declaration that carries the
+                    # citation's only claim still moves onto its symbol.
+                    if checker.symbol_is_in_range(
+                        lines,
+                        fragment,
+                        citation.start,
+                        citation.end,
+                        citation.target.suffix == ".py",
+                    ):
+                        positions.extend(_where(checker, citation.target, fragment, citation))
+                        continue
+                    where = _where(checker, citation.target, fragment, citation)
+                    if not where:
+                        continue
+                    positions.extend(where)
+                    drifted = True
+                    continue
+                if not quoted:
+                    continue
+                where = [
+                    number
+                    for number, line in enumerate(lines, 1)
+                    if quoted in " ".join(line.split())
+                ]
+                if not where:
+                    continue
+                if any(citation.start <= number <= citation.end for number in where):
                     continue
                 positions.extend(where)
                 drifted = True

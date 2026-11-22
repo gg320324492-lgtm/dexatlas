@@ -115,6 +115,28 @@ def build_evidence_package(analyzer: Analyzer, project_id: str, target: Path) ->
     same reconstruction the REST API's export uses — so the package's reports
     are the reports the API would have served, not a re-analysis.
     """
+    files = package_contents(analyzer, project_id)
+    manifest = package_manifest(analyzer, project_id, files)
+    manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path, content in sorted(files.items()):
+            archive.writestr(path, content)
+        archive.writestr(MANIFEST_NAME, manifest_bytes)
+    return manifest
+
+
+def package_contents(analyzer: Analyzer, project_id: str) -> dict[str, bytes]:
+    """What the evidence package holds, as ``archive path → bytes``.
+
+    The reports are rendered from the workspace's published snapshot — the
+    same reconstruction the REST API's export uses — so the package's reports
+    are the reports the API would have served, not a re-analysis. The cited
+    source fragments are copied under the same guards as ``export``: a file
+    that is not the analysis's own output stays out, and the manifest says
+    what the package leaves out rather than implying it is there.
+    """
     from dexatlas.api.app import _rebuild_result
 
     result = _rebuild_result(analyzer, project_id)
@@ -131,8 +153,22 @@ def build_evidence_package(analyzer: Analyzer, project_id: str, target: Path) ->
 
     for path, content in _cited_sources(evidence, workspace).items():
         files[path] = content
+    return files
 
-    manifest: dict[str, Any] = {
+
+def package_manifest(
+    analyzer: Analyzer, project_id: str, files: Mapping[str, bytes]
+) -> dict[str, Any]:
+    """The manifest for a set of packaged files, bound to the analysis.
+
+    The manifest is built from the same result the files were rendered from,
+    so a caller that renders one run's files and hands them here gets a
+    manifest that names that run — not whatever happens to be published now.
+    """
+    from dexatlas.api.app import _rebuild_result
+
+    result = _rebuild_result(analyzer, project_id)
+    return {
         "schema_version": PACKAGE_SCHEMA_VERSION,
         "project_id": project_id,
         "apk_sha256": result.project.apk.sha256,
@@ -150,14 +186,6 @@ def build_evidence_package(analyzer: Analyzer, project_id: str, target: Path) ->
         ],
         "not_included": NOT_INCLUDED,
     }
-    manifest_bytes = json.dumps(manifest, indent=2, ensure_ascii=False).encode("utf-8")
-
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
-        for path, content in sorted(files.items()):
-            archive.writestr(path, content)
-        archive.writestr(MANIFEST_NAME, manifest_bytes)
-    return manifest
 
 
 def package_file_summary(manifest: Mapping[str, Any]) -> str:
@@ -464,6 +492,8 @@ __all__ = [
     "EvidencePackageError",
     "build_evidence_package",
     "load_manifest",
+    "package_contents",
+    "package_manifest",
     "verify_citations",
     "verify_package",
 ]

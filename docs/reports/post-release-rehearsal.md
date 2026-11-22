@@ -208,8 +208,8 @@
   | `.github/social-preview*.png` 两张卡片 | **有** | `scripts/make-social-preview.py --check`（CI job + pytest） |
   | `docs/status.md:24` 覆盖率 | **有** | `<!--fig:coverage.pct-->` 标记 |
   | `docs/how-to-verify.md:172`、`docs/how-to-verify.zh-CN.md:149` | **无** | `tests/test_how_to_verify.py` 比的是该页的 **collect 汇总数**（总数/快测/集成，见 `tests/test_how_to_verify.py:114-132`），**不比对这一行的 passed/skipped** |
-  | `docs/releases/v1.0.0.md:95` | **无** | `scripts/check-version-claims.py` 的 `release_documents()`（`scripts/check-version-claims.py:976-996`）把发版说明纳入检查，但 `expected["tests.total"]` 取自 `history.<tag>.tests`（`scripts/check-version-claims.py:1275`），而 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:229`）只有 `v0.1.0`–`v0.1.3`，**不含 v1.0.0** → 这个数**没有可比的测量**，规则跳过 |
-  | `docs/reports/v1.0.0-github-release-body.md:168`、`:175`、`:267`、`:299`、`:304` | **部分** | 测量**指纹**被 `check-declaration` 比对；**测试数没有** |
+  | `docs/releases/v1.0.0.md` 的测试数（Verification 一节） | **无** | `scripts/check-version-claims.py` 的 `release_documents()`（`scripts/check-version-claims.py:976-996`）把发版说明纳入检查，但 `expected["tests.total"]` 取自 `history.<tag>.tests`，而 `HISTORY_TAGS`（`scripts/refresh-report-figures.py:229`）只有 `v0.1.0`–`v0.1.3`，**不含 v1.0.0** → 这个数**没有可比的测量**，规则跳过 |
+  | `docs/reports/v1.0.0-github-release-body.md` 的指纹句（`:177`、`:272`、`:295` 一带） | **部分** | 测量**指纹**被 `check-declaration` 比对；**测试数没有** |
   | GitHub 上已发布的那一份正文 | **无** | 不在仓库里 |
 
 - **§3 步骤 8 本该拦住但没拦住？** **是**。§7 N6

@@ -222,6 +222,8 @@ uv run dexatlas manifest  <project-id>
 uv run dexatlas search   <project-id> "yourTerm"
 uv run dexatlas xrefs    <project-id> "com.example.demo.MainActivity.describe(Ljava/lang/String;)Ljava/lang/String;"
 uv run dexatlas export <project-id> -o evidence-package.zip
+uv run dexatlas runs <project-id>     # one APK's analysis attempts (add --run <run-id> for one record)
+uv run dexatlas render <project-id> <run-id> -o rendered-run/   # one run's reports + evidence package, as files
 ```
 
 The `analyze` example points at `examples/demo-app/demo.apk` — a real APK

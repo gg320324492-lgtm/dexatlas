@@ -212,6 +212,9 @@ ignore = ["E501"]
 # the exclusion registry's string literals hold fullwidth punctuation; same
 # reason as above: the reasons are read by a reader, not parsed.
 "scripts/check-doc-citations.py" = ["RUF001"]
+# The A6 regression tests break sentences of a Chinese document by exact
+# match, so their string literals carry the document's fullwidth punctuation.
+"tests/test_m10_selfcheck.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"
