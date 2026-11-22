@@ -171,41 +171,43 @@ def release_documents(root: pathlib.Path) -> list[pathlib.Path]:
 #: Until that is done for a report, it stays here, visibly, with its reason.
 REPORT_EXCLUSIONS: dict[str, str] = {
     # -- Phase 1/2 audits: line numbers pinned to the pre-release trees they
-    #    name in their headers (b8ef71a, 8df894b).
+    #    name in their headers (b8ef71a, 8df894b). The reports themselves only
+    #    entered the tree later (9b6f028), and the checker resolves citation
+    #    paths against the working copy, where the bare ``<dir>/file.py``
+    #    shorthands these reports use do not resolve.
     "phase1-maturity-assessment.md": "历史评估快照，行号按其文首声明的基线树 b8ef71a 写；该树未在 TREE_DOCUMENTS 登记指纹，按当前树核会全数误报。待按其基线树回锚后移出。",
     "phase2-issue-list.md": "Phase 2 开工清单，行号按其文首声明的 HEAD=8df894b 写；按当前树核会全数误报。待按其基线树回锚后移出。",
-    "phase1-findings-ledger.md": "发现台账快照，行号按其文首声明的基线 8df894b 写；待回锚。",
-    "phase1-review-report.md": "Phase 1 评审报告的历史快照，行号按写作当时的树取值；待回锚。",
-    "phase3-baseline.md": "Phase 3 基线报告，行号按其声明的基线 6b08684 写；待回锚。",
+    "phase1-findings-ledger.md": "发现台账快照，行号按其文首声明的基线 8df894b 写；待回锚。（核实：evidence.py:183 在 8df894b 上为空行，add_cross_references 当时在 :211，这 1 处需先改才可回锚）",
     # -- Records of the M10 acceptance material and the de-platformisation
     #    cleanup: their citations name documents that were removed with the
     #    cleanup, and their line numbers belong to the trees they audited.
-    "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag 那棵树（文首声明，历史记录）；待回锚。",
-    "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值；其引用的发布清单与演练目标文件已随去平台化清理移除（2026-11-21）。",
-    "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值；其引用的发布清单与演练记录已随去平台化清理移除（2026-11-21）。",
-    "handwritten-numbers-audit.md": "手写数审计，行号按其审计树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
-    "unguarded-numbers-gates.md": "无守数门禁记录，其 B9 语句与素材侧条目随去平台化清理移除。",
-    "m8-4-note-and-c17.md": "M8-4 备注与 C17 登记，行号按写作当时树取值。",
-    "platform-gate-inventory.md": "平台门禁清单记录，行号按其核对树取值。",
-    "evidence-package-isolation.md": "证据包隔离核对，行号按其核对树取值。",
-    "citation-value-comparison.md": "引用值比对记录，行号按其核对树取值。",
-    "c17-markers-everywhere.md": "C17 落地记录，行号按其写作树取值。",
-    "v1.1.0-candidate-c10-manifest.md": "C10/C16 登记报告，行号按其写作树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
+    #    The checker resolves citation paths against the working copy, so a
+    #    citation naming a removed file cannot be checked at all; these stay
+    #    out until their citations are rewritten against surviving files.
+    "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag（0104ccb）那棵树（文首声明，历史记录）；其引用的 m10-acceptance-pack / m10-invitation-final / m10-reader-package 已随去平台化清理移除，工作副本路径解析失败，保持排除。",
+    "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值；其引用的发布清单与演练目标文件已随去平台化清理移除（2026-11-21）。（核实：37 条引用的锚点跨树——scripts 侧锚 e55ad07、checklist 侧锚 3e943b5——且文中引用的两个指纹均非任一候选树的落盘指纹，无法登记）",
+    "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值；其引用的发布清单与演练记录已随去平台化清理移除（2026-11-21），工作副本路径解析失败，保持排除。",
+    "handwritten-numbers-audit.md": "手写数审计，行号按其审计树 0b98843 取值；其引用的 outreach 素材与 M10 材料已在去平台化清理中移除，工作副本路径解析失败，保持排除。",
+    "unguarded-numbers-gates.md": "无守数门禁记录，其 B9 语句与素材侧条目随去平台化清理移除，工作副本路径解析失败，保持排除。",
+    "m8-4-note-and-c17.md": "M8-4 备注与 C17 登记，行号按写作当时树（f373aaf）取值；其引用的 m10-number-traceability / stale-number-scan 已移除，工作副本路径解析失败，保持排除。",
+    "platform-gate-inventory.md": "平台门禁清单记录，行号按其核对树 415f522 取值；其引用的 outreach-first-read 已移除，工作副本路径解析失败，保持排除。",
+    "evidence-package-isolation.md": "证据包隔离核对，行号按其核对树取值（现引用 46/46 锚在 ff937e1，与其文首声明的 3e943b5 不一致）；其引用的 m10-acceptance-pack 已移除，工作副本路径解析失败，保持排除。",
+    "citation-value-comparison.md": "引用值比对记录，行号按其核对树取值；其唯一引用指向已随去平台化清理移除的 v1.0.0-github-release-body.md，工作副本路径解析失败，保持排除。",
+    "c17-markers-everywhere.md": "C17 落地记录，行号按其写作树取值；其引用的 ci-gate-coverage.md 已移除，工作副本路径解析失败，保持排除。",
+    "v1.1.0-candidate-c10-manifest.md": "C10/C16 登记报告，行号按其写作树 0b98843 取值；其引用的 outreach 素材与 M10 材料已在去平台化清理中移除，工作副本路径解析失败，保持排除。",
     # -- M10 acceptance materials: pinned to the trees they accepted.
     # -- Release-week records: pinned to the trees they recorded.
-    "changelog-vs-release-notes.md": "CHANGELOG 对账，行号基准 d2c5f35（文首声明）；待回锚。",
-    "v1.0.0-ci-run-record.md": "CI run 记录，行号按其记录的 run 当时树取值；待回锚。",
+    "changelog-vs-release-notes.md": "CHANGELOG 对账，行号基准 d2c5f35（文首声明）；65/66 条引用在该树上逐行核实成立，唯一例外是 1 条指向已随去平台化清理移除的 v1.0.0-github-release-body.md:160-170，工作副本路径解析失败，保持排除。",
+    "v1.0.0-ci-run-record.md": "CI run 记录；4 条引用在 774d4fb（文中引用其指纹 sha256:975afa8e…）上全部成立，但该树不含本记录文件，登记会使 local-vs-ci-gates 对本记录的交叉引用解析失败；其余候选树的落盘指纹均与文中引文不符。保持排除。",
     # -- November 2026 audit round: each names its review tree in its header.
-    "coverage-guard-audit.md": "覆盖率守护审计，引用基线 8868e30（文首声明）；待回锚。",
-    "readme-map-audit.md": "README 地图审计，基线 062c4b5（文首声明）；待回锚。",
-    "handover-tails-audit.md": "交接尾巴核对，核对树 0a8e02e（文首声明）；待回锚。",
-    "github-repo-metadata-proposal.md": "仓库元数据提案，行号按其复核时远端 main=8f9ddca 写；待回锚。",
+    "coverage-guard-audit.md": "覆盖率守护审计，审计对象树 8868e30（文首声明，15 条引用在该树逐行核实成立）；但报告文件首入库于 9f707e9（另一分支），8868e30 上无此文件，登记任一棵都会让 glossary.md 与 declarations-outward.md 对本报告的反向行号引用解析失败。保持排除。",
+    "handover-tails-audit.md": "交接尾巴核对，核对树 0a8e02e（文首声明）；29/30 条引用在该树逐行核实成立，唯一未解的 `invitation-final.md:146` 是对读者包错误引用的刻意转引（实义锚 m10-invitation-final.md:146，内容吻合）。保持排除。",
+    "github-repo-metadata-proposal.md": "仓库元数据提案，行号按其复核时远端 main=8f9ddca 写；23 条引用在其落盘树 6ba304d 上逐行核实成立，但文中未引该树指纹。待补指纹声明后移出。",
     # -- Design/analysis reports written against a since-moved tree.
-    "figures-coverage-design.md": "数字自动覆盖的设计报告，行号按 2026-11-18 当时树写（未声明基线）；其多处引用已随后续提交位移，待回锚。",
-    "case-studies-run-correspondence.md": "案例与 run 对应关系报告，行号按 9f0dae3 树写；待回锚。",
-    "case-studies-third-package.md": "第三案例包报告，行号按 c3586d8 树写；待回锚。",
-    "m8-install-rehearsal.md": "M8 安装演练报告，行号按 e4f3011 树写；待回锚。",
-    "glossary-pass.md": "术语表工作记录，行号按 75976e0 树写；待回锚。",
+    "figures-coverage-design.md": "数字自动覆盖的设计报告，行号按其落盘树 d6b8edf 写（未声明基线）；46/47 条引用在该树逐行核实成立，唯一残点是 how-to-verify.md:171-:168 的倒序区间（skip 表实际在 :165-:168）。待补指纹声明并修正该区间后移出。",
+    "case-studies-run-correspondence.md": "案例与 run 对应关系报告，行号按其落盘树 2d008d7 写；19/21 条引用在该树逐行核实成立，2 条 bare 简写指向 docs/outreach/（全路径形式可解）。待补指纹声明后移出。",
+    "case-studies-third-package.md": "第三案例包报告，行号按其声明树 48a56b5 写；20/20 条引用在该树逐行核实成立。待补指纹声明后移出。",
+    "glossary-pass.md": "术语表工作记录，行号按其写作树 d43369b（其父树）写；3/3 条引用在该树逐行核实成立。待补指纹声明后移出。",
     # -- This candidates list itself: it cites benchmark files by line, and
     #    those lines belong to the trees the candidates were written on.
     "v1.1.0-candidates.md": "候选清单本身引用多处基准文件行号，按写作当时树取值；其 C13 节自述了这一缺口，待统一回锚。",
@@ -278,6 +280,19 @@ TREE_DOCUMENTS: dict[str, str] = {
     "docs/reports/readme-image-consistency.md": "3ef6676",
     "docs/reports/case-studies-client-read.md": "9e1aa61",
     "docs/reports/local-vs-ci-gates.md": "9e1aa61",
+    # Historical reports whose citations were re-derived tree by tree and
+    # whose headers now quote the fingerprint of the tree they are anchored
+    # to. phase1-review-report, phase3-baseline and readme-map-audit are
+    # anchored to the tree each names in its own header (their citations were
+    # verified line by line there); no other document cites them by line, so
+    # the reports themselves need not be in those trees. m8-install-rehearsal
+    # is anchored to the first tree that holds it, because m8-4-note-and-c17
+    # and reader-dry-run cite its lines and those citations are read out of
+    # the tree registered here.
+    "docs/reports/phase1-review-report.md": "9b6f028",
+    "docs/reports/phase3-baseline.md": "100b191",
+    "docs/reports/readme-map-audit.md": "062c4b5",
+    "docs/reports/m8-install-rehearsal.md": "73ff432",
 }
 
 #: The document that carries a tree's measurement record. The record holds the

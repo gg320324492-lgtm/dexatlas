@@ -266,9 +266,9 @@ report says: '_51 further evidence records omitted._'
 
 **指标行还在，支撑它的那条证据没了。**
 
-### I6 · `xrefs` 表没有主键
+### I6 · xrefs 表没有主键
 
-**它声称**（`storage.py:427`）：「symbol tables key on the symbol」。
+**它声称**（`storage.py:546` `anchor: symbol tables key on the symbol`）：「symbol tables key on the symbol」。
 **实际**：`xrefs` 表没有 `PRIMARY KEY`、没有 `UNIQUE`，而 `classes`/`methods`/`fields` 都有。
 
 **重复有两个来源**（评审只提到一个）：跨 DEX，以及**同一个 DEX 里调用同一目标两次**
@@ -455,3 +455,9 @@ I9 的教训更深：**docstring 里的「机制」和「约定」差一个字�
 
 见 [Phase 2 issue 清单](phase2-issue-list.md)——每条带现状、两个方案、
 推荐、验收标准，以及**钉住它的测试该怎么写**。
+
+---
+
+> **本报告的行号锚在哪棵树：** 全部锚在提交 **`9b6f028`**（本报告入库的那一次提交）上；
+> 那棵树的测量指纹是 `sha256:42d16641…`。**本报告里的 `file:line` 只在 `9b6f028` 上
+> 成立**，按当前树核会误报。

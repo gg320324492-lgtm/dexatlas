@@ -141,7 +141,7 @@ Regenerating 段现在写的就是这两条正确命令。
 
 | # | 声明 | 状态 | 证据 |
 |---|---|---|---|
-| B1 | agent 默认预算：20,000 tokens / 8 迭代 / 120 秒 / 12 次工具调用 | 已验证 | `src/dexatlas/agent/state.py:120-127`（`Budget`）；`src/dexatlas/agent/planner.py:171`（`DEFAULT_MAX_STEPS = 12`） |
+| B1 | agent 默认预算：20,000 tokens / 8 迭代 / 120 秒 / 12 次工具调用 | 已验证 | `src/dexatlas/agent/state.py:117-127`（`Budget`）；`src/dexatlas/agent/planner.py:171`（`DEFAULT_MAX_STEPS = 12`） |
 | B2 | 预算可经环境变量覆盖：`DEXATLAS_AGENT_MAX_TOKENS` / `_MAX_ITERATIONS` / `_MAX_SECONDS` / `_MAX_STEPS`；非法值报 `agent_env_invalid` 而非静默忽略 | 已验证 | `src/dexatlas/workbench/agent_tasks.py`（`budget_from_env` / `max_steps_from_env`）；`docs/architecture/agent.md` budgets 段 |
 | B3 | comparison harness 的默认每请求预算：scripted 2048、真实模型 4096（三配置同值）；agent 任务总预算默认 10× 请求预算；循环默认 16 轮、600 秒 | 已验证 | `benchmarks/comparison/run.py:934` 与 `--help` 文本；`systems.py` AgentSystem 注释 |
 | B4 | 预算耗尽时任务停止并如实标注 *did not finish*，不编造「没找到」 | 已验证 | `docs/architecture/agent.md`；`m4-e2e-run.md` 5/5 `budget_exhausted` 记录 |
@@ -236,3 +236,9 @@ M5 的目标达成：**对外承诺、代码、trace、演示四者一致**。
 双语 README 首屏可见位置；README 路线图表的 Phase 2 版本号与实际发布一致。
 声明清单 34 项中：已验证 30 项、受限 3 项（F6、F7、F11，边界均已写明）、
 未验证 1 项（P3 macOS）。遗留问题全部入册（§5），无阻断项。
+
+---
+
+> **本报告的行号锚在哪棵树：** 全部锚在提交 **`100b191`**（本报告入库的那一次提交）上；
+> 那棵树的测量指纹是 `sha256:f0336537…`。**本报告里的 `file:line` 只在 `100b191` 上
+> 成立**，按当前树核会误报。

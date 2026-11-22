@@ -84,7 +84,7 @@ Docker 构建每次都走完整下载并在构建期验证后端可运行，其�
 | 坏输入 | 17 字节非 ZIP 文件当 APK 分析 | `Not a usable APK: ... is not a ZIP archive`，**退出码 2**（`EXIT_BAD_REQUEST`） | ✅ |
 | 后端缺失 | `DEXATLAS_JADX_PATH="" DEXATLAS_APKTOOL_JAR=""` | `backends` 如实报 `not installed`×2；分析继续，errors 记录 `not_installed`×2，报告照常产出 | ✅ 失败是值不是异常 |
 | 超时 | `DEXATLAS_TOOL_TIMEOUT_SECONDS=1` | 三后端各记一条 `timeout` 错误（jadx 被杀进程树、apktool/androguard 的 launcher 已先退出），报告照出 | ⚠️ 见 M8-4 |
-| 截断运行 | demo.apk 过小，`DEXATLAS_TOOL_MAX_OUTPUT_BYTES=1MB` 未触发 | 既有测试 `tests/test_cli.py:1229` 以 monkeypatch 覆盖：退出码 5、输出含 "incomplete" 与 "exit code 5" | ✅（已有覆盖，未重复造） |
+| 截断运行 | demo.apk 过小，输出上限环境变量未触发 | 既有测试 `tests/test_cli.py:1229` `anchor: def test_a_truncated_run_exits_with_its_own_code(` 以 monkeypatch 覆盖：退出码 5、输出含 "incomplete" 与 "exit code 5" | ✅（已有覆盖，未重复造） |
 | 重复分析幂等 | 同一 APK 连续分析两次 | 同一 project id `apk_80a8fe0e81204c9f`，`projects` 仅 1 条，计数一致（8.3 s / 8.1 s） | ✅ |
 | 证据隔离 | 检查 `export` 包内容 | 包内仅 3 报告 + manifest；`not_included` 明示 APK、全源码、未引用字符串不在包内 | ✅ |
 
@@ -171,3 +171,9 @@ Docker 构建每次都走完整下载并在构建期验证后端可运行，其�
 修复提交上跑：ruff check / ruff format --check / mypy strict /
 vulture --min-confidence 80 / pytest 全量 / check-doc-citations /
 check-version-claims --base auto —— 结果见提交信息与 CI。
+
+---
+
+> **本报告的行号锚在哪棵树：** 全部锚在提交 **`73ff432`**（本报告入库的那一次提交，
+> 即其演练基线 `bcafc33` 之后的第一个树）上；那棵树的测量指纹是 `sha256:7b36c9dd…`。
+> **本报告里的 `file:line` 只在 `73ff432` 上成立**，按当前树核会误报。

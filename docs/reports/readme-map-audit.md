@@ -114,7 +114,7 @@
 | （地图无对应行） | — | **缺失**：`docs/benchmarks/m6-level2-narrow-verify3.md` | 在 `README.zh-CN.md:360` 之后补一条 |
 | `README.zh-CN.md:367` | `docs/HANDOVER.md` — 现状/怎么跑/下一步 | 存在，描述相符 | — |
 | `README.zh-CN.md:368` | `docs/install.md` — 每条命令都在全新克隆上验证过 | 存在，描述相符 | — |
-| `README.zh-CN.md:369` | `docs/status.md` — 项目现在在哪，还剩什么 | 存在，描述相符（比英文 `:472` 少一句「§4.0 带 M6 判定」，不算错） | 可选：补 §4.0 |
+| `README.zh-CN.md:369` | `docs/status.md` — 项目现在在哪，还剩什么 | 存在，描述相符（比英文 `README.md:472` 少一句「§4.0 带 M6 判定」，不算错） | 可选：补 §4.0 |
 | （地图无对应行） | — | **缺失**：`docs/service-commitments.md` | 在 `README.zh-CN.md:369` 之后补一条 |
 | （地图无对应行） | — | **缺失**：`docs/how-to-verify.md` | 在 `README.zh-CN.md:369` 之后补一条（最要紧，见 §7） |
 | `README.zh-CN.md:370` | `docs/analysis-provenance.md` — 哪条结论由哪个后端支撑 | 存在，描述相符 | — |
@@ -125,7 +125,7 @@
 | `README.zh-CN.md:377` | `docs/assets/demo.mp4` — 85 秒完整会话 | 存在，描述相符 | — |
 | `README.zh-CN.md:381` | `docs/releases/phase1-acceptance-2026-10-21.md` — 验收了什么 | 存在，描述相符 | — |
 | `README.zh-CN.md:383` | `docs/reports/phase1-review-report.md` — Phase 1 源码评审 | 存在，描述相符 | — |
-| `README.zh-CN.md:384` | `docs/reports/phase1-maturity-assessment.md` — 六个加权维度 | 存在，描述相符（比英文 `:500` 少「修复前基线」免责） | 可选：补「修复前基线」免责 |
+| `README.zh-CN.md:384` | `docs/reports/phase1-maturity-assessment.md` — 六个加权维度 | 存在，描述相符（比英文 `README.md:500` 少「修复前基线」免责） | 可选：补「修复前基线」免责 |
 | `README.zh-CN.md:385` | `docs/reports/phase2-issue-list.md` — 推迟的发现 | 存在，描述相符 | — |
 | （地图无对应行） | — | **缺失**：`docs/reports/README.md` 报告目录索引 | 在 `README.zh-CN.md:365` 段加一条（最要紧，见 §7） |
 | （地图无对应行） | — | **缺失**：`docs/releases/v1.0.0.md` v1.0.0 发版说明 | 在 `README.zh-CN.md:365` 段加一条 |
@@ -209,11 +209,11 @@
 3. **`README.md` 与 `README.zh-CN.md` 的项目记录段各补一条 `docs/releases/v1.0.0.md`**；同时把 `README.zh-CN.md:31` 的「见发版说明」补成链接或删掉该半句。
 4. **`README.zh-CN.md` 的基准段（`README.zh-CN.md:360` 之后）补两条**：`docs/benchmarks/m6-level2-narrow-verify2.md`、`docs/benchmarks/m6-level2-narrow-verify3.md`。
 5. **`README.zh-CN.md` 的项目记录段补一条 `docs/service-commitments.md`**。
-6. **`README.zh-CN.md:330` 与 `README.zh-CN.md:346` 补 glossary 指引**（`docs/architecture/README.md#glossary`），与英文 `:390`/`:416` 对齐。
+6. **`README.zh-CN.md:330` 与 `README.zh-CN.md:346` 补 glossary 指引**（`docs/architecture/README.md#glossary`），与英文 `README.md:390`/`README.md:416` 对齐。
 7. **`docs/reports/README.md:3` 与 `docs/reports/README.md:28` 的「三十七份」改为实数**，并补链 4 份漏掉的报告（`english-reader-review.md`、`m10-invitation-sender-checklist.md`、`new-pages-crosscheck.md`、`outreach-publish-checklist.md`）；本页 `readme-map-audit.md` 落地后数字再改一次。
 8. **`README.zh-CN.md:31` 的退出标准摘要补 M8**（与英文 `README.md:41` 对齐；中文自己的 Roadmap status 表已写 M8「部分完成」）。
 9. **`README.md:377` 与 `README.zh-CN.md:319` 的案例段各补一条 `docs/case-studies/README.md`**（案例索引页）。
-10. **`README.md:388` 与 `README.zh-CN.md:328` 的架构段收进 `docs/architecture/` 其余各页**（至少 `analysis-runs.md`、`call-sites-and-edges.md`、`evidence-invariants.md`、`runtime-isolation.md`、`diagram.md`）；`diagram.md` 目前连 `docs/architecture/README.md` 都没链。
+10. **`README.md:388` `anchor: ### Architecture` 与 `README.zh-CN.md:328` 的架构段收进 docs/architecture/ 其余各页**（至少 analysis-runs.md、call-sites-and-edges.md、evidence-invariants.md、runtime-isolation.md、diagram.md）；diagram.md 目前连 docs/architecture/README.md 都没链。
 
 > 上述 10 条中，1–4 条是「外部访客会走不通」的直接原因；5–10 条是完整性缺口。
 > 低优先但同批可做：`docs/portfolio.md`、`docs/proposals/exit-code-partial-read.md`、
@@ -265,3 +265,9 @@ ls docs/reports/*.md | wc -l  # 43（42 份报告 + README.md 索引；本页落
 或中英等价性**——本文列的 21 条问题全部能通过这三道门禁。若要防复发，需要新增一条针对
 「文档地图覆盖面」的测试（例如：两份 README 的地图条目集合必须相等，且必须包含
 `docs/reports/README.md`）。
+
+---
+
+> **本报告的行号锚在哪棵树：** 全部锚在提交 **`062c4b5`**（文首声明的基线树）上；
+> 那棵树的测量指纹是 `sha256:78728268…`。**本报告里的 `file:line` 只在 `062c4b5` 上
+> 成立**，按当前树核会误报。
