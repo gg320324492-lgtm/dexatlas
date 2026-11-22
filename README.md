@@ -84,7 +84,11 @@ still yields a manifest, an index and a report that says which steps did not run
 > local gateway, same frozen 20 questions) scored **51/60 = 85.0% (17/20 in
 > every round)** — every round above the ≥80% per-round line, the combined
 > ≥90% line still not met (see the
-> [GLM record](docs/benchmarks/m6-level2-glm.md));
+> [GLM record](docs/benchmarks/m6-level2-glm.md)); and a 2026-11-22 run
+> with DeepSeek-V4.1-Flash (same frozen 20 questions, widened budget) scored
+> **56/60 = 93.3% (18/20/20 per round)** — the per-round and three-round
+> acceptance lines are both met and B1 is closed (see the
+> [DeepSeek record](docs/benchmarks/m6-level2-deepseek.md)).
 > M8 (clean
 > installs, contracts, export safety) has its rehearsals, fixes and public
 > contract table done with acceptance still open; M9 (this showcase) is done on
@@ -507,6 +511,10 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   round)** — every round above the ≥80% per-round line, the combined ≥90% line
   still not met; A 30.0%, B 35.0%; 949,093 tokens. Reported separately from the
   MiniMax baseline, never combined with it
+- **[M6 level-2 acceptance run — DeepSeek-V4.1-Flash](docs/benchmarks/m6-level2-deepseek.md)** —
+  the same frozen 20 questions, widened budget, three rounds × 3 configurations:
+  DexAtlas **56/60 = 93.3% (18/20/20 per round)** — both acceptance lines met,
+  B1 closed. Reported separately from the GLM and MiniMax runs
 - **[Task set](docs/benchmarks/task-set.md)** — the questions the comparisons ask, how
   an answer is judged, and how a second person confirms that an expected answer is
   right without running anything
@@ -639,7 +647,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan — the milestone stays open |
+| M6 | bounded agent tasks on a frozen regression set | **partly done** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan; a 2026-11-22 run with DeepSeek-V4.1-Flash (same frozen set, widened budget) scored **56/60 = 93.3% (18/20/20 per round)** — both acceptance lines met, **B1 closed** ([DeepSeek record](docs/benchmarks/m6-level2-deepseek.md)) |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **partly done** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit code is implemented as exit code 6 (`EXIT_NO_INDEX`) and written into the [public contract table](docs/architecture/public-contracts.md) |
 | M9 | GitHub showcase (this page) and outreach materials | **showcase done; materials removed** — this page is in place; the outreach materials were removed in the 2026-11-21 de-platformisation cleanup |

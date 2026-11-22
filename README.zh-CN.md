@@ -509,7 +509,9 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 |---|---|---|
 | M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
 | M6 | 冻结回归集上的有限 agent 任务 | **部分完成** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 24/60 = 40.0% 低于三轮合计 ≥54/60（≥90%）线）；执行层修复后，三轮完整[复测](docs/benchmarks/m6-level2-retest4.md) DexAtlas 49/60 = 81.7%（逐轮 15/16/18，trace 1,182,356 tokens）——r2/r3 达单轮 ≥16/20 线、r1 未达，81.7% 仍低于三轮合计 ≥54/60（≥90%）的验收门槛；修复后的[窄验证二轮](docs/benchmarks/m6-level2-narrow-verify2.md)在六个已知失败面上转通过 2/6 题（确定性子集 2/5），低于窄验证门槛（≥4/6 与 ≥3/5）；预算效率四项修复后的[窄验证三轮](docs/benchmarks/m6-level2-narrow-verify3.md)（54 条 trace，380,881 tokens，在 450,000 授权之内）转通过 3/6（确定性子集 3/5），仍低于门槛，故按方案停止投入、M6 转入方案 3 现状披露，里程碑保持未收口；2026-11-21 换模型
-（GLM-5.3-Flash，本地网关，同一冻结集）追加三轮 **51/60 = 85.0%（逐轮均 17/20）**——高于逐轮线、低于 ≥90% 合计线（[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)） |
+（GLM-5.3-Flash，本地网关，同一冻结集）追加三轮 **51/60 = 85.0%（逐轮均 17/20）**——高于逐轮线、低于 ≥90% 合计线（[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)）；2026-11-22 DeepSeek-V4.1-Flash
+（同一冻结集，放宽预算）**56/60 = 93.3%（逐轮 18/20/20）**——两条验收线均达成，**B1 关闭**
+（[DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)） |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | 干净安装、故障恢复、契约与导出安全验收 | **部分完成** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |
 | M9 | GitHub 展示入口（本页）与对外素材 | **展示入口已完成；素材已移除** —— 本页与[项目简介](docs/portfolio.md)已就位；对外素材已随 2026-11-21 的去平台化清理移除 |
