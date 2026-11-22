@@ -31,10 +31,10 @@
 
 | 文件 | 插入位置 | 形式 |
 |---|---|---|
-| [cover-letter-templates.md](../outreach/cover-letter-templates.md) | 两个模板各自的 `Best regards` 之前 | 正文内加粗小段 |
-| [project-brief.md](../outreach/project-brief.md) | `## Links` 之后、结尾横线之前 | `## Availability and contact` 节 |
-| [scope-backend-automation.md](../outreach/scope-backend-automation.md) | `## Changes and scope adjustments` 之后、`## A concrete example` 之前 | 同上 |
-| [scope-ai-mcp.md](../outreach/scope-ai-mcp.md) | 同上 | 同上 |
+| `cover-letter-templates.md`（已随 2026-11-21 去平台化清理移除） | 两个模板各自的 `Best regards` 之前 | 正文内加粗小段 |
+| `project-brief.md`（已移除） | `## Links` 之后、结尾横线之前 | `## Availability and contact` 节 |
+| `scope-backend-automation.md`（已移除） | `## Changes and scope adjustments` 之后、`## A concrete example` 之前 | 同上 |
+| `scope-ai-mcp.md`（已移除） | 同上 | 同上 |
 
 **没有替的占位符**：模板里的业务变量（`{{job title}}`、`{{client name}}`、
 `{{Deliverable ...}}`、`{{your name}}` 等）是**每次提案才填的内容**，不属于
@@ -59,7 +59,7 @@ message thread」，不写「已提交」「已发布」「客户可联系到」
 
 ## 3. 字符长度复算（素材改后）
 
-用 [publish-review.md](../outreach/publish-review.md) §5 的同一段脚本口径
+用当时 `publish-review.md` §5 的同一段脚本口径（该内部核对记录已随去平台化清理移除）
 （raw = Markdown 源码字符数；plain = 去 Markdown 语法后正文字符数）复算了
 改动后的四份素材。给平台表单用的字段结论：
 

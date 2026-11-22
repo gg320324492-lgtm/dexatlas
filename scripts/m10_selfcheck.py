@@ -797,10 +797,19 @@ def check_package_entry_count(report: Report, root: Path = REPO_ROOT) -> None:
         roles = re.findall(r'"(\w+)":\s*"([^"]+)"', role_block)
 
     files_block = ""
+    # ``package_contents`` builds the files dict and returns it; the manifest
+    # is built by ``package_manifest`` from that dict. The block that has to
+    # be free of the manifest's own name is the one that assembles ``files``
+    # -- bounded by the end of that function, not by the next ``manifest:``
+    # annotation, which after the C8 split first appears inside
+    # ``verify_package`` and would drag its ``manifest.json`` reads into a
+    # block that never contained them.
     if "files: dict[str, bytes] = {}" in package_src:
-        files_block = package_src.split("files: dict[str, bytes] = {}", 1)[-1].split(
-            "manifest: dict[str, Any] = {", 1
-        )[0]
+        files_block = package_src.split("files: dict[str, bytes] = {}", 1)[-1]
+        if "def package_manifest(" in files_block:
+            files_block = files_block.split("def package_manifest(", 1)[0]
+        else:
+            files_block = files_block.split("manifest: dict[str, Any] = {", 1)[0]
     manifest_written = (
         'archive.writestr("manifest.json"' in package_src
         or "archive.writestr(MANIFEST_NAME" in package_src

@@ -2,20 +2,20 @@
   "schema": 1,
   "note": "The figures the social preview cards draw, and the images that carry them. Written by scripts/make-social-preview.py; checked by the same script's --check mode. The numbers are compared, never the image bytes: a PNG drawn on one machine has different bytes on another. The suite block holds every outcome the measuring script accounts for (its SUITE_NAMES), so a measurement that gains an outcome is a sidecar that has to be redrawn, not one that passes in silence.",
   "figures": {
-    "contract.checks.cli": "15",
+    "contract.checks.cli": "18",
     "contract.checks.mcp": "6",
     "contract.checks.rest": "28",
-    "contract.checks.total": "49",
-    "coverage.covered": "7177",
+    "contract.checks.total": "52",
+    "coverage.covered": "7295",
     "coverage.pct": "93.3%",
-    "coverage.total": "7691",
+    "coverage.total": "7820",
     "license": "Apache-2.0",
     "mcp.tools": "11",
-    "suite.failed": "0",
-    "suite.passed": "1790",
-    "tests.fast": "1642",
+    "suite.failed": "2",
+    "suite.passed": "1803",
+    "tests.fast": "1657",
     "tests.slow": "149",
-    "tests.total": "1791",
+    "tests.total": "1806",
     "version": "1.0.1"
   },
   "origins": {
@@ -37,8 +37,8 @@
   },
   "suite": {
     "deselected": "",
-    "failed": "0",
-    "passed": "1790",
+    "failed": "2",
+    "passed": "1803",
     "skipped": "1",
     "xfailed": "0",
     "xpassed": "0"
@@ -48,15 +48,15 @@
       "headline": "From APK to Evidence",
       "positioning": "An open-source, evidence-first Android reverse engineering and mobile application analysis platform.",
       "image": ".github/social-preview.png",
-      "sha256": "aeae9e377a2db11cfdea78daaa5d989a336c4c99926955d2a37dc607bd21062c",
-      "bytes": 53796
+      "sha256": "6ae926ae2eea09876b8b11761d51b193905928b1455cd8740941c1bba52f44b6",
+      "bytes": 57096
     },
     "zh-CN": {
       "headline": "从 APK 到可核查的证据",
       "positioning": "开源、证据优先的 Android 逆向工程与移动应用分析平台。",
       "image": ".github/social-preview.zh-CN.png",
-      "sha256": "4567c6ed00d41d7e05b055e7a0ee11571cc7bdebce724911be666af775bd82ff",
-      "bytes": 71694
+      "sha256": "87f6b428c172b738ea6c3befff2134c3e96acd3e4d2e03101991d78e77368b41",
+      "bytes": 74865
     }
   }
 }
