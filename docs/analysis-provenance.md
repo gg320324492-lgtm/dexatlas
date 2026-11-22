@@ -23,7 +23,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | APK 哈希、大小、DEX 文件列表、原生库、是否有签名证书 | 无（纯标准库） | `ApkMetadata` | `core/ingest.py:199-225` |
 | manifest（包名、版本、SDK、权限、组件） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:130-229` |
 | manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:675-711` |
-| manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `read_sdk_levels` | `tools/androguard/adapter.py:280-331`、`core/pipeline.py:535-585` |
+| manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `read_sdk_levels` | `tools/androguard/adapter.py:280-331`、`core/pipeline.py:611-661` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:526-542` |
 | 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:720-881` 的 `class_source_document` / `method_source_document` |
 | 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:621-637` |

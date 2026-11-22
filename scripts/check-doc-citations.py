@@ -181,6 +181,8 @@ REPORT_EXCLUSIONS: dict[str, str] = {
     #    cleanup: their citations name documents that were removed with the
     #    cleanup, and their line numbers belong to the trees they audited.
     "reader-dry-run.md": "读者流程实跑记录，file:line 针对 v1.0.0 tag 那棵树（文首声明，历史记录）；待回锚。",
+    "post-release-rehearsal.md": "发布后重打演练，行号按其演练树取值；其引用的发布清单与演练目标文件已随去平台化清理移除（2026-11-21）。",
+    "declarations-outward.md": "引用带声明的外发记录，行号按其复核树取值；其引用的发布清单与演练记录已随去平台化清理移除（2026-11-21）。",
     "handwritten-numbers-audit.md": "手写数审计，行号按其审计树取值；其引用的素材与 M10 材料已在去平台化清理中移除。",
     "unguarded-numbers-gates.md": "无守数门禁记录，其 B9 语句与素材侧条目随去平台化清理移除。",
     "m8-4-note-and-c17.md": "M8-4 备注与 C17 登记，行号按写作当时树取值。",

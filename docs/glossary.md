@@ -145,7 +145,7 @@
 
 | 术语 | English | 一句话定义 | 出现位置（`file:line`） | 首次出现处是否给了定义 |
 |---|---|---|---|---|
-| **静态条数 / 实跑条数** | static count / live count | 契约的**静态条数**是脚本里 `check()` 调用点的数目（49）；**实跑条数**是那次真跑出来的条数（48 或 47，依可用后端而定）。两者不是一回事。 | `docs/architecture/public-contracts.md` §7 | 是 |
+| **静态条数 / 实跑条数** | static count / live count | 契约的**静态条数**是脚本里 `check()` 调用点的数目（52）；**实跑条数**是那次真跑出来的条数（50 或 51，依可用后端而定）。两者不是一回事。 | `docs/architecture/public-contracts.md` §7 | 是 |
 
 
 ## 故意不收的词
