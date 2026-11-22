@@ -412,3 +412,24 @@ def test_render_summary_names_what_was_written(published_run: AnalysisRun, tmp_p
     assert result.exit_code == 0
     assert published_run.id in result.stdout
     assert "evidence-package.zip" in result.stdout
+
+
+def test_runs_listing_shows_the_full_run_id_in_a_narrow_terminal(
+    published_run: AnalysisRun, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A narrow terminal must not truncate the run id out of the listing.
+
+    The public-contract check reads the listing's text and requires the
+    published run's *full* id (``run_`` + 16 hex) to appear in it. A Rich
+    table that fits its columns to an 80-column terminal truncates the id
+    to ``run_0123456…`` — the listing then shows a run that cannot be named,
+    and the check fails on CI while passing on a wide local console. The
+    id column is therefore not allowed to wrap or truncate.
+    """
+    monkeypatch.setenv("COLUMNS", "80")
+    result = runner.invoke(app, ["runs", PROJECT_ID])
+
+    assert result.exit_code == 0, result.output
+    assert published_run.id in result.stdout, (
+        f"the run id was truncated in an 80-column terminal: {result.stdout}"
+    )

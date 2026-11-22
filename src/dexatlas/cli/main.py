@@ -1042,7 +1042,11 @@ def runs(
         raise ExitCode(code=EXIT_EMPTY)
     published = analyzer.store.get_published_run_id(project_id)
     table = Table(title=f"Analysis runs of {project_id}", header_style="bold")
-    table.add_column("Run")
+    # The run id is the one thing a reader has to be able to copy out of
+    # this listing — ``runs --run <id>`` and ``render <id>`` both take it.
+    # A Rich table fitting itself to an 80-column terminal would truncate
+    # it to ``run_0123456…``, so the column names it in full, unwrapped.
+    table.add_column("Run", no_wrap=True, overflow="ignore")
     table.add_column("Status")
     table.add_column("Completeness")
     table.add_column("Started")
