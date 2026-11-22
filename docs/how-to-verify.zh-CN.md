@@ -195,7 +195,7 @@ facts:
   package version: 1.0.1
   changelog: 1.0.1, 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.0.1
-documents read: <!--fig:documents.count-->126<!--/fig-->
+documents read: <!--fig:documents.count-->127<!--/fig-->
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
@@ -441,7 +441,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:tests.total-->1793<!--/fig-->
+<!--fig:documents.count-->127<!--/fig-->
 ```
 
 **改了会怎样？**

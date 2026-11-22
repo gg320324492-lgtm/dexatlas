@@ -1011,7 +1011,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 23,
     "cli_commands": 13,
-    "documents": 126,
+    "documents": 127,
     "sample_apks": 5
   },
   "coverage": {
