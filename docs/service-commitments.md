@@ -46,12 +46,12 @@ DexAtlas 是 evidence-first 的 Android 静态分析工具：输入一个 APK，
 
 | 配置 | MiniMax 单轮（2026-11-16） | GLM 三轮合计（2026-11-21） | 说明 |
 |---|---:|---:|---|
-| DexAtlas | **16/20（80.0%）** | **51/60（85.0%；逐轮均 17/20）** | agent 配置，带证据工具链 |
-| 对照 A | 7/20 | 9/20（30.0%） | 纯模型 + 基础工具 |
-| 对照 B | 7/20 | 7/20（35.0%） | 纯模型 + 检索工具 |
+| DexAtlas | **16/20（80.0%）** | **53/60（88.3%；逐轮 17/18/18）** | agent 配置，带证据工具链 |
+| 对照 A | 7/20 | 18/60（30.0%） | 纯模型 + 基础工具 |
+| 对照 B | 7/20 | 18/60（30.0%） | 纯模型 + 检索工具 |
 
 - MiniMax 单轮：证据 grounding 率 **97.7%**，无依据断言率 **2.3%**，工具调用成功率 **99.4%**，trace 合计 **355,623 tokens**（完整表见 [m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)）。
-- GLM 三轮：证据 grounding 率 **90.9%→97.5%**（逐轮），无依据断言率 **9.1%→2.5%**，工具调用成功率 **≥98.2%**，trace 合计 **949,093 tokens**（完整表见 [m6-level2-glm.md](benchmarks/m6-level2-glm.md)）。
+- GLM 三轮：证据 grounding 率 **95.8%**，无依据断言率 **4.2%**，工具调用成功率 **100.0%**，trace 合计 **966,655 tokens**（完整表见 [m6-level2-glm.md](benchmarks/m6-level2-glm.md)）。
 - 判分客观可复算：`must_contain` / `expect_count` / `expect_empty` / `expect_backend_failure` 全部机器判定，trace 已提交，报告可逐字节重算。
 
 ### 2.2 按题类的能力现状
