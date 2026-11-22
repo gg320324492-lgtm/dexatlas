@@ -1,6 +1,6 @@
 # DexAtlas 服务承诺范围（Service Commitments）
 
-**状态：对外表述边界文档。本文只陈述已有实测证据支持的能力与明确不做的事；所有数字来自已提交的评测报告，由脚本从 trace 重算生成，未手改、未外推。最新实测基准：[m6-level2-glm.md](benchmarks/m6-level2-glm.md)（2026-11-21，GLM-5.3-Flash 三轮 53/60 = 88.3%，逐轮 17/18/18；历史 MiniMax 基线 [m6-level2-retest4.md](benchmarks/m6-level2-retest4.md) 2026-11-17 三轮 49/60 = 81.7% 仍留档）；**本文 §2 与 §3.3 引的单轮数字来自 [m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)（2026-11-16）那一次**，不是最新一轮。**
+**状态：对外表述边界文档。本文只陈述已有实测证据支持的能力与明确不做的事；所有数字来自已提交的评测报告，由脚本从 trace 重算生成，未手改、未外推。最新实测基准：[m6-level2-deepseek.md](benchmarks/m6-level2-deepseek.md)（2026-11-22，DeepSeek-V4.1-Flash 三轮 56/60 = 93.3%，逐轮 18/20/18——**B1 验收线达成**）；同口径对照：[m6-level2-glm.md](benchmarks/m6-level2-glm.md)（GLM-5.3-Flash 53/60 = 88.3%）、历史 MiniMax 基线 [m6-level2-retest4.md](benchmarks/m6-level2-retest4.md)（49/60 = 81.7%）均留档；**本文 §2 与 §3.3 引的单轮数字来自 [m6-level2-retest2.md](benchmarks/m6-level2-retest2.md)（2026-11-16）那一次**，不是最新一轮。**
 
 本文面向潜在客户与雇主，回答一个问题：**把一个 APK 分析任务交给 DexAtlas，当前可以期待什么、不可以期待什么。** 它不是营销页，每一句能力声明都挂在可点开的证据上。
 
@@ -90,7 +90,7 @@ DexAtlas 是 evidence-first 的 Android 静态分析工具：输入一个 APK，
 
 ### 3.1 验收线
 
-服务回归集的验收线（[service-regression-set.md](benchmarks/service-regression-set.md) §5）：**每轮 ≥80%，三轮合计 ≥90%**（空答与预算耗尽计失败；不得删题换通过率）。当前状态：**两套三轮完整测量均已跑完**——历史 MiniMax 基线 49/60 = 81.7%（逐轮 15/16/18），2026-11-21 的 GLM-5.3-Flash 复测 53/60 = 88.3%（逐轮 17/18/18）——单轮线（≥80%）均过，三轮合计线（≥90%）**均未过**（GLM 差 1 题）；按验收方案，**方案 3「现状披露」是最终定稿路径**（[m6-verify3-plan.md](benchmarks/m6-verify3-plan.md) §7），不再追加修复轮。对外只声称「单轮达到验收线」与「三轮 53/60 = 88.3%（GLM）/ 49/60 = 81.7%（MiniMax）」，**不声称「达到三轮验收线」**。
+服务回归集的验收线（[service-regression-set.md](benchmarks/service-regression-set.md) §5）：**每轮 ≥80%，三轮合计 ≥90%**（空答与预算耗尽计失败；不得删题换通过率）。当前状态：**三套三轮完整测量均已跑完**——历史 MiniMax 基线 49/60 = 81.7%（逐轮 15/16/18），GLM-5.3-Flash 53/60 = 88.3%（逐轮 17/18/18），2026-11-22 的 DeepSeek-V4.1-Flash **56/60 = 93.3%（逐轮 18/20/18）——单轮线（≥80%）与三轮合计线（≥90%）均达成，B1 验收线关闭**。同一套产品修复在三个模型上成绩递增（81.7% → 88.3% → 93.3%），修复有效性得到跨模型验证；三模型成绩分开陈述，不并表、不混排。
 
 ### 3.2 质量纪律（对客户可核查）
 
