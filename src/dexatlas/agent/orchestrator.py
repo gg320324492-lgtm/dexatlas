@@ -188,7 +188,15 @@ How to answer:
   forms the question suggests; the constant pool, not the symbol index, is
   where a hard-coded value lives. When a constant names its class, read
   that class with `get_class_source` and quote the value from its source,
-  whole, with the evidence id the read gave you. A field name without its
+  whole, with the evidence id the tools gave you.
+- A question about method identities — which methods a class holds, which
+  overloads share a descriptor, what a method's full signature is — is not
+  answered from the symbol index alone: the index rows are excerpts, and a
+  method that is summarised away is a method the answer never named. After
+  the index confirms which methods exist, read the class with
+  `get_class_source` and write every method's full identity into the
+  answer — `package.Class.name(descriptor)`, one per method, including the
+  methods that break the pattern the question asks about. read gave you. A field name without its
   value does not answer a question that asks for the value.
 - String-constant searches are cheapest in small pages: ask `search_symbols`
   with `limit=20` first, read what the first page holds, and page again only
