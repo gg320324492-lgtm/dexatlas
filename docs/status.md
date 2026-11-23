@@ -12,6 +12,7 @@
 - 「三阶段的计划」在[路线图](roadmap/ROADMAP.md)里
 - [Phase 3 计划](roadmap/phase3-plan.md)的实施进度与证据见 §4.0，M10 独立验收已通过（2026-11-20，重评 97.5% / 96.3%）
 - [Phase 4 执行单](roadmap/phase4-plan.md)（最终决策 A + D + G）定义作品集收尾、软件设计与 Workbench UI 的范围；完成后默认进入 Portfolio Freeze
+- M15 作品集材料在 [portfolio/](portfolio/)：[通用外部渠道案例页](portfolio/case-page.md)（不点名平台、不虚构联系方式）与 [Portfolio Freeze 声明](portfolio/freeze.md)（四类解冻信号与冻结期四类维护，与执行单 §8 一致）
 - 每次发布的具体内容在 [releases/](releases/) 里
 
 ---

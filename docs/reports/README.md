@@ -50,6 +50,10 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 收的是「读者读不懂就会猜错」的词——源指纹、契约活检、独占测量、两棵树、红/绿、证据包、判定……
 表里还标了每个词在哪份文档的首次出现处有没有就地定义。
 
+**对外作品集材料**：M15 起另设 [`docs/portfolio/`](../portfolio/)（不在本目录计数）——
+[案例页骨架](../portfolio/case-page.md)（通用外部渠道，按[发布规划 §4](phase4-release-plan.md) 填写）与
+[Portfolio Freeze 声明](../portfolio/freeze.md)（解冻信号与冻结期维护范围，与[执行单 §8](../roadmap/phase4-plan.md) 一致）。
+
 ---
 
 ## 1. 执行、评审与阶段结论（Phase 1–2）
