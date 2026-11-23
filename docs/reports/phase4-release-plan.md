@@ -67,7 +67,7 @@
 
 | 用途 | 建议采用资产 | 来源基线 | 替换/新增位置 |
 |---|---|---|---|
-| 顶部快速预览（分析摘要 + 证据层级） | `docs/assets/demo-quick.gif`（保留，直到新短视频产出） | 旧演示，真实分析画面 | 两份 README 现有 `<img src="docs/assets/demo-quick.gif">`；步骤 2 完成后替换成新 60–90 s 剪辑的短 GIF |
+| 顶部快速预览（分析摘要 + 证据层级） | `docs/assets/demo-quick.gif`（保留，直到新短视频产出） | 旧演示，真实分析画面 | 两份 README 现有 `<img src=docs/assets/demo-quick.gif>`；步骤 2 完成后替换成新 60–90 s 剪辑的短 GIF |
 | 完整会话（搜索、交叉引用、报告） | `docs/assets/demo.gif` + `docs/assets/demo.mp4`（保留但更新披露） | 旧 85 秒录制，真实分析画面 + **脚本化 agent** | 两份 README 完整演示段与 Demo video 入口；与 §2 新素材一起发布，旧披露不可删改一半 |
 | Workbench 项目列表 / 上传 | `docs/assets/phase4-baseline/01-project-list-1440.png`（或 M14 更新帧） | M11 基线，24 张四宽度截图 | 两份 README 新增「Workbench」小节；375/768/1024/1440 的对照另列入架构文档，不必全塞 README |
 | 项目详情 / 导出 | `docs/assets/phase4-baseline/02-project-detail-1440.png` | M11 基线 | Workbench 小节 |

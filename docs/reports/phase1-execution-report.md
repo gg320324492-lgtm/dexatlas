@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1807<!--/fig-->（<!--fig:tests.fast-->1658<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7295<!--/fig-->/<!--fig:coverage.total-->7820<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1808<!--/fig-->（<!--fig:tests.fast-->1659<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7323<!--/fig-->/<!--fig:coverage.total-->7852<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1658<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1659<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1807<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1808<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -881,10 +881,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1807<!--/fig--> 个：<!--fig:tests.fast-->1658<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1808<!--/fig--> 个：<!--fig:tests.fast-->1659<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7295<!--/fig-->/<!--fig:coverage.total-->7820<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1806<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7323<!--/fig-->/<!--fig:coverage.total-->7852<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1807<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1012,7 +1012,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 23,
     "cli_commands": 15,
-    "documents": 129,
+    "documents": 133,
     "sample_apks": 5
   },
   "coverage": {
@@ -1029,7 +1029,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "agent/providers/scripted.py": [42, 2],
       "agent/providers/transport.py": [30, 2],
       "agent/reporter.py": [127, 12],
-      "agent/state.py": [201, 5],
+      "agent/state.py": [233, 9],
       "agent/sufficiency.py": [31, 1],
       "agent/tool_executor.py": [368, 35],
       "api/__init__.py": [3, 0],
@@ -1087,8 +1087,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/app.py": [166, 4],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 525,
-    "statements": 7820
+    "missing": 529,
+    "statements": 7852
   },
   "history": {
     "v0.1.0": {
@@ -1105,10 +1105,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:f918956829495eef90fd750065d4b5445fd86afe88cbde09d31ead5aaeff52b8",
+  "source_fingerprint": "sha256:503afff0a846144665bd7dcda5ad74da4cf92bf38e10581bb8f7d495d975d0ed",
   "suite": {
     "failed": 0,
-    "passed": 1806,
+    "passed": 1807,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1122,8 +1122,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1658,
+    "fast": 1659,
     "slow": 149,
-    "total": 1807
+    "total": 1808
   }
 }-->
