@@ -236,6 +236,7 @@ def collect_documents(root: pathlib.Path = REPO) -> list[pathlib.Path]:
     named = [
         root / "docs" / "analysis-provenance.md",
         root / "docs" / "architecture" / "public-contracts.md",
+        root / "docs" / "architecture" / "workbench-ui.md",
         root / "docs" / "benchmarks" / "large-apk.md",
     ]
     report_documents: list[pathlib.Path] = []
