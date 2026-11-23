@@ -1,4 +1,4 @@
-import { useEffect, useRef, type JSX, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type JSX, type ReactNode, type RefObject } from "react";
 
 // The workbench's shared base components (workbench-ui.md §4). Each does one
 // thing, takes its data through props, and fetches nothing: the screens own
@@ -149,9 +149,26 @@ const BADGE_CLASS: Record<BadgeKind, string> = {
   neutral: "status-pending",
 };
 
-/** A status badge. The project statuses map onto it through `badgeKind`. */
+/** A status badge. The project statuses map onto it through `badgeKind`. The
+ * mark is the non-color signal the design calls for: every kind reads the
+ * same with color away. */
+const BADGE_MARK: Record<BadgeKind, string> = {
+  ok: "✓",
+  running: "…",
+  failed: "✕",
+  pending: "•",
+  neutral: "•",
+};
+
 export function StatusBadge({ kind, label }: { kind: BadgeKind; label: string }): JSX.Element {
-  return <span className={`status ${BADGE_CLASS[kind]}`}>{label}</span>;
+  return (
+    <span className={`status ${BADGE_CLASS[kind]}`}>
+      <span className="status-mark" aria-hidden="true">
+        {BADGE_MARK[kind]}
+      </span>{" "}
+      {label}
+    </span>
+  );
 }
 
 /** The existing statuses' colors, in one place: completed is green, a status
@@ -318,8 +335,9 @@ export function Spinner({ label }: { label: ReactNode }): JSX.Element {
 
 // -- the overlays -----------------------------------------------------------
 
-/** A modal dialog. Escape closes it; focus is handed back to the trigger
- * through `restoreFocusTo` when it closes. */
+/** A modal dialog. Escape closes it; on open the first focusable element
+ * inside receives focus, Tab cycles within the panel (focus trap), and focus
+ * is handed back to the trigger through `restoreFocusTo` when it closes. */
 export function Dialog({
   open,
   title,
@@ -333,12 +351,14 @@ export function Dialog({
   children: ReactNode;
   restoreFocusTo?: HTMLElement | null;
 }): JSX.Element | null {
+  const panelRef = useRef<HTMLDivElement | null>(null);
   useEscapeCloses(open, onClose);
-  useRestoreFocus(open, restoreFocusTo);
+  useModalFocus(open, panelRef, restoreFocusTo);
   if (!open) return null;
   return (
     <div className="wb-overlay" onClick={onClose}>
       <div
+        ref={panelRef}
         className="wb-dialog"
         role="dialog"
         aria-modal="true"
@@ -371,12 +391,14 @@ export function Drawer({
   children: ReactNode;
   restoreFocusTo?: HTMLElement | null;
 }): JSX.Element | null {
+  const panelRef = useRef<HTMLElement | null>(null);
   useEscapeCloses(open, onClose);
-  useRestoreFocus(open, restoreFocusTo);
+  useModalFocus(open, panelRef, restoreFocusTo);
   if (!open) return null;
   return (
     <div className="wb-overlay" onClick={onClose}>
       <aside
+        ref={panelRef}
         className="wb-drawer"
         role="dialog"
         aria-modal="true"
@@ -406,14 +428,74 @@ function useEscapeCloses(open: boolean, onClose: () => void): void {
   }, [open, onClose]);
 }
 
-function useRestoreFocus(open: boolean, target: HTMLElement | null | undefined): void {
+/** The focusable elements a modal manages: native controls plus anything with
+ * a tabindex. Not matching `display: none` contents is good enough here — the
+ * panels' children are simple controls, not conditionally hidden subtrees. */
+function focusableIn(panel: HTMLElement): HTMLElement[] {
+  const candidates = panel.querySelectorAll<HTMLElement>(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  );
+  return Array.from(candidates).filter((element) => element.offsetParent !== null);
+}
+/** Open a modal: focus moves into the panel (its first focusable element, or
+ * the panel itself when none — the panel carries `tabindex="-1"` for that),
+ * and Tab or Shift+Tab cycles within it instead of escaping to the page
+ * behind. Close: focus returns to the trigger through `restoreFocusTo`. */
+function useModalFocus<T extends HTMLElement>(
+  open: boolean,
+  panelRef: RefObject<T | null>,
+  restoreFocusTo: HTMLElement | null | undefined,
+): void {
   const wasOpen = useRef(false);
+  const restore = useCallback((): void => {
+    if (restoreFocusTo && document.contains(restoreFocusTo)) restoreFocusTo.focus();
+  }, [restoreFocusTo]);
+
   useEffect(() => {
     if (open) {
       wasOpen.current = true;
+      const panel = panelRef.current;
+      if (panel) {
+        const first = focusableIn(panel)[0] ?? panel;
+        if (first !== panel) {
+          first.focus();
+        } else {
+          panel.tabIndex = -1;
+          panel.focus();
+        }
+      }
       return;
     }
-    if (wasOpen.current && target && document.contains(target)) target.focus();
+    if (wasOpen.current) restore();
     wasOpen.current = false;
-  }, [open, target]);
+  }, [open, panelRef, restore]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== "tab") return;
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = focusableIn(panel);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const current = document.activeElement;
+      const index = focusable.indexOf(current as HTMLElement);
+      const lastIndex = focusable.length - 1;
+      const next =
+        event.shiftKey
+          ? index <= 0
+            ? focusable[lastIndex]
+            : focusable[index - 1]
+          : index === lastIndex || index === -1
+            ? focusable[0]
+            : focusable[index + 1];
+      event.preventDefault();
+      if (next) next.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, panelRef]);
 }

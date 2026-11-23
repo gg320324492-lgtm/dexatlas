@@ -84,13 +84,16 @@
   --border: 1px solid var(--line);
   --border-2: 2px solid var(--line);
 
-  /* 焦点环约定：交互元素键盘聚焦时使用
-     outline: var(--focus-ring-width) solid var(--focus-ring-color);
-     outline-offset: var(--focus-ring-offset);
-     存量样式仍依赖 UA 默认焦点框，新交互组件应直接采用本 token。 */
+  /* 焦点环约定：所有可交互元素（链接、输入框、select、按钮、tab）键盘聚焦时
+     统一使用 outline: var(--focus-ring-width) solid var(--focus-ring-color);
+     outline-offset: var(--focus-ring-offset)；只在 :focus-visible 下出现，
+     鼠标用户不双份。 */
   --focus-ring-color: var(--accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+
+  /* 触控目标：交互元素（按钮/输入框/tab）的可点击区域最小 44px。 */
+  --touch-target: 2.75rem;
 
   /* 骨架屏与进行中状态：底色在 --bg 与 --line 之间，微光用面板色。 */
   --skeleton-base: #1a212a;
@@ -228,6 +231,11 @@ table.projects td.num {
   border: var(--border);
 }
 
+/* 徽标里的状态记号：状态不只靠颜色（规范 §5），色彩之外另有文字记号。 */
+.status-mark {
+  font-weight: 700;
+}
+
 .status-completed {
   color: var(--ok);
 }
@@ -357,6 +365,7 @@ table.benchmarks td:first-child {
   border: var(--border);
   border-radius: var(--radius-sm);
   padding: var(--space-0-4) var(--space-0-6);
+  min-height: var(--touch-target);
   font: inherit;
 }
 
@@ -366,6 +375,9 @@ button {
   border: var(--border);
   border-radius: var(--radius-sm);
   padding: var(--space-0-35) var(--space-0-7);
+  /* 触控目标 ≥44px：浏览器会把按钮内容在增高后的盒内垂直居中，
+     因此 min-height 不改变文字位置，只扩大可点击区域。 */
+  min-height: var(--touch-target);
   font: inherit;
   cursor: pointer;
 }
@@ -377,7 +389,10 @@ button:hover {
 .link-button {
   background: none;
   border: none;
-  padding: 0;
+  /* 触控目标 ≥44px：padding 撑出可点区域，负 margin 原样抵消，
+     行内文本流与基线布局都不变，只有可点击范围变大。 */
+  padding: var(--space-0-7) var(--space-0-4);
+  margin: calc(-1 * var(--space-0-7)) calc(-1 * var(--space-0-4));
   color: var(--accent);
   text-align: left;
 }
@@ -391,6 +406,8 @@ button:hover {
 
 .upload-panel input[type="file"] {
   color: var(--muted);
+  min-height: var(--touch-target);
+  padding: var(--space-0-4) 0;
 }
 
 .upload-panel .ok,
@@ -593,6 +610,9 @@ ul.targets li {
 
 .graph-edges .edge.in {
   stroke: var(--warn);
+  /* 成功/方向不只靠颜色：入边用虚线与出边（实线）区分，色弱读者
+     也能从线型读出方向。 */
+  stroke-dasharray: 6 4;
 }
 
 .graph-edges .edge.out {
@@ -711,12 +731,16 @@ table.sites td.num {
   font-weight: 700;
 }
 
-/* Buttons: the plain `button` styling is the base; the primary variant fills
-   with the accent. Focus uses the shared focus-ring tokens. */
-.wb-button:focus-visible,
-.wb-tab:focus-visible,
-.link-button:focus-visible,
-.topnav a:focus-visible {
+/* Focus: every interactive element shares the focus-ring tokens — links,
+   inputs, selects, buttons and tabs alike — so keyboard focus is equally
+   visible on the dark background everywhere (M13's four classes included:
+   .wb-button/.wb-tab/.link-button/.topnav a are all a/button elements). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }

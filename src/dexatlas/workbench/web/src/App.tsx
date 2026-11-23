@@ -6,6 +6,7 @@ import {
   PartialBanner,
   Skeleton,
   Spinner,
+  StatusBadge,
   Topbar,
   badgeKind,
 } from "./components";
@@ -312,7 +313,8 @@ function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX
         </p>
       )}
       {phase.kind === "done" && (
-        <p className="ok">
+        <p className="ok" role="status">
+          <span className="status-mark" aria-hidden="true">✓</span>{" "}
           {phase.alreadyAnalysed ? "already analysed: " : "analysis finished: "}
           <code>{phase.name}</code>{" "}
           <button className="link-button" onClick={() => onReady(phase.projectId)}>
@@ -322,7 +324,8 @@ function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX
         </p>
       )}
       {phase.kind === "failed" && (
-        <p className="error">
+        <p className="error" role="alert">
+          <span className="status-mark" aria-hidden="true">✕</span>{" "}
           <code>{phase.name}</code> was not analysed: {phase.message}{" "}
           <button className="link-button" onClick={reset}>try again</button>
         </p>
@@ -343,7 +346,7 @@ function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
         </div>
       </td>
       <td>
-        <span className={`status status-${project.status}`}>{project.status}</span>
+        <StatusBadge kind={badgeKind(project.status)} label={project.status} />
       </td>
       <td className="num">{formatCount(project.class_count)}</td>
       <td className="num">{formatCount(project.method_count)}</td>
@@ -505,8 +508,7 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
       />
       <header className="project-header">
         <h2>
-          {project.apk_name}{" "}
-          <span className={`status status-${project.status}`}>{project.status}</span>
+          {project.apk_name} <StatusBadge kind={badgeKind(project.status)} label={project.status} />
         </h2>
         <p className="meta">
           <code>{project.id}</code> · sha256 {project.apk_sha256.slice(0, 16)}… · analysed{" "}
@@ -618,16 +620,6 @@ function provenanceRef(entry: unknown): string | null {
 // The statuses a poll stops at: the task will not move again on its own.
 const AGENT_TERMINAL_STATUSES = new Set(["completed", "failed", "budget_exhausted", "interrupted"]);
 
-function statusClass(status: string): string {
-  // The badge kinds land on the same classes the project rows use, so an
-  // agent status and a project status of the same word read alike.
-  const kind = badgeKind(status);
-  if (kind === "ok") return "status status-completed";
-  if (kind === "running") return "status status-running";
-  if (kind === "failed") return "status status-failed";
-  return "status status-pending";
-}
-
 function AgentEvidenceTable({
   title,
   rows,
@@ -690,6 +682,7 @@ function AgentToolTimeline({ calls }: { calls: AgentToolCall[] }): JSX.Element {
             <li key={index} className={call.ok ? "agent-call-ok" : "agent-call-failed"}>
               <code>{call.tool}</code>{" "}
               <span className="meta">
+                <span className="status-mark" aria-hidden="true">{call.ok ? "✓" : "✕"}</span>{" "}
                 {call.ok ? "ok" : `failed (${call.error_kind ?? "error"})`} ·{" "}
                 {call.duration_seconds.toFixed(3)}s
                 {call.attempt > 1 ? ` · attempt ${call.attempt}` : ""}
@@ -764,7 +757,7 @@ function AgentTaskPanel({ taskId }: { taskId: string }): JSX.Element {
       <section className="panel" aria-label="task status">
         <h3>Task</h3>
         <p>
-          <span className={statusClass(task.status)}>{task.status}</span> <code>{task.task_id}</code>{" "}
+          <StatusBadge kind={badgeKind(task.status)} label={task.status} /> <code>{task.task_id}</code>{" "}
           · asked {formatWhen(task.created_at)}
         </p>
         <p>"{task.question}"</p>
