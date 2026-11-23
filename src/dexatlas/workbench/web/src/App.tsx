@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent, type JSX } from "react";
 import {
+  AppShell,
+  Breadcrumbs,
+  ErrorPanel,
+  PartialBanner,
+  Skeleton,
+  Spinner,
+  Topbar,
+  badgeKind,
+} from "./components";
+import {
   ApiError,
   agentReportUrl,
   askAgent,
@@ -103,6 +113,77 @@ function errorText(err: unknown): string {
     return "the server could not answer this — try again, and check the server log if it persists";
   }
   return err.message;
+}
+
+// An unknown project id is a screen the workspace cannot answer, not a
+// loading state that never resolves: the contract's `unknown_project` 404 is
+// the one error every project screen treats alike — the reason, the way
+// back. The source endpoints are the documented exception (a missing source
+// and a missing project are the same `found: false` there), so their screens
+// keep their own handling.
+function isUnknownProject(err: unknown): boolean {
+  return err instanceof ApiError && err.code === "unknown_project";
+}
+
+// The path back to the list is part of every project-screen error, so the
+// screens' messages say "unknown project" in the same words the contract
+// uses and point the way out.
+function projectErrorNote(projectId: string): string {
+  return `this workspace holds no project “${projectId}”. Check the id or go back to the list.`;
+}
+
+/** One project-scoped screen's single piece of project validation: it asks
+ * the status endpoint once per project id and reports what it learned to the
+ * screen. The screens that only render a subpage of a project (calls,
+ * agent) validate through this instead of staying silent when the project is
+ * not in the workspace. */
+function useProjectExists(projectId: string): {
+  projectKnown: boolean | null;
+  projectError: string | null;
+  retry: () => void;
+} {
+  const [state, setState] = useState<{ known: boolean | null; error: string | null; tick: number }>({
+    known: null,
+    error: null,
+    tick: 0,
+  });
+
+  useEffect(() => {
+    setState({ known: null, error: null, tick: state.tick });
+    getProjectStatus(projectId)
+      .then(() => setState((current) => ({ ...current, known: true, error: null })))
+      .catch((err: unknown) => {
+        if (isUnknownProject(err)) {
+          setState((current) => ({ ...current, known: false, error: null }));
+        } else {
+          setState((current) => ({ ...current, known: null, error: errorText(err) }));
+        }
+      });
+    // The tick is the retry: bumping it re-runs the probe.
+  }, [projectId, state.tick]);
+
+  return {
+    projectKnown: state.known,
+    projectError: state.error,
+    retry: () => setState((current) => ({ ...current, tick: current.tick + 1 })),
+  };
+}
+
+/** The screen an unknown project id renders instead of the page's content:
+ * the contract's own reason, and the way back. */
+function UnknownProjectPanel({ projectId }: { projectId: string }): JSX.Element {
+  return (
+    <ErrorPanel
+      message={projectErrorNote(projectId)}
+      links={<a href="#/">project list</a>}
+    />
+  );
+}
+
+/** The screen a failed project probe renders: the probe's own reason and a
+ * retry that asks again. */
+function ProjectProbeError({ message, onRetry }: { message: string; onRetry: () => void }): JSX.Element {
+  return <ErrorPanel message={`the project could not be checked: ${message}`} onRetry={onRetry} />;
 }
 
 function BackendsWarning({ missing }: { missing: string[] }): JSX.Element | null {
@@ -214,13 +295,19 @@ function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX
       )}
       {phase.kind === "uploading" && (
         <p className="loading">
-          storing <code>{phase.name}</code>…
+          <Spinner label={<>storing <code>{phase.name}</code>…</>} />
         </p>
       )}
       {phase.kind === "analysing" && (
         <p className="loading">
-          <code>{phase.name}</code> is stored; the analysis is running — this can take a while.
-          {" "}
+          <Spinner
+            label={
+              <>
+                <code>{phase.name}</code> is stored; the analysis is running — this can take a
+                while.
+              </>
+            }
+          />{" "}
           <button className="link-button" onClick={reset}>upload another</button>
         </p>
       )}
@@ -290,21 +377,25 @@ function ProjectListScreen(): JSX.Element {
 
   if (error) {
     return (
-      <p className="error">
-        the list could not be read: {error}{" "}
-        <button type="button" className="link-button" onClick={() => setTick(tick + 1)}>
-          try again
-        </button>
-      </p>
+      <ErrorPanel
+        message={`the list could not be read: ${error}`}
+        onRetry={() => setTick(tick + 1)}
+      />
     );
   }
-  if (!data) return <p className="loading">reading the workspace…</p>;
+  if (!data) {
+    return (
+      <>
+        <Skeleton rows={4} label="reading the workspace" />
+      </>
+    );
+  }
   if (data.projects.length === 0) {
     return (
       <>
         <UploadPanel onReady={openProject} />
         <p className="empty">
-          this workspace holds no analysed APK yet. Upload one here, or analyse it with{" "}
+          this workspace holds no analysed APK yet. Upload one above, or analyse it with{" "}
           <code>dexatlas analyze &lt;apk&gt;</code> and it appears here.
         </p>
       </>
@@ -374,25 +465,44 @@ type RunSummaryLike = ProjectStatus["runs"][number];
 function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element {
   const [status, setStatus] = useState<ProjectStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
+    setStatus(null);
+    setError(null);
     getProjectStatus(projectId)
       .then(setStatus)
       .catch((err: unknown) => setError(errorText(err)));
-  }, [projectId]);
+  }, [projectId, tick]);
 
   if (error) {
-    return (
-      <p className="error">
-        this project could not be read: {error} — <a href="#/">back to the project list</a>
-      </p>
+    return isUnknownProject(error) ? (
+      <UnknownProjectPanel projectId={projectId} />
+    ) : (
+      <ErrorPanel
+        message={`this project could not be read: ${error}`}
+        onRetry={() => setTick(tick + 1)}
+        links={<a href="#/">back to the project list</a>}
+      />
     );
   }
-  if (!status) return <p className="loading">reading the project…</p>;
+  if (!status) return <Skeleton rows={5} label="reading the project" />;
 
   const { project, completeness } = status;
+  const partialReasons: string[] = [
+    ...completeness.missing_backends.map(
+      (backend) => `the ${backend} backend did not take part — numbers that depend on it are lower bounds`,
+    ),
+    ...(completeness.truncated ? ["a limit stopped the analysis short — the counts are what was read"] : []),
+  ];
   return (
     <article>
+      <Breadcrumbs
+        items={[
+          { label: "projects", to: "#/" },
+          { label: project.apk_name },
+        ]}
+      />
       <header className="project-header">
         <h2>
           {project.apk_name}{" "}
@@ -403,6 +513,8 @@ function ProjectStatusScreen({ projectId }: { projectId: string }): JSX.Element 
           {formatWhen(project.created_at)}
         </p>
       </header>
+
+      {partialReasons.length > 0 && <PartialBanner>partial analysis: {partialReasons.join("; ")}.</PartialBanner>}
 
       <section className="panel" aria-label="completeness">
         <h3>Completeness</h3>
@@ -507,11 +619,13 @@ function provenanceRef(entry: unknown): string | null {
 const AGENT_TERMINAL_STATUSES = new Set(["completed", "failed", "budget_exhausted", "interrupted"]);
 
 function statusClass(status: string): string {
-  if (status === "completed") return "status status-completed";
-  if (status === "running" || status === "planning" || status === "pending") {
-    return "status status-running";
-  }
-  return "status status-failed";
+  // The badge kinds land on the same classes the project rows use, so an
+  // agent status and a project status of the same word read alike.
+  const kind = badgeKind(status);
+  if (kind === "ok") return "status status-completed";
+  if (kind === "running") return "status status-running";
+  if (kind === "failed") return "status status-failed";
+  return "status status-pending";
 }
 
 function AgentEvidenceTable({
@@ -596,6 +710,7 @@ function AgentTaskPanel({ taskId }: { taskId: string }): JSX.Element {
   const [task, setTask] = useState<AgentTask | null>(null);
   const [report, setReport] = useState<AgentReportDocument | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   // The poll is the whole screen while the task runs: the plan, the tool log
   // and the events are read from the task's saved state, which the loop
@@ -605,6 +720,7 @@ function AgentTaskPanel({ taskId }: { taskId: string }): JSX.Element {
     let stopped = false;
     let timer = 0;
     let polls = 0;
+    setError(null);
     const tick = (): void => {
       polls += 1;
       getAgentTask(taskId)
@@ -635,10 +751,12 @@ function AgentTaskPanel({ taskId }: { taskId: string }): JSX.Element {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [taskId]);
+  }, [taskId, tick]);
 
-  if (error) return <p className="error">the task could not be read: {error}</p>;
-  if (!task) return <p className="loading">reading the task…</p>;
+  if (error) {
+    return <ErrorPanel message={`the task could not be read: ${error}`} onRetry={() => setTick(tick + 1)} />;
+  }
+  if (!task) return <Skeleton rows={4} label="reading the task" />;
 
   const running = !AGENT_TERMINAL_STATUSES.has(task.status);
   return (
@@ -724,6 +842,10 @@ function AgentWorkspaceScreen({ projectId }: { projectId: string }): JSX.Element
   const [taskId, setTaskId] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The project is checked before anything else renders, so an unknown id is
+  // the error it is rather than a screen the "no model" panel happens to
+  // eclipse. The check re-runs when the id changes.
+  const projectProbe = useProjectExists(projectId);
 
   useEffect(() => {
     getAgentConfig()
@@ -744,6 +866,13 @@ function AgentWorkspaceScreen({ projectId }: { projectId: string }): JSX.Element
 
   return (
     <article>
+      <Breadcrumbs
+        items={[
+          { label: "projects", to: "#/" },
+          { label: projectId, to: `#/projects/${projectId}` },
+          { label: "agent" },
+        ]}
+      />
       <header className="project-header">
         <h2>Agent workspace</h2>
         <p className="meta">
@@ -752,47 +881,59 @@ function AgentWorkspaceScreen({ projectId }: { projectId: string }): JSX.Element
         </p>
       </header>
 
-      {config && !config.configured && (
-        <section className="panel" aria-label="no model configured">
-          <h3>No model endpoint is configured</h3>
-          <p className="warn">
-            The agent needs a model to ask its questions of. Set{" "}
-            <code>DEXATLAS_AGENT_BASE_URL</code> and <code>DEXATLAS_AGENT_MODEL</code> (and, when
-            the endpoint needs one, <code>DEXATLAS_AGENT_API_KEY</code>) in the environment of the
-            process serving this workbench. Without them a question is refused rather than answered
-            by a stand-in model.
-          </p>
-        </section>
+      {projectProbe.projectError !== null && (
+        <ProjectProbeError message={projectProbe.projectError} onRetry={projectProbe.retry} />
       )}
+      {projectProbe.projectKnown === false && <UnknownProjectPanel projectId={projectId} />}
 
-      {config?.configured && (
-        <p className="meta">
-          model: <code>{config.model}</code> via <code>{config.provider}</code>
-        </p>
+      {projectProbe.projectKnown === true && (
+        <>
+          {config && !config.configured && (
+            <section className="panel" aria-label="no model configured">
+              <h3>No model endpoint is configured</h3>
+              <p className="warn">
+                The agent needs a model to ask its questions of. Set{" "}
+                <code>DEXATLAS_AGENT_BASE_URL</code> and <code>DEXATLAS_AGENT_MODEL</code> (and, when
+                the endpoint needs one, <code>DEXATLAS_AGENT_API_KEY</code>) in the environment of the
+                process serving this workbench. Without them a question is refused rather than answered
+                by a stand-in model.
+              </p>
+            </section>
+          )}
+
+          {config?.configured && (
+            <p className="meta">
+              model: <code>{config.model}</code> via <code>{config.provider}</code>
+            </p>
+          )}
+
+          {taskId === null && (
+            <section className="panel" aria-label="ask the agent">
+              <h3>Ask a question</h3>
+              <form className="search-form" onSubmit={submit}>
+                <input
+                  type="text"
+                  value={question}
+                  maxLength={2000}
+                  placeholder="e.g. Which permissions does this APK request?"
+                  aria-label="your question about this APK"
+                  onChange={(event) => setQuestion(event.target.value)}
+                  disabled={!config?.configured || submitting}
+                />
+                <button type="submit" disabled={!question.trim() || !config?.configured || submitting}>
+                  {submitting ? "asking…" : "ask the agent"}
+                </button>
+              </form>
+              {submitting && (
+                <Spinner label="the question is on its way to the agent…" />
+              )}
+              {failed && <p className="error">{failed}</p>}
+            </section>
+          )}
+
+          {taskId !== null && <AgentTaskPanel taskId={taskId} />}
+        </>
       )}
-
-      {taskId === null && (
-        <section className="panel" aria-label="ask the agent">
-          <h3>Ask a question</h3>
-          <form className="search-form" onSubmit={submit}>
-            <input
-              type="text"
-              value={question}
-              maxLength={2000}
-              placeholder="e.g. Which permissions does this APK request?"
-              aria-label="your question about this APK"
-              onChange={(event) => setQuestion(event.target.value)}
-              disabled={!config?.configured || submitting}
-            />
-            <button type="submit" disabled={!question.trim() || !config?.configured || submitting}>
-              {submitting ? "asking…" : "ask the agent"}
-            </button>
-          </form>
-          {failed && <p className="error">{failed}</p>}
-        </section>
-      )}
-
-      {taskId !== null && <AgentTaskPanel taskId={taskId} />}
 
       <p>
         <a href={`#/projects/${encodeURIComponent(projectId)}`}>← back to the project</a> ·{" "}
@@ -972,6 +1113,7 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
   const [submitted, setSubmitted] = useState("Crypto");
   const [symbols, setSymbols] = useState<SymbolList | null>(null);
   const [symbolsError, setSymbolsError] = useState<string | null>(null);
+  const [symbolsTick, setSymbolsTick] = useState(0);
 
   const [source, setSource] = useState<SourceView | null>(null);
   const [sourceLabel, setSourceLabel] = useState<string | null>(null);
@@ -979,6 +1121,7 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
 
   const [records, setRecords] = useState<EvidenceView[] | null>(null);
   const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [recordsTick, setRecordsTick] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [record, setRecord] = useState<EvidenceView | null>(null);
   const [recordError, setRecordError] = useState<string | null>(null);
@@ -989,7 +1132,7 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
     searchSymbols(projectId, submitted)
       .then(setSymbols)
       .catch((err: unknown) => setSymbolsError(errorText(err)));
-  }, [projectId, submitted]);
+  }, [projectId, submitted, symbolsTick]);
 
   useEffect(() => {
     setRecords(null);
@@ -997,7 +1140,7 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
     listEvidence(projectId)
       .then(setRecords)
       .catch((err: unknown) => setRecordsError(errorText(err)));
-  }, [projectId]);
+  }, [projectId, recordsTick]);
 
   useEffect(() => {
     if (selectedId === null) {
@@ -1028,6 +1171,13 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
 
   return (
     <article>
+      <Breadcrumbs
+        items={[
+          { label: "projects", to: "#/" },
+          { label: projectId, to: `#/projects/${projectId}` },
+          { label: "search & evidence" },
+        ]}
+      />
       <header className="project-header">
         <h2>Symbol search &amp; evidence</h2>
         <p className="meta">
@@ -1055,10 +1205,18 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
           />
           <button type="submit">search</button>
         </form>
-        {symbolsError && <p className="error">the index could not be read: {symbolsError}</p>}
-        {!symbolsError && !symbols && <p className="loading">searching…</p>}
+        {symbolsError && (
+          <ErrorPanel
+            message={`the index could not be read: ${symbolsError}`}
+            onRetry={() => setSymbolsTick((t) => t + 1)}
+          />
+        )}
+        {!symbolsError && !symbols && <Skeleton rows={4} label="searching the index" />}
         {symbols && symbols.symbols.length === 0 && (
-          <p className="empty">nothing in the index matches “{submitted}”.</p>
+          <p className="empty">
+            nothing in the index matches “{submitted}”. Try a shorter piece of the name — the
+            search reads the index, not the bytecode.
+          </p>
         )}
         {symbols && symbols.symbols.length > 0 && (
           <>
@@ -1106,15 +1264,25 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
           </p>
         )}
         {sourceError && <p className="error">the source could not be read: {sourceError}</p>}
-        {!sourceError && sourceLabel !== null && !source && <p className="loading">reading…</p>}
+        {!sourceError && sourceLabel !== null && !source && <Skeleton rows={5} label="reading the source" />}
         {source && <SourcePanel projectId={projectId} source={source} />}
       </section>
 
       <section className="panel" aria-label="evidence records">
         <h3>3 · Evidence records</h3>
-        {recordsError && <p className="error">the evidence could not be listed: {recordsError}</p>}
-        {!recordsError && !records && <p className="loading">listing evidence…</p>}
-        {records && records.length === 0 && <p className="empty">this analysis holds no evidence records.</p>}
+        {recordsError && (
+          <ErrorPanel
+            message={`the evidence could not be listed: ${recordsError}`}
+            onRetry={() => setRecordsTick((t) => t + 1)}
+          />
+        )}
+        {!recordsError && !records && <Skeleton rows={3} label="listing evidence" />}
+        {records && records.length === 0 && (
+          <p className="empty">
+            this analysis holds no evidence records yet. Evidence is written when a report claims
+            something — run the agent or the CLI report to create the first ones.
+          </p>
+        )}
         {records && records.length > 0 && (
           <>
             <ul className="evidence-list">
@@ -1129,7 +1297,9 @@ function SearchEvidenceScreen({ projectId }: { projectId: string }): JSX.Element
             </ul>
             {selectedId === null && <p className="empty">open a record to see its provenance.</p>}
             {recordError && <p className="error">the record could not be read: {recordError}</p>}
-            {!recordError && selectedId !== null && !record && <p className="loading">reading the record…</p>}
+            {!recordError && selectedId !== null && !record && (
+              <Skeleton rows={2} label="reading the record" />
+            )}
             {record && (
               <div className="record">
                 <h4>
@@ -1479,6 +1649,7 @@ function CallScreen({ projectId, methodId }: { projectId: string; methodId: stri
   const [callers, setCallers] = useState<CallerView | null>(null);
   const [callees, setCallees] = useState<CalleeView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     setCallers(null);
@@ -1490,17 +1661,18 @@ function CallScreen({ projectId, methodId }: { projectId: string; methodId: stri
         setCallees(outbound);
       })
       .catch((err: unknown) => setError(errorText(err)));
-  }, [projectId, methodId]);
+  }, [projectId, methodId, tick]);
 
   if (error) {
     return (
-      <p className="error">
-        the calls could not be read: {error} —{" "}
-        <a href={callUrl(projectId, methodId)}>try again</a> · <a href="#/">project list</a>
-      </p>
+      <ErrorPanel
+        message={`the calls of ${methodId} could not be read: ${error}`}
+        onRetry={() => setTick(tick + 1)}
+        links={<a href="#/">project list</a>}
+      />
     );
   }
-  if (!callers || !callees) return <p className="loading">reading the calls…</p>;
+  if (!callers || !callees) return <Skeleton rows={6} label="reading the calls" />;
 
   return (
     <>
@@ -1605,8 +1777,20 @@ function CallGraphScreen({
   projectId: string;
   methodId: string | null;
 }): JSX.Element {
+  // Without a `method` parameter the screen asks nothing and used to stay
+  // silent about a project that is not in the workspace; the probe makes the
+  // unknown id the error it is, on every form of this screen.
+  const projectProbe = useProjectExists(projectId);
+
   return (
     <article>
+      <Breadcrumbs
+        items={[
+          { label: "projects", to: "#/" },
+          { label: projectId, to: `#/projects/${projectId}` },
+          { label: "calls" },
+        ]}
+      />
       <header className="project-header">
         <h2>
           {methodId ? (
@@ -1623,8 +1807,19 @@ function CallGraphScreen({
         </p>
       </header>
 
-      <MethodPicker projectId={projectId} />
-      {methodId !== null && <CallScreen projectId={projectId} methodId={methodId} />}
+      {projectProbe.projectError !== null && (
+        <ProjectProbeError message={projectProbe.projectError} onRetry={projectProbe.retry} />
+      )}
+      {projectProbe.projectKnown === false && <UnknownProjectPanel projectId={projectId} />}
+      {projectProbe.projectKnown === true && (
+        <>
+          <MethodPicker projectId={projectId} />
+          {methodId !== null && <CallScreen projectId={projectId} methodId={methodId} />}
+        </>
+      )}
+      {projectProbe.projectKnown === null && projectProbe.projectError === null && (
+        <Skeleton rows={3} label="checking the project" />
+      )}
 
       <p>
         <a href={`#/projects/${encodeURIComponent(projectId)}`}>← back to the project</a> ·{" "}
@@ -1764,15 +1959,13 @@ function BenchmarksScreen(): JSX.Element {
 
   if (error) {
     return (
-      <p className="error">
-        the benchmark measurements could not be read: {error}{" "}
-        <button type="button" className="link-button" onClick={() => setTick(tick + 1)}>
-          try again
-        </button>
-      </p>
+      <ErrorPanel
+        message={`the benchmark measurements could not be read: ${error}`}
+        onRetry={() => setTick(tick + 1)}
+      />
     );
   }
-  if (!data) return <p className="loading">recomputing the benchmark metrics…</p>;
+  if (!data) return <Skeleton rows={5} label="recomputing the benchmark metrics" />;
 
   return (
     <article>
@@ -1826,24 +2019,22 @@ export default function App(): JSX.Element {
   }, []);
 
   return (
-    <div className="workbench">
-      <header className="topbar">
-        <h1>
-          <a href="#/">DexAtlas Workbench</a>
-        </h1>
-        <nav className="topnav" aria-label="workbench screens">
-          <a href="#/benchmarks" className={benchmarksMatch ? "active" : undefined}>
-            Benchmarks
-          </a>
-        </nav>
-        <span className="meta">
-          {health
+    <AppShell>
+      <Topbar
+        title="DexAtlas Workbench"
+        workspaceNote={
+          health
             ? `v${health.version} · workspace: ${health.workspace}`
             : healthError
               ? "the server is not answering — is the workbench running?"
-              : "…"}
-        </span>
-      </header>
+              : "…"
+        }
+        nav={
+          <a href="#/benchmarks" className={benchmarksMatch ? "active" : undefined}>
+            Benchmarks
+          </a>
+        }
+      />
       <main>
         {callsMatch ? (
           <CallGraphScreen
@@ -1862,6 +2053,6 @@ export default function App(): JSX.Element {
           <ProjectListScreen />
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }

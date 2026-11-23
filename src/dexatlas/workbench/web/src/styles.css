@@ -92,6 +92,10 @@
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
 
+  /* 骨架屏与进行中状态：底色在 --bg 与 --line 之间，微光用面板色。 */
+  --skeleton-base: #1a212a;
+  --skeleton-shine: #232d38;
+
   /* 版心宽度 */
   --content-max-width: 72rem;
 }
@@ -649,6 +653,229 @@ table.sites td.num {
 .panel > .empty,
 .panel > .loading {
   margin: var(--space-0-4) 0;
+}
+
+/* -- M13 shared base components (components.tsx) --------------------------- */
+
+/* Breadcrumbs: the hierarchy path, quiet enough to read over the page title. */
+.wb-crumbs {
+  color: var(--muted);
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-0-5);
+  overflow-wrap: anywhere;
+}
+
+.wb-crumb-sep {
+  margin: 0 var(--space-0-4);
+  color: var(--line);
+}
+
+/* The error panel every screen's failure renders through. */
+.wb-error-panel {
+  border: var(--border);
+  border-left: var(--border-2);
+  border-left-color: var(--error);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  padding: var(--space-0-6) var(--space-0-8);
+  margin: var(--space-1) 0;
+}
+
+.wb-error-panel .error {
+  margin: 0 0 var(--space-0-3);
+  overflow-wrap: anywhere;
+}
+
+.wb-error-actions {
+  margin: 0;
+}
+
+/* The partial banner: the top-of-page "this data is incomplete" strip. */
+.wb-partial-banner {
+  display: flex;
+  gap: var(--space-0-5);
+  align-items: baseline;
+  border: var(--border);
+  border-left: var(--border-2);
+  border-left-color: var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--warn);
+  padding: var(--space-0-5) var(--space-0-8);
+  margin: var(--space-1) 0;
+  overflow-wrap: anywhere;
+}
+
+.wb-partial-mark {
+  flex: none;
+  font-weight: 700;
+}
+
+/* Buttons: the plain `button` styling is the base; the primary variant fills
+   with the accent. Focus uses the shared focus-ring tokens. */
+.wb-button:focus-visible,
+.wb-tab:focus-visible,
+.link-button:focus-visible,
+.topnav a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.wb-button-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.wb-button:disabled {
+  color: var(--muted);
+  cursor: default;
+  border-color: var(--line);
+}
+
+/* In-page tabs. */
+.wb-tabs {
+  display: flex;
+  gap: var(--space-0-4);
+  margin: var(--space-0-5) 0;
+  flex-wrap: wrap;
+}
+
+.wb-tab {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  border-bottom-color: transparent;
+}
+
+.wb-tab-active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Skeleton rows: a quiet shimmer where content is arriving. The animation is
+   the only motion in the system, and it stops for readers who ask for less. */
+.wb-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  margin: var(--space-0-6) 0;
+}
+
+.wb-skeleton-row {
+  display: block;
+  height: 0.9rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+  background-size: 200% 100%;
+  animation: wb-skeleton-shine 1.4s ease infinite;
+}
+
+@keyframes wb-skeleton-shine {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wb-skeleton-row {
+    animation: none;
+  }
+
+  .wb-spinner-wheel {
+    animation-duration: 4s;
+  }
+}
+
+/* A spinner inside visible content: an upload in flight, a question on its
+   way. Smaller than a skeleton block, and it carries the wait in words. */
+.wb-spinner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.wb-spinner-wheel {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+  border-radius: 50%;
+  border: var(--border);
+  border-top-color: var(--accent);
+  animation: wb-spin 0.9s linear infinite;
+}
+
+@keyframes wb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Dialog and drawer: an overlay, and a surface that holds its own heading. */
+.wb-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 60%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-1);
+  z-index: 10;
+}
+
+.wb-dialog {
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1) var(--space-1-2);
+  max-width: 36rem;
+  max-height: 80vh;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.wb-drawer {
+  background: var(--panel);
+  border: var(--border);
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  padding: var(--space-1) var(--space-1-2);
+  width: min(30rem, 90vw);
+  max-height: 100vh;
+  overflow: auto;
+  margin-left: auto;
+  align-self: stretch;
+  box-sizing: border-box;
+}
+
+.wb-dialog-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.wb-dialog-head h3 {
+  margin: 0 0 var(--space-0-5);
+  font-size: var(--font-size-lg);
+}
+
+/* The page header's title row: the actions sit at the right edge and wrap
+   under the title on a narrow screen. */
+.wb-page-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.wb-page-actions {
+  display: flex;
+  gap: var(--space-0-5);
+  align-items: baseline;
+  flex-wrap: wrap;
 }
 
 /* The agent workspace */
