@@ -215,7 +215,7 @@ const POLL_LIMIT = 600; // ~15 minutes, then the wait is reported rather than sp
 
 function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX.Element {
   const [phase, setPhase] = useState<UploadPhase>({ kind: "idle" });
-  const [inputValue, setInputValue] = useState("");
+  const [hasFile, setHasFile] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -272,7 +272,7 @@ function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX
 
   function reset(): void {
     setPhase({ kind: "idle" });
-    setInputValue("");
+    setHasFile(false);
     if (fileInput.current) fileInput.current.value = "";
   }
 
@@ -286,10 +286,9 @@ function UploadPanel({ onReady }: { onReady: (projectId: string) => void }): JSX
             type="file"
             accept=".apk,application/vnd.android.package-archive"
             aria-label="the APK file to analyse"
-            value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
+            onChange={(event) => setHasFile(Boolean(event.target.files?.[0]))}
           />
-          <button type="submit" disabled={!inputValue}>
+          <button type="submit" disabled={!hasFile}>
             upload & analyse
           </button>
         </form>
