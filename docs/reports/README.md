@@ -1,7 +1,7 @@
 # `docs/reports/` 索引
 
-这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**55 份报告**
-（**这是 2026-11-22 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
+这个目录里是 DexAtlas 从 Phase 1 到 v1.0.0 发版收尾之间的**59 份报告**
+（**这是 2026-11-23 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
 看到的是一堵墙；不知道哪一份是现状、哪一份是当时的快照、哪一份已经被后面的检查推翻了。
 
 本页只做三件事：
@@ -24,9 +24,9 @@
 | [§2 M4 / M8 验收与模型可禁用性](#2-m4--m8-验收与模型可禁用性) | 5 | 里程碑的退出标准是怎么验出来的 |
 | [§3 里程碑与下一轮候选](#3-里程碑与下一轮候选) | 1 | 下一轮可以做什么、每项做完算不算完 |
 | [§4 v1.0.0 发版材料](#4-v100-发版材料) | 2 | 发版要发什么、凭什么、怎么核 |
-| [§5 审计与走查](#5-审计与走查2026-11-17–20) | 40 | 发版前后几轮审计与走查找出来的问题，以及怎么处置的 |
+| [§5 审计与走查](#5-审计与走查2026-11-17–20) | 46 | 发版前后几轮审计与走查找出来的问题，以及怎么处置的 |
 | [§6 历史记录](#6-历史记录不要当现状读) | 1 | 不要当现状读的记录 |
-| 合计（点名） | 53 | 另有 2 份不点名（见下） |
+| 合计（点名） | 59 | 另有 0 份不点名（见下） |
 
 **每个「份数」就是该节表格的行数**。要核某一节，就数那一节的行。
 **份数是快照，不是常数。** 目录里每落进一份新报告，这个数与下面各组的份数就变一次
@@ -38,9 +38,8 @@ ls docs/reports/*.md | wc -l      # 减掉本页自己（README.md）就是报�
 ```
 
 **下面 §1–§6 的每一行都点名了一个文件**，所以「哪几份没被收录」可以直接比出来。
-（2026-11-22 复核（逐行实测，C9 轮起沿用该口径）：目录里 53 份报告中 51 份被分组表点名，
-无遗漏、无虚指；另有 2 份不占分组行——[citation-anchor-declarations.md](citation-anchor-declarations.md)
-这类被多处引用的声明文件，以链接形式出现。历史快照（2026-11-18 的 95、C9 轮的 98）与实测对不上——
+（2026-11-23 复核（逐行实测，C9 轮起沿用该口径）：目录里 59 份报告中 59 份被分组表点名，
+无遗漏、无虚指。历史快照（2026-11-18 的 95、C9 轮的 98）与实测对不上——
 那是只加行不核数累积出来的，且去平台化清理（2026-11-21）移除了 46 份，本页从 C9 轮起以「逐行实测」为准。）
 
 > 分组表里的「份数」是该节表格的行数，不是目录总数；目录总数以 `ls` 实测为准。
@@ -139,12 +138,13 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [claim-mismatches.md](claim-mismatches.md) | M1–M24 的复核量于 `8df894b`（2026-10-21），此后落地了五个大变更，文件开头就说明了这一点。 | [phase2-issue-list.md](phase2-issue-list.md) 第 8 节与当前源码。 |
 | [prose-to-markers.md](prose-to-markers.md) | 把**散文里的手写测量数**改成标记 ✓：两页 how-to-verify 的「应当是 N 个测试」「N passed」等，现在由测量统一写 ✓ —— **加测试不用再手改任何数字** ✓（三个闭环里最根治的一个 ✓）。**机制这轮真改了三处** ✓：加 `tests.trio` 这个 figure kind ✓（守卫一个字没改 ✓、幂等 ✓）；**写的口径与发现的口径用同一把尺子** ✓（代码块与行内代码里的标记不再被写 ✓ —— 但执行报告代码块里的标记是**它自己那份数的拷贝** ✓，必须跟着数字走 ✓，所以单独 `copies=True` ✓）；**配不平的标记不吃掉整段** ✓（跳过并报出来 ✓ —— 旧行为是按最近闭标记截断 ✓，正是吃正文那一步 ✓）。 | 5 个新回归测试**在旧实现上 5 red** ✓；**「没取样本」那一行的具体条数已删** ✓（它是另一个环境的汇总 ✓、没有键可挂 ✓ —— 只留 skip 的理由分类 ✓，不再长得像当前树的数 ✓）。**留给主会话**：对外素材的数要重测后同步 ✓；机制还差两处（守卫挪进自检段 ✓、collect-only 期望输出改读标记 ✓）。 |
 | [c17-markers-everywhere.md](c17-markers-everywhere.md) | **C17 的收尾**：把剩下三处手写测量数收进机制 ✓——两页 §2.3 的 `pytest --collect-only` 期望输出改成 `tests.collect.*` 标记（**围栏写入通道**：这几句的文本就是测量本身，是「围栏是引文」的唯一例外 ✓）；`documents read` 改成 `documents.count` 标记（复用 version-claims 的统计口径 ✓）；测试文件表的行集合核对**写进测量记录**（`table.missing_rows`/`stale_rows`，拒绝路径也写 ✓）；卡片 sidecar 增 `suite` 块并与测量记录的 `SUITE_NAMES` 对账（44 → 50 项检查 ✓）。 | 机制 + 页面 + 守卫 + 11 条新回归测试，红→绿证过 ✓；**测量未跑**（按分工留给主会话统一重测）——两页的数因本窗口新增 9 个测试而过期，守卫 6 red 是闭环本身的样子，重测后由机制自动转绿 ✓。 |
-<<<<<<< HEAD
 | [c13-report-citations.md](c13-report-citations.md) | **C13 的收口**：引用检查器改为**结构性收集**——`collect_documents()` 自动读取 `docs/reports/` 下全部报告，不再靠手工登记 `DOCS` 名单；每份历史报告要么被检查、要么登记进显式排除清单 `REPORT_EXCLUSIONS`（每份附原因）。**红→绿已证**：一份带坏引用的新报告，不改任何名单，落盘即被检查并让退出码变 1（旧手工名单实现下为 0）；另修好 6 份既有报告因名单重构位移的 16 处引用。 | 40 份历史报告的逐份回锚（登记 `TREE_DOCUMENTS` + 文档补指纹声明）与候选 C13 的三条新规则（空白行 / 越界 / 悬空裸引用）留给后续；报告 `docs/reports/c13-report-citations.md`。 |
 | [c8-render-run.md](c8-render-run.md) | **C8 的落地**：CLI 增加「渲染某一次运行」的能力 ✓——`dexatlas runs` 列出某项目的全部运行、`--run` 原样取回某次运行的记录（工具版本、起止、错误）；`dexatlas render` 把某次**已完成且仍是已发布**的运行渲染成可复核目录（三格式报告 + 证据包 zip + `run.json`），包写入后当场过 `verify_package`/`verify_citations` ✓。公共契约向后兼容新增：CLI 活检 15→18、静态总数 49→52，契约表/CHANGELOG/两页 how-to-verify/发版材料同步 ✓；15 条集成测试覆盖输出结构、退出码、「未发布/已被替换的 run 拒绝渲染」与「渲染只读工作区」 ✓。 | `src/dexatlas/cli/main.py`（runs/render 两个子命令）、`src/dexatlas/reports/run_render.py`（新模块）、`src/dexatlas/reports/evidence_package.py`（抽出 `package_contents`/`package_manifest` 共用底层）、`scripts/verify-public-contracts.py`、`scripts/m10_selfcheck.py`（A6 判据升级 + 条目数探测适配）、`tests/test_run_render.py`、`tests/test_public_contracts.py`、`tests/test_m10_selfcheck.py`、`docs/architecture/public-contracts.md`、`CHANGELOG.md`、`docs/install.md`、`README.md`、两页 how-to-verify、M10 读者包 A6 两段、执行报告测试文件表 + 本索引。**测量已由主会话统一补跑**（2026-11-22，`3489ddc`）；M10 演练 #9 的「当场记下」建议更新为「先记 run id，可用 runs/render 回看已发布那次，但重跑会换掉已发布运行」。 |
-=======
 | [c9-outward-info.md](c9-outward-info.md) | **C9 的收尾**：作者给定三项取值（`hello@dexatlas.example` 模拟邮箱、`Asia/Shanghai`、工作日 10:00–18:00）后，四份对外素材各补一段「Availability and contact」✓，模拟值就地标注 ✓，**不写响应时长** ✓（判据的保守执行）；素材字符长度复算 ✓；候选清单计数改齐（已完成 9 → 10）✓。 | 要替换占位邮箱、核对素材的可用性表述，或看「哪些留给主会话」时看它。 |
->>>>>>> claude/funny-lamarr-adf41c
+| [phase4-release-plan.md](phase4-release-plan.md) | **Phase 4 M15 发布冻结规划**（2026-11-23）：M15 七步逐条对照（现状/缺口/建议执行方式）、80 秒演示与 3–5 分钟讲解的脚本提纲、README 双语截图更新清单、通用渠道案例页模板骨架、发布前核查清单与 Portfolio Freeze 声明草稿。规划文档——执行、录制、门禁与发布动作尚未发生，不宣称任何未执行步骤已通过。 | Phase 4 收口时按它排执行顺序；录演示、改 README、写渠道页前先看它。 |
+| [phase4-walkthrough.md](phase4-walkthrough.md) | **Phase 4 M15 独立用户 walkthrough**（2026-11-23）：零上下文用户按 README 在干净 clone（`main` @ `22c0621`）走完整链路（安装 → 后端 → analyze → 只读命令 → runs/render → fixtures → REST API → Workbench → agent 成功流/503 拒绝流 → 证据包）的逐步实测记录。**结论：通过**，4 项低危/信息发现（F1 分支进度、F2 install-backends 不打印 export 行、F3 Workbench `/api` 子集与 REST API 表不同、F4 端口占用自救）只记录未修。 | 判断「陌生人按 README 能不能走通」时看它；修 F2–F4 前先读原始发现。 |
+| [phase4-release-review.md](phase4-release-review.md) | **Phase 4 M15 发布前本地评审**（2026-11-23）：全量本地门禁、Phase 4 源码评审（M11–M15）、发布数字一致性、walkthrough 四项低危发现追踪。未跑、未盯 GitHub CI（按用户要求）。 | 发布前判断「本地门禁全绿了吗、还有哪些待办」时看它。 |
+| [phase4-tech-talk-script.md](phase4-tech-talk-script.md) | **Phase 4 M15 技术讲解脚本**（4 分钟，2026-11-23）：分段与画面同[发布规划 §2.2](phase4-release-plan.md)；所有画面均来自真实运行（Workbench 与 agent 真实模型调用），解说只引用画面可见事实。讲解视频尚未录制——本文件以脚本形式保留。 | 录制/重录讲解视频时按它执行；核对解说与画面是否一致时看它。 |
 
 ## 6. 历史记录：不要当现状读
 

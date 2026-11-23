@@ -93,6 +93,23 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 
 </details>
 
+同一条链路在当前 Web 工作台里的真实截图（同样针对内置演示 APK 的真实运行；四宽度
+全套见[工作台 UI 规范](docs/architecture/workbench-ui.md)）：
+
+<p align="center">
+  <img src="docs/assets/phase4-baseline/01-project-list-1440.png" alt="工作台项目面板：工作区中的项目、参与的后端与各次分析产出的计数" width="900">
+</p>
+<p align="center">
+  <img src="docs/assets/phase4-baseline/03-search-evidence-1440.png" alt="工作台检索与证据视图：索引符号、源码入口，以及一条能解析回本次分析内具体位置的证据记录" width="900">
+</p>
+<p align="center">
+  <img src="docs/assets/phase4-agent/agent-03-final.png" alt="真实模型运行后的 Agent 工作区：答案分成已确证、线索与未确证三区，上方是工具调用时间线" width="900">
+</p>
+
+调用关系截图（`04-calls-1440.png` 与方法视图
+`phase4-agent/r6-calls-method-1440.png`）与其余各屏在同样两个目录里。一段替换旧演示的
+60–90 秒新视频正在录制；在它落盘之前，今天的工作台长什么样以上面这些真实截图为准。
+
 ---
 
 ## 为什么是 DexAtlas？
@@ -207,9 +224,17 @@ uv run uvicorn dexatlas.api.app:app --reload
 # 交互式文档：http://localhost:8000/docs
 ```
 
+给集成方的一个提示：Web 工作台走的是**另一套**以 `/api/` 为前缀的子集，路径与这套
+REST API 不同——工作台是在浏览器里调用同一批十一个只读工具，而
+[docs/install.md](docs/install.md) 的端点表写的是 REST API 的契约。两者是「返回形状
+同源」，不是「路径相同」。
+
 **后端是可选且互相独立的。** DexAtlas 会报告它用现有后端能做什么，并把做不到的部分
 作为证据记录进报告。一个后端都不装时，仍能得到哈希、校验和 APK 自身元数据；三个都装
-时，则能获得完整的符号索引、反编译源码和交叉引用。
+时，则能获得完整的符号索引、反编译源码和交叉引用。安装时的一点提醒：
+`scripts/install-backends.sh` 结束时只打印两行已装版本号——你的 shell 需要的两行
+`export`（`DEXATLAS_JADX_PATH`、`DEXATLAS_APKTOOL_JAR`）并不在它的输出里；请从
+[docs/install.md](docs/install.md) 复制到自己的 shell 里。
 
 ### MCP server
 
@@ -300,7 +325,9 @@ uv run dexatlas-workbench            # 打开 http://127.0.0.1:8618
 ```
 
 首次启动会用 npm 构建前端（只需一次），之后每次都是这一条命令。工作区仍由
-`DEXATLAS_WORKSPACE` 指定，与其余命令一致。在项目列表上传一个 APK，它按 REST API
+`DEXATLAS_WORKSPACE` 指定，与其余命令一致。若默认端口被占用，换一个即可：
+`uv run dexatlas-workbench --port 8619`（报错信息里会给出这个办法）。本页顶部就是
+下面这些屏的真实截图。在项目列表上传一个 APK，它按 REST API
 同一套策略入库（大小限制、校验、拒绝措辞都一致），后台跑分析，前端轮询项目状态
 直到完成；打开项目后进入 **search & evidence**、**调用关系**，或在项目页点
 **ask the agent** 提问：一次查询返回索引符号，点开类或方法查看 Java / Smali 源码，
@@ -355,6 +382,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   [术语表](docs/architecture/README.md#glossary)（agent service promise、frozen discipline、
   B1、七条评分规则）
 - **[Web 工作台](docs/architecture/workbench.md)** —— 只读浏览器界面：已有的屏幕、启动方式与选型
+- **[工作台 UI 规范](docs/architecture/workbench-ui.md)** —— 这些屏幕背后的信息架构：页面结构、
+  数据边界、状态模型，以及据以核验的四宽度截图
 - **[MCP server](docs/architecture/mcp-server.md)** —— 十一个只读工具，以及调用方在提问前要知道的三件事
 - **[证据优先的 Agent](docs/architecture/agent.md)** —— 一个循环、一份预算、一份状态机，以及线索与 finding 的边界
 - **[报告渲染与证据包](docs/architecture/report-rendering.md)** —— 同一份分析的三种渲染，以及可交给客户的证据导出
@@ -449,6 +478,16 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   有范围的客户交付、独立验收
 - **[Phase 3 基线](docs/reports/phase3-baseline.md)** —— 声明清单、重算后的 benchmark 数字，
   以及其背后的未决问题
+- **[Phase 4 计划](docs/roadmap/phase4-plan.md)** —— Phase 4 执行单：工作台的 UI 与
+  无障碍工作，以及发布冻结的退出标准
+- **[Phase 4 基线](docs/reports/phase4-baseline.md)** —— 本阶段起点的 M11 记录：对外
+  状态文案、六页工作台现状、四宽度截图集与逐页缺口清单
+- **[工作台 UI 规范](docs/architecture/workbench-ui.md)** —— 屏幕据以建成的 M12 实现
+  规范（架构一节亦有列出）
+- **[Phase 4 walkthrough](docs/reports/phase4-walkthrough.md)** —— 独立用户从本 README
+  出发、在干净 clone 上走完整链路的记录，含通过项与记录在案的问题（2026-11-23，结论：通过）
+- **[发布规划](docs/reports/phase4-release-plan.md)** —— M15 冻结规划：交付什么、还缺什么，
+  以及作品集冻结的规则
 - **[报告目录索引](docs/reports/README.md)** —— `docs/reports/` 的目录索引：每份报告回答什么、
   什么时候该看它、哪些是历史记录而不是当前状态
 - **[v1.0.0 发版说明](docs/releases/v1.0.0.md)** —— v1.0.0 包含什么、打 tag 前复核过什么、

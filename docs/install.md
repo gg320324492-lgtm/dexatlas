@@ -159,9 +159,11 @@ export PATH="$PATH:/path/to/apktool"   # provides apktool or apktool.jar
 > **The exports above only affect the shell that runs them.**
 > `scripts/install-backends.sh` downloads both backends, but the `export PATH=…` and
 > `export DEXATLAS_JADX_PATH=…` it performs belong to *its own* process — a script
-> cannot change the environment of the shell that started it. Copy the two lines
-> it prints into your own shell (or set them in your environment) before running
-> `dexatlas backends`, otherwise it will still report the backend as missing.
+> cannot change the environment of the shell that started it. Note that the script's
+> own output at the end is only the two installed version lines (`jadx …`, `apktool …`);
+> it does not print the two `export` lines to copy. Set them in your own shell (as
+> shown above) before running `dexatlas backends`, otherwise it will still report the
+> backend as missing.
 >
 > **Windows:** the `curl`/`unzip` steps above are the POSIX path. From Git Bash run
 > `scripts/install-backends.sh` instead, then set the two variables in your own
@@ -379,6 +381,11 @@ no network at all:
 uv run dexatlas analyze app.apk --output report.md
 ```
 
+The table below is the **REST API's** contract (`dexatlas.api.app`). The web
+workbench serves its **own** `/api/...` subset over the same eleven read-only
+tools — the paths differ; see [the workbench architecture](architecture/workbench.md)
+for that list.
+
 | Method   | Path                                           | Purpose                       |
 | -------- | ---------------------------------------------- | ----------------------------- |
 | `GET`    | `/health`                                      | Liveness and backend versions |
@@ -463,5 +470,8 @@ falls back to ASCII.
 ## Next
 
 - [Architecture](architecture/README.md) — how it fits together and why
+- [The web workbench](architecture/workbench.md) — the browser UI; its first start
+  builds the front end, it serves on `127.0.0.1:8618`, and if that port is taken it
+  names the fix: pass another one with `--port <other>`
 - [Roadmap](roadmap/ROADMAP.md) — what comes next
 - [Contributing](../CONTRIBUTING.md) — how to propose a change

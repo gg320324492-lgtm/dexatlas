@@ -124,6 +124,26 @@ model call**. What a real model does on that screen is disclosed separately in t
 
 </details>
 
+The same session, captured as stills from the current web workbench (real runs against
+the same bundled demo APK; the full four-width set lives in the
+[workbench UI spec](docs/architecture/workbench-ui.md)):
+
+<p align="center">
+  <img src="docs/assets/phase4-baseline/01-project-list-1440.png" alt="Workbench project list: the projects in the workspace, the backends that took part, and the counts each analysis produced" width="900">
+</p>
+<p align="center">
+  <img src="docs/assets/phase4-baseline/03-search-evidence-1440.png" alt="Workbench search and evidence view: indexed symbols, source access, and an evidence record whose provenance locators resolve inside the analysis" width="900">
+</p>
+<p align="center">
+  <img src="docs/assets/phase4-agent/agent-03-final.png" alt="Agent workspace after a real-model run: the answer separated into established findings, leads and what was not established, with the tool-call timeline above" width="900">
+</p>
+
+The call-graph stills (`04-calls-1440.png` and the method view
+`phase4-agent/r6-calls-method-1440.png`) and the remaining screens are in the same two
+directories. A new 60–90-second demo video is being recorded to replace the one above;
+until it lands, what the workbench actually looks like today is best seen in these
+stills.
+
 ---
 
 ## Why DexAtlas?
@@ -244,10 +264,20 @@ uv run uvicorn dexatlas.api.app:app --reload
 # interactive docs at http://localhost:8000/docs
 ```
 
+Note for integrators: the web workbench speaks its own `/api/...` subset, not the
+paths of this API — the workbench is a browser UI over the same eleven read-only
+tools, while the endpoint table in [docs/install.md](docs/install.md) is the REST
+API's contract. The two are related by shape, not by identical paths.
+
 **Backends are optional and independent.** DexAtlas reports what it can do with what is
 installed and records what it could not do, as evidence in the report. With none
 installed you still get hashing, validation and the APK's own metadata; with all three
-you get a full symbol index, decompiled source and cross-references.
+you get a full symbol index, decompiled source and cross-references. One setup note:
+`scripts/install-backends.sh` finishes by printing the two installed versions only —
+the two `export` lines your shell needs (`DEXATLAS_JADX_PATH`, `DEXATLAS_APKTOOL_JAR`)
+are not part of its output; copy them from
+[docs/install.md](docs/install.md#installing-a-backend).
+
 
 ### The MCP server
 
@@ -326,7 +356,10 @@ uv run dexatlas-workbench            # serves http://127.0.0.1:8618
 ```
 
 The first start builds the front end (npm once); `DEXATLAS_WORKSPACE` points
-it at a workspace, as everywhere else. In the workbench, upload an APK from
+it at a workspace, as everywhere else. If the default port is taken, pass
+another one: `uv run dexatlas-workbench --port 8619` (the error message names
+the flag). Real screenshots of the screens below are at the top of this page.
+In the workbench, upload an APK from
 the project list and the analysis runs with the same pipeline the API runs,
 or open a project and follow **search & evidence**, **cross-references** or
 **ask the agent**: a
@@ -425,6 +458,9 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   (agent service promise, frozen discipline, B1, the seven scoring rules)
 - **[The web workbench](docs/architecture/workbench.md)** — the read-only browser UI:
   the screens that exist, how to start it, and the choices behind them
+- **[Workbench UI spec](docs/architecture/workbench-ui.md)** — the information
+  architecture behind those screens: page structure, data boundaries, the state model,
+  and the four-width screenshots they were verified against
 - **[The MCP server](docs/architecture/mcp-server.md)** — the read-only tools, and
   the three things a caller has to know before it asks them anything
 - **[The agent](docs/architecture/agent.md)** — the evidence-first agent: the loop, the
@@ -561,6 +597,19 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   GitHub showcase, scoped client deliverables, independent acceptance
 - **[Phase 3 baseline](docs/reports/phase3-baseline.md)** — the claims inventory, the
   recomputed benchmark figures, and the open issues behind them
+- **[Phase 4 plan](docs/roadmap/phase4-plan.md)** — the Phase 4 execution plan:
+  the workbench's UI and accessibility work, and the release-freeze exit criteria
+- **[Phase 4 baseline](docs/reports/phase4-baseline.md)** — the M11 record this
+  phase started from: the outward-text wording, the six workbench pages, the
+  four-width screenshot set and the page-by-page gap list
+- **[Workbench UI spec](docs/architecture/workbench-ui.md)** — the M12 implementation
+  spec the screens were built to, including the six-state screenshot matrix (also
+  listed under Architecture)
+- **[Phase 4 walkthrough](docs/reports/phase4-walkthrough.md)** — an independent
+  user's full-path run from this README on a clean clone, with what passed and what
+  was recorded (2026-11-23, verdict: pass)
+- **[Release plan](docs/reports/phase4-release-plan.md)** — the M15 freeze plan:
+  what ships, what is still open, and the rules for the portfolio freeze
 - **[Report directory index](docs/reports/README.md)** — the index of `docs/reports/`:
   what each report answers, when to read it, and which ones are history rather than
   current state (Chinese; 报告目录索引)
