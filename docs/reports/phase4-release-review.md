@@ -8,7 +8,7 @@
 
 ## 0. 结论摘要
 
-**13 项本地门禁全部 PASS**（含完整 pytest：1807 passed / 1 skipped，唯一 skip 为 Windows 平台设计内跳过）；Phase 4 源码评审未见正确性缺陷或公共契约破坏；发布数字四处口径一致（1808 total / 1807 passed / 1 skipped / 93.3%）；walkthrough 4 项低危发现均有归属，无阻断项。**建议：本地可发布（条件：按流程合入工作分支、用户发话后跑 CI）。**
+**13 项本地门禁全部 PASS**（含完整 pytest：1807 passed / 1 skipped，唯一 skip 为 Windows 平台设计内跳过）；Phase 4 源码评审未见正确性缺陷或公共契约破坏（前端独立子评审的 5 项发现经逐项复核，2 项不成立、2 项低危非阻断、1 项可接受，唯一坐实的上传屏 `failed` 文案问题系 v1.0.0 既有行为，登记为 R-5）；发布数字四处口径一致（1808 total / 1807 passed / 1 skipped / 93.3%）；walkthrough 4 项低危发现均有归属，无阻断项。**建议：本地可发布（条件：按流程合入工作分支、用户发话后跑 CI）。**
 
 ## 1. 本地门禁逐项结果
 
@@ -50,6 +50,20 @@
 
 **回归风险与遗留：** 未见正确性缺陷或契约破坏。前端改动集中在展示层与交互层，公共契约（REST/MCP/CLI/退出码）在 diff 范围内未变，`check-contract-records` / `verify-public-contracts` 仍 PASS。walkthrough F2/F3 两处文档可用性小问题留待后续（见 §4）。
 
+### 2.1 前端深度评审（独立子评审 + 逐项人工复核）
+
+在 §2 逐 diff 评审之外，另以只读子评审对 `src/dexatlas/workbench/web/` 的 Phase 4 diff 做了一轮独立检查，返回 5 项发现；以下为逐项人工复核结论（复核基于当前工作树源码，非转述子评审）：
+
+| # | 子评审发现（原判级） | 复核结论 | 依据 |
+|---|---|---|---|
+| 1 | 项目页把带 errors 的分析当完整展示，无 partial 横幅（High） | **不成立** | `Completeness.complete = not absent and not truncated and not project.errors`（`src/dexatlas/mcp/tools/projects.py:103`）：errors 非空时 `complete` 必为 false，项目页走 gaps 分支把每条 error 红字列出（`src/dexatlas/workbench/web/src/App.tsx:535`），「every step of the analysis finished」仅在 `complete` 为真时渲染（`src/dexatlas/workbench/web/src/App.tsx:522`）——子评审描述的场景自相矛盾。errors 不触发顶部 PartialBanner 与 UI 规范一致（`docs/architecture/workbench-ui.md` §3 的 partial 触发条件为 missing_backends/truncated） |
+| 2 | 上传轮询把项目 `failed` 终态并入成功分支，绿 ✓ 显示「analysis finished」（High） | **成立，但系 Phase 4 之前既有行为** | 轮询终止条件对 `completed` 与 `failed` 同样进入 `done`（`src/dexatlas/workbench/web/src/App.tsx:228`），该行为来自 `903195c`（2026-11-14，已含于 v1.0.0），非本评审范围引入；失败本身在项目页以红 ✕ 徽章与 completeness errors 明示，误导限于上传屏瞬时文案。登记为发现 R-5（见 §5），不阻断发布 |
+| 3 | Dialog/Drawer 键盘用户无法关闭（Medium） | **不成立** | 面板头部有 `aria-label="close"` 的 ✕ 按钮，Escape 关闭路径独立存在（`useEscapeCloses`）；overlay 点击是鼠标的额外通道，键盘路径并未缺失 |
+| 4 | Tabs 缺 aria-controls / tabpanel / roving tabIndex（Medium） | **成立，潜伏项** | 该组件当前未被任何页面使用；将来采用时会带入不完整的 tab 语义。登记为低危备忘，不阻断 |
+| 5 | `useModalFocus` 在 window 上全局捕获 Tab（Low） | **成立，可接受** | 模态打开期间全局捕获 Tab 是常见的简单焦点陷阱实现，当前单页面板下行为正确；未来若出现「模态外保留可聚焦区域」的需求，应改为面板边界陷阱 |
+
+小结：5 项中 2 项不成立、2 项成立但非阻断（1 项既有、1 项潜伏）、1 项成立可接受。**未发现 Phase 4 diff 引入的正确性缺陷**；子评审坐实的既有问题已登记为 R-5。
+
 ## 3. 发布数字一致性
 
 **口径核对（全部一致，PASS）：**
@@ -87,14 +101,17 @@
 - **R-2（信息，按设计）**：`check-release-numbers.py` 对 `docs/reports/v1.0.0-github-release-body.md` 报 `missing document`——该可选文件不存在，脚本 stderr 提示后继续，已有 releases/v1.0.0.md 与 GitHub 已发布正文兜底；非缺陷。
 - **R-3（流程注意）**：`check-release-numbers.py --strict` 在发布说明就绪后才应作为发布门；当前普通模式已 PASS，strict 亦 PASS，但若后续新增 release body 文件需重跑。
 - **R-4（信息，证据补强）**：本次完整 pytest 实测 1807 passed / 1 skipped（545.05s），与执行报告 `<!--fig:suite.passed-->1807`、`<!--fig:suite.skipped-->1` 标记一致（见 `docs/reports/phase1-execution-report.md:887`），实测闭环了报告数字与当前树的一致性。
+- **R-5（低危，既有行为，建议后续修）**：Workbench 上传屏的轮询把项目 `failed` 终态并入成功分支——`status.project.status === "completed" || status.project.status === "failed"` 都进入 `done`，绿 ✓ 显示「analysis finished: <name>」并提供「open the project」入口（`src/dexatlas/workbench/web/src/App.tsx:228`、`src/dexatlas/workbench/web/src/App.tsx:314`）。该行为由 `903195c`（2026-11-14，已含于 v1.0.0）引入，**不是 Phase 4 改动**；失败项目在跳转后的项目页有红 ✕ 徽章与 completeness errors 明示，故误导仅限上传屏的瞬时文案。建议后续把 `failed` 分支改走 `UploadPhase["failed"]`；不阻断本次发布。
+- **R-6（低危备忘）**：`Tabs` 组件（`src/dexatlas/workbench/web/src/components.tsx:275`）缺 `aria-controls`/关联 tabpanel/roving tabIndex；当前未被任何页面使用，属潜伏项，采用前应补全 tab 模式。
 
 ## 6. 可发布建议
 
 **建议：本地可发布。** 依据：
 
 1. 13 项本地门禁全部 PASS，其中完整 pytest（带 JADX/Apktool 后端与第三方 fixtures）1807 passed / 1 skipped，skip 为平台镜像设计内跳过，与执行报告口径一致。
-2. Phase 4 全部源码改动（M11–M15）逐 diff 评审，无正确性缺陷、无公共契约变化、回归测试满足「旧实现变红」纪律。
-3. 发布数字（测试数/覆盖率）在执行报告、README 双语、status.md、portfolio.md、social-preview 卡之间完全一致，且全部由脚本生成。
-4. walkthrough 4 项低危发现均不阻断：F1 随分支合入解决，F2/F3 为后续文档小改进，F4 为环境体验点。
+2. Phase 4 全部源码改动（M11–M15）逐 diff 评审 + 前端独立子评审复核，无正确性缺陷、无公共契约变化、回归测试满足「旧实现变红」纪律。
+3. 发布数字（测试数/覆盖率）在执行报告、README 双语、status.md、portfolio.md、social-preview 卡之间完全一致，且全部由脚本生成，本次实测闭环。
+4. walkthrough 4 项低危发现均不阻断：F1 随分支合入解决，F2/F3 评审期内他窗已落实，F4 为环境体验点。
+5. 新登记的 R-5（上传屏 failed 文案，既有行为）与 R-6（Tabs 潜伏 a11y）均为低危、非阻断，建议随下一轮前端维护处理。
 
-**发布前置（非本次执行）：** 按 [phase4-release-plan.md](phase4-release-plan.md) §5 完成工作分支合入 `main`；CI 由用户发话后运行；F2/F3 可随下一轮文档维护处理。
+**发布前置（非本次执行）：** 按 [phase4-release-plan.md](phase4-release-plan.md) §5 完成工作分支合入 `main`；CI 由用户发话后运行。
