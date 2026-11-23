@@ -147,7 +147,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [phase4-walkthrough.md](phase4-walkthrough.md) | **Phase 4 M15 独立用户 walkthrough**（2026-11-23）：零上下文用户按 README 在干净 clone（`main` @ `22c0621`）走完整链路（安装 → 后端 → analyze → 只读命令 → runs/render → fixtures → REST API → Workbench → agent 成功流/503 拒绝流 → 证据包）的逐步实测记录。**结论：通过**，4 项低危/信息发现（F1 分支进度、F2 install-backends 不打印 export 行、F3 Workbench `/api` 子集与 REST API 表不同、F4 端口占用自救）只记录未修。 | 判断「陌生人按 README 能不能走通」时看它；修 F2–F4 前先读原始发现。 |
 | [phase4-release-review.md](phase4-release-review.md) | **Phase 4 M15 发布前本地评审**（2026-11-23）：全量本地门禁、Phase 4 源码评审（M11–M15）、发布数字一致性、walkthrough 四项低危发现追踪。未跑、未盯 GitHub CI（按用户要求）。 | 发布前判断「本地门禁全绿了吗、还有哪些待办」时看它。 |
 | [phase4-demo-shots.md](phase4-demo-shots.md) | **Phase 4 M15 演示镜头表**（2026-11-23）：新 80 秒演示视频（`docs/assets/phase4-demo-80s.mp4`）逐镜说明画面来自哪一次真实运行（Workbench + agent 真实模型调用，Playwright 真实交互驱动）、每个读数在哪份接口/状态文件可复核。 | 核对演示视频每一帧的证据来源，或替换旧 demo 入口前确认素材边界时看它。 |
-| [phase4-tech-talk-script.md](phase4-tech-talk-script.md) | **Phase 4 M15 技术讲解脚本**（4 分钟，2026-11-23）：分段与画面同[发布规划 §2.2](phase4-release-plan.md)；所有画面均来自真实运行（Workbench 与 agent 真实模型调用），解说只引用画面可见事实。讲解视频尚未落盘——本文件以脚本形式保留。 | 录制/重录讲解视频时按它执行；核对解说与画面是否一致时看它。 |
+| [phase4-tech-talk-script.md](phase4-tech-talk-script.md) | **Phase 4 M15 技术讲解脚本**（4 分钟，2026-11-23）：分段与画面同[发布规划 §2.2](phase4-release-plan.md)；所有画面均来自真实运行（Workbench 与 agent 真实模型调用），解说只引用画面可见事实。讲解视频已按本表渲染为 `docs/assets/phase4-tech-talk-4min.mp4`（233 s，无配音）。 | 核对讲解视频解说与画面是否一致，或重录/配音时看它。 |
 
 ## 6. 历史记录：不要当现状读
 
