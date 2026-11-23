@@ -16,7 +16,10 @@ is resumed needs the plan it was interrupted under.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -583,11 +586,24 @@ def _turn_from_dict(document: dict[str, Any]) -> AssistantTurn | Observation:
 class TaskStore:
     """Where task states are kept, so a task can be picked up later.
 
-    One JSON file per task, written whole. The write goes through a temporary
-    file and a rename, because a state that is half written is worse than no
-    state: it would be read back as a task that stopped in the middle of a
-    step.
+    One JSON file per task, written whole. The write goes through a
+    temporary file and a rename, because a state that is half written is
+    worse than no state: it would be read back as a task that stopped in
+    the middle of a step.
+
+    Two writers can be saving at once — two agent loops over one workspace
+    — and a poll can be reading while they do. So each write gets a
+    temporary file of its own (a shared name would have the second writer
+    re-create the first's file between the write and the rename), and the
+    rename retries briefly: on Windows, replacing a file another process
+    still has open fails with ``PermissionError`` (``WinError 5``), and the
+    poll is exactly such an opener. A state a reader holds a moment longer
+    is the previous step's state — never a half-written one.
     """
+
+    #: How long a save may keep retrying the rename while a reader holds the
+    #: target open: several poll cycles, still far under a second of work.
+    REPLACE_RETRY_SECONDS = 2.0
 
     def __init__(self, directory: Path) -> None:
         self._directory = Path(directory)
@@ -605,18 +621,61 @@ class TaskStore:
         """Write a task's state down."""
         self._directory.mkdir(parents=True, exist_ok=True)
         target = self.path_for(state.task_id)
-        temporary = target.with_suffix(".json.tmp")
+        temporary = self._temporary_path(target)
         temporary.write_text(
             json.dumps(state.as_dict(), indent=2, sort_keys=True), encoding="utf-8"
         )
-        temporary.replace(target)
+        self._replace(temporary, target)
+
+    def _temporary_path(self, target: Path) -> Path:
+        """A temporary file name no other writer is using right now.
+
+        The name is per-process and per-call, so two stores — or one store
+        saving twice — never share a temporary file.
+        """
+        unique = f"{os.getpid():x}-{id(object()):x}-{time.monotonic_ns():x}"
+        return target.with_name(f"{target.name}.{unique}.tmp")
+
+    def _replace(self, temporary: Path, target: Path) -> None:
+        """Rename over the target, waiting out a reader's open handle."""
+        deadline = time.monotonic() + self.REPLACE_RETRY_SECONDS
+        delay = 0.001
+        while True:
+            try:
+                os.replace(temporary, target)
+                return
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    with contextlib.suppress(OSError):
+                        temporary.unlink(missing_ok=True)
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2, 0.05)
 
     def load(self, task_id: str) -> TaskState | None:
-        """Read a task's state back, or ``None`` when there is none."""
+        """Read a task's state back, or ``None`` when there is none.
+
+        The read is retried briefly, like the write's rename: on Windows
+        the moment a replace swaps the target under a reader, that reader's
+        open fails with ``PermissionError``, and the retry lands on the
+        file the save just put there. A state that is gone for good is
+        ``None``.
+        """
         path = self.path_for(task_id)
-        if not path.is_file():
-            return None
-        return TaskState.from_dict(json.loads(path.read_text(encoding="utf-8")))
+        deadline = time.monotonic() + self.REPLACE_RETRY_SECONDS
+        delay = 0.001
+        while True:
+            try:
+                document = path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                return None
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(delay)
+                delay = min(delay * 2, 0.05)
+                continue
+            return TaskState.from_dict(json.loads(document))
 
     def list_tasks(self) -> list[str]:
         """The ids of the tasks that are kept here."""

@@ -151,6 +151,76 @@ def test_the_state_survives_a_round_trip_through_the_store(tmp_path: Path) -> No
     assert read.limits.max_iterations == 1
 
 
+def test_concurrent_writers_do_not_lose_a_state(tmp_path: Path) -> None:
+    """Two writers and two readers racing through one store all succeed.
+
+    The workbench can run two agent loops at once, and both write through
+    the same store while the poll reads the tasks back. The old save wrote
+    every task through one shared ``.json.tmp`` name and renamed it with no
+    retry: a second writer could re-create the first's temporary file
+    between its write and its rename, and a reader's open handle on Windows
+    made the rename fail with ``PermissionError`` (``WinError 5``) — the
+    failure the M13 live run recorded. The store has to absorb the race:
+    one temporary file per writer, and a rename that retries while another
+    process still holds the target open.
+    """
+    import threading
+
+    store = TaskStore(tmp_path / "tasks")
+    errors: list[tuple[str, str, str]] = []
+    start = threading.Barrier(4)
+    stop = threading.Event()
+
+    def write(task_id: str, question: str) -> None:
+        state = TaskState(
+            task_id=task_id,
+            question=question,
+            created_at="2026-01-01T00:00:00+00:00",
+            updated_at="2026-01-01T00:00:00+00:00",
+        )
+        try:
+            start.wait(timeout=10)
+            for step in range(25):
+                state.note("tool_call", f"step-{step}")
+                try:
+                    store.save(state)
+                except Exception as error:
+                    errors.append(("save", task_id, repr(error)))
+        except Exception as error:
+            errors.append(("writer", task_id, repr(error)))
+
+    def read(task_id: str) -> None:
+        try:
+            start.wait(timeout=10)
+            while not stop.is_set():
+                store.load(task_id)
+        except Exception as error:
+            errors.append(("load", task_id, repr(error)))
+
+    threads = [
+        threading.Thread(target=write, args=("task-a", "first question")),
+        threading.Thread(target=write, args=("task-b", "second question")),
+        threading.Thread(target=read, args=("task-a",)),
+        threading.Thread(target=read, args=("task-b",)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads[:2]:
+        thread.join(timeout=60)
+        assert not thread.is_alive(), "a writer never finished"
+    stop.set()
+    for thread in threads[2:]:
+        thread.join(timeout=10)
+
+    assert errors == [], f"the concurrent store failed: {errors!r}"
+    first = store.load("task-a")
+    second = store.load("task-b")
+    assert first is not None and first.question == "first question"
+    assert second is not None and second.question == "second question"
+    assert store.list_tasks() == ["task-a", "task-b"]
+    assert not list((tmp_path / "tasks").glob("*.tmp")), "a temporary file was left behind"
+
+
 def test_a_task_that_is_not_there_is_not_there(tmp_path: Path) -> None:
     """Reading a task that was never written is ``None``, not a crash."""
     store = TaskStore(tmp_path / "tasks")
