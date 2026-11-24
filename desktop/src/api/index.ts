@@ -5,7 +5,7 @@
  * 类型与实现分开导出，方便只取类型的组件做 tree-shaking。
  */
 
-export { DexAtlasClient, ApiError, dexatlas, downloadText } from "./client";
+export { DexAtlasClient, ApiError, describeError, dexatlas, downloadText } from "./client";
 export type { DexAtlasClientOptions } from "./client";
 
 export type {

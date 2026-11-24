@@ -80,6 +80,34 @@ function messageFromBody(body: unknown, statusText: string): string {
   return statusText;
 }
 
+/**
+ * 把任意抛出的错误转成一句人能读的话（不展示给最终用户的原始前缀）。
+ *
+ * 验收报告 T2-A9 遗留项：网络层失败的 fetch TypeError 会把 `undefined:`
+ * 拼进 message（如 "undefined: Failed to fetch"），ApiError 构造时又拼了
+ * baseURL，直接展示很费解。这里按错误类别给出中文说明，并保留原始
+ * message 作为附注；HTTP 状态码在 statusText 里另配一句语义说明。
+ */
+export function describeError(err: unknown): string {
+  if (err instanceof ApiError) {
+    const statusNote =
+      err.status === undefined
+        ? "无法连接后端（网络错误或服务未启动）"
+        : `请求失败（HTTP ${err.status}）`;
+    const raw = err.message.trim();
+    // HTTP 错误体已有可读 message 时直接用它；网络错误则用中文说明 + 原始附注
+    const readable =
+      err.status !== undefined && raw && !raw.startsWith("undefined")
+        ? raw
+        : `${statusNote}${raw && raw !== "undefined" ? `（${raw}）` : ""}`;
+    return readable;
+  }
+  if (err instanceof Error && err.message.trim()) {
+    return err.message;
+  }
+  return String(err);
+}
+
 export class DexAtlasClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;

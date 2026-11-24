@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
-import { ApiError, dexatlas } from "../api";
+import { describeError, dexatlas } from "../api";
 import type { EvidenceRecord, ProjectSummary } from "../api";
 import "./FindingsPage.css";
 
@@ -55,6 +55,7 @@ export default function FindingsPage() {
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const [evidenceNonce, setEvidenceNonce] = useState(0);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -65,7 +66,7 @@ export default function FindingsPage() {
       const done = list.find((p) => p.status === "completed") ?? list[0];
       if (done) setProjectId(done.id);
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export default function FindingsPage() {
       .catch((e: unknown) => {
         if (!cancelled) {
           setEvidence([]);
-          setEvidenceError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+          setEvidenceError(describeError(e));
         }
       })
       .finally(() => {
@@ -97,7 +98,7 @@ export default function FindingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, evidenceNonce]);
 
   const projectName = useMemo(
     () => projects?.find((p) => p.id === projectId)?.apk_name ?? projectId,
@@ -121,7 +122,12 @@ export default function FindingsPage() {
         <header className="page-header">
           <h1 className="page-title">证据</h1>
         </header>
-        <ErrorState title="证据加载失败" description="无法读取项目列表。" detail={error} onRetry={loadProjects} />
+        <ErrorState
+          title="证据加载失败"
+          description="无法读取项目列表。请确认 DexAtlas 后端（127.0.0.1:8618）正在运行。"
+          detail={error}
+          onRetry={loadProjects}
+        />
       </div>
     );
   }
@@ -158,7 +164,12 @@ export default function FindingsPage() {
         {loadingEvidence ? (
           <LoadingState lines={4} label="正在加载证据" />
         ) : evidenceError ? (
-          <ErrorState title="证据加载失败" description={`无法读取项目 ${projectName} 的证据。`} detail={evidenceError} />
+          <ErrorState
+            title="证据加载失败"
+            description={`无法读取项目「${projectName}」的证据记录。可切换其他项目，或稍后重试。`}
+            detail={evidenceError}
+            onRetry={() => setEvidenceNonce((n) => n + 1)}
+          />
         ) : evidence.length === 0 ? (
           <EmptyState title="该项目暂无证据" description="完成分析的项目会在这里展示其全部证据记录。" />
         ) : (

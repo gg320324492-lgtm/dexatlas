@@ -27,7 +27,7 @@ import { PartialBanner } from "../components/PartialBanner";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
-import { ApiError, dexatlas } from "../api";
+import { ApiError, describeError, dexatlas } from "../api";
 import type { ProjectDetailEnvelope as WsProjectStatus, WorkbenchHealth as WsHealth } from "../api";
 import type { BackendState, BackendStatus, LogLevel, LogEntry, StageInfo, StageState } from "../types";
 import "./Analysis.css";
@@ -37,6 +37,10 @@ const API_BASE = "/api";
 
 /** 轮询间隔：pending/running 时每 2s 读一次项目状态。 */
 const POLL_INTERVAL_MS = 2000;
+/** 轮询连续失败达到该次数才降级为 ErrorState（之前每次失败都直接报错）。 */
+const POLL_FAIL_STREAK_LIMIT = 5;
+/** 连续失败后的重试退避：第 n 次失败后等 POLL_INTERVAL_MS * 2^(n-1)，上限 30s。 */
+const POLL_BACKOFF_MAX_MS = 30_000;
 /** 阶段模拟推进间隔（前端模拟，非后端数据）。 */
 const STAGE_TICK_MS = 2400;
 /** 404 连续多少次后提示"迟迟未入库"（2s 一次，15 次 ≈ 30s）。 */
@@ -106,6 +110,8 @@ interface PollingResult {
   project: WsProjectStatus | null;
   health: WsHealth | null;
   pollError: string | null;
+  /** 连续失败次数是否已达到降级阈值（达到才展示整页 ErrorState） */
+  pollFailedHard: boolean;
   notFound: boolean;
   notFoundLong: boolean;
   logs: LogEntry[];
@@ -117,6 +123,7 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
   const [project, setProject] = useState<WsProjectStatus | null>(null);
   const [health, setHealth] = useState<WsHealth | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
+  const [pollFailedHard, setPollFailedHard] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [notFoundLong, setNotFoundLong] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -124,6 +131,7 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
   const prevStatusRef = useRef<string | null>(null);
   const prevRunCountRef = useRef(0);
   const notFoundStreakRef = useRef(0);
+  const failStreakRef = useRef(0);
   const lastErrorRef = useRef<string | null>(null);
 
   const pushLog = useCallback((level: LogLevel, source: string, message: string) => {
@@ -139,10 +147,12 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     setNotFound(false);
     setNotFoundLong(false);
     setPollError(null);
+    setPollFailedHard(false);
     setLogs([]);
     prevStatusRef.current = null;
     prevRunCountRef.current = 0;
     notFoundStreakRef.current = 0;
+    failStreakRef.current = 0;
     lastErrorRef.current = null;
 
     let stopped = false;
@@ -150,9 +160,14 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     let timer: number | undefined;
     const stop = () => {
       if (timer !== undefined) {
-        window.clearInterval(timer);
+        window.clearTimeout(timer);
         timer = undefined;
       }
+    };
+    /** 下一次轮询：连续失败时按指数退避拉长间隔，成功或手动重试后回到基准间隔。 */
+    const schedule = (delayMs: number) => {
+      if (stopped) return;
+      timer = window.setTimeout(() => void poll(), delayMs);
     };
 
     const poll = async () => {
@@ -162,9 +177,11 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
         const data = await dexatlas.getProject(projectId);
         if (stopped) return;
         notFoundStreakRef.current = 0;
+        failStreakRef.current = 0;
         setNotFound(false);
         setNotFoundLong(false);
         setPollError(null);
+        setPollFailedHard(false);
         lastErrorRef.current = null;
 
         const status = data.project.status;
@@ -192,10 +209,11 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 
         setProject(data);
         if (status === "completed" || status === "failed") stop();
+        else schedule(POLL_INTERVAL_MS);
       } catch (err) {
         if (stopped) return;
-        const code = err instanceof ApiError ? err.status : 0;
-        const msg = err instanceof Error ? err.message : String(err);
+        const code = err instanceof ApiError ? err.status : undefined;
+        const msg = describeError(err);
         if (code === 404) {
           // 刚上传的项目要等后台任务把项目行写入 store，短时间内 404 属正常
           notFoundStreakRef.current += 1;
@@ -207,12 +225,20 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
             setNotFoundLong(true);
             pushLog("warn", "轮询", "项目已约 30 秒未入库，请检查后端日志或重新上传");
           }
+          schedule(POLL_INTERVAL_MS);
         } else {
+          // 网络/服务错误：指数退避重试，连续 POLL_FAIL_STREAK_LIMIT 次才降级 ErrorState
+          failStreakRef.current += 1;
+          const streak = failStreakRef.current;
           setPollError(msg);
+          setPollFailedHard(streak >= POLL_FAIL_STREAK_LIMIT);
           if (lastErrorRef.current !== msg) {
             lastErrorRef.current = msg;
-            pushLog("warn", "轮询", `轮询失败：${msg}`);
+            pushLog("warn", "轮询", `轮询失败（第 ${streak} 次）：${msg}`);
           }
+          const backoff = Math.min(POLL_INTERVAL_MS * 2 ** (streak - 1), POLL_BACKOFF_MAX_MS);
+          pushLog("debug", "轮询", `${(backoff / 1000).toFixed(0)}s 后自动重试`);
+          schedule(backoff);
         }
       } finally {
         busy = false;
@@ -221,7 +247,6 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 
     pushLog("info", "轮询", `开始轮询 GET ${API_BASE}/projects/${projectId}（每 ${POLL_INTERVAL_MS / 1000}s）`);
     void poll();
-    timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
     void dexatlas
       .getHealth()
       .then((h) => {
@@ -237,7 +262,7 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     };
   }, [projectId, retryNonce, pushLog]);
 
-  return { project, health, pollError, notFound, notFoundLong, logs, pushLog };
+  return { project, health, pollError, pollFailedHard, notFound, notFoundLong, logs, pushLog };
 }
 
 /**
@@ -295,7 +320,8 @@ function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
 export function Analysis() {
   const { projectId } = useParams();
   const [retryNonce, setRetryNonce] = useState(0);
-  const { project, health, pollError, notFound, notFoundLong, logs, pushLog } = useProjectPolling(projectId, retryNonce);
+  const { project, health, pollError, pollFailedHard, notFound, notFoundLong, logs, pushLog } =
+    useProjectPolling(projectId, retryNonce);
   const status = project?.project.status ?? null;
   const progress = useStageSimulation(status);
   const stageStates = useMemo(() => deriveStageStates(progress, status), [progress, status]);
@@ -324,8 +350,8 @@ export function Analysis() {
       await dexatlas.cancelProject(projectId);
       pushLog("info", "取消", "已向后端发送取消请求（202），等待状态确认");
     } catch (err) {
-      const code = err instanceof ApiError ? err.status : 0;
-      const msg = err instanceof Error ? err.message : String(err);
+      const code = err instanceof ApiError ? err.status : undefined;
+      const msg = describeError(err);
       const notice =
         code === 404 || code === 405
           ? "取消失败：当前 workbench 后端未提供 /api/projects/{id}/cancel 接口，无法取消。"
@@ -401,7 +427,13 @@ export function Analysis() {
             message="项目迟迟未入库：后端持续返回 404。可能上传失败、后端异常或项目 id 有误；仍在继续轮询。"
           />
         ) : null}
-        {pollError && project ? <PartialBanner tone="warning" message={`轮询失败，正在重试：${pollError}`} /> : null}
+        {pollError && project ? (
+          <PartialBanner
+            tone="warning"
+            message={`轮询失败，正在自动重试（连续失败会拉长间隔；${POLL_FAIL_STREAK_LIMIT} 次后暂停）：${pollError}。`}
+            onRetry={() => setRetryNonce((n) => n + 1)}
+          />
+        ) : null}
         {cancelNotice ? (
           <PartialBanner tone="danger" message={cancelNotice} onDismiss={() => setCancelNotice(null)} />
         ) : null}
@@ -444,11 +476,12 @@ export function Analysis() {
         />
       ) : !project && notFound ? (
         <LoadingState label="等待项目入库" lines={3} />
-      ) : !project && pollError ? (
+      ) : !project && pollFailedHard ? (
         <ErrorState
           title="无法连接后端"
-          description={`正在尝试访问 ${API_BASE}，失败原因：${pollError}`}
+          description={`已连续多次读取 ${API_BASE}/projects 失败（最后原因：${pollError}）。轮询已暂停，可手动重试。`}
           onRetry={() => setRetryNonce((n) => n + 1)}
+          retryLabel="手动刷新"
         />
       ) : (
         <div className="analysis__grid">

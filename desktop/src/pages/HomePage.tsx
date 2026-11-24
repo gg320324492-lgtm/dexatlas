@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { StatusBadge, type StatusKind } from "../components/StatusBadge";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
-import { ApiError, dexatlas } from "../api";
+import { LoadingState } from "../components/states/LoadingState";
+import { describeError, dexatlas } from "../api";
 import type { AnalyzeAccepted, ProjectSummary as WorkbenchProject } from "../api";
 import "./HomePage.css";
 
@@ -40,6 +41,9 @@ function formatTime(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** 首页拖拽区单文件大小上限（MB）。与后端工作台的常见样例体量对齐，超限前端直接拒绝。 */
+const MAX_UPLOAD_MB = 512;
+
 /** 首页：拖拽上传 + 最近项目（补充单 2-1；Q2-M3-T1 起统一走 api/ 客户端）。 */
 export default function HomePage() {
   const navigate = useNavigate();
@@ -58,7 +62,7 @@ export default function HomePage() {
       setProjects(await dexatlas.listProjects());
     } catch (err) {
       setProjects(null);
-      setProjectsError(err instanceof ApiError ? `${err.status}: ${err.message}` : String(err));
+      setProjectsError(describeError(err));
     }
   }, []);
 
@@ -74,17 +78,25 @@ export default function HomePage() {
         setError("仅支持 .apk 文件");
         return;
       }
+      if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        setFileName(null);
+        setError(`文件过大：${(file.size / 1024 / 1024).toFixed(1)} MB 超过 ${MAX_UPLOAD_MB} MB 上限，请换更小的 APK。`);
+        return;
+      }
       setError(null);
       setFileName(file.name);
       setUploading(true);
       dexatlas
         .analyzeUpload(file, file.name)
         .then((accepted: AnalyzeAccepted) => {
-          // 同 hash 已存在时后端也返回已有项目，同样跳转。
+          if (accepted.already_analysed) {
+            // 同 hash 已分析过：明确提示"复用已有项目"再跳转，避免误以为重新分析
+            setError(`该 APK 已分析过（sha256 前 12 位 ${accepted.apk_sha256.slice(0, 12)}），正在打开已有项目，不会重复分析。`);
+          }
           void navigate(`/analysis/${accepted.project_id}`);
         })
         .catch((err: unknown) => {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(describeError(err));
           setFileName(null);
         })
         .finally(() => setUploading(false));
@@ -128,13 +140,13 @@ export default function HomePage() {
           <>
             <strong className="dropzone-file">{fileName}</strong>
             <span className="page-subtitle" role="status">
-              正在上传并启动分析…
+              {error ?? "正在上传并启动分析…"}
             </span>
           </>
         ) : (
           <>
             <strong>拖拽 APK 到此处</strong>
-            <span className="page-subtitle">或</span>
+            <span className="page-subtitle">或 · 单个文件不超过 {MAX_UPLOAD_MB} MB；同一 APK 重复上传会打开已有项目，不会重复分析</span>
             <label className={`btn btn-primary dropzone-browse${uploading ? " is-busy" : ""}`}>
               浏览文件
               <input
@@ -168,7 +180,11 @@ export default function HomePage() {
               onRetry={() => setReloadTick((t) => t + 1)}
             />
           </div>
-        ) : projects !== null && projects.length === 0 ? (
+        ) : projects === null ? (
+          <div className="card project-list-card">
+            <LoadingState variant="table" lines={5} label="正在加载最近项目" />
+          </div>
+        ) : projects.length === 0 ? (
           <div className="card project-list-card">
             <EmptyState
               title="还没有分析过的项目"
