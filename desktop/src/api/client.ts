@@ -41,6 +41,36 @@ import type {
   WorkbenchHealth,
 } from "./types";
 
+/**
+ * Tauri 发布形态下的后端访问适配（X2-P1）。
+ *
+ * 打包后的 exe 运行在 tauri://localhost（生产 origin），而 workbench 后端
+ * 在 http://127.0.0.1:8618 且不带 CORS 头，浏览器环境直接 fetch 会被 CORS
+ * 拦截（X2 走查 CDP 实测 MissingAllowOriginHeader）。Tauri 环境下改用
+ * @tauri-apps/plugin-http 的 fetch：请求走 Rust 侧 HTTP 插件发出，不受
+ * WebKit/CORS 约束（capability 已放行 8618）。dev / 浏览器环境保持原生
+ * fetch（vite 代理转发）。
+ */
+const TAURI_FETCH = import("@tauri-apps/plugin-http").then(
+  (m) => m.fetch as typeof fetch,
+);
+
+/** 是否运行在 Tauri WebView 内（dev 窗口与发布 exe 都算）。 */
+function isTauriRuntime(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    "__TAURI_INTERNALS__" in window
+  );
+}
+
+/** 按运行环境取 fetch 实现；Tauri 下惰性加载 plugin-http。 */
+function resolveFetch(): Promise<typeof fetch> {
+  if (isTauriRuntime()) {
+    return TAURI_FETCH;
+  }
+  return Promise.resolve(fetch.bind(globalThis));
+}
+
 /** 客户端可调的统一错误。status 为 undefined 表示请求根本没到服务器。 */
 export class ApiError extends Error {
   readonly status?: number;
@@ -113,11 +143,13 @@ export function describeError(err: unknown): string {
 
 export class DexAtlasClient {
   private readonly baseUrl: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: Promise<typeof fetch>;
 
   constructor(options: DexAtlasClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? "/api").replace(/\/+$/, "");
-    this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    this.fetchImpl = options.fetchImpl
+      ? Promise.resolve(options.fetchImpl)
+      : resolveFetch();
   }
 
   // -------------------------------------------------------------------------
@@ -273,7 +305,7 @@ export class DexAtlasClient {
   private async raw(path: string, init?: RequestInit): Promise<Response> {
     let response: Response;
     try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, init);
+      response = await (await this.fetchImpl)(`${this.baseUrl}${path}`, init);
     } catch (cause) {
       // fetch 只在网络层失败时 reject（断连、DNS、CORS 等）
       throw new ApiError(
