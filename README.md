@@ -140,9 +140,10 @@ the same bundled demo APK; the full four-width set lives in the
 
 The call-graph stills (`04-calls-1440.png` and the method view
 `phase4-agent/r6-calls-method-1440.png`) and the remaining screens are in the same two
-directories. A new 60–90-second demo video is being recorded to replace the one above;
-until it lands, what the workbench actually looks like today is best seen in these
-stills.
+directories. A new 80-second demo video has been recorded and is on disk
+(`docs/assets/phase4-demo-80s.mp4`); the README showcase entry pointing at it is still
+to be updated, so until then these stills remain the best view of what the workbench
+actually looks like today.
 
 ---
 

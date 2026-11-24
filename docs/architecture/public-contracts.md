@@ -216,13 +216,19 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 | 2 | `get_project_status` | `project_id` | `ProjectStatus{project,completeness,published_run?,runs[],evidence_catalog[]}` | `src/dexatlas/mcp/server.py:126-139` |
 | 3 | `get_manifest` | `project_id` | `ManifestView` | `src/dexatlas/mcp/server.py:141-152` |
 | 4 | `search_symbols` | `project_id`、`query`、`offset`、`limit` | `SymbolList{symbols:[SymbolView],total,offset,limit}` | `src/dexatlas/mcp/server.py:154-174` |
-| 5 | `get_class_source` | `project_id`、`class_name`、`offset≥0=0`、`limit(1..200000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:178-200` |
-| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?`、`offset≥0=0`、`limit(1..200000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:203-233` |
+| 5 | `get_class_source` | `project_id`、`class_name`、`offset≥0=0`、`limit(1..20000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:178-200` |
+| 6 | `get_method_source` | `project_id`、`class_name`、`method_name`、`descriptor?`、`offset≥0=0`、`limit(1..20000)=200000` | `SourceView{found,reason,kind?,text?,text_offset,text_total_chars,provenance[],candidates[]}` | `src/dexatlas/mcp/server.py:203-233` |
 | 7 | `find_callers` | `project_id`、`method_id`、`limit(1..200)=50`、`offset≥0=0` | `CallerView{call_sites:[CallSiteView],call_site_count,call_edge_count,truncated,offset}` | `src/dexatlas/mcp/server.py:239-263` |
 | 8 | `find_callees` | `project_id`、`method_id`、`limit(1..200)=50`、`offset≥0=0` | `CalleeView{callees:[SymbolView],call_site_count,call_edge_count,truncated,offset}` | `src/dexatlas/mcp/server.py:265-290` |
 | 9 | `get_evidence` | `project_id`、`evidence_id` | `EvidenceView{id,kind,level,summary,detail,provenance[]}` | `src/dexatlas/mcp/server.py:302-312` |
 | 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:315-330` |
 | 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:322-357` |
+
+> 注：5/6 两个工具的 `limit` 默认值（200000）大于其校验上界（20000）是**现有实现的事实**，
+> 不是文档笔误——pydantic 不校验 default，所以省略 `limit` 时按 200000 生效；显式传
+> 20001–200000 会被拒（`src/dexatlas/mcp/server.py:198-201, 236-239`，上界来自
+> `MAX_LIMIT * 100`，`src/dexatlas/mcp/schemas.py:25`）。本表按实现如实记录；让默认值与
+> 上界自洽属于冻结期之外的行为变更，这里不改代码。
 
 ### 3.2 响应形状与"有界、说清"语义
 
@@ -349,7 +355,7 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 ## 6. 版本政策
 
 - 版本号唯一来源是 `src/dexatlas/__init__.py:11` 的 `__version__`
-（当前 `1.0.0`）；打包经 hatch 从该文件读取（`pyproject.toml:145-146` `anchor: [tool.hatch.version]`）。
+（当前 `1.0.1`）；打包经 hatch 从该文件读取（`pyproject.toml:145-146` `anchor: [tool.hatch.version]`）。
 - 遵循 Semantic Versioning（`CHANGELOG.md:5-6` `anchor: project adheres to [Semantic Versioning]`）；变更记录在 CHANGELOG 的
   `[Unreleased]` 节，分类 Added/Changed/Fixed（发版时该节并入该版本的段）。
 - 公共契约（本文所列）的变更规则：

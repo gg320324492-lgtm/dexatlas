@@ -748,10 +748,13 @@ REST API 同样会说：`GET /projects/{id}/classes/{name}/source` 的响应头�
   另外，`StringConstant` 的 locator 是 `androguard:classes.dex#str/<值前 64 字符>`，
   前 64 字符相同的两个字符串会得到**相同的 locator**。
 
-- **它是唯一一个跑在进程内的后端。** JADX 和 Apktool 是子进程（`tools/base.py:168` 的 `run`），
-  Androguard 是 Python 库，直接 import 进我们的进程（`tools/androguard/adapter.py:355-356` 的 `APK` / `DEX`）。
-  所以 DEX 解析崩溃会打在**我们**的进程里——代码用 try/except 把它兜成 `ToolError`
-  （`tools/androguard/adapter.py:356-374`），但解析器本身的内存安全风险是继承来的。
+- **DEX 解析跑在隔离的 worker 进程里。** JADX 和 Apktool 是子进程（`tools/base.py:168` 的 `run`），
+  Androguard 的 DEX 解析也已从进程内搬进**独立 worker 进程**（入口是
+  `tools/androguard/adapter.py:235-279` 的 `extract`，经 `tools/androguard/isolation.py:238` 的
+  `run_worker` 启动 worker 模块 `tools/androguard/worker.py`）——解析处理的是服务自己没写过的
+  字节，worker 崩溃会被记录成一次解析失败（`ToolError`），而不是打挂服务的进程（见
+  `docs/architecture/runtime-isolation.md`）。只有 `read_sdk_levels`
+  （`tools/androguard/adapter.py:281-331`）仍在进程内读 binary manifest 里那一小段 XML。
 
 - **它答不了「这个方法反编译出来了吗」。** Androguard 读 DEX，能回答「这个方法有没有
   字节码」——但那不是同一个问题，而且几乎每个方法都有字节码，所以这个答案没有信息量。

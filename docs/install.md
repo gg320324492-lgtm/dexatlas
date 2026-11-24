@@ -176,7 +176,7 @@ export PATH="$PATH:/path/to/apktool"   # provides apktool or apktool.jar
 | `DEXATLAS_WORKSPACE`      | Where projects and the database live     | `.dexatlas`        |
 | `DEXATLAS_JADX_PATH`      | JADX launcher                            | discovered on PATH |
 | `DEXATLAS_APKTOOL_JAR`    | Apktool jar                              | discovered on PATH |
-| `DEXATLAS_LOG_LEVEL`      | Python log level                          | `WARNING`          |
+| `DEXATLAS_LOG_LEVEL`      | Python log level（`Settings.log_level`，当前代码路径未消费；CLI 日志级别由 `--log-level` 控制，默认 `WARNING`） | `INFO`             |
 | `DEXATLAS_TOOL_TIMEOUT_SECONDS` | Per-backend timeout                  | `900`              |
 | `DEXATLAS_TOOL_MAX_OUTPUT_BYTES` | Cap on captured backend output   | `268435456`        |
 | `DEXATLAS_GHIDRA_PATH`   | Ghidra install, for Phase 3 native analysis | discovered on PATH |
