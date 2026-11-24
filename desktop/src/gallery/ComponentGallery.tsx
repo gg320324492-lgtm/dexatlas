@@ -71,6 +71,7 @@ export function ComponentGallery() {
   const [dangerOpen, setDangerOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [galleryUploadMsg, setGalleryUploadMsg] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [name, setName] = useState("");
   const [bannerVisible, setBannerVisible] = useState(true);
@@ -366,15 +367,20 @@ export function ComponentGallery() {
       </Section>
 
       {/* ---------- DragDropUploader ---------- */}
-      <Section title="DragDropUploader 拖拽上传" desc="扩展名与大小前端校验；拖入高亮；键盘可达（Enter/空格打开文件选择）。">
+      <Section title="DragDropUploader 拖拽上传" desc="扩展名与大小前端校验；拖入高亮；键盘可达（Enter/空格打开文件选择）；校验失败行内提示，不弹原生 alert。">
         <DragDropUploader
           accept={[".apk"]}
           maxSizeMB={512}
           title="拖入 APK 文件"
           description="支持 .apk，单个文件不超过 512 MB"
-          onFileSelected={(file) => window.alert(`已选择：${file.name}`)}
-          onRejected={(reason) => window.alert(reason)}
+          onFileSelected={(file) => setGalleryUploadMsg(`已选择：${file.name}`)}
+          onRejected={(reason) => setGalleryUploadMsg(reason)}
         />
+        {galleryUploadMsg ? (
+          <p className="gallery-upload-msg" role="status">
+            {galleryUploadMsg}
+          </p>
+        ) : null}
       </Section>
 
       <footer className="gallery__section" style={{ color: "var(--color-text-muted)", fontSize: "var(--text-sm)" }}>

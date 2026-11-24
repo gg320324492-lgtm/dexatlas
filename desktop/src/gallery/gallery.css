@@ -127,6 +127,17 @@
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-3);
 }
+
+/* 上传演示的行内反馈（替代原生 alert） */
+.gallery-upload-msg {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-navy-800);
+  font-size: var(--text-sm);
+}
 .gallery__swatch {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

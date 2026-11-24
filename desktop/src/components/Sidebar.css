@@ -104,3 +104,7 @@
   color: var(--color-text-invert);
   border-color: var(--color-lavender);
 }
+.da-sidebar__collapse:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}

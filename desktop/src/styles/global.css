@@ -32,6 +32,36 @@ button {
   cursor: pointer;
 }
 
+/* 动效尊重系统偏好：关闭非必要动画与过渡（补充单 §3.4）。
+   保留透明度过渡（不引起位移），禁用 shimmer/旋转/脉冲/滑入/缩放。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .da-skeleton-line,
+  .da-btn__spinner,
+  .da-badge--pulse .da-badge__dot,
+  .da-timeline__dot,
+  .da-log__cursor {
+    animation: none !important;
+  }
+
+  .da-drawer,
+  .da-drawer__backdrop,
+  .da-dialog,
+  .da-uploader--over,
+  .dropzone.is-dragging {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
 input,
 textarea,
 select {
