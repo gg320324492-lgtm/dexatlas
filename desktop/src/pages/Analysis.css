@@ -90,11 +90,37 @@
 .da-stage__label {
   font-weight: 600;
   font-size: var(--text-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.da-stage__partial {
+  font-size: var(--text-2xs, 10px);
+  font-weight: 600;
+  color: var(--color-warning, #b8860b);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  padding: 0 6px;
+  line-height: 1.4;
 }
 .da-stage__desc {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   margin-top: 2px;
+}
+/* 阶段卡底部：真实 run 元数据（id / 状态 / 时长 / 工具版本） */
+.da-stage-meta {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.da-stage-meta__tools {
+  font-family: var(--font-mono, monospace);
 }
 
 /* ---- 中：实时日志 ---- */
