@@ -17,7 +17,13 @@ what comes next.
   closure, software design and Workbench UI — scoped by
   [phase4-plan.md](phase4-plan.md) (final decision A + D + G; the project freezes
   after Phase 4 unless real user signals arrive).
-- **Plan version:** 2026-11-23 (Phase 4 execution order added; Phase 3 history retained)
+- **Plan version:** 2026-11-24 (Phase 4 Q2 desktop-app supplement added; Phase 3 and Phase 4 history retained)
+- **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
+  new work front inside this repository — Tauri + React, light "studio" visual
+  language, evidence-chain-first — scoped by
+  [phase4-q2-supplement.md](phase4-q2-supplement.md) and closed by
+  [phase4-q2-closure.md](phase4-q2-closure.md). This selectively unfreezes the
+  desktop-app front; the rest of the Portfolio Freeze rules still apply.
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
