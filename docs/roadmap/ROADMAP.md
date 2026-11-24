@@ -9,8 +9,9 @@ what comes next.
 
 - **Current phase:** Phase 3 delivered — M5–M7 shipped, M6's B1 acceptance line
   closed on 2026-11-22, M8 delivered (macOS unverified, as disclosed), M9
-  showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.1
-  (2026-11-21) is the documentation/measurement follow-up. Per-milestone evidence
+  showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.2
+  (2026-11-24) is the Phase 4 documentation, dependency-hardening and measurement
+  follow-up. Per-milestone evidence
   is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
   [Phase 3 plan](phase3-plan.md). The project is now in **Phase 4** — portfolio
   closure, software design and Workbench UI — scoped by
@@ -380,7 +381,7 @@ security certification or commercial SaaS readiness.
 ### 3.4 Progress (2026-11-15)
 
 Only work merged into the repository is listed; anything without merged
-evidence is marked as not started or unverified. **Independent acceptance passed on 2026-11-20 (39/40 checks, re-scored 97.5% / 96.3%); the Phase 3 exit criteria are met — M6's B1 acceptance line was closed on 2026-11-22. `v1.0.0` shipped on 2026-11-17 with the boundaries stated in its release notes; `v1.0.1` (2026-11-21) is the documentation/measurement/gate follow-up, with identical production code.**
+evidence is marked as not started or unverified. **Independent acceptance passed on 2026-11-20 (39/40 checks, re-scored 97.5% / 96.3%); the Phase 3 exit criteria are met — M6's B1 acceptance line was closed on 2026-11-22. `v1.0.0` shipped on 2026-11-17 with the boundaries stated in its release notes; `v1.0.1` (2026-11-21) is the documentation/measurement/gate follow-up. Its tag tree changed 7 source files for agent instructions and evidence-catalog support; the production analysis flow is unchanged, but the source trees are not identical.**
 
 | Milestone | Status | Evidence and what remains |
 |---|---|---|

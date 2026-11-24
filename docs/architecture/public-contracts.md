@@ -355,7 +355,7 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 ## 6. 版本政策
 
 - 版本号唯一来源是 `src/dexatlas/__init__.py:11` 的 `__version__`
-（当前 `1.0.1`）；打包经 hatch 从该文件读取（`pyproject.toml:145-146` `anchor: [tool.hatch.version]`）。
+（当前 `1.0.2`，v1.0.2 发布准备中）；打包经 hatch 从该文件读取（`pyproject.toml:145-146` `anchor: [tool.hatch.version]`）。
 - 遵循 Semantic Versioning（`CHANGELOG.md:5-6` `anchor: project adheres to [Semantic Versioning]`）；变更记录在 CHANGELOG 的
   `[Unreleased]` 节，分类 Added/Changed/Fixed（发版时该节并入该版本的段）。
 - 公共契约（本文所列）的变更规则：

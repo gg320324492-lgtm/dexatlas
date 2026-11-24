@@ -97,11 +97,11 @@ pass.** Read the skip count in the summary line, not just the exit code.
 
 Phase 2 (M0–M4) and Phase 3 (M5–M10) are **complete** — M4's review passed
 on 2026-11-14 (v0.2.0), M6's B1 acceptance line closed on 2026-11-22, M10's
-independent acceptance passed on 2026-11-20, and v1.0.1 shipped the
-documentation/measurement follow-up. The current work is **Phase 4** —
-portfolio closure, software design and Workbench UI — scoped by
+independent acceptance passed on 2026-11-20. Phase 4 (M11–M15) is complete:
+portfolio closure, software design and Workbench UI, scoped by
 [`docs/roadmap/phase4-plan.md`](roadmap/phase4-plan.md) (final decision
-A + D + G, milestones M11–M15). The project freezes after Phase 4 unless real
+A + D + G). v1.0.2 ships the Phase 4 documentation, dependency-hardening and
+measurement follow-up. The project is now in **Portfolio Freeze** unless real
 user signals arrive. Read [`docs/status.md`](status.md) for the current state
 and its open gaps.
 

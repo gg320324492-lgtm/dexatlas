@@ -50,7 +50,7 @@ still yields a manifest, an index and a report that says which steps did not run
 > records are the [comparison report](docs/benchmarks/comparison.md) and the
 > [M4 end-to-end run record](docs/reports/m4-e2e-run.md).
 >
-> **Status: early development — v1.0.1 released; v1.0.0 was tagged 2026-11-17. Phase 3's
+> **Status: early development — v1.0.2 released; v1.0.0 was tagged 2026-11-17. Phase 3's
 > deliverables are released; M10 independent acceptance passed on 2026-11-20 and M6's
 > B1 acceptance line was closed on 2026-11-22 (M8 is delivered; macOS unverified).** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in

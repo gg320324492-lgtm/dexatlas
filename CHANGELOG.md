@@ -5,6 +5,33 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-11-24
+
+### Added
+
+- **v1.0.2 发布说明与 Phase 4 收尾记录。** 新增
+  [发布说明](docs/releases/v1.0.2.md)（待完整测量落盘后定稿），汇总文档修正、
+  引用链补证、依赖加固与完整测量；Phase 4 的 M11–M15 交付物与 Portfolio Freeze
+  声明继续保留在仓库中。
+- **可复核的依赖来源。** Dockerfile 固定 uv 镜像 digest，后端与 fixture 下载脚本
+  记录 sha256 校验；相关哈希来自联网实测或上游发布值，详见依赖加固实施记录。
+
+### Fixed
+
+- **Phase 4 收尾的文档事实错误。** 修正 MCP source 工具 `limit` 上界、Androguard
+  隔离说明、`DEXATLAS_LOG_LEVEL` 默认值与消费范围、版本号陈述、双语 README 的
+  演示视频状态；补上 M15 验收引用链（镜头帧未入库说明、F2 时序归因、发布规划
+  状态追记）。
+- **对外表述与仓库证据对齐。** 双语 README 更新演示入口与逐轮比分写法；
+  v1.0.1 release body 的 CI run 归属与 `src/` 变更描述改为可复核措辞。
+
+### Changed
+
+- **依赖与发布链路加固。** Dockerfile 固定 uv 镜像 digest；后端与 fixture 下载
+  增加 sha256 校验；GitHub Actions 全部按 commit SHA 固定。
+- **完整测量落盘。** 文档数从 133 更新为 139（M15 新增 6 篇）；测试与覆盖率数字
+  继续由 `scripts/refresh-report-figures.py` 对发布树重新生成。
+
 ## [1.0.1] — 2026-11-21
 
 ### Added
@@ -1489,7 +1516,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v0.2.0

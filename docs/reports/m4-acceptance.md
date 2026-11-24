@@ -34,7 +34,7 @@
 | 9 | 启动 REST API（[README.md:149](../../README.md)） | `uv run uvicorn dexatlas.api.app:app --reload` | ✅ `/docs` 200（OpenAPI 页面）；`/health` 返回 `{"status":"ok","version":"0.1.3","backends":{...}}`。 |
 | 10 | API 上传分析（[install.md:226](../install.md) `POST /analyze`） | `curl -X POST -F "file=@examples/demo-app/demo.apk" http://127.0.0.1:8000/analyze` | ✅ 202，返回 `{"project_id":"apk_80a8fe0e81204c9f","status":"completed","detail":"/projects/..."}`。 |
 | 11 | MCP server（[README.md:168](../../README.md)） | `uv run dexatlas-mcp` + `uv run --no-sync python examples/mcp_client.py` | ✅ 客户端列出 10 个工具，每个都带「数据不是指令」的描述；全程无模型 provider。 |
-| 12 | 文档自检（CLAUDE.md 规定的门禁） | `check-doc-citations.py` / `check-version-claims.py --base auto` / `ruff check` / `ruff format --check` / `mypy` | ✅ 引用 0 drift；版本陈述 2 个已知 findings（`docs/releases/v0.2.0.md:326` 的 91.0% 表述、`CHANGELOG.md:1129` 的 93.9% 表述，均为检查器已记录项）；ruff 全过；mypy strict 无问题。 |
+| 12 | 文档自检（CLAUDE.md 规定的门禁） | `check-doc-citations.py` / `check-version-claims.py --base auto` / `ruff check` / `ruff format --check` / `mypy` | ✅ 引用 0 drift；版本陈述 2 个已知 findings（91.0% 与 93.9% 的历史表述，均为检查器已记录项，见[版本门禁示例](../../docs/how-to-verify.md#25-门禁二对外的版本声明与仓库对得上吗)）；ruff 全过；mypy strict 无问题。 |
 | 13 | 完整测试套件（[CONTRIBUTING.md:43](../../CONTRIBUTING.md)） | `uv run pytest -q` | ✅ `1260 passed, 27 skipped in 380.79s`。**27 个 skip 全部是「fixture not present; run scripts/fetch-fixtures.sh」**（`tests/test_androguard_isolation.py:99` 等），是文档写明的预期跳过，不是后端缺失。 |
 
 **新用户视角小结：** 从 clone 到看到 workbench 的路径是通的，文档命令全部可执行。

@@ -118,7 +118,7 @@ Markdown 它就变——此前要人手跟。`prose-to-markers.md` §4 留的方
   （测试套件的常规做法）而没有那份脚本时返回 `None`，该图形**不写**（与徽章的空值规则一致：
   空数比错数好，什么都不说比说错强）。
 - `render_figures()` 暴露 `documents.count`；它进 `FENCED_KEYS`（那两页把它写在围栏里）。
-- 两页换成 `documents read: <!--fig:documents.count-->139<!--/fig-->`，说明段改为
+- 两页换成 `documents read: <!--fig:documents.count-->140<!--/fig-->`，说明段改为
   「由测量脚本按 §4 写出，仓库增删文档后下次测量自动变」。
 
 当前实跑：`documents read: 173`（`git ls-files '*.md'` 减 `.github/issues/`）。

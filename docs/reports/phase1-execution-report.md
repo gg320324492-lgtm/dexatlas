@@ -1012,7 +1012,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 23,
     "cli_commands": 15,
-    "documents": 139,
+    "documents": 140,
     "sample_apks": 5
   },
   "coverage": {
@@ -1105,7 +1105,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:503afff0a846144665bd7dcda5ad74da4cf92bf38e10581bb8f7d495d975d0ed",
+  "source_fingerprint": "sha256:56e4dae9066dc40410e3c8ea7ab587ca0108196b89bbaefa76d521b94760e1fb",
   "suite": {
     "failed": 0,
     "passed": 1807,
