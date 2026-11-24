@@ -129,7 +129,7 @@ dexatlas = "dexatlas.cli.main:app"
 # The read-only MCP server. It speaks over stdio, so a host starts it as a
 # subprocess; see docs/architecture/mcp-server.md.
 dexatlas-mcp = "dexatlas.mcp.server:main"
-# The M4 web workbench: a browser over the same eleven read-only tools, called
+# The M4 web workbench: a browser over the same ten read-only tools, called
 # in-process; see docs/architecture/workbench.md.
 dexatlas-workbench = "dexatlas.workbench.__main__:main"
 
