@@ -19,7 +19,7 @@
 | 3 | `ruff format --check .` | PASS | 381 files already formatted |
 | 4 | `mypy` | PASS | Success: no issues found in 69 source files |
 | 5 | `vulture src/ tests/ scripts/ benchmarks/ --min-confidence 80` | PASS | 无输出，exit 0 |
-| 6 | `check-doc-citations.py` | PASS | 771 citations；drifted 0；unresolved 0；values not matching 0 |
+| 6 | `check-doc-citations.py` | PASS | 771 citations；drifted 0；unresolved 0；values not matching 0。（2026-11-24 追记：文档事实错误修复后引用数增至 775，复跑仍 drifted 0 / unresolved 0 / values not matching 0，结论不变。） |
 | 7 | `check-version-claims.py --base auto` | PASS | exit 0 |
 | 8 | `check-unguarded-numbers.py` | PASS | PASS 21 watched statements agree with the tree |
 | 9 | `check-release-numbers.py` | PASS（附记录） | exit 0；check-release-numbers --strict 亦 exit 0；有 2 处 `coverage.pct not written`（见发现 R-1）与 v1.0.0 release body 缺失提示（见发现 R-2） |

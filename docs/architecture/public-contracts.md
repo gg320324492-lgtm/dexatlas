@@ -227,8 +227,8 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 > 注：5/6 两个工具的 `limit` 默认值（200000）大于其校验上界（20000）是**现有实现的事实**，
 > 不是文档笔误——pydantic 不校验 default，所以省略 `limit` 时按 200000 生效；显式传
 > 20001–200000 会被拒（`src/dexatlas/mcp/server.py:198-201, 236-239`，上界来自
-> `MAX_LIMIT * 100`，`src/dexatlas/mcp/schemas.py:25`）。本表按实现如实记录；让默认值与
-> 上界自洽属于冻结期之外的行为变更，这里不改代码。
+> `MAX_LIMIT * 100`，`src/dexatlas/mcp/schemas.py:25` 的 `MAX_LIMIT`）。本表按实现如实记录；
+> 让默认值与上界自洽属于冻结期之外的行为变更，这里不改代码。
 
 ### 3.2 响应形状与"有界、说清"语义
 
