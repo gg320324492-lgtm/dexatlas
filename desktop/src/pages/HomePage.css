@@ -1,0 +1,135 @@
+.home-page {
+  background:
+    radial-gradient(1200px 400px at 80% -10%, rgba(184, 167, 245, 0.18), transparent),
+    radial-gradient(900px 360px at 10% -10%, rgba(247, 197, 159, 0.16), transparent);
+}
+
+/* 拖拽上传区：首屏插画感的渐变卡片 */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-7) var(--space-5);
+  border: 2px dashed var(--color-border-strong);
+  background: var(--gradient-hero);
+  box-shadow: var(--shadow-2);
+  text-align: center;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.dropzone.is-dragging {
+  border-color: var(--color-lavender);
+  transform: scale(1.01);
+}
+
+.dropzone.has-file {
+  border-style: solid;
+  border-color: var(--color-lavender);
+}
+
+.dropzone-art {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.dropzone-art-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+  opacity: 0.35;
+  filter: blur(2px);
+}
+
+.dropzone-art-core {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  font-size: var(--text-2xl);
+  color: var(--color-navy-800);
+}
+
+.dropzone-file {
+  font-size: var(--text-lg);
+  font-family: var(--font-mono);
+}
+
+.dropzone-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.dropzone-browse {
+  position: relative;
+  overflow: hidden;
+}
+
+.dropzone-browse input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.dropzone-error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: var(--space-6) 0 var(--space-3);
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.section-more {
+  color: var(--color-navy-600);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.section-more:hover {
+  text-decoration: underline;
+}
+
+.project-list-card {
+  padding: var(--space-2) var(--space-4);
+}
+
+.project-link {
+  color: var(--color-navy-800);
+  font-weight: 600;
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.project-link:hover {
+  text-decoration: underline;
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}

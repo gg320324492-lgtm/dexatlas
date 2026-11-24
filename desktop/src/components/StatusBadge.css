@@ -1,0 +1,59 @@
+.da-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: var(--da-radius-full);
+  font-size: var(--da-text-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.da-badge__dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.da-badge--completed {
+  background: var(--da-success-soft);
+  color: var(--da-success);
+  border-color: color-mix(in srgb, var(--da-success) 25%, transparent);
+}
+.da-badge--running {
+  background: var(--da-info-soft);
+  color: var(--da-info);
+  border-color: color-mix(in srgb, var(--da-info) 25%, transparent);
+}
+.da-badge--failed {
+  background: var(--da-danger-soft);
+  color: var(--da-danger);
+  border-color: color-mix(in srgb, var(--da-danger) 25%, transparent);
+}
+.da-badge--partial {
+  background: var(--da-warning-soft);
+  color: var(--da-warning);
+  border-color: color-mix(in srgb, var(--da-warning) 25%, transparent);
+}
+.da-badge--pending {
+  background: var(--da-neutral-soft);
+  color: var(--da-neutral);
+  border-color: color-mix(in srgb, var(--da-neutral) 25%, transparent);
+}
+
+.da-badge--pulse .da-badge__dot {
+  animation: da-badge-pulse 1.4s ease-in-out infinite;
+}
+@keyframes da-badge-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}

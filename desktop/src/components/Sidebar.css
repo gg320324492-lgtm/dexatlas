@@ -1,0 +1,110 @@
+.da-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 232px;
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--da-surface-veil);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid var(--da-border);
+  transition: width var(--da-transition-slow);
+}
+.da-sidebar--collapsed {
+  width: 64px;
+}
+
+.da-sidebar__header {
+  padding: var(--da-space-4);
+  border-bottom: 1px solid var(--da-border);
+}
+
+.da-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--da-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.da-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--da-space-3);
+  width: 100%;
+  padding: var(--da-space-2) var(--da-space-3);
+  border: none;
+  border-radius: var(--da-radius-md);
+  background: transparent;
+  color: var(--da-text-secondary);
+  font-size: var(--da-text-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--da-transition), color var(--da-transition);
+  text-align: left;
+}
+.da-sidebar__item:hover {
+  background: var(--da-neutral-soft);
+  color: var(--da-text);
+}
+.da-sidebar__item--active {
+  background: var(--da-gradient-primary);
+  color: var(--da-text-invert);
+  box-shadow: var(--da-shadow-1);
+}
+.da-sidebar__item:focus-visible {
+  outline: none;
+  box-shadow: var(--da-focus-ring);
+}
+
+.da-sidebar__icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.da-sidebar__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.da-sidebar__badge {
+  font-size: var(--da-text-xs);
+  background: var(--da-violet-soft);
+  color: var(--da-navy-700);
+  border-radius: var(--da-radius-full);
+  padding: 1px 8px;
+}
+.da-sidebar__item--active .da-sidebar__badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: var(--da-text-invert);
+}
+
+.da-sidebar__footer {
+  padding: var(--da-space-2);
+  border-top: 1px solid var(--da-border);
+  display: flex;
+  align-items: center;
+  gap: var(--da-space-2);
+}
+
+.da-sidebar__collapse {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--da-border);
+  border-radius: var(--da-radius-md);
+  background: var(--da-surface);
+  color: var(--da-text-muted);
+  cursor: pointer;
+  font-size: var(--da-text-lg);
+  line-height: 1;
+}
+.da-sidebar__collapse:hover {
+  color: var(--da-navy-600);
+  border-color: var(--da-navy-200);
+}

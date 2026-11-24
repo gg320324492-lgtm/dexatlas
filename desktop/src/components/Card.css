@@ -1,0 +1,68 @@
+/* 卡片：大圆角 + 一级阴影 + 暖白表面（token 唯一来源 tokens.css） */
+.da-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+.da-card--interactive {
+  cursor: pointer;
+  transition:
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.da-card--interactive:hover {
+  box-shadow: var(--shadow-2);
+  transform: translateY(-2px);
+  border-color: var(--color-lavender);
+}
+.da-card--interactive:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}
+
+/* 渐变描边：淡紫→淡橙（首屏/强调卡片） */
+.da-card--accent {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    var(--gradient-brand) border-box;
+}
+
+.da-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) 0;
+}
+.da-card__heading {
+  min-width: 0;
+}
+.da-card__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-navy-800);
+  line-height: 1.25;
+}
+.da-card__subtitle {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+.da-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+.da-card__body {
+  padding: var(--space-4) var(--space-5);
+}
+.da-card__footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}

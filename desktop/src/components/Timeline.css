@@ -1,0 +1,105 @@
+.da-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.da-timeline__item {
+  display: flex;
+  gap: var(--da-space-3);
+}
+
+.da-timeline__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.da-timeline__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--da-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  border: 2px solid var(--da-border-strong);
+  background: var(--da-surface);
+  color: var(--da-text-muted);
+  flex-shrink: 0;
+}
+
+.da-timeline__item--completed .da-timeline__dot {
+  background: var(--da-success);
+  border-color: var(--da-success);
+  color: #fff;
+}
+.da-timeline__item--running .da-timeline__dot {
+  background: var(--da-info-soft);
+  border-color: var(--da-info);
+  color: var(--da-info);
+  animation: da-timeline-pulse 1.4s ease-in-out infinite;
+}
+.da-timeline__item--failed .da-timeline__dot {
+  background: var(--da-danger);
+  border-color: var(--da-danger);
+  color: #fff;
+}
+.da-timeline__item--partial .da-timeline__dot {
+  background: var(--da-warning);
+  border-color: var(--da-warning);
+  color: #fff;
+}
+
+@keyframes da-timeline-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--da-info) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--da-info) 0%, transparent);
+  }
+}
+
+.da-timeline__line {
+  width: 2px;
+  flex: 1;
+  min-height: 24px;
+  background: var(--da-border);
+  margin: 4px 0;
+}
+.da-timeline__item--completed .da-timeline__line {
+  background: var(--da-success);
+}
+
+.da-timeline__content {
+  padding-bottom: var(--da-space-4);
+  min-width: 0;
+}
+.da-timeline__item:last-child .da-timeline__content {
+  padding-bottom: 0;
+}
+
+.da-timeline__title {
+  font-size: var(--da-text-md);
+  font-weight: 700;
+  color: var(--da-text);
+  line-height: 26px; /* 与点对齐 */
+}
+
+.da-timeline__meta {
+  font-size: var(--da-text-xs);
+  color: var(--da-text-muted);
+  margin-top: 2px;
+}
+
+.da-timeline__detail {
+  margin-top: var(--da-space-2);
+  font-size: var(--da-text-sm);
+  color: var(--da-text-secondary);
+  background: var(--da-surface-sunken);
+  border-radius: var(--da-radius-sm);
+  padding: var(--da-space-2) var(--da-space-3);
+}

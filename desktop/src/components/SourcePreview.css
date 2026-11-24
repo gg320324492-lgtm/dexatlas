@@ -1,0 +1,103 @@
+.da-srcpreview {
+  margin: 0;
+  border: 1px solid var(--da-border);
+  border-radius: var(--da-radius-md);
+  overflow: hidden;
+  background: var(--da-navy-900);
+}
+
+.da-srcpreview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--da-space-3);
+  padding: var(--da-space-2) var(--da-space-3);
+  background: var(--da-navy-800);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.da-srcpreview__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--da-space-2);
+  min-width: 0;
+}
+
+.da-srcpreview__lang {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--da-orange);
+  background: rgba(247, 197, 159, 0.12);
+  padding: 1px 8px;
+  border-radius: var(--da-radius-full);
+  flex-shrink: 0;
+}
+
+.da-srcpreview__path {
+  font-family: var(--da-font-mono);
+  font-size: var(--da-text-xs);
+  color: var(--da-navy-200);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.da-srcpreview__actions {
+  display: flex;
+  gap: var(--da-space-2);
+  flex-shrink: 0;
+}
+
+.da-srcpreview__code {
+  overflow: auto;
+  max-height: 420px;
+}
+
+.da-srcpreview__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.da-srcpreview__lineno {
+  width: 48px;
+  padding: 1px var(--da-space-2);
+  text-align: right;
+  font-family: var(--da-font-mono);
+  font-size: var(--da-text-xs);
+  color: var(--da-navy-300);
+  user-select: none;
+  vertical-align: top;
+}
+
+.da-srcpreview__line {
+  padding: 1px var(--da-space-3) 1px var(--da-space-2);
+  font-family: var(--da-font-mono);
+  font-size: var(--da-text-sm);
+  color: var(--da-navy-100);
+  white-space: pre-wrap;
+  word-break: break-all;
+  vertical-align: top;
+}
+
+.da-srcpreview__row--highlight .da-srcpreview__line,
+.da-srcpreview__row--highlight .da-srcpreview__lineno {
+  background: color-mix(in srgb, var(--da-orange) 22%, transparent);
+  color: #fff;
+}
+
+.da-srcpreview__more {
+  width: 100%;
+  background: var(--da-navy-800);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--da-navy-200);
+  padding: var(--da-space-2);
+  font-size: var(--da-text-sm);
+  cursor: pointer;
+}
+.da-srcpreview__more:hover {
+  color: #fff;
+  background: var(--da-navy-700);
+}

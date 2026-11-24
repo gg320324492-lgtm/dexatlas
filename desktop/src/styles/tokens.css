@@ -1,0 +1,74 @@
+/*
+ * DexAtlas Studio 设计 token —— 唯一的颜色/圆角/阴影/间距来源。
+ * 依据 docs/roadmap/phase4-q2-supplement.md 第 2.3 节：
+ * 深海军蓝 + 淡紫/橙渐变，大圆角，两级轻阴影，渐变仅用于首屏。
+ */
+:root {
+  /* ---- 品牌色 ---- */
+  --color-navy-900: #101b30; /* 最深背景（侧栏底部/标题） */
+  --color-navy-800: #16243d; /* 主品牌深海军蓝：侧栏、主按钮 */
+  --color-navy-700: #1f3252; /* 悬停态 */
+  --color-navy-600: #2c4370; /* 次级强调 */
+  --color-lavender: #b8a7f5; /* 淡紫：渐变端点 / 强调 */
+  --color-lavender-soft: #d8cefc; /* 淡紫浅调：标签、选中背景 */
+  --color-apricot: #f7c59f; /* 淡橙：渐变端点 / 警示强调 */
+  --color-apricot-soft: #fbe3cf; /* 淡橙浅调 */
+
+  /* ---- 中性色（暖白底） ---- */
+  --color-bg: #fbf7f2; /* 应用底色：暖白 */
+  --color-surface: #ffffff; /* 卡片表面 */
+  --color-surface-muted: #f4efe8; /* 次级表面：日志区、表格头 */
+  --color-border: #e8e0d5; /* 描边 */
+  --color-border-strong: #d8cdbd; /* 强调描边 */
+
+  /* ---- 文本 ---- */
+  --color-text: #24303f; /* 正文 */
+  --color-text-secondary: #5d6b7a; /* 次要文本 */
+  --color-text-muted: #8a95a1; /* 弱化文本 */
+  --color-text-invert: #f6f9ff; /* 深底上的文本 */
+
+  /* ---- 语义色 ---- */
+  --color-success: #2e9e6b;
+  --color-warning: #d98a2b;
+  --color-danger: #d64550;
+  --color-info: #4a7fd6;
+
+  /* ---- 渐变（仅首屏与品牌强调使用） ---- */
+  --gradient-brand: linear-gradient(135deg, var(--color-lavender) 0%, var(--color-apricot) 100%);
+  --gradient-hero: linear-gradient(135deg, #e9e2fb 0%, #fdeeda 100%);
+
+  /* ---- 圆角：两级 ---- */
+  --radius-lg: 16px; /* 卡片、面板 */
+  --radius-md: 12px; /* 输入框、按钮 */
+  --radius-sm: 8px; /* 徽章、小元素 */
+  --radius-pill: 999px; /* 胶囊形 */
+
+  /* ---- 阴影：两级 ---- */
+  --shadow-1: 0 1px 3px rgba(22, 36, 61, 0.06), 0 1px 2px rgba(22, 36, 61, 0.04);
+  --shadow-2: 0 8px 24px rgba(22, 36, 61, 0.1), 0 2px 6px rgba(22, 36, 61, 0.05);
+
+  /* ---- 间距 ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ---- 字体 ---- */
+  --font-sans: "Inter", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+
+  /* ---- 布局 ---- */
+  --sidebar-width: 232px;
+  --transition-fast: 140ms ease;
+}

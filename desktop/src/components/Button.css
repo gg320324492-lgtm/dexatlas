@@ -1,0 +1,108 @@
+/* 按钮：primary 实心海军蓝 / secondary 描边 / danger 红 / ghost 无底（补充单 3-4） */
+.da-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+  white-space: nowrap;
+}
+.da-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.da-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.da-btn:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}
+
+.da-btn--md {
+  height: 38px;
+  padding: 0 var(--space-4);
+  font-size: var(--text-md);
+}
+.da-btn--sm {
+  height: 30px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+.da-btn--lg {
+  height: 46px;
+  padding: 0 var(--space-5);
+  font-size: var(--text-lg);
+  border-radius: var(--radius-lg);
+}
+
+/* primary：实心海军蓝 */
+.da-btn--primary {
+  background: var(--color-navy-800);
+  color: var(--color-text-invert);
+  box-shadow: var(--shadow-1);
+}
+.da-btn--primary:hover:not(:disabled) {
+  background: var(--color-navy-700);
+  box-shadow: var(--shadow-2);
+}
+
+/* secondary：描边 */
+.da-btn--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-navy-800);
+}
+.da-btn--secondary:hover:not(:disabled) {
+  border-color: var(--color-navy-800);
+  background: rgba(184, 167, 245, 0.12);
+}
+
+/* danger：红 */
+.da-btn--danger {
+  background: var(--color-danger);
+  color: var(--color-text-invert);
+}
+.da-btn--danger:hover:not(:disabled) {
+  background: #b93843;
+}
+
+/* ghost：无底，弱操作 */
+.da-btn--ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+.da-btn--ghost:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+/* 加载 spinner */
+.da-btn__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: da-btn-spin 700ms linear infinite;
+}
+@keyframes da-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.da-btn__label {
+  display: inline-flex;
+  align-items: center;
+}

@@ -1,0 +1,73 @@
+/* 面板：带标题与折叠能力的区块容器 */
+.da-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.da-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+}
+.da-panel--collapsed .da-panel__header {
+  border-bottom: none;
+}
+
+.da-panel__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 0;
+  text-align: left;
+}
+.da-panel__toggle:hover {
+  background: rgba(184, 167, 245, 0.15);
+}
+
+.da-panel__chevron {
+  color: var(--color-navy-600);
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+.da-panel__chevron--closed {
+  transform: rotate(-90deg);
+}
+
+.da-panel__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-navy-800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.da-panel__subtitle {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.da-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.da-panel__body {
+  padding: var(--space-4);
+}
