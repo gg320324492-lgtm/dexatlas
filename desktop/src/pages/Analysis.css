@@ -144,7 +144,8 @@
   display: flex;
   gap: var(--space-2);
   white-space: pre-wrap;
-  word-break: break-all;
+  /* X2-P5：长 token（URL/项目 id）仅在放不下时整行换行，不再把每行都 break-all 成碎行 */
+  overflow-wrap: anywhere;
 }
 .da-log__time {
   color: #6b7c99;

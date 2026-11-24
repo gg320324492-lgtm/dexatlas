@@ -81,6 +81,13 @@ select {
   min-width: 0;
   overflow-y: auto;
   padding: var(--space-6) var(--space-7);
+  /* X2-P6：超宽屏（≥1440px）内容居中限宽；1440 以下行为不变。
+     页面内部的 grid（如详情页三栏、分析页三区）有自己的列宽与断点，
+     不受此容器限宽影响。 */
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .page-header {
