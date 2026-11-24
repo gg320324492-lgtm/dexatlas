@@ -71,6 +71,18 @@ function resolveFetch(): Promise<typeof fetch> {
   return Promise.resolve(fetch.bind(globalThis));
 }
 
+/**
+ * 发布/浏览器形态下前端与后端不同源（vite dev 端口、tauri://localhost），
+ * 相对路径 "/api" 无法指向 8618；dev 模式由 vite 代理处理，这里只补
+ * 非 dev 场景的绝对地址。Tauri 内不用拼：plugin-http 直接吃完整 URL。
+ */
+function defaultBaseUrl(): string {
+  if (import.meta.env.DEV) {
+    return "/api";
+  }
+  return "http://127.0.0.1:8618/api";
+}
+
 /** 客户端可调的统一错误。status 为 undefined 表示请求根本没到服务器。 */
 export class ApiError extends Error {
   readonly status?: number;
@@ -146,7 +158,7 @@ export class DexAtlasClient {
   private readonly fetchImpl: Promise<typeof fetch>;
 
   constructor(options: DexAtlasClientOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? "/api").replace(/\/+$/, "");
+    this.baseUrl = (options.baseUrl ?? defaultBaseUrl()).replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl
       ? Promise.resolve(options.fetchImpl)
       : resolveFetch();
