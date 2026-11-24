@@ -1,61 +1,150 @@
-import { useCallback, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { StatusBadge, type StatusKind } from "../components/StatusBadge";
+import { EmptyState } from "../components/states/EmptyState";
+import { ErrorState } from "../components/states/ErrorState";
 import "./HomePage.css";
 
-interface RecentProject {
+/** 工作台项目摘要（GET /api/projects 的条目）。 */
+interface WorkbenchProject {
   id: string;
-  name: string;
-  package: string;
-  status: "done" | "running" | "failed" | "partial";
-  findings: number;
-  time: string;
+  apk_name: string;
+  apk_sha256: string;
+  status: "pending" | "running" | "completed" | "failed" | string;
+  created_at: string;
+  class_count: number;
+  method_count: number;
+  call_site_count: number;
+  call_edge_count: number;
+  evidence_count: number;
+  missing_backends: string[];
+  truncated: boolean;
 }
 
-// 占位数据：真实数据接入由后续窗口完成。
-const RECENT_PROJECTS: RecentProject[] = [
-  {
-    id: "demo-weather",
-    name: "com.example.weather",
-    package: "3 个后端 · 42 个类",
-    status: "done",
-    findings: 7,
-    time: "2 小时前",
-  },
-  {
-    id: "demo-payment",
-    name: "com.acme.payment",
-    package: "3 个后端 · 128 个类",
-    status: "partial",
-    findings: 15,
-    time: "昨天",
-  },
-];
+/** POST /api/analyze 的 202 应答（同 hash 已存在时返回已有项目）。 */
+interface AnalyzeAccepted {
+  project_id: string;
+  status: string;
+  apk_sha256: string;
+  already_analysed: boolean;
+}
 
-const STATUS_LABEL: Record<RecentProject["status"], { label: string; cls: string }> = {
-  done: { label: "已完成", cls: "badge-success" },
-  running: { label: "分析中", cls: "badge-info" },
-  failed: { label: "失败", cls: "badge-danger" },
-  partial: { label: "部分完成", cls: "badge-warning" },
-};
+/** 后端状态 → 徽章语义（与 components/StatusBadge 的五态对齐）。 */
+function statusToKind(status: WorkbenchProject["status"]): StatusKind {
+  switch (status) {
+    case "completed":
+      return "completed";
+    case "running":
+      return "running";
+    case "failed":
+      return "failed";
+    default:
+      return "pending";
+  }
+}
 
-/** 首页：拖拽上传 + 最近项目（补充单 2-1）。 */
+/** 证据/发现数：仅完成或部分完成时展示数字。 */
+function hasFindings(p: WorkbenchProject): boolean {
+  return p.status === "completed" || p.status === "failed";
+}
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  const diffMs = Date.now() - date.getTime();
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} 天前`;
+  return date.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// 最小 fetch 封装（M2-A 的 api client 合并前先在此落地；合并后统一切换 import）。
+// 浏览器 dev 下 /api 由 vite proxy 转发到 8618（见 vite.config.ts），Tauri 内
+// 同源相对路径即可；因此统一用相对路径，不写死后端地址。
+// ---------------------------------------------------------------------------
+
+async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, init);
+  if (!response.ok) {
+    let detail = `HTTP ${response.status}`;
+    try {
+      const body = (await response.json()) as { detail?: unknown; message?: string };
+      if (typeof body.detail === "string") detail = body.detail;
+      else if (typeof body.message === "string") detail = body.message;
+    } catch {
+      // 非 JSON 错误体：保留状态码信息
+    }
+    throw new Error(`请求失败（${detail}）`);
+  }
+  return (await response.json()) as T;
+}
+
+function listProjects(): Promise<{ projects: WorkbenchProject[]; total: number }> {
+  return apiJson("/api/projects?limit=50");
+}
+
+function uploadApk(file: File): Promise<AnalyzeAccepted> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return apiJson("/api/analyze", { method: "POST", body: form });
+}
+
+/** 首页：拖拽上传 + 最近项目（补充单 2-1；Q2-M2-B 接入真实工作台 API）。 */
 export default function HomePage() {
+  const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [projects, setProjects] = useState<WorkbenchProject[] | null>(null);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const dragDepth = useRef(0);
 
-  const acceptFile = useCallback((file: File | undefined | null) => {
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".apk")) {
-      setFileName(null);
-      setError("仅支持 .apk 文件");
-      return;
+  const loadProjects = useCallback(async () => {
+    setProjectsError(null);
+    try {
+      const data = await listProjects();
+      setProjects(data.projects);
+    } catch (err) {
+      setProjects(null);
+      setProjectsError(err instanceof Error ? err.message : String(err));
     }
-    setError(null);
-    setFileName(file.name);
-    // TODO(Q2-M2): 调用 Tauri 后端启动分析任务。
   }, []);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects, reloadTick]);
+
+  const acceptFile = useCallback(
+    (file: File | undefined | null) => {
+      if (!file || uploading) return;
+      if (!file.name.toLowerCase().endsWith(".apk")) {
+        setFileName(null);
+        setError("仅支持 .apk 文件");
+        return;
+      }
+      setError(null);
+      setFileName(file.name);
+      setUploading(true);
+      uploadApk(file)
+        .then((accepted) => {
+          // 同 hash 已存在时后端也返回已有项目，同样跳转。
+          void navigate(`/analysis/${accepted.project_id}`);
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : String(err));
+          setFileName(null);
+        })
+        .finally(() => setUploading(false));
+    },
+    [navigate, uploading],
+  );
 
   return (
     <div className="page home-page">
@@ -89,28 +178,23 @@ export default function HomePage() {
           <div className="dropzone-art-ring" />
           <div className="dropzone-art-core">⇪</div>
         </div>
-        {fileName ? (
+        {uploading ? (
           <>
             <strong className="dropzone-file">{fileName}</strong>
-            <span className="page-subtitle">文件已选择，点击「开始分析」进入分析页。</span>
-            <div className="dropzone-actions">
-              <Link className="btn btn-primary" to="/analysis">
-                开始分析
-              </Link>
-              <button className="btn btn-secondary" onClick={() => setFileName(null)}>
-                重新选择
-              </button>
-            </div>
+            <span className="page-subtitle" role="status">
+              正在上传并启动分析…
+            </span>
           </>
         ) : (
           <>
             <strong>拖拽 APK 到此处</strong>
             <span className="page-subtitle">或</span>
-            <label className="btn btn-primary dropzone-browse">
+            <label className={`btn btn-primary dropzone-browse${uploading ? " is-busy" : ""}`}>
               浏览文件
               <input
                 type="file"
                 accept=".apk"
+                disabled={uploading}
                 onChange={(e) => acceptFile(e.target.files?.[0])}
               />
             </label>
@@ -130,45 +214,61 @@ export default function HomePage() {
             查看全部 →
           </Link>
         </div>
-        <div className="card project-list-card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>项目</th>
-                <th>规模</th>
-                <th>状态</th>
-                <th>发现</th>
-                <th>时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {RECENT_PROJECTS.map((p) => {
-                const st = STATUS_LABEL[p.status];
-                return (
+        {projectsError ? (
+          <div className="card project-list-card">
+            <ErrorState
+              title="项目列表加载失败"
+              description={projectsError}
+              onRetry={() => setReloadTick((t) => t + 1)}
+            />
+          </div>
+        ) : projects !== null && projects.length === 0 ? (
+          <div className="card project-list-card">
+            <EmptyState
+              title="还没有分析过的项目"
+              description="拖入一个 APK 文件，开始第一次分析。"
+            />
+          </div>
+        ) : (
+          <div className="card project-list-card">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>规模</th>
+                  <th>状态</th>
+                  <th>证据</th>
+                  <th>时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(projects ?? []).map((p) => (
                   <tr key={p.id}>
                     <td>
-                      <Link to={`/analysis/${p.id}`} className="project-link">
-                        {p.name}
+                      <Link to={`/projects/${p.id}`} className="project-link">
+                        {p.apk_name}
                       </Link>
                     </td>
-                    <td className="text-secondary">{p.package}</td>
-                    <td>
-                      <span className={`badge ${st.cls}`}>{st.label}</span>
+                    <td className="text-secondary">
+                      {p.class_count} 类 · {p.method_count} 方法
                     </td>
                     <td>
-                      {p.findings > 0 ? (
-                        <span className="badge badge-warning">{p.findings} 项</span>
+                      <StatusBadge kind={statusToKind(p.status)} pulse={p.status === "running"} />
+                    </td>
+                    <td>
+                      {hasFindings(p) && p.evidence_count > 0 ? (
+                        <span className="badge badge-warning">{p.evidence_count} 条</span>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="text-muted">{p.time}</td>
+                    <td className="text-muted">{formatTime(p.created_at)}</td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
     </div>
   );

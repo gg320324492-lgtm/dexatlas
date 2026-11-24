@@ -1,4 +1,8 @@
 /**
+ * @deprecated 已废弃：App.tsx 的路由实际使用 `./pages/HomePage`（Q2-M1 起为路由首页）。
+ * 本文件是 Q2-M1 早期组件稿，未被任何路由引用；保留仅为参考，请勿新增依赖。
+ * Q2-M2-B 已在 HomePage 接入真实后端（POST /api/analyze、GET /api/projects）。
+ *
  * 首页 — 拖拽上传 + 最近项目（§2-1 首屏）。
  * 上传区支持点击选择与 drag&drop，做 APK 类型校验与错误反馈；
  * 最近项目列表带状态徽章与进入详情入口。
