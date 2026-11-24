@@ -1,0 +1,7 @@
+# 前端构建产物与依赖
+node_modules/
+dist/
+
+# Tauri 构建产物与生成代码
+src-tauri/target/
+src-tauri/gen/

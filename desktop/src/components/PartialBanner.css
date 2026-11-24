@@ -1,0 +1,82 @@
+/* 部分结果横幅：warning/info/danger 三档 */
+.da-partial {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: var(--text-md);
+}
+
+.da-partial--warning {
+  background: var(--color-apricot-soft);
+  border-color: rgba(217, 138, 43, 0.35);
+  color: #7c4d10;
+}
+.da-partial--info {
+  background: rgba(74, 127, 214, 0.1);
+  border-color: rgba(74, 127, 214, 0.3);
+  color: #2c5aa0;
+}
+.da-partial--danger {
+  background: rgba(214, 69, 80, 0.1);
+  border-color: rgba(214, 69, 80, 0.3);
+  color: #a02c38;
+}
+
+.da-partial__icon {
+  flex-shrink: 0;
+  font-size: var(--text-lg);
+  line-height: 1.4;
+}
+
+.da-partial__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.da-partial__message {
+  font-weight: 700;
+}
+
+.da-partial__details {
+  margin: var(--space-1) 0 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.da-partial__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.da-partial__retry {
+  background: none;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  padding: 3px 12px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+.da-partial__retry:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.da-partial__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+.da-partial__dismiss:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.5);
+}

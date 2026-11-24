@@ -1,0 +1,248 @@
+/* 分析进行中页：三区布局（阶段进度 / 实时日志 / 后端状态） */
+
+.analysis__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.analysis__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.analysis__grid {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .analysis__grid {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+  .analysis__backends {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- 左：阶段进度 ---- */
+.da-stage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.da-stage {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+.da-stage:last-child {
+  border-bottom: none;
+}
+.da-stage--running {
+  background: var(--color-lavender-soft);
+  border-radius: var(--radius-sm);
+  margin: 0 calc(var(--space-1) * -1);
+  padding-left: var(--space-2);
+}
+
+.da-stage__dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  flex-shrink: 0;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+.da-stage--done .da-stage__dot {
+  background: rgba(46, 158, 107, 0.14);
+  color: var(--color-success);
+  border-color: transparent;
+}
+.da-stage--running .da-stage__dot {
+  background: var(--color-lavender);
+  color: var(--color-navy-900);
+  border-color: transparent;
+}
+.da-stage--error .da-stage__dot {
+  background: rgba(214, 69, 80, 0.12);
+  color: var(--color-danger);
+  border-color: transparent;
+}
+
+.da-stage__text {
+  flex: 1;
+  min-width: 0;
+}
+.da-stage__label {
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+.da-stage__desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* ---- 中：实时日志 ---- */
+.da-log {
+  height: 480px;
+  overflow-y: auto;
+  background: #141c2c;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: #c8d4e8;
+}
+.da-log:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}
+
+.da-log__line {
+  display: flex;
+  gap: var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.da-log__time {
+  color: #6b7c99;
+  flex-shrink: 0;
+}
+.da-log__source {
+  color: #9aa9c7;
+  flex-shrink: 0;
+}
+.da-log__line--debug .da-log__msg {
+  color: #7f92b5;
+}
+.da-log__line--success .da-log__msg {
+  color: #7fd8a8;
+}
+.da-log__line--warn .da-log__msg {
+  color: #f2c98a;
+}
+.da-log__line--error .da-log__msg {
+  color: #f29a9a;
+}
+
+.da-log__cursor {
+  color: var(--color-lavender);
+  animation: da-log-blink 1s steps(1) infinite;
+}
+@keyframes da-log-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .da-log__cursor {
+    animation: none;
+  }
+}
+
+/* ---- 右：后端状态 ---- */
+.da-backend-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.da-backend {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--color-surface);
+}
+
+.da-backend__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-1);
+}
+.da-backend__name {
+  font-weight: 600;
+  font-size: var(--text-md);
+}
+.da-backend__detail {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.da-backend__bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+.da-backend__bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-brand);
+  transition: width var(--transition-fast);
+}
+
+/* 复用 PartialBanner 时给操作留位 */
+.da-partial .btn {
+  margin-left: var(--space-2);
+}
+
+/* ---- 模拟标注角标：如实标注非真实数据（阶段推进/轮询记录） ---- */
+.da-mock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-border);
+  white-space: nowrap;
+}
+
+/* 顶部分组内的横幅纵向排列 */
+.analysis__banners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* 后端状态卡：推断来源说明 */
+.da-backend__note {
+  margin: var(--space-4) 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* Link 渲染为按钮时继承按钮样式（无下划线、文字色继承） */
+a.da-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+

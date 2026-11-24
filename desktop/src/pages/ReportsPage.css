@@ -1,0 +1,48 @@
+.reports-card {
+  padding: var(--space-2) var(--space-4);
+}
+
+.report-id {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.report-project {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.report-time {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.report-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+}
+
+.reports-row-error {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger, #c0392b);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--color-danger, #c0392b);
+  font-size: var(--text-sm);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

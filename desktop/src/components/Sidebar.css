@@ -1,0 +1,110 @@
+/* 侧栏：品牌区 + 导航列表 + 折叠按钮，支持受控折叠 */
+.da-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  height: 100%;
+  background: var(--color-navy-800);
+  color: var(--color-text-invert);
+  transition: width var(--transition-fast);
+}
+.da-sidebar--collapsed {
+  width: 64px;
+}
+
+.da-sidebar__header {
+  padding: var(--space-4);
+  border-bottom: 1px solid rgba(246, 249, 255, 0.08);
+}
+
+.da-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.da-sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(246, 249, 255, 0.72);
+  font-size: var(--text-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  text-align: left;
+}
+.da-sidebar__item:hover {
+  background: rgba(246, 249, 255, 0.08);
+  color: var(--color-text-invert);
+}
+.da-sidebar__item--active {
+  background: var(--color-navy-600);
+  color: var(--color-text-invert);
+  box-shadow: inset 3px 0 0 var(--color-lavender);
+}
+.da-sidebar__item:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}
+
+.da-sidebar__icon {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.da-sidebar__label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.da-sidebar__badge {
+  font-size: var(--text-xs);
+  background: var(--color-lavender-soft);
+  color: var(--color-navy-800);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.da-sidebar__footer {
+  padding: var(--space-2);
+  border-top: 1px solid rgba(246, 249, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.da-sidebar__collapse {
+  width: 100%;
+  height: 32px;
+  border: 1px solid rgba(246, 249, 255, 0.15);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(246, 249, 255, 0.6);
+  cursor: pointer;
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+.da-sidebar__collapse:hover {
+  color: var(--color-text-invert);
+  border-color: var(--color-lavender);
+}
+.da-sidebar__collapse:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}

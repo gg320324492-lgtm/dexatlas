@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "DexAtlas Studio 默认窗口能力：允许访问本地 FastAPI 后端（8618）的 HTTP 接口。",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://localhost:8618" },
+        { "url": "http://127.0.0.1:8618" }
+      ]
+    }
+  ]
+}

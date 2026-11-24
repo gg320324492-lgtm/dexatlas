@@ -1,0 +1,73 @@
+/* 文本输入框：label/hint/error 关联完整，focus-within 焦点环 */
+.da-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.da-field__label {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-navy-800);
+}
+.da-field__required {
+  color: var(--color-danger);
+}
+
+.da-field__control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.da-field__control:focus-within {
+  border-color: var(--color-lavender);
+  box-shadow: 0 0 0 3px rgba(184, 167, 245, 0.35);
+}
+.da-field--error .da-field__control {
+  border-color: var(--color-danger);
+}
+.da-field--error .da-field__control:focus-within {
+  box-shadow: 0 0 0 3px rgba(214, 69, 80, 0.2);
+}
+
+.da-field__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: var(--space-2) 0;
+  font-size: var(--text-md);
+  color: var(--color-text);
+}
+.da-field__input::placeholder {
+  color: var(--color-text-muted);
+}
+.da-field__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.da-field__prefix,
+.da-field__suffix {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+
+.da-field__hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.da-field__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-danger);
+  font-weight: 600;
+}

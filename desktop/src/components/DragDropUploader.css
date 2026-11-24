@@ -1,0 +1,76 @@
+/* 拖拽上传器：虚线框 + 拖入高亮 + 键盘可达 */
+.da-uploader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-6);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+.da-uploader:hover:not(.da-uploader--disabled) {
+  border-color: var(--color-lavender);
+  background: rgba(184, 167, 245, 0.08);
+}
+.da-uploader:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+}
+.da-uploader--over {
+  border-color: var(--color-lavender);
+  background: rgba(184, 167, 245, 0.12);
+  transform: scale(1.01);
+  box-shadow: var(--shadow-1);
+}
+.da-uploader--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.da-uploader__input {
+  display: none;
+}
+
+.da-uploader__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #fff;
+  margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-1);
+}
+
+.da-uploader__title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-navy-800);
+}
+
+.da-uploader__desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.da-uploader__file {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-navy-800);
+  background: var(--color-lavender-soft);
+  border-radius: var(--radius-pill);
+  padding: 4px 14px;
+  max-width: 80%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

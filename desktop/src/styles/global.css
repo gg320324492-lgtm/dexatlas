@@ -1,0 +1,251 @@
+/* 全局基础样式：只做重置与通用工具类，页面样式各自内聚。 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  color: var(--color-text);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 键盘可达：统一可见焦点（补充单 4-4）。 */
+:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* 动效尊重系统偏好：关闭非必要动画与过渡（补充单 §3.4）。
+   保留透明度过渡（不引起位移），禁用 shimmer/旋转/脉冲/滑入/缩放。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .da-skeleton-line,
+  .da-btn__spinner,
+  .da-badge--pulse .da-badge__dot,
+  .da-timeline__dot,
+  .da-log__cursor {
+    animation: none !important;
+  }
+
+  .da-drawer,
+  .da-drawer__backdrop,
+  .da-dialog,
+  .da-uploader--over,
+  .dropzone.is-dragging {
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+input,
+textarea,
+select {
+  font-family: inherit;
+}
+
+/* ---- 通用工具类 ---- */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.page {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-7);
+}
+
+.page-header {
+  margin-bottom: var(--space-5);
+}
+
+.page-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.page-subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-md);
+}
+
+/* 卡片：大圆角 + 一级阴影 */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5);
+}
+
+.card + .card {
+  margin-top: var(--space-4);
+}
+
+.card-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+/* 主按钮：实心海军蓝 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  padding: 10px 18px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--color-navy-800);
+  color: var(--color-text-invert);
+}
+
+.btn-primary:hover {
+  background: var(--color-navy-700);
+}
+
+/* 次按钮：描边 */
+.btn-secondary {
+  background: transparent;
+  color: var(--color-navy-800);
+  border-color: var(--color-border-strong);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-navy-800);
+  background: rgba(184, 167, 245, 0.12);
+}
+
+/* 危险按钮：红 */
+.btn-danger {
+  background: transparent;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.btn-danger:hover {
+  background: rgba(214, 69, 80, 0.08);
+}
+
+/* 状态徽章 */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.badge-success {
+  background: rgba(46, 158, 107, 0.12);
+  color: var(--color-success);
+}
+
+.badge-warning {
+  background: var(--color-apricot-soft);
+  color: #a4651a;
+}
+
+.badge-danger {
+  background: rgba(214, 69, 80, 0.1);
+  color: var(--color-danger);
+}
+
+.badge-info {
+  background: var(--color-lavender-soft);
+  color: #5f4bc4;
+}
+
+.badge-muted {
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+}
+
+/* 表格基础 */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table th:first-child {
+  border-radius: var(--radius-sm) 0 0 0;
+}
+
+.table th:last-child {
+  border-radius: 0 var(--radius-sm) 0 0;
+}
+
+.table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-5);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.empty-state strong {
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+}
