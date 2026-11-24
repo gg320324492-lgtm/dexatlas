@@ -87,7 +87,7 @@
 | 编号 | 严重度 | 位置 | 摘要 | 本次评审处理 |
 |---|---|---|---|---|
 | F1 | 信息 | 分支状态 | `main`@`22c0621` 未含工作分支 M14 两修复（TaskStore 加固、a11y 补齐） | 已确认：本评审基线 `e5cb165` 已包含 `6dbc9a3`、`acb9f0b`；发布前随分支合入即消除，不阻断 |
-| F2 | 低（文档可用性） | `scripts/install-backends.sh` ↔ `docs/install.md` | install.md 称脚本「prints the two lines」，脚本实际不打印 export 两行 | 评审期内发现他窗已将 install.md 表述改为如实描述「脚本只打印版本行、不打印 export」，文档侧矛盾已消除（脚本侧打印 export 仍可作为后续改进）；不阻断发布 |
+| F2 | 低（文档可用性） | `scripts/install-backends.sh` ↔ `docs/install.md` | install.md 称脚本「prints the two lines」，脚本实际不打印 export 两行 | 归因核实：install.md 的如实表述「脚本只打印版本行、不打印 export」并非评审期内新改，而是由提交 `9ab7b43`（2026-11-18）早已落地（早于 walkthrough 的 2026-11-23）；walkthrough §1.4 记录的「prints the two lines」是当时所见的旧状态。结论方向不变：文档侧矛盾已消除（脚本侧打印 export 仍可作为后续改进）；不阻断发布 |
 | F3 | 低（文档口径） | `docs/install.md` API 表 | 表列 REST API 路径，Workbench 实为另一套 `/api/` 子集；README 未做相同承诺，不构成冲突 | 评审期内发现他窗已在 API 表前加注「REST API 契约 / Workbench 另有 `/api/...` 子集并指路 workbench.md」；不阻断发布 |
 | F4 | 低（Windows 首启体验） | Workbench 端口 8618 | 端口被占时报错清晰并提示 `--port`，README 未写换端口 | 环境体验点，报错已可自救；不修，不阻断 |
 

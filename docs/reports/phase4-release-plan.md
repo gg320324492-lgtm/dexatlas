@@ -1,5 +1,7 @@
 # Phase 4 M15 — 发布冻结与作品集封装规划
 
+> **2026-11-24 状态追记（不改动下文原规划）：** 本文写作时（2026-11-23，`337e7d5`）素材、走查、README 入口尚未落盘，各步骤的「当前是否已具备」自评是当时如实的判断，现已过时。截至 2026-11-24（基线 `e30307e`）：步骤 1（独立 walkthrough）已完成，见 [phase4-walkthrough.md](phase4-walkthrough.md)；步骤 2（演示与讲解录制）已完成，见 [phase4-demo-shots.md](phase4-demo-shots.md) 与 `docs/assets/phase4-demo-80s.mp4`、`docs/assets/phase4-tech-talk-4min.mp4`；步骤 3（README 展示区）与步骤 4（案例页）已完成，见 [case-page.md](../portfolio/case-page.md)；步骤 7（作品集冻结）已完成，见 [portfolio.md](../portfolio/portfolio.md)。步骤 5（发布前门禁）已本地执行，见 [phase4-release-review.md](phase4-release-review.md)；步骤 6（GitHub 侧发布）评审已出、待收口。下文原规划正文保留不改写，读者请以本追记与所引落盘文档为准。
+
 **日期：** 2026-11-23 · **阶段：** Phase 4（[执行单](../roadmap/phase4-plan.md)，最终决策 A + D + G）· **里程碑：** M15 — 发布冻结和作品集封装
 **性质：** 规划文档。七步中的执行、录制、门禁和发布动作尚未在本轮完成；本文只写清交付物、前置、现状、缺口与建议执行方式，不宣称任何未执行步骤已经通过。
 **范围约束：** 通用开源项目。不点名任何外部平台或发布渠道；作者自行选择渠道，渠道页复用同一套演示、截图和案例材料。本轮不改产品代码，不主动触发 CI。
