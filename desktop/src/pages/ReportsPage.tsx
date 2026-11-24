@@ -132,7 +132,7 @@ export default function ReportsPage() {
                         disabled={exporting !== null}
                         onClick={() => void doExport(p, "markdown")}
                       >
-                        {exporting?.id === p.id && exporting.format === "markdown" ? "导出中…" : "导出 MD"}
+                        {exporting?.id === p.id && exporting.format === "markdown" ? "导出中…" : "导出 Markdown"}
                       </Button>
                       <Button
                         variant="primary"
