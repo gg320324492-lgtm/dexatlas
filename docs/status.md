@@ -13,6 +13,7 @@
 - [Phase 3 计划](roadmap/phase3-plan.md)的实施进度与证据见 §4.0，M10 独立验收已通过（2026-11-20，重评 97.5% / 96.3%）
 - [Phase 4 执行单](roadmap/phase4-plan.md)（最终决策 A + D + G）定义作品集收尾、软件设计与 Workbench UI 的范围；完成后默认进入 Portfolio Freeze
 - [Phase 4 Q2 补充单](roadmap/phase4-q2-supplement.md)（2026-11-24 批准）**解除桌面应用范围的冻结**：在同一仓库立项原创桌面应用（Tauri + React），按四步 UI 方法设计与迭代；收尾条件见 [Q2 收尾单](roadmap/phase4-q2-closure.md)。设计规范（信息架构、视觉 token、组件清单、状态矩阵、接线边界）见[桌面应用设计规范](architecture/desktop-app.md)。其余 Freeze 规则继续生效
+- **Q2 已完成（2026-11-24）：** 桌面应用 DexAtlas Studio 交付——组件库 + 画廊（Q2-M1）、核心工作流接入真实数据（Q2-M2：首页拖拽上传 → 分析三区 → 详情三栏与证据抽屉 → 报告导出）、四态与可访问性打磨（Q2-M3-T2）、Windows Tauri 真窗口原型与四步标准截图（Q2-M3-T1/T3）。验收按补充单 §6 八维度逐项通过（含如实记录的已知限制：后端无 `/api/backends`、`/runs`、`/cancel` 端点；分析页阶段推进为前端模拟；未做安装包分发），结论与证据见[Q2 验收报告](reports/phase4-q2-acceptance.md)；收尾单交付物与退出条件已逐项回填。**Q2 之后定界：部分解冻（B）**——仅允许修桌面应用的缺陷、性能与可用性问题，新功能重新评审；其余 Freeze 规则继续生效。
 - M15 作品集材料在 [portfolio/](portfolio/)：[通用外部渠道案例页](portfolio/case-page.md)（不点名平台、不虚构联系方式）与 [Portfolio Freeze 声明](portfolio/freeze.md)（四类解冻信号与冻结期四类维护，与执行单 §8 一致）
 - 每次发布的具体内容在 [releases/](releases/) 里
 

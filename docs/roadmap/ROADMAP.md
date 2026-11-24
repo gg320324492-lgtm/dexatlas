@@ -26,6 +26,15 @@ what comes next.
   desktop-app front; the rest of the Portfolio Freeze rules still apply. The
   desktop-app design specification lives at
   [docs/architecture/desktop-app.md](../architecture/desktop-app.md).
+  **Q2 delivered (2026-11-24):** M1 design spec + component library +
+  gallery, M2 real-data core workflow (home upload → analysis → evidence
+  drawer → report export), M3 polish + Windows Tauri prototype + four-step
+  screenshots. Acceptance per the supplement's §6 matrix: all eight dimensions
+  passed — see the [Q2 acceptance
+  report](../reports/phase4-q2-acceptance.md); the closure checklist is
+  back-filled in [phase4-q2-closure.md](phase4-q2-closure.md). Post-Q2 boundary:
+  **partial unfreeze** (defect/performance/usability fixes only; new features
+  re-review) — recorded in [status.md](../status.md).
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
