@@ -1,10 +1,11 @@
 /**
  * 项目详情页 — 三栏布局：左列证据列表 / 中间源码或调用图主体 / 右侧证据抽屉（§2-4）。
- * 证据抽屉内提供 locator 与 resolve 动作位（跳回来源）。
- * 当前为受控 mock；真实数据接入由后续窗口完成。
+ * Q2-M2-D：数据来自真实后端 GET /api/projects/{id} 与 /evidence；
+ * 证据抽屉展示后端真实 locator（provenance 串），"打开来源"/"resolve" 调
+ * /locators/resolve 显示真实机器路径。partial 横幅由项目 errors 真实生成。
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Button } from "../components/Button";
 import { Card, CardBody, CardHeader } from "../components/Card";
@@ -12,9 +13,20 @@ import { SearchInput } from "../components/SearchInput";
 import { Drawer } from "../components/Drawer";
 import { PartialBanner } from "../components/PartialBanner";
 import { EmptyState } from "../components/states/EmptyState";
-import { EVIDENCE_DETAILS, EVIDENCE_ITEMS, SOURCE_LINES } from "../mockData";
-import type { DetailViewMode, EvidenceDetail, EvidenceKind } from "../types";
-import "./ProjectDetail.css";
+import { ErrorState } from "../components/states/ErrorState";
+import { LoadingState } from "../components/states/LoadingState";
+import {
+  ApiError,
+  client,
+  downloadText,
+  type BackendError,
+  type EvidenceRecord,
+  type LocatorResolution,
+  type ProjectDetailResponse,
+} from "../client";
+
+/** 证据列表的展示分类：由后端 kind + summary 归纳，标签与 M1 原型一致。 */
+type EvidenceKind = "symbol" | "string" | "permission" | "component" | "sink";
 
 const KIND_LABEL: Record<EvidenceKind, string> = {
   symbol: "符号",
@@ -32,75 +44,265 @@ const KIND_CLASS: Record<EvidenceKind, string> = {
   sink: "da-ev-tag--sink",
 };
 
-const ORIGIN_LABEL = { jadx: "JADX", apktool: "Apktool", androguard: "Androguard" } as const;
+const KIND_ORDER: EvidenceKind[] = ["permission", "component", "symbol", "string", "sink"];
+
+/** 从证据记录归纳展示分类（确定性规则，不是推断结论）。 */
+function classify(rec: EvidenceRecord): EvidenceKind {
+  const s = rec.summary.toLowerCase();
+  const detail = JSON.stringify(rec.detail).toLowerCase();
+  if (s.includes("permission") || detail.includes("android.permission")) return "permission";
+  if (s.includes("exported") || s.includes("component") || detail.includes('"components"')) return "component";
+  if (s.includes("called from") || rec.kind === "cross_reference") return "sink";
+  if (rec.kind === "declaration") return "symbol";
+  return "string";
+}
+
+/** provenance 串 → 展示后端名。 */
+function originOf(provenance: string[]): string {
+  const tool = provenance[0]?.split(":", 1)[0] ?? "";
+  switch (tool) {
+    case "jadx":
+      return "JADX";
+    case "apktool":
+      return "Apktool";
+    case "androguard":
+      return "Androguard";
+    case "apk-reader":
+      return "APK Reader";
+    default:
+      return tool || "未知";
+  }
+}
+
+/** 把 detail 里的结构化信息拼成一行次要说明。 */
+function subtitleOf(rec: EvidenceRecord): string | undefined {
+  const d = rec.detail as Record<string, unknown>;
+  if (Array.isArray(d.permissions) && d.permissions.length) {
+    return (d.permissions as string[]).join(", ");
+  }
+  if (Array.isArray(d.components)) {
+    const names = (d.components as Array<{ name?: string }>).map((c) => c.name ?? "").filter(Boolean);
+    if (names.length) return names.join(", ");
+  }
+  if (Array.isArray(d.callers) && d.callers.length) {
+    return `调用方：${(d.callers as string[]).slice(0, 2).join(", ")}${d.callers.length > 2 ? "…" : ""}`;
+  }
+  if (typeof d.dex_files !== "undefined") return undefined;
+  return undefined;
+}
+
+/** 从完整 provenance 串提取展示用 locator（tool:place → place）。 */
+function displayLocator(provenance: string[]): string {
+  const first = provenance[0] ?? "";
+  const idx = first.indexOf(":");
+  return idx >= 0 ? first.slice(idx + 1) : first;
+}
+
+/** 项目详情响应中的错误 → 横幅文案（真实 errors，非编造）。 */
+function bannerFromErrors(errors: BackendError[], missing: string[]): string | null {
+  if (!errors.length && !missing.length) return null;
+  const parts: string[] = [];
+  if (missing.length) parts.push(`缺失后端：${missing.join("、")}`);
+  for (const e of errors.slice(0, 3)) {
+    parts.push(`${e.tool} [${e.code}] ${e.message}`);
+  }
+  if (errors.length > 3) parts.push(`…等 ${errors.length} 条错误`);
+  return `部分状态：${parts.join("；")}`;
+}
+
+interface Loaded {
+  project: ProjectDetailResponse;
+  evidence: EvidenceRecord[];
+}
 
 export function ProjectDetail() {
-  const { projectId = "demo-app" } = useParams();
+  const { projectId = "" } = useParams();
   const [keyword, setKeyword] = useState("");
   const [kindFilter, setKindFilter] = useState<EvidenceKind | "all">("all");
-  const [viewMode, setViewMode] = useState<DetailViewMode>("source");
-  const [selectedId, setSelectedId] = useState<string | null>("ev-3");
+  const [data, setData] = useState<Loaded | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<EvidenceRecord | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [resolution, setResolution] = useState<LocatorResolution | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [exporting, setExporting] = useState<"markdown" | "json" | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!projectId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [project, evidence] = await Promise.all([
+        client.getProject(projectId),
+        client.getEvidence(projectId),
+      ]);
+      setData({ project, evidence });
+    } catch (e) {
+      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
-    return EVIDENCE_ITEMS.filter((item) => {
-      const matchKind = kindFilter === "all" || item.kind === kindFilter;
-      const matchKw = kw === "" || item.title.toLowerCase().includes(kw) || (item.subtitle ?? "").toLowerCase().includes(kw);
+    return (data?.evidence ?? []).filter((rec) => {
+      const kind = classify(rec);
+      const matchKind = kindFilter === "all" || kind === kindFilter;
+      const matchKw =
+        kw === "" ||
+        rec.summary.toLowerCase().includes(kw) ||
+        rec.provenance.some((p) => p.toLowerCase().includes(kw));
       return matchKind && matchKw;
     });
-  }, [keyword, kindFilter]);
+  }, [data, keyword, kindFilter]);
 
-  const selected: EvidenceDetail | null = selectedId ? EVIDENCE_DETAILS[selectedId] ?? null : null;
+  const banner = useMemo(() => {
+    if (!data) return null;
+    return bannerFromErrors(data.project.completeness.errors, data.project.completeness.missing_backends);
+  }, [data]);
 
-  const openEvidence = (id: string) => {
-    setSelectedId(id);
+  const openEvidence = (rec: EvidenceRecord) => {
+    setSelected(rec);
+    setResolution(null);
     setDrawerOpen(true);
   };
+
+  /** resolve 按钮：调后端 /locators/resolve，展示真实解析路径。 */
+  const resolveSelected = async () => {
+    if (!selected || !projectId) return;
+    setResolving(true);
+    try {
+      const r = await client.resolveLocator(projectId, selected.provenance[0] ?? "");
+      setResolution(r);
+    } catch (e) {
+      setResolution({
+        resolved: false,
+        reason: e instanceof ApiError ? `${e.status}: ${e.message}` : String(e),
+        kind: null,
+        text: null,
+        provenance: [],
+      });
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  /** 导出报告：Blob + a[download] 下载。 */
+  const exportReport = async (format: "markdown" | "json") => {
+    if (!projectId) return;
+    setExporting(format);
+    setExportError(null);
+    try {
+      const text = await client.getReport(projectId, format);
+      const ext = format === "markdown" ? "md" : "json";
+      downloadText(`${projectId}.${ext}`, text, format === "markdown" ? "text/markdown" : "application/json");
+    } catch (e) {
+      setExportError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="page detail">
+        <header className="page-header">
+          <h1 className="page-title">项目详情</h1>
+        </header>
+        <LoadingState variant="card" lines={4} label="正在加载项目详情" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="page detail">
+        <header className="page-header">
+          <h1 className="page-title">项目详情</h1>
+        </header>
+        <ErrorState
+          title="项目详情加载失败"
+          description={`无法读取项目 ${projectId || "(未指定)"} 的分析数据。`}
+          detail={error ?? undefined}
+          onRetry={load}
+        />
+      </div>
+    );
+  }
+
+  const p = data.project.project;
+  const counts = [
+    `类 ${p.class_count}`,
+    `方法 ${p.method_count}`,
+    `调用点 ${p.call_site_count}`,
+    `边 ${p.call_edge_count}`,
+  ].join(" · ");
 
   return (
     <div className="page detail">
       <header className="page-header detail__header">
         <div>
-          <h1 className="page-title">项目详情</h1>
+          <h1 className="page-title">{p.apk_name}</h1>
           <p className="page-subtitle">
-            <code className="da-code">{projectId}</code> · 47 条证据 · 报告已生成
+            <code className="da-code">{p.id}</code> · {p.status} · {p.evidence_count} 条证据 · {counts}
           </p>
         </div>
         <div className="detail__actions">
-          <Button variant="secondary" size="sm" iconEnd={<span aria-hidden="true">↧</span>}>
-            导出 Markdown
+          <Button
+            variant="secondary"
+            size="sm"
+            iconEnd={<span aria-hidden="true">↧</span>}
+            disabled={exporting !== null}
+            onClick={() => void exportReport("markdown")}
+          >
+            {exporting === "markdown" ? "导出中…" : "导出 Markdown"}
           </Button>
-          <Button variant="primary" size="sm" iconEnd={<span aria-hidden="true">↧</span>}>
-            导出 JSON
+          <Button
+            variant="primary"
+            size="sm"
+            iconEnd={<span aria-hidden="true">↧</span>}
+            disabled={exporting !== null}
+            onClick={() => void exportReport("json")}
+          >
+            {exporting === "json" ? "导出中…" : "导出 JSON"}
           </Button>
         </div>
       </header>
 
-      <PartialBanner
-        tone="warning"
-        message="部分状态：JADX 对 482 个类反编译降级，这些类的证据来自 Smali 视图，locator 指向 .smali 文件。"
-      />
+      {exportError && (
+        <div className="detail__export-error" role="alert">
+          报告导出失败：{exportError}
+        </div>
+      )}
+
+      {banner && <PartialBanner tone="warning" message={banner} />}
 
       <div className="detail__grid">
         {/* 左列：证据列表 */}
         <Card className="detail__list" aria-label="证据列表">
           <CardHeader
             title="证据"
-            subtitle={`${filtered.length} / ${EVIDENCE_ITEMS.length} 条`}
+            subtitle={`${filtered.length} / ${data.evidence.length} 条`}
             actions={
               <SearchInput
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 onClear={() => setKeyword("")}
-                placeholder="搜索类名 / 权限 / 字符串"
+                placeholder="搜索摘要 / locator"
                 aria-label="搜索证据"
               />
             }
           />
           <CardBody>
             <div className="detail__filters" role="group" aria-label="按证据类型筛选">
-              {(["all", "permission", "symbol", "sink", "component", "string"] as const).map((kind) => (
+              {(["all", ...KIND_ORDER] as const).map((kind) => (
                 <button
                   key={kind}
                   type="button"
@@ -117,76 +319,64 @@ export function ProjectDetail() {
               <EmptyState title="没有匹配的证据" description="换个关键词，或清除筛选条件。" />
             ) : (
               <ul className="da-ev-list">
-                {filtered.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      type="button"
-                      className={`da-ev-item${selectedId === item.id ? " is-selected" : ""}`}
-                      onClick={() => openEvidence(item.id)}
-                      aria-expanded={selectedId === item.id && drawerOpen}
-                    >
-                      <div className="da-ev-item__top">
-                        <span className={`da-ev-tag ${KIND_CLASS[item.kind]}`}>{KIND_LABEL[item.kind]}</span>
-                        <span className="da-ev-item__origin">{ORIGIN_LABEL[item.origin]}</span>
-                      </div>
-                      <div className="da-ev-item__title">{item.title}</div>
-                      {item.subtitle && <div className="da-ev-item__subtitle">{item.subtitle}</div>}
-                    </button>
-                  </li>
-                ))}
+                {filtered.map((rec) => {
+                  const kind = classify(rec);
+                  return (
+                    <li key={rec.id}>
+                      <button
+                        type="button"
+                        className={`da-ev-item${selected?.id === rec.id && drawerOpen ? " is-selected" : ""}`}
+                        onClick={() => openEvidence(rec)}
+                        aria-expanded={selected?.id === rec.id && drawerOpen}
+                      >
+                        <div className="da-ev-item__top">
+                          <span className={`da-ev-tag ${KIND_CLASS[kind]}`}>{KIND_LABEL[kind]}</span>
+                          <span className="da-ev-item__origin">{originOf(rec.provenance)}</span>
+                        </div>
+                        <div className="da-ev-item__title">{rec.id} · {rec.summary}</div>
+                        {subtitleOf(rec) && <div className="da-ev-item__subtitle">{subtitleOf(rec)}</div>}
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CardBody>
         </Card>
 
-        {/* 中间：源码 / 调用图主体 */}
-        <Card className="detail__main" aria-label="源码预览">
+        {/* 中间：选中证据的详情主体（来自后端真实数据） */}
+        <Card className="detail__main" aria-label="证据正文">
           <CardHeader
-            title={viewMode === "source" ? "SmsLeakWorker.java" : "调用图（局部）"}
-            subtitle={viewMode === "source" ? "JADX 还原 · 片段 82–96 行" : "以 ev-3 为中心的调用关系"}
-            actions={
-              <div className="detail__view-toggle" role="tablist" aria-label="主体视图切换">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === "source"}
-                  className={`da-view-btn${viewMode === "source" ? " is-active" : ""}`}
-                  onClick={() => setViewMode("source")}
-                >
-                  源码
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === "callgraph"}
-                  className={`da-view-btn${viewMode === "callgraph" ? " is-active" : ""}`}
-                  onClick={() => setViewMode("callgraph")}
-                >
-                  调用图
-                </button>
-              </div>
+            title={selected ? `${selected.id} · ${selected.kind}` : "选择一条证据"}
+            subtitle={
+              selected
+                ? `${originOf(selected.provenance)} · level=${selected.level}`
+                : "从左列选择证据查看正文与 provenance"
             }
           />
           <CardBody>
-            {viewMode === "source" ? (
-              <pre className="da-source" tabIndex={0} aria-label="源码预览片段">
-                {SOURCE_LINES.map((line) => (
-                  <div key={line.line} className={`da-source__line${line.highlighted ? " is-highlighted" : ""}${selected?.locator.line === line.line ? " is-referenced" : ""}`}>
-                    <span className="da-source__num">{line.line}</span>
-                    <code>{line.text}</code>
-                  </div>
-                ))}
-              </pre>
-            ) : (
-              <div className="da-callgraph" aria-label="调用图预览">
-                <div className="da-callgraph__node da-callgraph__node--entry">MainActivity.onCreate</div>
-                <div className="da-callgraph__edge" aria-hidden="true">↓</div>
-                <div className="da-callgraph__node">SmsLeakWorker.schedule(context)</div>
-                <div className="da-callgraph__edge" aria-hidden="true">↓</div>
-                <div className="da-callgraph__node da-callgraph__node--hot">SmsLeakWorker.collect() ← 证据 ev-3</div>
-                <div className="da-callgraph__edge" aria-hidden="true">↓</div>
-                <div className="da-callgraph__node">TelephonyManager.getDeviceId()</div>
+            {selected ? (
+              <div className="da-ev-body">
+                <p className="da-ev-body__summary">{selected.summary}</p>
+                <pre className="da-source" tabIndex={0} aria-label="证据 detail 结构">
+                  {JSON.stringify(selected.detail, null, 2)}
+                </pre>
+                <div className="da-ev-body__prov">
+                  <div className="da-ev-body__prov-title">provenance（后端原始 locator）</div>
+                  <ul>
+                    {selected.provenance.map((prov, i) => (
+                      <li key={`${prov}-${i}`}>
+                        <code className="da-code">{prov}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
+            ) : (
+              <EmptyState
+                title="尚未选择证据"
+                description={`共 ${data.evidence.length} 条证据；点击左列任意条目在此查看其结构与来源。`}
+              />
             )}
           </CardBody>
         </Card>
@@ -201,60 +391,63 @@ export function ProjectDetail() {
         footer={
           selected && (
             <div className="da-ev-drawer__footer">
-              <span className="da-ev-drawer__locator" title={selected.locator.path}>
-                locator：{selected.locator.path}
-                {selected.locator.line ? `:${selected.locator.line}` : ""}
+              <span className="da-ev-drawer__locator" title={displayLocator(selected.provenance)}>
+                locator：{displayLocator(selected.provenance)}
               </span>
               <div className="da-ev-drawer__actions">
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => window.alert(`原型阶段：跳转定位到 ${selected.locator.path}:${selected.locator.line ?? 1}`)}
+                  onClick={() =>
+                    window.alert(
+                      `来源文件（后端解析）：${displayLocator(selected.provenance)}\n完整 provenance：${selected.provenance.join("\n")}`,
+                    )
+                  }
                 >
                   打开来源
                 </Button>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => window.alert(`原型阶段：在分析工作区内解析 locator ${selected.locator.path}`)}
-                >
-                  resolve
+                <Button variant="primary" size="sm" disabled={resolving} onClick={() => void resolveSelected()}>
+                  {resolving ? "解析中…" : "resolve"}
                 </Button>
               </div>
+              {resolution && (
+                <div className="da-ev-drawer__resolution" role="status">
+                  <div>
+                    resolved：{String(resolution.resolved)}
+                    {resolution.kind ? ` · kind=${resolution.kind}` : ""}
+                  </div>
+                  {resolution.reason && <div className="da-ev-drawer__resolution-path">{resolution.reason}</div>}
+                  {resolution.text && (
+                    <pre className="da-ev-drawer__resolution-text">{resolution.text.text.slice(0, 800)}</pre>
+                  )}
+                </div>
+              )}
             </div>
           )
         }
       >
         {selected && (
-          <div className="da-ev-drawer">
-            <div className="da-ev-drawer__tags">
-              <span className={`da-ev-tag ${KIND_CLASS[selected.kind]}`}>{KIND_LABEL[selected.kind]}</span>
-              <span className="da-ev-tag da-ev-tag--origin">{ORIGIN_LABEL[selected.origin]}</span>
+          <div className="da-ev-drawer__body">
+            <div className="da-ev-drawer__field">
+              <span className="da-ev-drawer__label">编号</span>
+              <code className="da-code">{selected.id}</code>
             </div>
-            <h3 className="da-ev-drawer__title">{selected.title}</h3>
-            {selected.subtitle && <p className="da-ev-drawer__subtitle">{selected.subtitle}</p>}
-            <p className="da-ev-drawer__summary">{selected.summary}</p>
-            <pre className="da-ev-drawer__snippet" tabIndex={0}>
-              <code>{selected.snippet}</code>
-            </pre>
-            {selected.relatedIds.length > 0 && (
-              <div className="da-ev-drawer__related">
-                <div className="da-ev-drawer__related-label">关联证据</div>
-                <ul>
-                  {selected.relatedIds.map((rid) => {
-                    const rel = EVIDENCE_DETAILS[rid];
-                    if (!rel) return null;
-                    return (
-                      <li key={rid}>
-                        <button type="button" className="da-ev-drawer__related-item" onClick={() => setSelectedId(rid)}>
-                          {rel.title}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
+            <div className="da-ev-drawer__field">
+              <span className="da-ev-drawer__label">类型 / 级别</span>
+              {selected.kind} · {selected.level}
+            </div>
+            <div className="da-ev-drawer__field">
+              <span className="da-ev-drawer__label">摘要</span>
+              {selected.summary}
+            </div>
+            <div className="da-ev-drawer__field">
+              <span className="da-ev-drawer__label">来源后端</span>
+              {originOf(selected.provenance)}
+            </div>
+            <div className="da-ev-drawer__field">
+              <span className="da-ev-drawer__label">detail</span>
+              <pre className="da-ev-drawer__detail">{JSON.stringify(selected.detail, null, 2)}</pre>
+            </div>
           </div>
         )}
       </Drawer>

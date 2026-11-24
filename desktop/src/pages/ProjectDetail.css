@@ -34,6 +34,94 @@
   margin-bottom: var(--space-3);
 }
 
+/* 导出失败提示 */
+.detail__export-error {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger, #c0392b);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--color-danger, #c0392b);
+  font-size: var(--text-sm);
+}
+
+/* 中间证据正文 */
+.da-ev-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.da-ev-body__summary {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+.da-ev-body__prov-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+.da-ev-body__prov ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.da-ev-body__prov code {
+  word-break: break-all;
+  font-size: var(--text-xs);
+}
+
+/* 抽屉内容 */
+.da-ev-drawer__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.da-ev-drawer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+}
+.da-ev-drawer__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.da-ev-drawer__detail {
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  max-height: 220px;
+  overflow: auto;
+}
+.da-ev-drawer__resolution {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.da-ev-drawer__resolution-path {
+  word-break: break-all;
+  color: var(--color-text-secondary);
+}
+.da-ev-drawer__resolution-text {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: var(--text-xs);
+}
+
 .da-filter-chip {
   border: 1px solid var(--color-border-strong);
   background: var(--color-surface);
