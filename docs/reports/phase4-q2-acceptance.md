@@ -2,7 +2,7 @@
 
 **日期：** 2026-11-24 · **性质：** Q2 收尾验收记录 · **基线：** 分支 `claude/youthful-clarke-db2263-wt` @ `215afcb`
 **验收对象：** [Q2 补充单](../roadmap/phase4-q2-supplement.md) §6 验收矩阵 · [Q2 收尾单](../roadmap/phase4-q2-closure.md) §3 退出条件
-**上游素材：** [设计规范](../architecture/desktop-app.md) · [T2 可访问性审计](../../../.scratch/q2-m3-a11y-report.md)（`.scratch/q2-m3-a11y-report.md`） · [T3 截图说明](../../../.scratch/q2-m3-screenshots.md)（`.scratch/q2-m3-screenshots.md`）
+**上游素材：** [设计规范](../architecture/desktop-app.md) · T2 可访问性审计（`.scratch/q2-m3-a11y-report.md`，工作区文件不入库） · T3 截图说明（`.scratch/q2-m3-screenshots.md`，工作区文件不入库）
 
 > **本文的地位。** Q2 补充单 §6 要求按八个维度给验收结论，收尾单 §3 要求逐条勾选退出条件。本文是逐维度结论与证据的落点；截图一律指向 `docs/assets/phase4-q2/` 下的四张 Tauri 真窗口截图。**诚实优先于好看**：不能核验的条件标「未验证」并说明缺什么，不把「待完成」改写成「完成」。
 
