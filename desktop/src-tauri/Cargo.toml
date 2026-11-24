@@ -9,7 +9,9 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# protocol-http：启用 Tauri 的 HTTP 能力（capabilities/default.json 里的 http:default），
+# 供前端经 Tauri 的 fetch 访问本地 FastAPI 后端 http://localhost:8618。
+tauri = { version = "2", features = ["protocol-http"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
