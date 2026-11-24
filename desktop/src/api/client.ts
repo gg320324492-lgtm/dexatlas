@@ -1,5 +1,5 @@
 /**
- * DexAtlas REST API 客户端 — Q2-M2-A。
+ * DexAtlas REST API 客户端 — Q2-M3-T1 统一层。
  *
  * 基于 fetch 的薄封装：统一 baseURL、JSON 解析和错误处理。所有方法返回
  * 解析后的数据，失败时抛出 {@link ApiError}（网络错误、非 2xx、JSON 损坏
@@ -8,23 +8,34 @@
  * dev 模式下 baseURL 默认为 ``/api``，由 vite 代理转发到后端
  * （见 vite.config.ts）；生产/Tauri 打包后可传入完整地址。
  *
- * 后端差异说明：当前 8618 运行的是 workbench 应用，其 /api/projects 返回
- * ``{projects, total, offset, limit}`` 分页信封；api/app.py 契约则是裸数组。
- * listProjects 对两者做了归一化，其余端点按 api/app.py 契约直读。
+ * 后端差异说明（Q2-M3-T1 按 8618 workbench 实测核对，src/dexatlas/workbench/app.py）：
+ * - GET /api/projects 返回 ``{projects, total, offset, limit}`` 分页信封
+ *   （mcp/schemas.py:128 ProjectList）；listProjects 对此归一化为数组。
+ * - GET /api/projects/{id} 返回 ProjectStatus 信封
+ *   （mcp/schemas.py:166：{project, completeness, published_run, runs,
+ *   evidence_catalog}）；getProject 返回该信封原样。
+ * - GET /api/projects/{id}/evidence 返回裸数组（workbench app.py:209），
+ *   getEvidence 归一化为 {project_id, total, evidence}。
+ * - workbench 没有 /api/backends、/runs、/cancel 端点：getBackends 会得到
+ *   404，cancelProject 会得到 405，调用方按"后端未提供"如实处理。
+ * - 错误体是 MCP RequestError 的 as_dict（mcp/errors.py:27）：
+ *   {code, message, detail}，HTTP 404=unknown_project、400=其余请求错误。
  */
 
 import type {
+  AnalyzeAccepted,
   AnalyzeJob,
   BackendInfo,
   CancelResponse,
   EvidenceList,
-  HealthInfo,
-  ProjectDetail,
+  EvidenceRecord,
+  LocatorResolution,
+  ProjectDetailEnvelope,
   ProjectSummary,
   ReportFormat,
-  ReportPayload,
   RunInfo,
-  RunList,
+  SymbolHit,
+  WorkbenchHealth,
 } from "./types";
 
 /** 客户端可调的统一错误。status 为 undefined 表示请求根本没到服务器。 */
@@ -48,19 +59,25 @@ export interface DexAtlasClientOptions {
   fetchImpl?: typeof fetch;
 }
 
-/** 从 FastAPI 的错误体里抠出一句人能读的话。 */
-function messageFromDetail(detail: unknown, fallback: string): string {
-  if (typeof detail === "string" && detail.trim()) {
-    return detail;
-  }
-  // 422 校验错误：detail 是 {loc, msg, type} 数组
-  if (Array.isArray(detail) && detail.length > 0) {
-    const first = detail[0] as { msg?: unknown };
-    if (first && typeof first.msg === "string") {
-      return first.msg;
+/** 从后端错误体里抠出一句人能读的话（兼容 FastAPI detail 与 MCP {code,message}）。 */
+function messageFromBody(body: unknown, statusText: string): string {
+  if (body && typeof body === "object") {
+    const obj = body as { message?: unknown; detail?: unknown };
+    if (typeof obj.message === "string" && obj.message.trim()) {
+      return obj.message;
+    }
+    if (typeof obj.detail === "string" && obj.detail.trim()) {
+      return obj.detail;
+    }
+    // FastAPI 422 校验错误：detail 是 {loc, msg, type} 数组
+    if (Array.isArray(obj.detail) && obj.detail.length > 0) {
+      const first = obj.detail[0] as { msg?: unknown };
+      if (first && typeof first.msg === "string") {
+        return first.msg;
+      }
     }
   }
-  return fallback;
+  return statusText;
 }
 
 export class DexAtlasClient {
@@ -77,19 +94,22 @@ export class DexAtlasClient {
   // -------------------------------------------------------------------------
 
   /**
-   * 上传 APK 并在后台分析。返回 202 任务；同 hash 已分析过时后端直接返回
-   * 已有项目。完成与否需轮询 {@link getProject} 的 status。
+   * 上传 APK 并在后台分析（workbench POST /api/analyze，202）。
+   * 同 hash 已分析过时后端直接返回已有项目（already_analysed=true）。
+   * 完成与否需轮询 {@link getProject} 的 status。
    */
-  async analyzeUpload(file: File | Blob, filename?: string): Promise<AnalyzeJob> {
+  async analyzeUpload(file: File | Blob, filename?: string): Promise<AnalyzeAccepted> {
     const form = new FormData();
     form.append("file", file, filename ?? (file instanceof File ? file.name : "upload.apk"));
-    return this.request<AnalyzeJob>("/analyze", { method: "POST", body: form });
+    return this.request<AnalyzeAccepted>("/analyze", { method: "POST", body: form });
   }
 
-  /** 项目列表，新→旧。 */
+  /**
+   * 项目列表，新→旧。workbench 的分页信封（{projects,...}）归一化为数组；
+   * api/app.py 的裸数组契约同样兼容。
+   */
   async listProjects(): Promise<ProjectSummary[]> {
-    const raw = await this.request<unknown>("/projects");
-    // api/app.py 契约是 ProjectResponse[]；workbench 是 {projects: [...]} 分页信封。
+    const raw = await this.request<unknown>("/projects?limit=50");
     if (Array.isArray(raw)) {
       return raw as ProjectSummary[];
     }
@@ -99,39 +119,60 @@ export class DexAtlasClient {
     throw new ApiError("/projects 返回了无法识别的形状", undefined, raw);
   }
 
-  /** 一个项目的元数据、计数与后端错误。 */
-  async getProject(projectId: string): Promise<ProjectDetail> {
-    return this.request<ProjectDetail>(`/projects/${encodeURIComponent(projectId)}`);
+  /**
+   * 项目状态信封：{project, completeness, published_run, runs, evidence_catalog}。
+   * workbench GET /api/projects/{id} 的原样返回。
+   */
+  async getProject(projectId: string): Promise<ProjectDetailEnvelope> {
+    return this.request<ProjectDetailEnvelope>(`/projects/${encodeURIComponent(projectId)}`);
   }
 
-  /** 项目全部分析轮次，新→旧，含 published 标记。 */
-  async getRuns(projectId: string): Promise<RunList> {
-    return this.request<RunList>(`/projects/${encodeURIComponent(projectId)}/runs`);
+  // -------------------------------------------------------------------------
+  // 证据与符号
+  // -------------------------------------------------------------------------
+
+  /**
+   * 项目的全部证据记录，各带 provenance locator。
+   * workbench 返回裸数组；这里归一化为 {project_id, total, evidence}，
+   * 与 api/app.py 的 EvidenceList 契约对齐，页面只需读 .evidence。
+   */
+  async getEvidence(projectId: string): Promise<EvidenceList> {
+    const raw = await this.request<unknown>(`/projects/${encodeURIComponent(projectId)}/evidence`);
+    const evidence = Array.isArray(raw)
+      ? (raw as EvidenceRecord[])
+      : Array.isArray((raw as { evidence?: unknown } | null)?.evidence)
+        ? ((raw as { evidence: EvidenceRecord[] }).evidence)
+        : null;
+    if (evidence === null) {
+      throw new ApiError("/evidence 返回了无法识别的形状", undefined, raw);
+    }
+    return { project_id: projectId, total: evidence.length, evidence };
   }
 
-  /** 单个轮次。 */
-  async getRun(projectId: string, runId: string): Promise<RunInfo> {
-    return this.request<RunInfo>(
-      `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}`,
+  /** 索引全文搜索（类/方法/字段/字符串），返回命中符号列表。 */
+  async searchSymbols(projectId: string, q: string, limit = 50): Promise<SymbolHit[]> {
+    const data = await this.request<{ symbols: SymbolHit[] }>(
+      `/projects/${encodeURIComponent(projectId)}/symbols?q=${encodeURIComponent(q)}&limit=${limit}`,
+    );
+    return data.symbols;
+  }
+
+  /** locator 解析：返回真实机器路径或解析说明（workbench app.py:231）。 */
+  async resolveLocator(projectId: string, locator: string): Promise<LocatorResolution> {
+    return this.request<LocatorResolution>(
+      `/projects/${encodeURIComponent(projectId)}/locators/resolve?locator=${encodeURIComponent(locator)}`,
     );
   }
 
-  /** 请求取消正在运行的分析（202 表示已受理，不表示已停止）。 */
-  async cancelProject(projectId: string): Promise<CancelResponse> {
-    return this.request<CancelResponse>(`/projects/${encodeURIComponent(projectId)}/cancel`, {
-      method: "POST",
-    });
-  }
-
-  /** 项目的全部证据记录，各带来源工具、版本与 locator。 */
-  async getEvidence(projectId: string): Promise<EvidenceList> {
-    return this.request<EvidenceList>(`/projects/${encodeURIComponent(projectId)}/evidence`);
-  }
+  // -------------------------------------------------------------------------
+  // 报告
+  // -------------------------------------------------------------------------
 
   /**
    * 导出报告。format=markdown 返回文本；format=json 返回结构化对象。
+   * 两个后端（workbench / api）对该端点的契约一致。
    */
-  async getReport(projectId: string, format: ReportFormat = "json"): Promise<ReportPayload> {
+  async getReport(projectId: string, format: ReportFormat = "json"): Promise<string | Record<string, unknown>> {
     const response = await this.raw(
       `/projects/${encodeURIComponent(projectId)}/report?format=${encodeURIComponent(format)}`,
     );
@@ -143,17 +184,37 @@ export class DexAtlasClient {
   }
 
   // -------------------------------------------------------------------------
-  // 元信息
+  // 元信息与控制
   // -------------------------------------------------------------------------
 
-  /** 存活与后端就绪状态。 */
-  async getHealth(): Promise<HealthInfo> {
-    return this.request<HealthInfo>("/health");
+  /** 存活与版本（workbench 返回 {version, workspace}）。 */
+  async getHealth(): Promise<WorkbenchHealth> {
+    return this.request<WorkbenchHealth>("/health");
   }
 
-  /** 装了哪些分析后端、缺哪些、版本几何。 */
+  /**
+   * 装了哪些分析后端。仅 api/app.py:349 提供该端点；workbench 没有，
+   * 调用方会把 404 当作"后端未提供该端点"如实展示。
+   */
   async getBackends(): Promise<BackendInfo> {
     return this.request<BackendInfo>("/backends");
+  }
+
+  /** 请求取消正在运行的分析（202 表示已受理）。workbench 未提供（405）。 */
+  async cancelProject(projectId: string): Promise<CancelResponse> {
+    return this.request<CancelResponse>(`/projects/${encodeURIComponent(projectId)}/cancel`, {
+      method: "POST",
+    });
+  }
+
+  /** 兼容旧调用点：按 id 读取分析任务（api/app.py 契约；workbench 无此端点）。 */
+  async getAnalyzeJob(projectId: string): Promise<AnalyzeJob> {
+    return this.request<AnalyzeJob>(`/analyze/${encodeURIComponent(projectId)}`);
+  }
+
+  /** 兼容旧调用点：项目分析轮次列表（api/app.py 契约；workbench 无此端点）。 */
+  async getRuns(projectId: string): Promise<{ runs: RunInfo[] }> {
+    return this.request<{ runs: RunInfo[] }>(`/projects/${encodeURIComponent(projectId)}/runs`);
   }
 
   // -------------------------------------------------------------------------
@@ -185,19 +246,16 @@ export class DexAtlasClient {
     if (response.ok) {
       return;
     }
-    let detail: unknown;
+    let body: unknown;
     try {
-      detail = await response.json();
+      body = await response.json();
     } catch {
-      detail = undefined;
+      body = undefined;
     }
     throw new ApiError(
-      messageFromDetail(
-        (detail as { detail?: unknown } | null)?.detail ?? detail,
-        `请求失败（HTTP ${response.status}）`,
-      ),
+      messageFromBody(body, `请求失败（HTTP ${response.status}）`),
       response.status,
-      detail,
+      body,
     );
   }
 
@@ -212,3 +270,16 @@ export class DexAtlasClient {
 
 /** 默认客户端实例。页面组件可直接 import 使用；需要定制时再 new。 */
 export const dexatlas = new DexAtlasClient();
+
+/** 触发浏览器下载（Blob + a[download]）。 */
+export function downloadText(filename: string, text: string, mime: string): void {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

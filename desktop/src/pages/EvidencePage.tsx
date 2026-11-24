@@ -10,13 +10,8 @@ import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { EmptyState } from "../components/states/EmptyState";
 import { SearchInput } from "../components/SearchInput";
-import {
-  ApiError,
-  client,
-  type EvidenceRecord,
-  type ProjectInfo,
-  type SymbolHit,
-} from "../client";
+import { ApiError, dexatlas as client } from "../api";
+import type { EvidenceRecord, ProjectSummary, SymbolHit } from "../api";
 import "./EvidencePage.css";
 
 /** 一行检索结果（证据摘要或符号命中）。 */
@@ -37,7 +32,7 @@ function backendOf(provenance: string[]): string {
 }
 
 export default function EvidencePage() {
-  const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [projectId, setProjectId] = useState<string>("");
   const [query, setQuery] = useState("");
   const [evidence, setEvidence] = useState<EvidenceRecord[]>([]);
@@ -76,7 +71,7 @@ export default function EvidencePage() {
     (async () => {
       try {
         const ev = await client.getEvidence(projectId);
-        if (!cancelled) setEvidence(ev);
+        if (!cancelled) setEvidence(ev.evidence);
       } catch (e) {
         if (!cancelled) {
           setEvidence([]);

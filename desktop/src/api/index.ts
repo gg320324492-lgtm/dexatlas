@@ -1,32 +1,32 @@
 /**
- * API 桥接层出口 — Q2-M2-A。
+ * API 桥接层出口 — Q2-M3-T1 统一入口。
  *
- * 页面统一从这里 import：`import { dexatlas } from "../api"`。
+ * 页面统一从这里 import：`import { dexatlas, downloadText } from "../api"`。
  * 类型与实现分开导出，方便只取类型的组件做 tree-shaking。
  */
 
-export { DexAtlasClient, ApiError, dexatlas } from "./client";
+export { DexAtlasClient, ApiError, dexatlas, downloadText } from "./client";
 export type { DexAtlasClientOptions } from "./client";
 
 export type {
+  AnalyzeAccepted,
   AnalyzeJob,
   BackendInfo,
   CancelResponse,
-  Evidence,
+  Completeness,
+  CompletenessError,
   EvidenceKind,
   EvidenceLevel,
   EvidenceList,
+  EvidenceRecord,
   HealthInfo,
-  ProjectDetail,
+  LocatorResolution,
+  ProjectDetailEnvelope,
   ProjectStatus,
   ProjectSummary,
-  Provenance,
   ReportFormat,
-  ReportPayload,
-  RunCompleteness,
   RunInfo,
-  RunList,
-  RunStatus,
-  ToolErrorInfo,
-  ToolErrorCode,
+  SymbolHit,
+  UntrustedText,
+  WorkbenchHealth,
 } from "./types";

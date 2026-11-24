@@ -15,15 +15,13 @@ import { PartialBanner } from "../components/PartialBanner";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
-import {
-  ApiError,
-  client,
-  downloadText,
-  type BackendError,
-  type EvidenceRecord,
-  type LocatorResolution,
-  type ProjectDetailResponse,
-} from "../client";
+import { ApiError, dexatlas as client, downloadText } from "../api";
+import type {
+  CompletenessError,
+  EvidenceRecord,
+  LocatorResolution,
+  ProjectDetailEnvelope,
+} from "../api";
 
 /** 证据列表的展示分类：由后端 kind + summary 归纳，标签与 M1 原型一致。 */
 type EvidenceKind = "symbol" | "string" | "permission" | "component" | "sink";
@@ -99,19 +97,23 @@ function displayLocator(provenance: string[]): string {
 }
 
 /** 项目详情响应中的错误 → 横幅文案（真实 errors，非编造）。 */
-function bannerFromErrors(errors: BackendError[], missing: string[]): string | null {
+function bannerFromErrors(errors: CompletenessError[], missing: string[]): string | null {
   if (!errors.length && !missing.length) return null;
   const parts: string[] = [];
   if (missing.length) parts.push(`缺失后端：${missing.join("、")}`);
   for (const e of errors.slice(0, 3)) {
-    parts.push(`${e.tool} [${e.code}] ${e.message}`);
+    if (typeof e === "string") {
+      parts.push(e);
+    } else {
+      parts.push(`${e.tool}${e.code ? ` [${e.code}]` : ""} ${e.message}`);
+    }
   }
   if (errors.length > 3) parts.push(`…等 ${errors.length} 条错误`);
   return `部分状态：${parts.join("；")}`;
 }
 
 interface Loaded {
-  project: ProjectDetailResponse;
+  project: ProjectDetailEnvelope;
   evidence: EvidenceRecord[];
 }
 
@@ -134,11 +136,11 @@ export function ProjectDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [project, evidence] = await Promise.all([
+      const [project, evidenceList] = await Promise.all([
         client.getProject(projectId),
         client.getEvidence(projectId),
       ]);
-      setData({ project, evidence });
+      setData({ project, evidence: evidenceList.evidence });
     } catch (e) {
       setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
     } finally {
@@ -200,7 +202,8 @@ export function ProjectDetail() {
     setExporting(format);
     setExportError(null);
     try {
-      const text = await client.getReport(projectId, format);
+      const payload = await client.getReport(projectId, format);
+      const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
       const ext = format === "markdown" ? "md" : "json";
       downloadText(`${projectId}.${ext}`, text, format === "markdown" ? "text/markdown" : "application/json");
     } catch (e) {

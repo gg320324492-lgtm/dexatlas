@@ -1,23 +1,52 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { LoadingState } from "../components/states/LoadingState";
+import { ApiError, dexatlas } from "../api";
+import type { BackendInfo, WorkbenchHealth } from "../api";
 import "./SettingsPage.css";
 
-interface BackendConfig {
-  key: "apktool" | "jadx" | "androguard";
-  name: string;
-  path: string;
-  enabled: boolean;
-}
-
-// 占位状态：真实配置读写（Tauri store / 后端命令）由后续窗口完成。
-const INITIAL_BACKENDS: BackendConfig[] = [
-  { key: "apktool", name: "Apktool", path: "C:\\tools\\apktool\\apktool.bat", enabled: true },
-  { key: "jadx", name: "JADX", path: "C:\\tools\\jadx\\bin\\jadx.bat", enabled: true },
-  { key: "androguard", name: "Androguard", path: "(内置 Python 后端)", enabled: true },
-];
-
-/** 设置页：版本信息与后端配置收纳处（补充单 2-5）。 */
+/**
+ * 设置页：版本信息与后端配置收纳处（补充单 2-5）。
+ * Q2-M3-T1：不再内置假配置。后端清单来自 GET /api/backends；当前 8618
+ * 的 workbench 未提供该端点（HTTP 404），页面如实显示"该端点在后端未提供"。
+ * 版本信息来自 GET /api/health（{version, workspace}）。
+ */
 export default function SettingsPage() {
-  const [backends, setBackends] = useState(INITIAL_BACKENDS);
+  const [health, setHealth] = useState<WorkbenchHealth | null>(null);
+  const [backends, setBackends] = useState<BackendInfo | null>(null);
+  const [backendsUnavailable, setBackendsUnavailable] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setBackendsUnavailable(null);
+    const results = await Promise.allSettled([dexatlas.getHealth(), dexatlas.getBackends()]);
+    if (results[0].status === "fulfilled") {
+      setHealth(results[0].value);
+    } else {
+      const e = results[0].reason;
+      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+    }
+    if (results[1].status === "fulfilled") {
+      setBackends(results[1].value);
+    } else {
+      const e = results[1].reason;
+      // 404 = 后端没有这个端点（当前 workbench 即如此），如实呈现而非编造清单
+      setBackendsUnavailable(
+        e instanceof ApiError && e.status === 404
+          ? "该端点在后端未提供（GET /api/backends 返回 404）"
+          : e instanceof ApiError
+            ? `读取失败（${e.status}: ${e.message}）`
+            : `读取失败（${String(e)}）`,
+      );
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <div className="page">
@@ -28,29 +57,44 @@ export default function SettingsPage() {
 
       <section className="card">
         <h2 className="card-title">分析后端</h2>
-        <ul className="backend-config-list">
-          {backends.map((b, i) => (
-            <li key={b.key} className="backend-config-item">
-              <div className="backend-config-main">
-                <strong>{b.name}</strong>
-                <code className="backend-path">{b.path}</code>
-              </div>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={b.enabled}
-                  onChange={(e) => {
-                    const next = [...backends];
-                    next[i] = { ...b, enabled: e.target.checked };
-                    setBackends(next);
-                  }}
-                />
-                <span className="switch-track" aria-hidden="true" />
-                <span className="visually-hidden">启用 {b.name}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
+        {loading ? (
+          <LoadingState lines={3} label="正在读取后端配置" />
+        ) : backendsUnavailable ? (
+          <p className="settings-unavailable" role="status">
+            {backendsUnavailable}
+          </p>
+        ) : backends ? (
+          <ul className="backend-config-list">
+            {["jadx", "apktool", "androguard"].map((key) => {
+              const available = backends.available.includes(key);
+              const version = backends.versions[key] ?? null;
+              return (
+                <li key={key} className="backend-config-item">
+                  <div className="backend-config-main">
+                    <strong>{key}</strong>
+                    <code className="backend-path">
+                      {available ? (version ? `已安装 · v${version}` : "已安装") : "未安装或未配置"}
+                    </code>
+                  </div>
+                  <span className={`badge ${available ? "badge-success" : "badge-muted"}`}>
+                    {available ? "可用" : "缺失"}
+                  </span>
+                </li>
+              );
+            })}
+            {backends.missing.length > 0 && (
+              <li className="backend-config-item">
+                <div className="backend-config-main">
+                  <code className="backend-path">缺失后端：{backends.missing.join("、")}</code>
+                </div>
+              </li>
+            )}
+          </ul>
+        ) : (
+          <p className="settings-unavailable" role="alert">
+            {error ?? "后端状态不可用。"}
+          </p>
+        )}
       </section>
 
       <section className="card">
@@ -80,7 +124,16 @@ export default function SettingsPage() {
           </div>
           <div>
             <dt>版本</dt>
-            <dd>v1.0.2 · Q2 原型</dd>
+            <dd>
+              {health ? (
+                <>
+                  v{health.version}
+                  {health.workspace ? <span className="settings-workspace"> · 工作区 {health.workspace}</span> : null}
+                </>
+              ) : (
+                <span className="settings-unavailable">{error ?? "读取中…"}</span>
+              )}
+            </dd>
           </div>
           <div>
             <dt>分析核心</dt>

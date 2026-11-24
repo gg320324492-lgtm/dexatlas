@@ -7,6 +7,19 @@
   gap: var(--space-3);
 }
 
+/* 后端端点不可用/读取中的如实提示 */
+.settings-unavailable {
+  margin: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.settings-workspace {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+
 .backend-config-item {
   display: flex;
   align-items: center;

@@ -27,8 +27,9 @@ import { PartialBanner } from "../components/PartialBanner";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
-import { STAGES } from "../mockData";
-import type { BackendState, BackendStatus, LogLevel, LogEntry, StageState } from "../types";
+import { ApiError, dexatlas } from "../api";
+import type { ProjectDetailEnvelope as WsProjectStatus, WorkbenchHealth as WsHealth } from "../api";
+import type { BackendState, BackendStatus, LogLevel, LogEntry, StageInfo, StageState } from "../types";
 import "./Analysis.css";
 
 /** 相对基址：由 vite dev 代理（→ http://127.0.0.1:8618）转发，见文件头说明。 */
@@ -41,73 +42,14 @@ const STAGE_TICK_MS = 2400;
 /** 404 连续多少次后提示"迟迟未入库"（2s 一次，15 次 ≈ 30s）。 */
 const NOT_FOUND_LONG_STREAK = 15;
 
-class ApiError extends Error {
-  readonly status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.name = "ApiError";
-    this.status = status;
-  }
-}
-
-/** 最小 fetch 封装：非 2xx 抛 ApiError（带状态码），网络错误归一为 status 0。 */
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE}${path}`, init);
-  } catch (err) {
-    throw new ApiError(`无法连接后端 ${API_BASE}（${err instanceof Error ? err.message : String(err)}）`, 0);
-  }
-  if (!res.ok) {
-    let detail = "";
-    try {
-      detail = (await res.text()).slice(0, 200);
-    } catch {
-      // 响应体读取失败不掩盖状态码
-    }
-    throw new ApiError(`HTTP ${res.status}${detail ? `：${detail}` : ""}`, res.status);
-  }
-  return (await res.json()) as T;
-}
-
-// ---- workbench API 响应形状（src/dexatlas/workbench/app.py + src/dexatlas/mcp/schemas.py）----
-
-interface WsRunSummary {
-  id: string;
-  status: string;
-  completeness: string;
-  tool_versions: Record<string, string | null>;
-  started_at: string;
-  finished_at: string | null;
-  duration_seconds: number | null;
-}
-
-interface WsProjectSummary {
-  id: string;
-  apk_name: string;
-  apk_sha256: string;
-  status: string;
-  created_at: string;
-  class_count: number;
-  method_count: number;
-  call_site_count: number;
-  call_edge_count: number;
-  evidence_count: number;
-  missing_backends: string[];
-  truncated: boolean;
-}
-
-interface WsProjectStatus {
-  project: WsProjectSummary;
-  completeness: { complete: boolean; missing_backends: string[]; truncated: boolean; errors: string[] };
-  published_run: WsRunSummary | null;
-  runs: WsRunSummary[];
-}
-
-interface WsHealth {
-  version: string;
-  workspace: string;
-}
+/** 分析阶段定义（§2-3 左侧阶段进度；原 mockData.STAGES 就地收编） */
+const STAGES: StageInfo[] = [
+  { id: "collect", label: "采集", description: "读取 APK 结构、manifest 与签名信息" },
+  { id: "parse", label: "解析", description: "Apktool 反编译资源与 Smali，JADX 还原 Java 源码" },
+  { id: "index", label: "索引", description: "Androguard 建立类/方法/字段符号索引" },
+  { id: "evidence", label: "证据", description: "抽取权限、组件、字符串与敏感调用点" },
+  { id: "report", label: "报告", description: "汇总为可复核的 Markdown / JSON 报告" },
+];
 
 /** 阶段状态 → StatusBadge kind */
 const STAGE_BADGE: Record<StageState, StatusKind> = {
@@ -217,7 +159,7 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
       if (busy || stopped) return;
       busy = true;
       try {
-        const data = await apiFetch<WsProjectStatus>(`/projects/${projectId}`);
+        const data = await dexatlas.getProject(projectId);
         if (stopped) return;
         notFoundStreakRef.current = 0;
         setNotFound(false);
@@ -280,7 +222,8 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     pushLog("info", "轮询", `开始轮询 GET ${API_BASE}/projects/${projectId}（每 ${POLL_INTERVAL_MS / 1000}s）`);
     void poll();
     timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
-    void apiFetch<WsHealth>("/health")
+    void dexatlas
+      .getHealth()
       .then((h) => {
         if (!stopped) setHealth(h);
       })
@@ -378,14 +321,14 @@ export function Analysis() {
     setCancelling(true);
     setCancelNotice(null);
     try {
-      await apiFetch(`/projects/${projectId}/cancel`, { method: "POST" });
+      await dexatlas.cancelProject(projectId);
       pushLog("info", "取消", "已向后端发送取消请求（202），等待状态确认");
     } catch (err) {
       const code = err instanceof ApiError ? err.status : 0;
       const msg = err instanceof Error ? err.message : String(err);
       const notice =
-        code === 404
-          ? "取消失败：当前 workbench 后端未提供 /api/projects/{id}/cancel 接口（HTTP 404），无法取消。"
+        code === 404 || code === 405
+          ? "取消失败：当前 workbench 后端未提供 /api/projects/{id}/cancel 接口，无法取消。"
           : `取消失败：${msg}`;
       setCancelNotice(notice);
       pushLog("warn", "取消", notice);
@@ -411,7 +354,10 @@ export function Analysis() {
   }
 
   const projectLabel = project ? `${project.project.apk_name} · ${projectId}` : projectId;
-  const errors = project?.completeness.errors ?? [];
+  // workbench 的 completeness.errors 是字符串数组；兼容历史对象形状，统一转字符串展示
+  const errors = (project?.completeness.errors ?? []).map((e) =>
+    typeof e === "string" ? e : `${e.tool}${e.code ? ` [${e.code}]` : ""} ${e.message}`,
+  );
 
   return (
     <div className="page analysis">

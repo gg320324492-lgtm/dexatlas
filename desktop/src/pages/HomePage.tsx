@@ -3,31 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { StatusBadge, type StatusKind } from "../components/StatusBadge";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
+import { ApiError, dexatlas } from "../api";
+import type { AnalyzeAccepted, ProjectSummary as WorkbenchProject } from "../api";
 import "./HomePage.css";
-
-/** 工作台项目摘要（GET /api/projects 的条目）。 */
-interface WorkbenchProject {
-  id: string;
-  apk_name: string;
-  apk_sha256: string;
-  status: "pending" | "running" | "completed" | "failed" | string;
-  created_at: string;
-  class_count: number;
-  method_count: number;
-  call_site_count: number;
-  call_edge_count: number;
-  evidence_count: number;
-  missing_backends: string[];
-  truncated: boolean;
-}
-
-/** POST /api/analyze 的 202 应答（同 hash 已存在时返回已有项目）。 */
-interface AnalyzeAccepted {
-  project_id: string;
-  status: string;
-  apk_sha256: string;
-  already_analysed: boolean;
-}
 
 /** 后端状态 → 徽章语义（与 components/StatusBadge 的五态对齐）。 */
 function statusToKind(status: WorkbenchProject["status"]): StatusKind {
@@ -62,39 +40,7 @@ function formatTime(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-// ---------------------------------------------------------------------------
-// 最小 fetch 封装（M2-A 的 api client 合并前先在此落地；合并后统一切换 import）。
-// 浏览器 dev 下 /api 由 vite proxy 转发到 8618（见 vite.config.ts），Tauri 内
-// 同源相对路径即可；因此统一用相对路径，不写死后端地址。
-// ---------------------------------------------------------------------------
-
-async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, init);
-  if (!response.ok) {
-    let detail = `HTTP ${response.status}`;
-    try {
-      const body = (await response.json()) as { detail?: unknown; message?: string };
-      if (typeof body.detail === "string") detail = body.detail;
-      else if (typeof body.message === "string") detail = body.message;
-    } catch {
-      // 非 JSON 错误体：保留状态码信息
-    }
-    throw new Error(`请求失败（${detail}）`);
-  }
-  return (await response.json()) as T;
-}
-
-function listProjects(): Promise<{ projects: WorkbenchProject[]; total: number }> {
-  return apiJson("/api/projects?limit=50");
-}
-
-function uploadApk(file: File): Promise<AnalyzeAccepted> {
-  const form = new FormData();
-  form.append("file", file, file.name);
-  return apiJson("/api/analyze", { method: "POST", body: form });
-}
-
-/** 首页：拖拽上传 + 最近项目（补充单 2-1；Q2-M2-B 接入真实工作台 API）。 */
+/** 首页：拖拽上传 + 最近项目（补充单 2-1；Q2-M3-T1 起统一走 api/ 客户端）。 */
 export default function HomePage() {
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
@@ -109,11 +55,10 @@ export default function HomePage() {
   const loadProjects = useCallback(async () => {
     setProjectsError(null);
     try {
-      const data = await listProjects();
-      setProjects(data.projects);
+      setProjects(await dexatlas.listProjects());
     } catch (err) {
       setProjects(null);
-      setProjectsError(err instanceof Error ? err.message : String(err));
+      setProjectsError(err instanceof ApiError ? `${err.status}: ${err.message}` : String(err));
     }
   }, []);
 
@@ -132,8 +77,9 @@ export default function HomePage() {
       setError(null);
       setFileName(file.name);
       setUploading(true);
-      uploadApk(file)
-        .then((accepted) => {
+      dexatlas
+        .analyzeUpload(file, file.name)
+        .then((accepted: AnalyzeAccepted) => {
           // 同 hash 已存在时后端也返回已有项目，同样跳转。
           void navigate(`/analysis/${accepted.project_id}`);
         })

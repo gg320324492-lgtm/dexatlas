@@ -1,144 +1,109 @@
 /**
- * DexAtlas REST API 类型 — 与 src/dexatlas/api/app.py 的响应模型逐字段对齐。
+ * DexAtlas REST API 类型 — Q2-M3-T1 按 8618 workbench 实测契约对齐。
  *
  * 字段名保留后端 snake_case 原样，不做 camelCase 改写，保证和 JSON 响应
  * 一一对应、调试时可直接对照。
  *
- * 对齐来源（2026-11-24 核对）：
- * - ProjectSummary / ProjectDetail ← ProjectResponse（app.py:188）
- * - AnalyzeJob ← AnalyzeJobResponse（app.py:223）
- * - RunInfo ← RunResponse（app.py:229）
- * - Evidence / Provenance ← core/models.py 的 Evidence（models.py:574）与
- *   Provenance（models.py:142），即 /projects/{id}/evidence 的 model_dump 输出
- * - HealthInfo ← HealthResponse（app.py:175）
- * - BackendInfo ← GET /api/backends（app.py:349）的 dict 形状
- * - 枚举值 ← core/models.py 的 ProjectStatus / EvidenceKind / EvidenceLevel /
- *   ToolErrorCode 与 core/runs.py 的 RunStatus / RunCompleteness
+ * 对齐来源（2026-11-24 用 8618 实测响应 + 源码核对）：
+ * - ProjectSummary / RunSummary / Completeness ← src/dexatlas/mcp/schemas.py
+ *   （ProjectList:128、RunSummary:139、ProjectStatus:166、Completeness:68）
+ * - ProjectDetailEnvelope ← GET /api/projects/{id}（workbench app.py:124，
+ *   实际调用 mcp/tools/projects.py project_status）
+ * - EvidenceRecord ← EvidenceView（schemas.py:417），GET /evidence 返回裸数组
+ * - SymbolHit ← SymbolView（schemas.py:230），name/detail 是 {text, notice}
+ * - LocatorResolution ← schemas.py:429
+ * - WorkbenchHealth ← workbench app.py:101（{version, workspace}）
+ * - AnalyzeAccepted ← workbench app.py:249 UploadAccepted
  *
- * 注意：当前 8618 端口实际运行的是 workbench 应用（src/dexatlas/workbench/app.py），
- * 其 /api/health 与 /api/projects 的形状和 api/app.py 不同（workbench 的
- * /api/projects 返回 {projects, total, offset, limit} 分页信封，且没有
- * /runs、/backends、/cancel 端点）。本文件的类型以 api/app.py 契约为准；
- * client.ts 对两种真实响应做了归一化，切换后端时无需改类型。
+ * 与 api/app.py 契约的差异在 client.ts 归一化，切换后端时无需改类型。
  */
-
-// ---------------------------------------------------------------------------
-// 共享：后端失败是值，不是异常（core/models.py:55 ToolError）
-// ---------------------------------------------------------------------------
-
-/** ToolErrorCode（core/models.py:34） */
-export type ToolErrorCode =
-  | "not_installed"
-  | "timeout"
-  | "exit_nonzero"
-  | "parse_error"
-  | "unsupported"
-  | "output_truncated"
-  | "analysis_failed";
-
-/** ErrorResponse（app.py:181）— 已按工作区脱敏的后端失败记录 */
-export interface ToolErrorInfo {
-  tool: string;
-  code: ToolErrorCode;
-  message: string;
-  detail?: string | null;
-}
 
 // ---------------------------------------------------------------------------
 // 项目
 // ---------------------------------------------------------------------------
 
-/** ProjectStatus（core/models.py:748） */
+/** workbench ProjectSummary.status（core/models.py:748 ProjectState 的值） */
 export type ProjectStatus = "pending" | "running" | "completed" | "failed";
 
-/**
- * ProjectResponse（app.py:188）— 列表与详情共用同一模型。
- * 列表 GET /api/projects 返回 ProjectResponse[]（新→旧）。
- */
+/** mcp/schemas.py:93 ProjectSummary — 一个已分析 APK 的概要 */
 export interface ProjectSummary {
   id: string;
-  status: ProjectStatus;
+  apk_name: string;
   apk_sha256: string;
-  /** 被分析 APK 的文件名（服务端目录布局不发布，见 app.py:192 的字段说明） */
-  apk_path: string;
-  apk_size_bytes: number;
+  status: ProjectStatus | string;
+  created_at: string;
   class_count: number;
   method_count: number;
-  /** 索引里的调用点数（app.py:201） */
-  reference_count: number;
-  /** 与 reference_count 同值，报告/MCP 侧的叫法（app.py:205） */
+  /** 索引里的调用点数：一个字节码位置记一条（schemas.py:113） */
   call_site_count: number;
-  /** 索引里的调用边数：两个方法之间的一条关系记一条（app.py:213） */
+  /** 索引里的调用边数：两个方法之间的一条关系记一条（schemas.py:116） */
   call_edge_count: number;
   evidence_count: number;
-  resource_count: number;
-  tool_versions: Record<string, string | null>;
-  errors: ToolErrorInfo[];
+  missing_backends: string[];
+  truncated: boolean;
 }
 
-/** 项目详情 — 后端与列表同形（GET /api/projects/{id}，app.py:408） */
-export interface ProjectDetail extends ProjectSummary {}
+/** mcp/schemas.py:139 RunSummary — 一次分析尝试 */
+export interface RunInfo {
+  id: string;
+  status: string;
+  completeness: "complete" | "partial" | string;
+  tool_versions: Record<string, string | null>;
+  started_at: string;
+  finished_at: string | null;
+  duration_seconds: number | null;
+}
+
+/**
+ * mcp/schemas.py:68 Completeness.errors — workbench 实际返回字符串数组
+ * （mcp/tools/projects.py:106 把 ToolError 格式化为 "tool: message"）。
+ * 历史响应可能仍是对象数组，页面侧做两种形状的兼容。
+ */
+export type CompletenessError = string | { tool: string; code?: string; message: string };
+
+/** mcp/schemas.py:68 Completeness — 一次分析读到了什么、没读到什么 */
+export interface Completeness {
+  complete: boolean;
+  missing_backends: string[];
+  truncated: boolean;
+  errors: CompletenessError[];
+}
+
+/** mcp/schemas.py:166 ProjectStatus — GET /api/projects/{id} 的完整信封 */
+export interface ProjectDetailEnvelope {
+  project: ProjectSummary;
+  completeness: Completeness;
+  published_run: RunInfo | null;
+  runs: RunInfo[];
+  /** 每条 {id, kind, summary}，指向 /evidence 里的完整记录 */
+  evidence_catalog?: Array<{ id: string; kind: string; summary: string }>;
+}
 
 // ---------------------------------------------------------------------------
 // 分析任务
 // ---------------------------------------------------------------------------
 
-/** AnalyzeJobResponse（app.py:223）— POST /api/analyze 的 202 响应 */
+/** workbench app.py:249 UploadAccepted — POST /api/analyze 的 202 响应 */
+export interface AnalyzeAccepted {
+  project_id: string;
+  status: string;
+  apk_sha256: string;
+  /** 工作台已持有该 APK 的分析：没有新任务在跑，可直接打开项目 */
+  already_analysed: boolean;
+}
+
+/** api/app.py 契约的 202 任务（workbench 无此形状；保留给 getAnalyzeJob） */
 export interface AnalyzeJob {
   project_id: string;
   status: string;
-  /** 去哪里轮询完成状态 */
   detail: string;
-}
-
-// ---------------------------------------------------------------------------
-// 分析轮次
-// ---------------------------------------------------------------------------
-
-/** RunStatus（core/runs.py:52） */
-export type RunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
-
-/** RunCompleteness（core/runs.py:75） */
-export type RunCompleteness = "complete" | "partial";
-
-/** RunResponse（app.py:229）— 一次分析尝试 */
-export interface RunInfo {
-  id: string;
-  project_id: string;
-  status: RunStatus;
-  completeness: RunCompleteness;
-  apk_sha256: string;
-  tool_versions: Record<string, string | null>;
-  errors: ToolErrorInfo[];
-  started_at: string;
-  finished_at: string | null;
-  duration_seconds: number | null;
-  /** 这一轮的结果是否就是项目当前发布的结果（app.py:249） */
-  published: boolean;
-}
-
-/** GET /api/projects/{id}/runs 的响应（app.py:417） */
-export interface RunList {
-  project_id: string;
-  total: number;
-  published_run_id: string | null;
-  runs: RunInfo[];
 }
 
 // ---------------------------------------------------------------------------
 // 证据
 // ---------------------------------------------------------------------------
 
-/** Provenance（core/models.py:142）— 一个事实来自哪里 */
-export interface Provenance {
-  tool: string;
-  tool_version?: string | null;
-  apk_sha256: string;
-  /** 形如 ``<tool>:<place>``，place 相对工具产物树（见 models.py:150 注释） */
-  locator: string;
-}
-
-/** EvidenceKind（core/models.py:506） */
+/** EvidenceView.kind（core/models.py:506 EvidenceKind 的值） */
 export type EvidenceKind =
   | "code_located"
   | "cross_reference"
@@ -146,57 +111,85 @@ export type EvidenceKind =
   | "behaviour"
   | "observation";
 
-/** EvidenceLevel（core/models.py:537） */
+/** EvidenceView.level（core/models.py:537 EvidenceLevel 的值） */
 export type EvidenceLevel = "verified" | "lead" | "insufficient";
 
-/** Evidence（core/models.py:574）— 一条可溯源的观察 */
-export interface Evidence {
+/** mcp/schemas.py:417 EvidenceView — 一条证据与其 provenance locator 串 */
+export interface EvidenceRecord {
   id: string;
-  kind: EvidenceKind;
-  level: EvidenceLevel;
+  kind: EvidenceKind | string;
+  level: EvidenceLevel | string;
   summary: string;
   detail: Record<string, unknown>;
-  provenance: Provenance[];
+  /** 形如 "jadx:sources/a/Foo.java" 的 locator 串（schemas.py:425） */
+  provenance: string[];
 }
 
-/** GET /api/projects/{id}/evidence 的响应（app.py:795） */
+/** getEvidence 的归一化返回：workbench 裸数组 → 与 api/app.py 对齐的信封 */
 export interface EvidenceList {
   project_id: string;
   total: number;
-  evidence: Evidence[];
+  evidence: EvidenceRecord[];
 }
 
 // ---------------------------------------------------------------------------
-// 元信息
+// 符号与 locator
 // ---------------------------------------------------------------------------
 
-/** HealthResponse（app.py:175）— GET /api/health */
-export interface HealthInfo {
-  status: string;
+/** UntrustedText（schemas.py:40 附近）— 从 APK 读出的文本，包一层 notice */
+export interface UntrustedText {
+  text: string;
+  notice?: string;
+  bytes?: number;
+  truncated?: boolean;
+}
+
+/** mcp/schemas.py:230 SymbolView — 索引里的一个符号命中 */
+export interface SymbolHit {
+  kind: string;
+  name: UntrustedText;
+  detail: UntrustedText | null;
+  provenance: string[];
+}
+
+/** mcp/schemas.py:429 LocatorResolution — 一个 locator 的解析结果 */
+export interface LocatorResolution {
+  resolved: boolean;
+  /** 为什么解析/未解析，后端原话 */
+  reason: string;
+  kind: "java" | "smali" | null;
+  text: UntrustedText | null;
+  provenance: string[];
+}
+
+// ---------------------------------------------------------------------------
+// 元信息与控制
+// ---------------------------------------------------------------------------
+
+/** workbench app.py:101 GET /api/health — 版本与工作区名（不含后端清单） */
+export interface WorkbenchHealth {
   version: string;
-  /** 各后端版本；不可用的后端为 null */
-  backends: Record<string, string | null>;
+  workspace: string;
 }
 
-/** GET /api/backends（app.py:349）— 装了哪些分析后端 */
+/** api/app.py 契约的 health（workbench 不返回 status/backends 字段） */
+export interface HealthInfo extends WorkbenchHealth {
+  status?: string;
+  backends?: Record<string, string | null>;
+}
+
+/** GET /api/backends（api/app.py:349）— workbench 未提供该端点 */
 export interface BackendInfo {
   available: string[];
   missing: string[];
   versions: Record<string, string | null>;
 }
 
-// ---------------------------------------------------------------------------
-// 取消与报告
-// ---------------------------------------------------------------------------
-
-/** POST /api/projects/{id}/cancel 的 202 响应（app.py:452） */
+/** POST /api/projects/{id}/cancel 的 202 响应（api/app.py 契约；workbench 405） */
 export interface CancelResponse {
   project_id: string;
   status: "cancelling";
 }
 
-/** 报告导出格式（app.py:810，query 参数 format） */
+/** 报告导出格式（两个后端一致，workbench app.py:300） */
 export type ReportFormat = "markdown" | "json";
-
-/** getReport 的返回：markdown 是文本，json 是任意结构 */
-export type ReportPayload = string | Record<string, unknown>;

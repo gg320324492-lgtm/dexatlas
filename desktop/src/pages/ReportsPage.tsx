@@ -10,14 +10,15 @@ import { Button } from "../components/Button";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { EmptyState } from "../components/states/EmptyState";
-import { ApiError, client, downloadText, type ProjectInfo } from "../client";
+import { ApiError, dexatlas as client, downloadText } from "../api";
+import type { ProjectSummary } from "../api";
 import "./ReportsPage.css";
 
 type Format = "markdown" | "json";
 
 /** 报告页一行：项目 + 两种格式的导出按钮。 */
 export default function ReportsPage() {
-  const [projects, setProjects] = useState<ProjectInfo[] | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState<{ id: string; format: Format } | null>(null);
@@ -39,11 +40,12 @@ export default function ReportsPage() {
     void load();
   }, [load]);
 
-  const doExport = async (project: ProjectInfo, format: Format) => {
+  const doExport = async (project: ProjectSummary, format: Format) => {
     setExporting({ id: project.id, format });
     setRowError(null);
     try {
-      const text = await client.getReport(project.id, format);
+      const payload = await client.getReport(project.id, format);
+      const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
       const ext = format === "markdown" ? "md" : "json";
       downloadText(`${project.id}.${ext}`, text, format === "markdown" ? "text/markdown" : "application/json");
     } catch (e) {
