@@ -1,9 +1,10 @@
+/* 面包屑：斜杠分隔，末项为当前页 */
 .da-crumbs__list {
   list-style: none;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--da-space-1);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
 }
@@ -11,31 +12,31 @@
 .da-crumbs__item {
   display: flex;
   align-items: center;
-  gap: var(--da-space-1);
-  font-size: var(--da-text-sm);
+  gap: var(--space-1);
+  font-size: var(--text-sm);
 }
 
 .da-crumbs__link {
   background: none;
   border: none;
   padding: 2px 6px;
-  border-radius: var(--da-radius-sm);
-  color: var(--da-text-muted);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
   cursor: pointer;
   font-size: inherit;
 }
 .da-crumbs__link:hover {
-  color: var(--da-navy-600);
-  background: var(--da-navy-50);
+  color: var(--color-navy-800);
+  background: var(--color-lavender-soft);
 }
 
 .da-crumbs__current {
-  color: var(--da-navy-800);
+  color: var(--color-navy-800);
   font-weight: 700;
   padding: 2px 6px;
 }
 
 .da-crumbs__sep {
-  color: var(--da-border-strong);
+  color: var(--color-border-strong);
   user-select: none;
 }

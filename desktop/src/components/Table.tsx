@@ -68,7 +68,9 @@ export function Table<Row extends Record<string, unknown>>({ columns, rows, rowK
         <thead>
           <tr>
             {columns.map((col) => {
-              const sortable = Boolean(col.sortValue) || (col.key in (rows[0] ?? ({} as Record<string, unknown>)));
+              const firstRow: Record<string, unknown> | undefined =
+                rows.length > 0 ? (rows[0] as unknown as Record<string, unknown>) : undefined;
+              const sortable = Boolean(col.sortValue) || (firstRow !== undefined && col.key in firstRow);
               const active = sort?.key === col.key;
               return (
                 <th

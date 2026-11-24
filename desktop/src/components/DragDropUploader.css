@@ -1,30 +1,31 @@
+/* 拖拽上传器：虚线框 + 拖入高亮 + 键盘可达 */
 .da-uploader {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--da-space-2);
-  padding: var(--da-space-10) var(--da-space-6);
-  border: 2px dashed var(--da-border-strong);
-  border-radius: var(--da-radius-xl);
-  background: var(--da-surface-veil);
+  gap: var(--space-2);
+  padding: var(--space-7) var(--space-6);
+  border: 2px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   cursor: pointer;
   text-align: center;
-  transition: border-color var(--da-transition), background var(--da-transition), transform var(--da-transition);
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
 }
 .da-uploader:hover:not(.da-uploader--disabled) {
-  border-color: var(--da-violet-strong);
-  background: var(--da-violet-faint);
+  border-color: var(--color-lavender);
+  background: rgba(184, 167, 245, 0.08);
 }
 .da-uploader:focus-visible {
-  outline: none;
-  box-shadow: var(--da-focus-ring);
+  outline: 2px solid var(--color-lavender);
+  outline-offset: 2px;
 }
 .da-uploader--over {
-  border-color: var(--da-violet-strong);
-  background: var(--da-violet-faint);
+  border-color: var(--color-lavender);
+  background: rgba(184, 167, 245, 0.12);
   transform: scale(1.01);
-  box-shadow: var(--da-shadow-1);
+  box-shadow: var(--shadow-1);
 }
 .da-uploader--disabled {
   opacity: 0.55;
@@ -38,35 +39,35 @@
 .da-uploader__icon {
   width: 56px;
   height: 56px;
-  border-radius: var(--da-radius-full);
-  background: var(--da-gradient-brand);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-brand);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 26px;
   color: #fff;
-  margin-bottom: var(--da-space-2);
-  box-shadow: var(--da-shadow-1);
+  margin-bottom: var(--space-2);
+  box-shadow: var(--shadow-1);
 }
 
 .da-uploader__title {
-  font-size: var(--da-text-xl);
+  font-size: var(--text-xl);
   font-weight: 700;
-  color: var(--da-navy-800);
+  color: var(--color-navy-800);
 }
 
 .da-uploader__desc {
-  font-size: var(--da-text-sm);
-  color: var(--da-text-muted);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .da-uploader__file {
-  margin-top: var(--da-space-2);
-  font-size: var(--da-text-sm);
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--da-navy-700);
-  background: var(--da-violet-soft);
-  border-radius: var(--da-radius-full);
+  color: var(--color-navy-800);
+  background: var(--color-lavender-soft);
+  border-radius: var(--radius-pill);
   padding: 4px 14px;
   max-width: 80%;
   overflow: hidden;

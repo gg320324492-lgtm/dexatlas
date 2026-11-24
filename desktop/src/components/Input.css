@@ -1,37 +1,38 @@
+/* 文本输入框：label/hint/error 关联完整，focus-within 焦点环 */
 .da-field {
   display: flex;
   flex-direction: column;
-  gap: var(--da-space-1);
+  gap: var(--space-1);
 }
 
 .da-field__label {
-  font-size: var(--da-text-sm);
+  font-size: var(--text-sm);
   font-weight: 700;
-  color: var(--da-navy-800);
+  color: var(--color-navy-800);
 }
 .da-field__required {
-  color: var(--da-danger);
+  color: var(--color-danger);
 }
 
 .da-field__control {
   display: flex;
   align-items: center;
-  gap: var(--da-space-2);
-  background: var(--da-surface);
-  border: 1px solid var(--da-border-strong);
-  border-radius: var(--da-radius-md);
-  padding: 0 var(--da-space-3);
-  transition: border-color var(--da-transition), box-shadow var(--da-transition);
+  gap: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 .da-field__control:focus-within {
-  border-color: var(--da-violet-strong);
-  box-shadow: var(--da-shadow-focus);
+  border-color: var(--color-lavender);
+  box-shadow: 0 0 0 3px rgba(184, 167, 245, 0.35);
 }
 .da-field--error .da-field__control {
-  border-color: var(--da-danger);
+  border-color: var(--color-danger);
 }
 .da-field--error .da-field__control:focus-within {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--da-danger) 25%, transparent);
+  box-shadow: 0 0 0 3px rgba(214, 69, 80, 0.2);
 }
 
 .da-field__input {
@@ -40,12 +41,12 @@
   border: none;
   outline: none;
   background: transparent;
-  padding: var(--da-space-2) 0;
-  font-size: var(--da-text-md);
-  color: var(--da-text);
+  padding: var(--space-2) 0;
+  font-size: var(--text-md);
+  color: var(--color-text);
 }
 .da-field__input::placeholder {
-  color: var(--da-text-muted);
+  color: var(--color-text-muted);
 }
 .da-field__input:disabled {
   opacity: 0.55;
@@ -54,19 +55,19 @@
 
 .da-field__prefix,
 .da-field__suffix {
-  color: var(--da-text-muted);
-  font-size: var(--da-text-sm);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
   flex-shrink: 0;
 }
 
 .da-field__hint {
   margin: 0;
-  font-size: var(--da-text-xs);
-  color: var(--da-text-muted);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 .da-field__error {
   margin: 0;
-  font-size: var(--da-text-xs);
-  color: var(--da-danger);
+  font-size: var(--text-xs);
+  color: var(--color-danger);
   font-weight: 600;
 }

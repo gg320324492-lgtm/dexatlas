@@ -1,50 +1,51 @@
+/* 状态组件共享样式：空 / 错误 / 加载（骨架屏） */
 .da-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--da-space-12) var(--da-space-6);
-  gap: var(--da-space-2);
-  border: 1px dashed var(--da-border-strong);
-  border-radius: var(--da-radius-lg);
-  background: var(--da-surface-veil);
+  padding: var(--space-7) var(--space-6);
+  gap: var(--space-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
   min-height: 220px;
 }
 
 .da-state__icon {
   font-size: 40px;
   line-height: 1;
-  margin-bottom: var(--da-space-2);
-  filter: grayscale(0.2);
+  margin-bottom: var(--space-2);
 }
 
 .da-state--empty .da-state__icon {
   opacity: 0.75;
 }
 .da-state--error .da-state__icon {
-  color: var(--da-danger);
+  color: var(--color-danger);
 }
 
 .da-state__title {
-  font-size: var(--da-text-lg);
+  font-size: var(--text-lg);
   font-weight: 700;
-  color: var(--da-navy-800);
+  color: var(--color-navy-800);
 }
 
 .da-state__desc {
-  font-size: var(--da-text-md);
-  color: var(--da-text-muted);
+  font-size: var(--text-md);
+  color: var(--color-text-muted);
   max-width: 420px;
 }
 
 .da-state__detail {
-  margin: var(--da-space-2) 0 0;
-  padding: var(--da-space-3);
-  background: var(--da-navy-900);
-  color: var(--da-navy-100);
-  border-radius: var(--da-radius-md);
-  font-size: var(--da-text-xs);
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  background: var(--color-navy-900);
+  color: var(--color-text-invert);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   max-width: 560px;
   max-height: 160px;
   overflow: auto;
@@ -54,13 +55,13 @@
 }
 
 .da-state__actions {
-  margin-top: var(--da-space-3);
+  margin-top: var(--space-3);
   display: flex;
-  gap: var(--da-space-3);
+  gap: var(--space-3);
   align-items: center;
 }
 
-/* 骨架屏 */
+/* 骨架屏 shimmer */
 @keyframes da-shimmer {
   0% {
     background-position: -400px 0;
@@ -72,8 +73,8 @@
 
 .da-skeleton-line {
   height: 14px;
-  border-radius: var(--da-radius-full);
-  background: linear-gradient(90deg, var(--da-neutral-soft) 25%, #e6e9ef 50%, var(--da-neutral-soft) 75%);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--color-surface-muted) 25%, #e9e3d9 50%, var(--color-surface-muted) 75%);
   background-size: 800px 100%;
   animation: da-shimmer 1.6s infinite linear;
   width: 100%;
@@ -91,34 +92,34 @@
   max-width: 480px;
   display: flex;
   flex-direction: column;
-  gap: var(--da-space-3);
+  gap: var(--space-3);
 }
 
 .da-skeleton-cards {
   width: 100%;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--da-space-4);
+  gap: var(--space-4);
 }
 .da-skeleton-card {
-  border: 1px solid var(--da-border);
-  border-radius: var(--da-radius-lg);
-  padding: var(--da-space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--da-space-3);
+  gap: var(--space-3);
 }
 
 .da-skeleton-table {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--da-space-3);
+  gap: var(--space-3);
 }
 .da-skeleton-table__row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr;
-  gap: var(--da-space-4);
+  gap: var(--space-4);
 }
 
 .da-visually-hidden {

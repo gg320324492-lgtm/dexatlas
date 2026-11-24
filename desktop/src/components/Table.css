@@ -1,41 +1,42 @@
+/* 数据表：粘性表头 + 可排序 + 紧凑密度 */
 .da-table-wrap {
-  background: var(--da-surface);
-  border: 1px solid var(--da-border);
-  border-radius: var(--da-radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   overflow: auto;
 }
 
 .da-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--da-text-md);
+  font-size: var(--text-md);
 }
 
 .da-table__caption {
   text-align: left;
-  padding: var(--da-space-3) var(--da-space-4);
-  color: var(--da-text-muted);
-  font-size: var(--da-text-sm);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .da-table thead th {
   position: sticky;
   top: 0;
-  background: var(--da-navy-50);
-  color: var(--da-navy-800);
+  background: var(--color-surface-muted);
+  color: var(--color-navy-800);
   font-weight: 700;
-  font-size: var(--da-text-sm);
+  font-size: var(--text-sm);
   text-align: left;
-  padding: var(--da-space-3) var(--da-space-4);
-  border-bottom: 1px solid var(--da-border-strong);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-strong);
   white-space: nowrap;
   z-index: 1;
 }
 
 .da-table tbody td {
-  padding: var(--da-space-3) var(--da-space-4);
-  border-bottom: 1px solid var(--da-border);
-  color: var(--da-text);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
   vertical-align: middle;
 }
 .da-table tbody tr:last-child td {
@@ -44,20 +45,20 @@
 
 .da-table-wrap--compact .da-table thead th,
 .da-table-wrap--compact .da-table tbody td {
-  padding: var(--da-space-1) var(--da-space-2);
-  font-size: var(--da-text-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
 }
 
 .da-table__row--clickable {
   cursor: pointer;
-  transition: background var(--da-transition);
+  transition: background var(--transition-fast);
 }
 .da-table__row--clickable:hover {
-  background: var(--da-navy-50);
+  background: var(--color-lavender-soft);
 }
 .da-table__row--clickable:focus-visible {
-  outline: none;
-  box-shadow: inset var(--da-focus-ring);
+  outline: 2px solid var(--color-lavender);
+  outline-offset: -2px;
 }
 
 .da-table__sort {
@@ -72,10 +73,10 @@
   font-weight: 700;
   color: inherit;
   cursor: pointer;
-  border-radius: var(--da-radius-sm);
+  border-radius: var(--radius-sm);
 }
 .da-table__sort:hover {
-  background: var(--da-navy-100);
+  background: rgba(184, 167, 245, 0.25);
 }
 .da-table__sort-arrow {
   font-size: 9px;
@@ -83,5 +84,5 @@
 }
 .da-table__sort-arrow--active {
   opacity: 1;
-  color: var(--da-violet-strong);
+  color: var(--color-navy-600);
 }

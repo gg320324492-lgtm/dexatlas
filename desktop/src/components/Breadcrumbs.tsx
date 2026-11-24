@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import "./Breadcrumbs.css";
 
 export interface BreadcrumbItem {
