@@ -41,27 +41,27 @@ export default function EvidencePage() {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 项目列表
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await client.listProjects();
-        if (cancelled) return;
-        setProjects(list);
-        // 默认选最新的已完成项目
-        const done = list.find((p) => p.status === "completed") ?? list[0];
-        if (done) setProjectId(done.id);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+  // 项目列表（失败可经 ErrorState 的重试按钮再次拉取）
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const list = await client.listProjects();
+      setProjects(list);
+      // 默认选最新的已完成项目
+      const done = list.find((p) => p.status === "completed") ?? list[0];
+      if (done) setProjectId(done.id);
+    } catch (e) {
+      setProjects(null);
+      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // 证据列表跟随所选项目
   useEffect(() => {
@@ -151,7 +151,7 @@ export default function EvidencePage() {
         <header className="page-header">
           <h1 className="page-title">证据</h1>
         </header>
-        <ErrorState title="证据加载失败" description="无法读取项目列表。" detail={error} />
+        <ErrorState title="证据加载失败" description="无法读取项目列表。" detail={error} onRetry={load} />
       </div>
     );
   }
