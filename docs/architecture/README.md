@@ -443,3 +443,8 @@ The rest of this directory holds the detail: [Analysis runs](analysis-runs.md),
 [The MCP server](mcp-server.md), [The agent](agent.md),
 [Report rendering and the evidence package](report-rendering.md) and
 [The public contracts](public-contracts.md).
+
+The desktop application — the fourth transport over this same core — is specified in
+[The desktop app](desktop-app.md): its information architecture, visual tokens,
+component inventory, state matrix and the wiring boundary that keeps it a consumer
+of the public contracts rather than a second analysis core.

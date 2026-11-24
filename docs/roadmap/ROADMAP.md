@@ -23,7 +23,9 @@ what comes next.
   language, evidence-chain-first — scoped by
   [phase4-q2-supplement.md](phase4-q2-supplement.md) and closed by
   [phase4-q2-closure.md](phase4-q2-closure.md). This selectively unfreezes the
-  desktop-app front; the rest of the Portfolio Freeze rules still apply.
+  desktop-app front; the rest of the Portfolio Freeze rules still apply. The
+  desktop-app design specification lives at
+  [docs/architecture/desktop-app.md](../architecture/desktop-app.md).
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
