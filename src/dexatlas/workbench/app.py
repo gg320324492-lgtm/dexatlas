@@ -36,7 +36,12 @@ from starlette.requests import Request
 
 from dexatlas import __version__
 from dexatlas.agent.state import TaskState
-from dexatlas.api.uploads import UploadSizeLimitMiddleware, run_background_analysis, stage_upload
+from dexatlas.api.uploads import (
+    RUNNING,
+    UploadSizeLimitMiddleware,
+    run_background_analysis,
+    stage_upload,
+)
 from dexatlas.core import ingest
 from dexatlas.core.models import Project
 from dexatlas.core.models import ProjectStatus as ProjectState
@@ -60,6 +65,7 @@ from dexatlas.mcp.tools import references as reference_tools
 from dexatlas.mcp.tools import symbols as symbol_tools
 from dexatlas.reports.json_report import build_json_report
 from dexatlas.reports.markdown import render_markdown
+from dexatlas.tools.registry import BackendRegistry
 from dexatlas.workbench import agent_tasks as agent
 from dexatlas.workbench import benchmarks as benchmark_view
 
@@ -475,6 +481,81 @@ def create_app(analyzer: Analyzer) -> FastAPI:
     def benchmark_m3() -> benchmark_view.BenchmarkSet:
         """The committed M3 comparison measurements, recomputed from their traces."""
         return benchmark_view.benchmark_set()
+
+    # -- the analysis control surfaces ----------------------------------------
+    #
+    # The desktop application polls these while an upload is being analysed,
+    # and asks to cancel it from the analysis screen. The workbench's own
+    # upload screen already hands APKs to the same background analysis the
+    # REST API runs (``run_background_analysis`` registers every such run in
+    # the same process-wide ``RUNNING`` table the REST API's cancel endpoint
+    # reads), so the answers here are the REST API's answers under the
+    # workbench's ``/api`` prefix: the run rows are read through
+    # :mod:`dexatlas.mcp.tools.projects` so the shapes stay the MCP
+    # contract's, and the backend status comes from the same
+    # :class:`~dexatlas.tools.registry.BackendRegistry` the REST API probes.
+
+    @app.get("/api/backends")
+    def list_backends() -> dict[str, Any]:
+        """Which analysis backends are installed, and at what version.
+
+        A fact about the machine, read through the same registry the REST
+        API's ``/backends`` endpoint probes -- the registry is built here
+        rather than shared with the Analyzer so that answering it never
+        opens the workspace database.
+        """
+        registry = BackendRegistry(analyzer.settings)
+        return {
+            "available": [backend.name for backend in registry.available()],
+            "missing": [backend.name for backend in registry.missing()],
+            "versions": registry.versions(),
+        }
+
+    @app.get("/api/projects/{project_id}/runs")
+    def list_runs(project_id: str) -> dict[str, Any]:
+        """Every run of a project, newest first, with the published one named."""
+        if analyzer.store.get_project(project_id) is None:
+            raise unknown_project(project_id)
+        with analyzer.store.reading() as view:
+            runs = view.list_runs(project_id)
+            published = view.get_published_run_id(project_id)
+        return {
+            "project_id": project_id,
+            "total": len(runs),
+            "published_run_id": published,
+            "runs": [
+                project_tools.run_summary(run).model_dump(mode="json")
+                | {"published": run.id == published}
+                for run in runs
+            ],
+        }
+
+    @app.get("/api/projects/{project_id}/runs/{run_id}")
+    def get_run(project_id: str, run_id: str) -> dict[str, Any]:
+        """One run of a project, with whether its snapshot is the published one."""
+        with analyzer.store.reading() as view:
+            run = view.get_run(run_id)
+            published = view.get_published_run_id(project_id)
+        if run is None or run.project_id != project_id:
+            raise HTTPException(status_code=404, detail=f"no run {run_id!r} for {project_id!r}")
+        return project_tools.run_summary(run).model_dump(mode="json") | {
+            "published": run.id == published
+        }
+
+    @app.post("/api/projects/{project_id}/cancel", status_code=202)
+    def cancel_analysis(project_id: str) -> dict[str, Any]:
+        """Ask the analysis that is running for a project to stop.
+
+        The answer is that the request was accepted, not that the analysis
+        has stopped: the analysis stops at the next point where stopping
+        cannot leave half-written results behind. With nothing running the
+        request conflicts with the project's state, and the answer is 409.
+        """
+        if not RUNNING.cancel(project_id):
+            raise HTTPException(
+                status_code=409, detail=f"no analysis is running for {project_id!r}"
+            )
+        return {"project_id": project_id, "status": "cancelling"}
 
     if front_end_is_built():
         app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="workbench")
