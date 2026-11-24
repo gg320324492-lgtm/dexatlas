@@ -87,3 +87,40 @@
   flex-direction: column;
   overflow: hidden;
 }
+
+/* skip-link：默认视觉隐藏，键盘聚焦时固定在视口左上角高对比展示。 */
+.skip-link {
+  position: fixed;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 100; /* 高于侧栏 */
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-navy-800);
+  color: var(--color-text-invert);
+  font-size: var(--text-md);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--shadow-2);
+  /* 视觉隐藏但保留可聚焦与可访问性树入口 */
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+  clip-path: none;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  outline: 2px solid var(--color-text-invert);
+  outline-offset: 2px;
+}
+
+/* 点击跳转后 main 需要能接收焦点（tabIndex={-1}），去掉默认轮廓由 focus-visible 补。 */
+.app-main:focus {
+  outline: none;
+}

@@ -1,3 +1,4 @@
+import { useRef, type MouseEvent } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import "./AppLayout.css";
 
@@ -11,8 +12,21 @@ const NAV_ITEMS = [
 
 /** 全局布局：左侧栏 + 主内容区。 */
 export default function AppLayout() {
+  const mainRef = useRef<HTMLElement>(null);
+
+  // HashRouter 下原生 fragment 跳转会污染路由 hash（#main-content 被解析为路径），
+  // 因此阻止默认导航，改为显式把焦点移到主内容。
+  const handleSkip = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    mainRef.current?.focus();
+  };
+
   return (
     <div className="app-shell">
+      {/* 键盘用户可第一跳直接进入主内容，不必穿过整个侧栏（验收 A-7）。 */}
+      <a href="#main-content" className="skip-link" onClick={handleSkip}>
+        跳到主内容
+      </a>
       <aside className="sidebar">
         <div className="sidebar-brand">
           <div className="sidebar-logo" aria-hidden="true">
@@ -47,7 +61,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      <main className="app-main">
+      <main id="main-content" ref={mainRef} className="app-main" tabIndex={-1}>
         <Outlet />
       </main>
     </div>
