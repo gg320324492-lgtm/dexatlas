@@ -1292,3 +1292,205 @@ def test_port_zero_lets_the_system_choose_the_port(
     assert exit_code is None, "a port the system chose is a start, not a failure"
     output = capsys.readouterr().out
     assert "127.0.0.1:0" not in output, "the banner does not print a port nobody chose"
+
+
+# ---------------------------------------------------------------------------
+# The analysis control surfaces: backends, runs and cancel
+#
+# The desktop application polls these three while an upload is being
+# analysed. Their answers are the REST API's answers under the /api prefix:
+# the backend registry is the same discovery, the run rows are the same
+# store rows, and the cancel token is the same process-wide table the
+# background analysis registers in.
+# ---------------------------------------------------------------------------
+
+
+def test_backends_separates_available_from_missing(client: TestClient) -> None:
+    """The three known backends are reported, each as available or missing."""
+    body = client.get("/api/backends").json()
+
+    available = set(body["available"])
+    missing = set(body["missing"])
+    assert available.isdisjoint(missing)
+    assert available | missing == {"jadx", "apktool", "androguard"}
+
+
+def test_backends_carries_a_version_for_every_backend(client: TestClient) -> None:
+    """The version map names all three backends, installed or not."""
+    body = client.get("/api/backends").json()
+
+    assert set(body["versions"]) == {"jadx", "apktool", "androguard"}
+    # A backend that is present carries a version string; one that is
+    # missing carries None, which is how the REST API says the same thing.
+    for name in body["available"]:
+        assert body["versions"][name] is not None
+
+
+def test_runs_of_a_project_carry_the_published_marker(client: TestClient) -> None:
+    """A project's runs are listed newest first, the published one marked.
+
+    The shape is the REST API's: an envelope with the project id, the total
+    and the published run's id, over run rows that say when they started,
+    how they ended and whether they are the snapshot the project publishes.
+    """
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    analyzer: Analyzer = client.app.state.analyzer
+    pid = Project.new_id(FAKE_SHA256)
+    workspace = analyzer.settings.workspace / "projects" / pid
+    project = Project(
+        id=pid,
+        apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectState.COMPLETED,
+        tool_versions={"androguard": "4.1.4"},
+    )
+    analyzer.store.save_project(project, workspace, manifest=None)
+
+    first = AnalysisRun.start(pid, FAKE_SHA256, workspace=workspace)
+    first.status = RunStatus.COMPLETED
+    analyzer.store.create_run(first)
+    second = AnalysisRun.start(pid, FAKE_SHA256, workspace=workspace)
+    second.status = RunStatus.RUNNING
+    analyzer.store.create_run(second)
+    analyzer.store.publish_run(project, first, _staged_snapshot(project, workspace), None)
+
+    response = client.get(f"/api/projects/{pid}/runs")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["project_id"] == pid
+    assert body["total"] == 2
+    assert body["published_run_id"] == first.id
+    published = [run for run in body["runs"] if run["published"]]
+    assert [run["id"] for run in published] == [first.id]
+    assert body["runs"][0]["id"] == second.id, "newest first"
+    assert body["runs"][0]["status"] == "running"
+    assert body["runs"][0]["published"] is False
+    assert published[0]["status"] == "completed"
+    assert published[0]["completeness"] == "complete"
+    assert published[0]["tool_versions"] == {}
+    assert published[0]["started_at"]
+    assert published[0]["finished_at"] is None or isinstance(published[0]["finished_at"], str)
+
+
+def test_run_detail_names_the_run_and_its_project(client: TestClient) -> None:
+    """One run's record, under its project, with the published marker."""
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    analyzer: Analyzer = client.app.state.analyzer
+    pid = Project.new_id(FAKE_SHA256)
+    workspace = analyzer.settings.workspace / "projects" / pid
+    project = Project(
+        id=pid,
+        apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectState.COMPLETED,
+        tool_versions={"androguard": "4.1.4"},
+    )
+    analyzer.store.save_project(project, workspace, manifest=None)
+    run = AnalysisRun.start(pid, FAKE_SHA256, workspace=workspace)
+    run.status = RunStatus.COMPLETED
+    analyzer.store.create_run(run)
+    analyzer.store.publish_run(project, run, _staged_snapshot(project, workspace), None)
+
+    response = client.get(f"/api/projects/{pid}/runs/{run.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == run.id
+    assert body["status"] == "completed"
+    assert body["published"] is True
+
+
+def test_run_detail_of_an_unknown_run_is_404(client: TestClient) -> None:
+    """A run id nobody wrote is a 404, as on the REST API."""
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    analyzer: Analyzer = client.app.state.analyzer
+    pid = Project.new_id(FAKE_SHA256)
+    workspace = analyzer.settings.workspace / "projects" / pid
+    project = Project(
+        id=pid,
+        apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+        status=ProjectState.COMPLETED,
+    )
+    analyzer.store.save_project(project, workspace, manifest=None)
+    run = AnalysisRun.start(pid, FAKE_SHA256, workspace=workspace)
+    run.status = RunStatus.COMPLETED
+    analyzer.store.create_run(run)
+
+    assert client.get(f"/api/projects/{pid}/runs/run_does_not_exist").status_code == 404
+
+
+def test_run_detail_of_another_projects_run_is_404(client: TestClient) -> None:
+    """A run id that exists but belongs to another project is a 404 too.
+
+    The run id is looked up on its own and then checked against the project
+    in the path, so a run cannot be read out from under a project that does
+    not own it.
+    """
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    analyzer: Analyzer = client.app.state.analyzer
+    other_pid = Project.new_id("cd" * 32)
+    other_workspace = analyzer.settings.workspace / "projects" / other_pid
+    other_project = Project(
+        id=other_pid,
+        apk=ApkMetadata(sha256="cd" * 32, size_bytes=1, path=Path("other.apk")),
+        status=ProjectState.COMPLETED,
+    )
+    analyzer.store.save_project(other_project, other_workspace, manifest=None)
+    other = AnalysisRun.start(other_pid, "cd" * 32, workspace=other_workspace)
+    other.status = RunStatus.COMPLETED
+    analyzer.store.create_run(other)
+
+    assert client.get(f"/api/projects/{FAKE_SHA256}/runs/{other.id}").status_code == 404
+
+
+def test_runs_of_an_unknown_project_are_the_contract_error(client: TestClient) -> None:
+    """An unknown project is the MCP contract's ``unknown_project``, as a 404."""
+    response = client.get("/api/projects/apk_missing/runs")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "unknown_project"
+
+
+def test_cancel_accepts_a_running_analysis_and_sets_its_token(client: TestClient) -> None:
+    """The endpoint stops the analysis it is asked about.
+
+    The answer is that the request was accepted (202), not that the
+    analysis has stopped: a backend half way through reading the APK
+    finishes reading it first.
+    """
+    from dexatlas.api.uploads import RUNNING
+
+    token = RUNNING.start(FAKE_SHA256, Path("uploads") / "demo.apk")
+    try:
+        response = client.post(f"/api/projects/{FAKE_SHA256}/cancel")
+
+        assert response.status_code == 202
+        assert response.json() == {"project_id": FAKE_SHA256, "status": "cancelling"}
+        assert token.cancelled
+    finally:
+        RUNNING.finish(FAKE_SHA256)
+
+
+def test_cancel_without_a_running_analysis_is_a_conflict(client: TestClient) -> None:
+    """Nothing is running, so there is nothing to cancel: 409, not a 404.
+
+    The desktop application branches on this answer to tell "the analysis
+    already ended" apart from "the endpoint does not exist", which is what
+    the pre-W1 workbench's 405 said.
+    """
+    response = client.post("/api/projects/apk_idle/cancel")
+
+    assert response.status_code == 409
+
+
+def _staged_snapshot(project: Project, workspace: Path) -> Path:
+    """A staged database holding the project's own rows, the way the pipeline publishes."""
+    from dexatlas.core.storage import Store
+
+    staged = workspace / "staging.db"
+    staged_store = Store.open(staged)
+    staged_store.save_project(project, workspace, manifest=None)
+    return staged

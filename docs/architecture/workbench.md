@@ -95,6 +95,19 @@ to the project page. Four things were decided deliberately:
   workspace's `uploads/` directory and the run's results in the project's
   own run directory, exactly as for the REST API.
 
+The analysis-progress screen polls three more endpoints while a run is
+going, and the desktop application uses the same three. They are the REST
+API's answers under this app's `/api` prefix, over the same registry, the
+same store rows and the same cancellation tokens the REST API's own
+`/backends`, `/projects/{id}/runs*` and `/projects/{id}/cancel` read:
+
+| Endpoint | Answer |
+|---|---|
+| `GET /api/backends` | which analysis backends are installed (`available` / `missing`) and at what `versions` |
+| `GET /api/projects/{id}/runs` | every run of a project, newest first, the published one marked, with `total` and `published_run_id` |
+| `GET /api/projects/{id}/runs/{run_id}` | one run's record, with whether it is the published snapshot |
+| `POST /api/projects/{id}/cancel` | ask the running analysis to stop — 202 with `{project_id, status: "cancelling"}`, or 409 when nothing is running |
+
 
 Screen 1 calls `list_projects` and `get_project_status` — the two tools that
 answer what a workspace holds and how complete each analysis is.

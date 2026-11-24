@@ -63,7 +63,7 @@
 
 - **左列·证据列表：** 符号、字符串、权限、组件、汇聚点条目，带来源工具标签（JADX/Apktool/Androguard）与等级（verified/lead/insufficient）。支持关键字与类别筛选。数据来自证据列表端点（`src/dexatlas/api/app.py:795-796` `anchor: def list_evidence(`），每条含来源工具、版本与 locator。
 - **中间·主体：** 两种视图切换——源码阅读（class/method source，`src/dexatlas/api/app.py:637` 与 `src/dexatlas/api/app.py:699`，响应头带 `X-DexAtlas-Source-Kind`/`X-DexAtlas-Source-Locator`，见 `src/dexatlas/api/app.py:841-846`）与调用关系（callers/callees，`src/dexatlas/api/app.py:757` `anchor: xrefs`）。长包名、长签名、长路径换行显示，不截断。
-- **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:231-232` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:429` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
+- **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:238-239` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:429` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
 - 顶部 `PartialBanner`：run 的 `completeness=partial` 或存在 `errors` 时常驻，列明未完成的步骤；横幅不阻塞下方数据展示。
 
 ### 3.5 设置页（补充单 2-5）
@@ -187,7 +187,7 @@
 | 详情页·源码 | MCP `class_source` / `method_source`（`src/dexatlas/mcp/tools/symbols.py:227`、`src/dexatlas/mcp/tools/symbols.py:227`） | Java 优先，Smali 回退 |
 | 详情页·调用关系 | MCP `find_callers` / `find_callees`（`src/dexatlas/mcp/tools/references.py:56`、`src/dexatlas/mcp/tools/references.py:56`） | callers/callees 图 |
 | 证据与抽屉 | MCP `get_evidence`（`src/dexatlas/mcp/tools/evidence.py:14` `anchor: get_evidence`）、`resolve_locator`（`src/dexatlas/mcp/tools/evidence.py:38` `anchor: resolve_locator`） | 证据记录与 locator 解析 |
-| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:297-298` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:806`） | json/markdown 两种既有格式 |
+| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:304-305` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:806`） | json/markdown 两种既有格式 |
 | Agent 问答 | workbench `GET /api/agent/config`、`POST /api/projects/{id}/agent/tasks`、`GET /api/agent/tasks/{id}[/report]`（`src/dexatlas/workbench/app.py:361-456`） | 未配置模型时 `configured=false`，界面拒答 |
 
 **边界红线：**
