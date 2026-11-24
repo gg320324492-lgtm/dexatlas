@@ -206,3 +206,43 @@
 .da-partial .btn {
   margin-left: var(--space-2);
 }
+
+/* ---- 模拟标注角标：如实标注非真实数据（阶段推进/轮询记录） ---- */
+.da-mock-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+  border: 1px dashed var(--color-border);
+  white-space: nowrap;
+}
+
+/* 顶部分组内的横幅纵向排列 */
+.analysis__banners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* 后端状态卡：推断来源说明 */
+.da-backend__note {
+  margin: var(--space-4) 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* Link 渲染为按钮时继承按钮样式（无下划线、文字色继承） */
+a.da-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
