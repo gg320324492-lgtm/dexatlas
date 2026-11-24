@@ -16,8 +16,10 @@
  *   evidence_catalog}）；getProject 返回该信封原样。
  * - GET /api/projects/{id}/evidence 返回裸数组（workbench app.py:209），
  *   getEvidence 归一化为 {project_id, total, evidence}。
- * - workbench 没有 /api/backends、/runs、/cancel 端点：getBackends 会得到
- *   404，cancelProject 会得到 405，调用方按"后端未提供"如实处理。
+ * - workbench 自 PR #5 起提供 GET /api/projects/{id}/runs（信封
+ *   {project_id, total, published_run_id, runs: [... & {published}]}）与
+ *   /cancel；仍没有 /api/backends：getBackends 会得到 404，调用方按
+ *   "后端未提供"如实处理。
  * - 错误体是 MCP RequestError 的 as_dict（mcp/errors.py:27）：
  *   {code, message, detail}，HTTP 404=unknown_project、400=其余请求错误。
  */
@@ -34,6 +36,7 @@ import type {
   ProjectSummary,
   ReportFormat,
   RunInfo,
+  RunsEnvelope,
   SymbolHit,
   WorkbenchHealth,
 } from "./types";
@@ -240,9 +243,21 @@ export class DexAtlasClient {
     return this.request<AnalyzeJob>(`/analyze/${encodeURIComponent(projectId)}`);
   }
 
-  /** 兼容旧调用点：项目分析轮次列表（api/app.py 契约；workbench 无此端点）。 */
-  async getRuns(projectId: string): Promise<{ runs: RunInfo[] }> {
-    return this.request<{ runs: RunInfo[] }>(`/projects/${encodeURIComponent(projectId)}/runs`);
+  /**
+   * 项目的全部分析轮次，新→旧，并标注哪一轮是已发布快照。
+   * workbench GET /api/projects/{id}/runs（PR #5 起）：信封
+   * {project_id, total, published_run_id, runs: [RunSummary & {published}]}；
+   * api/app.py 契约的裸数组同样兼容（旧后端无 published 字段）。
+   */
+  async getRuns(projectId: string): Promise<RunsEnvelope> {
+    const raw = await this.request<unknown>(`/projects/${encodeURIComponent(projectId)}/runs`);
+    if (Array.isArray(raw)) {
+      return { project_id: projectId, total: raw.length, published_run_id: null, runs: raw as RunInfo[] };
+    }
+    if (raw && typeof raw === "object" && Array.isArray((raw as { runs?: unknown }).runs)) {
+      return raw as RunsEnvelope;
+    }
+    throw new ApiError(`/projects/${projectId}/runs 返回了无法识别的形状`, undefined, raw);
   }
 
   // -------------------------------------------------------------------------

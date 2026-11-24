@@ -26,6 +26,7 @@ export type {
   ProjectSummary,
   ReportFormat,
   RunInfo,
+  RunsEnvelope,
   SymbolHit,
   UntrustedText,
   WorkbenchHealth,

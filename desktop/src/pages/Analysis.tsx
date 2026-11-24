@@ -4,18 +4,30 @@
  * Q2-M2-C 真实后端接线（如实披露，无编造能力）：
  * - 数据源：workbench 后端 GET /api/projects/{id}（pending/running 时每 2s 轮询，
  *   completed/failed 停止）与 GET /api/health。
- * - 后端没有阶段级进度接口：左侧阶段推进由前端按时间模拟（每 2.4s 推进一格，
- *   最多推进到"报告"格），completed/failed 时与真实状态对齐；卡片角标常驻
- *   标注"阶段推进为前端模拟"。
+ * - Q2 批次二 X3：阶段进度优先读取真实 run 数据。在项目状态轮询之外并行轮询
+ *   GET /api/projects/{id}/runs（workbench PR #5 起），用最新一轮 run 的
+ *   status/completeness/tool_versions/duration_seconds 映射到五阶段视图。
+ *
+ * 阶段映射规则（run 是后端分析的一次完整尝试，无法细分到五阶段内部）：
+ * - run.status = "pending"  → 仅"采集"待开始，其余 pending；
+ * - run.status = "running"  → "采集"完成、"解析"进行中，其余 pending
+ *   （后端只有一个运行信号，无法判断具体卡在哪个阶段，按最保守的早期阶段展示）；
+ * - run.status = "completed"→ 五阶段全部完成；若 run.completeness = "partial"，
+ *   在对应阶段（按 completeness.errors 里点名的工具）标注"部分"（skipped 态，
+ *   复用 PartialBanner 的 partial 语义）；
+ * - run.status = "failed"   → 按 progress 前的格子标 error。
+ * - run.tool_versions / duration_seconds 有值时展示在阶段卡。
+ * - runs 不可用（404 / 网络）或无 run 时，回退到原时间模拟并显示原角标；
+ *   映射到的真实部分与保留模拟的粒度在角标文案中如实区分。
+ *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
- * - 8618 是只读 workbench API：没有 /api/backends 与 /api/projects/{id}/cancel
- *   路由。后端状态区以最近分析轮次的 tool_versions 推断各后端参与情况；
- *   取消按钮调用 POST /api/projects/{id}/cancel，对 404/失败如实提示。
+ * - 8618 是只读 workbench API：没有 /api/backends 路由。后端状态区以最近分析
+ *   轮次的 tool_versions 推断各后端参与情况；取消按钮调用
+ *   POST /api/projects/{id}/cancel，对 404/失败如实提示。
  * - API 基址用相对 /api：依赖 vite dev 代理转发到 8618（M2-A 的 vite.config.ts
  *   代理合并后即生效；合并前可用临时代理配置验证）。后端未返回 CORS 头，
  *   浏览器直连绝对地址会被跨域拦截。
- * - M2-A 的统一 client（desktop/src/api/）合并后，本文件的 fetch 封装替换为该层。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -27,8 +39,13 @@ import { PartialBanner } from "../components/PartialBanner";
 import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
-import { ApiError, describeError, dexatlas } from "../api";
-import type { ProjectDetailEnvelope as WsProjectStatus, WorkbenchHealth as WsHealth } from "../api";
+import { ApiError, dexatlas } from "../api";
+import type {
+  ProjectDetailEnvelope as WsProjectStatus,
+  RunInfo,
+  RunsEnvelope,
+  WorkbenchHealth as WsHealth,
+} from "../api";
 import type { BackendState, BackendStatus, LogLevel, LogEntry, StageInfo, StageState } from "../types";
 import "./Analysis.css";
 
@@ -37,10 +54,6 @@ const API_BASE = "/api";
 
 /** 轮询间隔：pending/running 时每 2s 读一次项目状态。 */
 const POLL_INTERVAL_MS = 2000;
-/** 轮询连续失败达到该次数才降级为 ErrorState（之前每次失败都直接报错）。 */
-const POLL_FAIL_STREAK_LIMIT = 5;
-/** 连续失败后的重试退避：第 n 次失败后等 POLL_INTERVAL_MS * 2^(n-1)，上限 30s。 */
-const POLL_BACKOFF_MAX_MS = 30_000;
 /** 阶段模拟推进间隔（前端模拟，非后端数据）。 */
 const STAGE_TICK_MS = 2400;
 /** 404 连续多少次后提示"迟迟未入库"（2s 一次，15 次 ≈ 30s）。 */
@@ -110,8 +123,6 @@ interface PollingResult {
   project: WsProjectStatus | null;
   health: WsHealth | null;
   pollError: string | null;
-  /** 连续失败次数是否已达到降级阈值（达到才展示整页 ErrorState） */
-  pollFailedHard: boolean;
   notFound: boolean;
   notFoundLong: boolean;
   logs: LogEntry[];
@@ -123,7 +134,6 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
   const [project, setProject] = useState<WsProjectStatus | null>(null);
   const [health, setHealth] = useState<WsHealth | null>(null);
   const [pollError, setPollError] = useState<string | null>(null);
-  const [pollFailedHard, setPollFailedHard] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [notFoundLong, setNotFoundLong] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -131,7 +141,6 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
   const prevStatusRef = useRef<string | null>(null);
   const prevRunCountRef = useRef(0);
   const notFoundStreakRef = useRef(0);
-  const failStreakRef = useRef(0);
   const lastErrorRef = useRef<string | null>(null);
 
   const pushLog = useCallback((level: LogLevel, source: string, message: string) => {
@@ -147,12 +156,10 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     setNotFound(false);
     setNotFoundLong(false);
     setPollError(null);
-    setPollFailedHard(false);
     setLogs([]);
     prevStatusRef.current = null;
     prevRunCountRef.current = 0;
     notFoundStreakRef.current = 0;
-    failStreakRef.current = 0;
     lastErrorRef.current = null;
 
     let stopped = false;
@@ -160,14 +167,9 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     let timer: number | undefined;
     const stop = () => {
       if (timer !== undefined) {
-        window.clearTimeout(timer);
+        window.clearInterval(timer);
         timer = undefined;
       }
-    };
-    /** 下一次轮询：连续失败时按指数退避拉长间隔，成功或手动重试后回到基准间隔。 */
-    const schedule = (delayMs: number) => {
-      if (stopped) return;
-      timer = window.setTimeout(() => void poll(), delayMs);
     };
 
     const poll = async () => {
@@ -177,11 +179,9 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
         const data = await dexatlas.getProject(projectId);
         if (stopped) return;
         notFoundStreakRef.current = 0;
-        failStreakRef.current = 0;
         setNotFound(false);
         setNotFoundLong(false);
         setPollError(null);
-        setPollFailedHard(false);
         lastErrorRef.current = null;
 
         const status = data.project.status;
@@ -209,11 +209,10 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 
         setProject(data);
         if (status === "completed" || status === "failed") stop();
-        else schedule(POLL_INTERVAL_MS);
       } catch (err) {
         if (stopped) return;
-        const code = err instanceof ApiError ? err.status : undefined;
-        const msg = describeError(err);
+        const code = err instanceof ApiError ? err.status : 0;
+        const msg = err instanceof Error ? err.message : String(err);
         if (code === 404) {
           // 刚上传的项目要等后台任务把项目行写入 store，短时间内 404 属正常
           notFoundStreakRef.current += 1;
@@ -225,20 +224,12 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
             setNotFoundLong(true);
             pushLog("warn", "轮询", "项目已约 30 秒未入库，请检查后端日志或重新上传");
           }
-          schedule(POLL_INTERVAL_MS);
         } else {
-          // 网络/服务错误：指数退避重试，连续 POLL_FAIL_STREAK_LIMIT 次才降级 ErrorState
-          failStreakRef.current += 1;
-          const streak = failStreakRef.current;
           setPollError(msg);
-          setPollFailedHard(streak >= POLL_FAIL_STREAK_LIMIT);
           if (lastErrorRef.current !== msg) {
             lastErrorRef.current = msg;
-            pushLog("warn", "轮询", `轮询失败（第 ${streak} 次）：${msg}`);
+            pushLog("warn", "轮询", `轮询失败：${msg}`);
           }
-          const backoff = Math.min(POLL_INTERVAL_MS * 2 ** (streak - 1), POLL_BACKOFF_MAX_MS);
-          pushLog("debug", "轮询", `${(backoff / 1000).toFixed(0)}s 后自动重试`);
-          schedule(backoff);
         }
       } finally {
         busy = false;
@@ -247,6 +238,7 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 
     pushLog("info", "轮询", `开始轮询 GET ${API_BASE}/projects/${projectId}（每 ${POLL_INTERVAL_MS / 1000}s）`);
     void poll();
+    timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
     void dexatlas
       .getHealth()
       .then((h) => {
@@ -262,7 +254,51 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     };
   }, [projectId, retryNonce, pushLog]);
 
-  return { project, health, pollError, pollFailedHard, notFound, notFoundLong, logs, pushLog };
+  return { project, health, pollError, notFound, notFoundLong, logs, pushLog };
+}
+
+/** 并行轮询 runs 列表：与项目状态轮询独立，runs 拉取失败不阻塞状态展示。 */
+function useRunsPolling(projectId: string | undefined, active: boolean): {
+  runs: RunInfo[];
+  runsError: string | null;
+} {
+  const [runs, setRuns] = useState<RunInfo[]>([]);
+  const [runsError, setRunsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projectId || !active) return;
+    let stopped = false;
+    let busy = false;
+
+    const poll = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const envelope: RunsEnvelope = await dexatlas.getRuns(projectId);
+        if (!stopped) {
+          setRuns(envelope.runs);
+          setRunsError(null);
+        }
+      } catch (err) {
+        if (!stopped) {
+          const msg = err instanceof Error ? err.message : String(err);
+          // 404 = 后端（PR #5 之前）无该端点：如实记录一次，不反复刷屏
+          setRunsError((prev) => (prev === msg ? prev : msg));
+        }
+      } finally {
+        busy = false;
+      }
+    };
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [projectId, active]);
+
+  return { runs, runsError };
 }
 
 /**
@@ -300,6 +336,91 @@ function deriveStageStates(progress: number, status: string | null): Record<stri
   return states;
 }
 
+/**
+ * 阶段映射：把一轮真实 run 的状态折算到五阶段。
+ * 规则见文件头注释。partial 时按 completeness.errors 点名的工具落到对应阶段。
+ */
+function deriveStagesFromRun(run: RunInfo | null): {
+  states: Record<string, StageState>;
+  partialLabels: Record<string, string>;
+} {
+  const states: Record<string, StageState> = {};
+
+  if (!run) {
+    STAGES.forEach((s) => (states[s.id] = "pending"));
+    return { states, partialLabels: {} };
+  }
+
+  if (run.status === "pending") {
+    // 仅采集待开始：后端尚未产出任何阶段结果
+    STAGES.forEach((s) => (states[s.id] = "pending"));
+    return { states, partialLabels: {} };
+  }
+
+  if (run.status === "running") {
+    // 保守映射：采集已完成，解析进行中，其余未开始
+    states.collect = "done";
+    states.parse = "running";
+    states.index = "pending";
+    states.evidence = "pending";
+    states.report = "pending";
+    return { states, partialLabels: {} };
+  }
+
+  if (run.status === "completed") {
+    STAGES.forEach((s) => (states[s.id] = "done"));
+    if (run.completeness === "partial") {
+      // errors 形如 "jadx: ..." / "apktool: ..."，点名哪个工具没跑完
+      const errors = readCompletenessErrors(run);
+      const affected = new Set<string>();
+      for (const msg of errors) {
+        const tool = msg.split(":")[0]?.trim().toLowerCase() ?? "";
+        if (tool.includes("jadx") || tool.includes("apktool")) affected.add("parse");
+        if (tool.includes("androguard")) affected.add("index");
+        if (tool.includes("evidence")) affected.add("evidence");
+        if (tool.includes("report")) affected.add("report");
+      }
+      if (affected.size === 0) {
+        // 点不出具体工具时，标在最后的报告阶段（整体"部分完成"）
+        affected.add("report");
+      }
+      const labels: Record<string, string> = {};
+      affected.forEach((id) => {
+        states[id] = "skipped"; // 复用 partial 徽章语义
+        labels[id] = "部分";
+      });
+      return { states, partialLabels: labels };
+    }
+    return { states, partialLabels: {} };
+  }
+
+  // failed：run 已终止且未发布；把"解析"格标失败（首个非采集阶段）
+  states.collect = "done";
+  states.parse = "error";
+  states.index = "pending";
+  states.evidence = "pending";
+  states.report = "pending";
+  return { states, partialLabels: {} };
+}
+
+/** run.completeness.errors 的两种历史形状 → 字符串数组 */
+function readCompletenessErrors(run: RunInfo): string[] {
+  const raw = (run as { errors?: unknown }).errors;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e) =>
+    typeof e === "string" ? e : `${(e as { tool?: string }).tool ?? ""}: ${(e as { message?: string }).message ?? ""}`,
+  );
+}
+
+/** duration_seconds → 展示字符串 */
+function durationLabel(seconds: number | null | undefined): string | null {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return null;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return `${m}m${String(s).padStart(2, "0")}s`;
+}
+
 /** 后端状态：workbench 无 /api/backends，用最近轮次的 tool_versions 如实推断。 */
 function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
   const latest = project?.runs[0];
@@ -320,11 +441,21 @@ function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
 export function Analysis() {
   const { projectId } = useParams();
   const [retryNonce, setRetryNonce] = useState(0);
-  const { project, health, pollError, pollFailedHard, notFound, notFoundLong, logs, pushLog } =
-    useProjectPolling(projectId, retryNonce);
+  const { project, health, pollError, notFound, notFoundLong, logs, pushLog } = useProjectPolling(projectId, retryNonce);
   const status = project?.project.status ?? null;
-  const progress = useStageSimulation(status);
-  const stageStates = useMemo(() => deriveStageStates(progress, status), [progress, status]);
+  const active = status === "pending" || status === "running";
+  const { runs, runsError } = useRunsPolling(projectId, Boolean(project));
+  // 优先取最新一轮真实 run；runs 为空时回退项目信封里的 runs
+  const latestRun = runs[0] ?? project?.runs[0] ?? null;
+  const hasRealRun = Boolean(runs.length) || Boolean(project?.runs.length);
+  const runDerived = useMemo(() => deriveStagesFromRun(latestRun), [latestRun]);
+  const progress = useStageSimulation(hasRealRun ? null : status);
+  // 有真实 run 时用映射结果，否则回退时间模拟
+  const stageStates = useMemo(
+    () => (hasRealRun ? runDerived.states : deriveStageStates(progress, status)),
+    [hasRealRun, runDerived, progress, status],
+  );
+  const partialLabels = hasRealRun ? runDerived.partialLabels : {};
   const backends = useMemo(() => deriveBackends(project), [project]);
   const [cancelNotice, setCancelNotice] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -336,11 +467,14 @@ export function Analysis() {
     if (el) el.scrollTop = el.scrollHeight;
   }, [logs]);
 
-  const active = status === "pending" || status === "running";
   const completed = status === "completed";
   const failed = status === "failed";
   const ended = completed || failed;
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
+  const duration = durationLabel(latestRun?.duration_seconds);
+  const stageBadgeText = hasRealRun
+    ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError ? "（runs 端点不可用）" : ""}`
+    : "阶段推进为前端模拟";
 
   const handleCancel = async () => {
     if (!projectId) return;
@@ -350,8 +484,8 @@ export function Analysis() {
       await dexatlas.cancelProject(projectId);
       pushLog("info", "取消", "已向后端发送取消请求（202），等待状态确认");
     } catch (err) {
-      const code = err instanceof ApiError ? err.status : undefined;
-      const msg = describeError(err);
+      const code = err instanceof ApiError ? err.status : 0;
+      const msg = err instanceof Error ? err.message : String(err);
       const notice =
         code === 404 || code === 405
           ? "取消失败：当前 workbench 后端未提供 /api/projects/{id}/cancel 接口，无法取消。"
@@ -427,12 +561,9 @@ export function Analysis() {
             message="项目迟迟未入库：后端持续返回 404。可能上传失败、后端异常或项目 id 有误；仍在继续轮询。"
           />
         ) : null}
-        {pollError && project ? (
-          <PartialBanner
-            tone="warning"
-            message={`轮询失败，正在自动重试（连续失败会拉长间隔；${POLL_FAIL_STREAK_LIMIT} 次后暂停）：${pollError}。`}
-            onRetry={() => setRetryNonce((n) => n + 1)}
-          />
+        {pollError && project ? <PartialBanner tone="warning" message={`轮询失败，正在重试：${pollError}`} /> : null}
+        {project && runsError ? (
+          <PartialBanner tone="warning" message={`阶段进度回退为前端模拟（runs 数据不可用）：${runsError}`} />
         ) : null}
         {cancelNotice ? (
           <PartialBanner tone="danger" message={cancelNotice} onDismiss={() => setCancelNotice(null)} />
@@ -476,23 +607,29 @@ export function Analysis() {
         />
       ) : !project && notFound ? (
         <LoadingState label="等待项目入库" lines={3} />
-      ) : !project && pollFailedHard ? (
+      ) : !project && pollError ? (
         <ErrorState
           title="无法连接后端"
-          description={`已连续多次读取 ${API_BASE}/projects 失败（最后原因：${pollError}）。轮询已暂停，可手动重试。`}
+          description={`正在尝试访问 ${API_BASE}，失败原因：${pollError}`}
           onRetry={() => setRetryNonce((n) => n + 1)}
-          retryLabel="手动刷新"
         />
       ) : (
         <div className="analysis__grid">
-          {/* 左：阶段进度（模拟推进，见角标） */}
+          {/* 左：阶段进度（优先真实 run 映射，粒度不足处模拟，见角标） */}
           <Card className="analysis__stages" aria-label="阶段进度">
             <CardHeader
               title="阶段进度"
               subtitle="采集 → 解析 → 索引 → 证据 → 报告"
               actions={
-                <span className="da-mock-badge" title="后端没有阶段级进度接口，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐">
-                  阶段推进为前端模拟
+                <span
+                  className="da-mock-badge"
+                  title={
+                    hasRealRun
+                      ? "阶段状态由后端 run 的 status/completeness 映射；run 之内无阶段级接口，粒度由前端推断"
+                      : "后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐"
+                  }
+                >
+                  {stageBadgeText}
                 </span>
               }
             />
@@ -500,6 +637,7 @@ export function Analysis() {
               <ol className="da-stage-list">
                 {STAGES.map((stage) => {
                   const state = stageStates[stage.id] ?? "pending";
+                  const partial = partialLabels[stage.id];
                   return (
                     <li
                       key={stage.id}
@@ -510,14 +648,38 @@ export function Analysis() {
                         {state === "done" ? "✓" : state === "running" ? "◌" : state === "error" ? "✕" : "•"}
                       </span>
                       <div className="da-stage__text">
-                        <div className="da-stage__label">{stage.label}</div>
+                        <div className="da-stage__label">
+                          {stage.label}
+                          {partial ? <span className="da-stage__partial">{partial}</span> : null}
+                        </div>
                         <div className="da-stage__desc">{stage.description}</div>
                       </div>
-                      <StatusBadge kind={STAGE_BADGE[state]} pulse={state === "running"} />
+                      <StatusBadge
+                        kind={STAGE_BADGE[state]}
+                        label={partial ? "部分" : undefined}
+                        pulse={state === "running"}
+                      />
                     </li>
                   );
                 })}
               </ol>
+              {hasRealRun && latestRun ? (
+                <div className="da-stage-meta">
+                  <span>
+                    run <code className="da-code">{latestRun.id.slice(0, 8)}</code> · {latestRun.status}
+                    {latestRun.completeness === "partial" ? " · partial" : ""}
+                    {duration ? ` · ${duration}` : ""}
+                  </span>
+                  {Object.keys(latestRun.tool_versions ?? {}).length > 0 ? (
+                    <span className="da-stage-meta__tools">
+                      {Object.entries(latestRun.tool_versions)
+                        .filter(([, v]) => v)
+                        .map(([k, v]) => `${k} v${v}`)
+                        .join(" · ")}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </CardBody>
           </Card>
 

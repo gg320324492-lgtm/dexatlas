@@ -52,6 +52,16 @@ export interface RunInfo {
   started_at: string;
   finished_at: string | null;
   duration_seconds: number | null;
+  /** workbench PR #5 起附加：该轮是否为项目当前发布的快照 */
+  published?: boolean;
+}
+
+/** workbench GET /api/projects/{id}/runs 的响应信封（app.py list_runs） */
+export interface RunsEnvelope {
+  project_id: string;
+  total: number;
+  published_run_id: string | null;
+  runs: RunInfo[];
 }
 
 /**
