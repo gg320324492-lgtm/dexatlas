@@ -10,7 +10,7 @@ import { Button } from "../components/Button";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { EmptyState } from "../components/states/EmptyState";
-import { ApiError, dexatlas as client, downloadText } from "../api";
+import { describeError, dexatlas as client, downloadText } from "../api";
 import type { ProjectSummary } from "../api";
 import "./ReportsPage.css";
 
@@ -30,7 +30,7 @@ export default function ReportsPage() {
     try {
       setProjects(await client.listProjects());
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
+      setError(describeError(e));
     } finally {
       setLoading(false);
     }
@@ -43,15 +43,15 @@ export default function ReportsPage() {
   const doExport = async (project: ProjectSummary, format: Format) => {
     setExporting({ id: project.id, format });
     setRowError(null);
+    const ext = format === "markdown" ? "md" : "json";
     try {
       const payload = await client.getReport(project.id, format);
       const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
-      const ext = format === "markdown" ? "md" : "json";
       downloadText(`${project.id}.${ext}`, text, format === "markdown" ? "text/markdown" : "application/json");
     } catch (e) {
       setRowError({
         id: project.id,
-        message: e instanceof ApiError ? `${e.status}: ${e.message}` : String(e),
+        message: describeError(e),
       });
     } finally {
       setExporting(null);
