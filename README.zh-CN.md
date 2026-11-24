@@ -61,7 +61,7 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 > 用另一模型（GLM-5.3-Flash，本地网关，同一冻结 20 题）追加三轮，**53/60 = 88.3%（逐轮
 > 17/18/18）**——逐轮线全部达成、合计线仍未达（见[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)）；
 > 2026-11-22 用 DeepSeek-V4.1-Flash（同一冻结 20 题，放宽预算）跑出 **56/60 = 93.3%
-> （逐轮 18/20/20；DexAtlas 18/20/18）**——逐轮线与三轮合计线均达成，B1 关闭（见
+> （DexAtlas 逐轮 18/20、20/20、18/20）**——逐轮线与三轮合计线均达成，B1 关闭（见
 > [DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)）。M8（干净安装、契约与
 > 导出安全）已交付——演练、修复与公共契约表已完成；macOS 仍未验证（已知限制，不属于
 > 已完成的验收项）。M9（本页展示入口）GitHub 侧
@@ -107,9 +107,13 @@ DexAtlas 把一个 APK 变成一幅完整、可核查的图景：manifest 与权
 </p>
 
 调用关系截图（`04-calls-1440.png` 与方法视图
-`phase4-agent/r6-calls-method-1440.png`）与其余各屏在同样两个目录里。一段 80 秒的新演示视频
-已经录制并落盘（`docs/assets/phase4-demo-80s.mp4`）；指向它的展示入口尚未更新，在此之前，
-今天的工作台长什么样仍以上面这些真实截图为准。
+`phase4-agent/r6-calls-method-1440.png`）与其余各屏在同样两个目录里。当前工作台的两段实录
+也已落盘：91 秒的演示视频（[视频](docs/assets/phase4-demo-80s.mp4)）与 4 分钟的技术走读
+（[视频](docs/assets/phase4-tech-talk-4min.mp4)）。两段视频的每一帧都来自真实运行——工作台
+与 Agent 界面跑的是真实模型，由真实浏览器交互驱动；逐镜头出处见
+[phase4-demo-shots.md](docs/reports/phase4-demo-shots.md) 与
+[phase4-tech-talk-script.md](docs/reports/phase4-tech-talk-script.md)。上面这些截图仍是最
+快的浏览方式；下方较旧的 85 秒录制保留其披露（其 Agent 界面由 scripted 演示 provider 驱动）。
 
 ---
 
@@ -447,8 +451,8 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
   数字由脚本重算：DexAtlas **53/60 = 88.3%（逐轮 17/18/18）**——每轮都在 ≥80% 逐轮线
   之上，三轮合计 ≥90% 线仍未达；A 30.0%、B 30.0%。与 MiniMax 基线分开陈述，不混排
 - **[M6 层级 2 验收评测——DeepSeek-V4.1-Flash](docs/benchmarks/m6-level2-deepseek.md)** ——
-  同一冻结 20 题、放宽预算，三轮 × 3 配置：DexAtlas **56/60 = 93.3%（逐轮 18/20/20；
-  DexAtlas 18/20/18）**——两条验收线均达成，B1 关闭。与 GLM、MiniMax 两轮分开陈述
+  同一冻结 20 题、放宽预算，三轮 × 3 配置：DexAtlas **56/60 = 93.3%（逐轮 18/20、20/20、18/20）**
+  ——两条验收线均达成，B1 关闭。与 GLM、MiniMax 两轮分开陈述
 - **[M3 题目集](docs/benchmarks/task-set.md)** —— 对比实验问的题目、答案如何判分、
   以及第二个人如何在不跑任何东西的情况下确认一个期望答案是对的
 - **[覆盖率数字测在哪棵树上](docs/reports/phase1-execution-report.md)** —— 执行报告带着
@@ -496,7 +500,12 @@ Web 工作台的每个项目页都有 **ask the agent** 入口（`#/projects/{id
 - **[更早的发版说明](docs/releases/v0.1.0.md)** —— v1.0.0 之前的各次发布：
   [v0.1.1](docs/releases/v0.1.1.md)、[v0.1.2](docs/releases/v0.1.2.md)、
   [v0.1.3](docs/releases/v0.1.3.md)、[v0.2.0](docs/releases/v0.2.0.md)
-- **[演示视频](docs/assets/demo.mp4)** —— GIF 所出自的完整 85 秒会话（MP4）
+- **[演示视频（当前工作台，91 秒）](docs/assets/phase4-demo-80s.mp4)** —— 当前工作台的一次
+  真实端到端运行；逐镜头出处见 [phase4-demo-shots.md](docs/reports/phase4-demo-shots.md)
+- **[技术走读（4 分钟）](docs/assets/phase4-tech-talk-4min.mp4)** —— 证据模型、Agent 工作区
+  与冻结评审在屏幕上呈现的样子，配字幕讲解（233 秒，无旁白）
+- **[演示视频（v1.0 时期，85 秒）](docs/assets/demo.mp4)** —— GIF 所出自的那次会话；其 Agent
+  界面是 scripted 演示 provider（披露见上文）
 
 源码评审已经做完：三份审核共 44 条发现，每一条都在发现它的那棵树上复验过。
 
@@ -565,7 +574,7 @@ Phase 3（[计划](docs/roadmap/phase3-plan.md)）是一次作品集冲刺：让
 | M5 | 对外声明基线、重算 benchmark 数字 | **已完成** —— [phase3-baseline.md](docs/reports/phase3-baseline.md) |
 | M6 | 冻结回归集上的有限 agent 任务 | **已完成（B1 验收线已于 2026-11-22 达成）** —— 20 题题集已[冻结](docs/benchmarks/service-regression-set.md)；层级 0 确定性判分 20/20；[层级 1 scripted 演练](docs/benchmarks/m6-level1-scripted.md)已完成（替身 provider，只证明管线可用，不是模型能力基线）；[层级 2 真实模型批次](docs/benchmarks/m6-level2-real.md)已完成且**未通过**（DexAtlas 逐轮 45%/40%/35% 均低于每轮 ≥16/20（≥80%）线，三轮合计 24/60 = 40.0% 低于三轮合计 ≥54/60（≥90%）线）；执行层修复后，三轮完整[复测](docs/benchmarks/m6-level2-retest4.md) DexAtlas 49/60 = 81.7%（逐轮 15/16/18，trace 1,182,356 tokens）——r2/r3 达单轮 ≥16/20 线、r1 未达，81.7% 仍低于三轮合计 ≥54/60（≥90%）的验收门槛；修复后的[窄验证二轮](docs/benchmarks/m6-level2-narrow-verify2.md)在六个已知失败面上转通过 2/6 题（确定性子集 2/5），低于窄验证门槛（≥4/6 与 ≥3/5）；预算效率四项修复后的[窄验证三轮](docs/benchmarks/m6-level2-narrow-verify3.md)（54 条 trace，380,881 tokens，在 450,000 授权之内）转通过 3/6（确定性子集 3/5），仍低于门槛，故按方案停止投入、M6 转入方案 3 现状披露，里程碑保持未收口；2026-11-21 换模型
 （GLM-5.3-Flash，本地网关，同一冻结集）追加三轮 **53/60 = 88.3%（逐轮 17/18/18）**——高于逐轮线、低于 ≥90% 合计线（[GLM 评测记录](docs/benchmarks/m6-level2-glm.md)）；2026-11-22 DeepSeek-V4.1-Flash
-（同一冻结集，放宽预算）**56/60 = 93.3%（逐轮 18/20/20；DexAtlas 18/20/18）**——两条验收线均达成，**B1 关闭**
+（同一冻结集，放宽预算）**56/60 = 93.3%（逐轮 18/20、20/20、18/20）**——两条验收线均达成，**B1 关闭**
 （[DeepSeek 评测记录](docs/benchmarks/m6-level2-deepseek.md)） |
 | M7 | 客户可用的 HTML/JSON/Markdown 报告与证据包 | **已完成** —— [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | 干净安装、故障恢复、契约与导出安全验收 | **交付完成（macOS 未验证）** —— 安装、Docker 与故障恢复[演练](docs/reports/m8-install-rehearsal.md)已完成（macOS 未验证——已知限制，不属于已完成的验收项）；[公共契约表](docs/architecture/public-contracts.md)已发布并附已知限制；CLI `--workspace` 与 install.md 修复已合入；三后端全超时的退出码已实现为退出码 6（`EXIT_NO_INDEX`），并写入[公共契约表](docs/architecture/public-contracts.md) |

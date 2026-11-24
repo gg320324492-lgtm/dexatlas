@@ -86,7 +86,7 @@ still yields a manifest, an index and a report that says which steps did not run
 > ≥90% line still not met (see the
 > [GLM record](docs/benchmarks/m6-level2-glm.md)); and a 2026-11-22 run
 > with DeepSeek-V4.1-Flash (same frozen 20 questions, widened budget) scored
-> **56/60 = 93.3% (18/20/20 per round; 18/20/18 for DexAtlas)** — the per-round and three-round
+> **56/60 = 93.3% (DexAtlas per round: 18/20, 20/20, 18/20)** — the per-round and three-round
 > acceptance lines are both met and B1 is closed (see the
 > [DeepSeek record](docs/benchmarks/m6-level2-deepseek.md)).
 > M8 (clean
@@ -140,10 +140,16 @@ the same bundled demo APK; the full four-width set lives in the
 
 The call-graph stills (`04-calls-1440.png` and the method view
 `phase4-agent/r6-calls-method-1440.png`) and the remaining screens are in the same two
-directories. A new 80-second demo video has been recorded and is on disk
-(`docs/assets/phase4-demo-80s.mp4`); the README showcase entry pointing at it is still
-to be updated, so until then these stills remain the best view of what the workbench
-actually looks like today.
+directories. Two recordings of the current workbench are also on disk: the
+91-second demo ([video](docs/assets/phase4-demo-80s.mp4)) and a 4-minute
+technical walkthrough ([video](docs/assets/phase4-tech-talk-4min.mp4)). Every
+frame in both is a real run — the workbench and the agent screen run the real
+model, driven by real browser interaction; the per-shot provenance is indexed
+in [phase4-demo-shots.md](docs/reports/phase4-demo-shots.md) and
+[phase4-tech-talk-script.md](docs/reports/phase4-tech-talk-script.md). The
+stills above remain the quickest view; the older 85-second recording below
+keeps its disclosure (its agent screen was driven by the scripted demo
+provider).
 
 ---
 
@@ -553,7 +559,7 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
   MiniMax baseline, never combined with it
 - **[M6 level-2 acceptance run — DeepSeek-V4.1-Flash](docs/benchmarks/m6-level2-deepseek.md)** —
   the same frozen 20 questions, widened budget, three rounds × 3 configurations:
-  DexAtlas **56/60 = 93.3% (18/20/20 per round; 18/20/18 for DexAtlas)** — both acceptance lines met,
+  DexAtlas **56/60 = 93.3% (per round: 18/20, 20/20, 18/20)** — both acceptance lines met,
   B1 closed. Reported separately from the GLM and MiniMax runs
 - **[Task set](docs/benchmarks/task-set.md)** — the questions the comparisons ask, how
   an answer is judged, and how a second person confirms that an expected answer is
@@ -619,8 +625,14 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Earlier release notes](docs/releases/v0.1.0.md)** — the releases before v1.0.0:
   [v0.1.1](docs/releases/v0.1.1.md), [v0.1.2](docs/releases/v0.1.2.md),
   [v0.1.3](docs/releases/v0.1.3.md), [v0.2.0](docs/releases/v0.2.0.md)
-- **[Demo video](docs/assets/demo.mp4)** — the full 85-second session the GIFs were cut
-  from (MP4)
+- **[Demo video (current workbench, 91 s)](docs/assets/phase4-demo-80s.mp4)** — a real
+  end-to-end run of the current workbench; per-shot provenance in
+  [phase4-demo-shots.md](docs/reports/phase4-demo-shots.md)
+- **[Technical walkthrough (4 min)](docs/assets/phase4-tech-talk-4min.mp4)** — what the
+  evidence model, the agent workspace and the freeze review look like, narrated from
+  the screen (233 s, no voiceover)
+- **[Demo video (v1.0-era, 85 s)](docs/assets/demo.mp4)** — the session the GIFs were
+  cut from; its agent screen is the scripted demo provider (disclosed above)
 
 The source review is done: 44 findings across three reviews, every one of them
 re-verified against the tree it was found on.
@@ -700,7 +712,7 @@ every claim behind evidence a stranger can re-derive. Where it stands:
 | Milestone | Scope | Status |
 |---|---|---|
 | M5 | claims baseline, recomputed benchmark figures | **done** — [phase3-baseline.md](docs/reports/phase3-baseline.md) |
-| M6 | bounded agent tasks on a frozen regression set | **done (B1 acceptance line met 2026-11-22)** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan; a 2026-11-22 run with DeepSeek-V4.1-Flash (same frozen set, widened budget) scored **56/60 = 93.3% (18/20/20 per round; 18/20/18 for DexAtlas)** — both acceptance lines met, **B1 closed** ([DeepSeek record](docs/benchmarks/m6-level2-deepseek.md)) |
+| M6 | bounded agent tasks on a frozen regression set | **done (B1 acceptance line met 2026-11-22)** — the 20-question set is [frozen](docs/benchmarks/service-regression-set.md); level-0 deterministic scoring 20/20; the [level-1 scripted drill](docs/benchmarks/m6-level1-scripted.md) is complete (a stand-in provider: it proves the pipeline, not model capability); the [level-2 real-model batch](docs/benchmarks/m6-level2-real.md) is complete and **did not pass** (DexAtlas per-round 45%/40%/35% are all below the ≥16/20 (≥80%) line, and the three-round total 24/60 = 40.0% is below the ≥54/60 (≥90%) line); after the execution-layer fixes, the full three-round [retest](docs/benchmarks/m6-level2-retest4.md) scored DexAtlas 49/60 = 81.7% (rounds 15/16/18, traces 1,182,356 tokens) — r2/r3 met the per-round ≥16/20 line, r1 did not, and 81.7% is below the three-round ≥54/60 (≥90%) bar; the post-fix [narrow verification round 2](docs/benchmarks/m6-level2-narrow-verify2.md) over the six known failure surfaces converted 2/6 questions (deterministic fixes 2/5), below the narrow-verification gate (≥4/6 and ≥3/5); a third narrow round after the budget-efficiency fixes ([m6-level2-narrow-verify3.md](docs/benchmarks/m6-level2-narrow-verify3.md), 54 traces, 380,881 tokens inside the 450,000 authorization) converted 3/6 (deterministic 3/5), still below the gate, so per the plan investment stopped for good and M6 moved to the state-of-record disclosure plan; a 2026-11-22 run with DeepSeek-V4.1-Flash (same frozen set, widened budget) scored **56/60 = 93.3% (per round: 18/20, 20/20, 18/20)** — both acceptance lines met, **B1 closed** ([DeepSeek record](docs/benchmarks/m6-level2-deepseek.md)) |
 | M7 | client-ready HTML/JSON/Markdown reports and evidence packages | **done** — [report-rendering.md](docs/architecture/report-rendering.md) |
 | M8 | clean installs, failure recovery, contract and export-safety acceptance | **delivered (macOS unverified)** — install, Docker and failure-recovery [rehearsal](docs/reports/m8-install-rehearsal.md) done (macOS unverified — a known limitation, not a completed acceptance item); the [public contract table](docs/architecture/public-contracts.md) is published with its known limits; the CLI `--workspace` and install-docs fixes have landed; the all-backends-time-out exit code is implemented as exit code 6 (`EXIT_NO_INDEX`) and written into the [public contract table](docs/architecture/public-contracts.md) |
 | M9 | GitHub showcase (this page) and outreach materials | **showcase done; materials removed** — this page is in place; the outreach materials were removed in the 2026-11-21 de-platformisation cleanup |
