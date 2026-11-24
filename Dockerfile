@@ -19,7 +19,10 @@ RUN apt-get update \
         openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uv is pinned by digest (verified against ghcr.io on 2026-11-24; tag 0.11.21 matched
+# the toolchain's own version). Reproducibility comes from the digest: bump the tag and
+# re-query the digest together, never float back to :latest.
+COPY --from=ghcr.io/astral-sh/uv:0.11.21@sha256:ff07b86af50d4d9391d9daf4ff89ce427bc544f9aae87057e69a1cc0aa369946 /uv /usr/local/bin/uv
 
 WORKDIR /app
 

@@ -19,6 +19,13 @@ set -euo pipefail
 
 JADX_VERSION="${JADX_VERSION:-1.5.2}"
 APKTOOL_VERSION="${APKTOOL_VERSION:-2.11.1}"
+# sha256 pins for the exact artifacts named above. A version bump must update its hash
+# in the same change: the hash is what makes the pin meaningful. jadx's value is the
+# digest the upstream release publishes (GitHub API asset digest, v1.5.2); apktool
+# publishes none, so its value is the digest recorded from the official release asset
+# on 2026-11-24 and re-verified on a second download the same day.
+JADX_SHA256="5a8b480839c9c61527895d81d5572182279d973abe112047417f237df958a3aa"
+APKTOOL_SHA256="56d59c524fc764263ba8d345754d8daf55b1887818b15cd3b594f555d249e2db"
 INSTALL_ROOT="${INSTALL_ROOT:-${RUNNER_TEMP:-/tmp}/dexatlas-backends}"
 BACKENDS="${BACKENDS:-jadx apktool}"
 
@@ -52,6 +59,8 @@ if [[ "${wants_jadx}" -eq 1 && ! -x "${INSTALL_ROOT}/jadx/bin/jadx" ]]; then
   echo "Installing JADX ${JADX_VERSION}..."
   curl -fsSL --retry 3 -o "${INSTALL_ROOT}/jadx.zip" \
     "https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip"
+  echo "${JADX_SHA256}  ${INSTALL_ROOT}/jadx.zip" | sha256sum --check --quiet \
+    || { echo "jadx download failed the sha256 check; refusing to install it" >&2; exit 1; }
   mkdir -p "${INSTALL_ROOT}/jadx"
   unzip -q "${INSTALL_ROOT}/jadx.zip" -d "${INSTALL_ROOT}/jadx"
   chmod +x "${INSTALL_ROOT}/jadx/bin/"*
@@ -62,6 +71,8 @@ if [[ "${wants_apktool}" -eq 1 && ! -f "${INSTALL_ROOT}/apktool.jar" ]]; then
   echo "Installing Apktool ${APKTOOL_VERSION}..."
   curl -fsSL --retry 3 -o "${INSTALL_ROOT}/apktool.jar" \
     "https://github.com/iBotPeaches/Apktool/releases/download/v${APKTOOL_VERSION}/apktool_${APKTOOL_VERSION}.jar"
+  echo "${APKTOOL_SHA256}  ${INSTALL_ROOT}/apktool.jar" | sha256sum --check --quiet \
+    || { echo "apktool download failed the sha256 check; refusing to install it" >&2; exit 1; }
 fi
 
 # Make the install discoverable to DexAtlas without hard-coded paths per job.

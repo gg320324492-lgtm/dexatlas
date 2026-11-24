@@ -32,12 +32,23 @@ FILES=(
   "multidex.apk"
 )
 
+# sha256 pins for the exact blobs on ${SOURCE_REF}. The ref is a moving branch, so
+# these hashes are what turn "whatever is there today" into "the bytes these tests
+# were written against". Re-record them (and re-point SOURCE_REF at a tag) if the
+# upstream ever moves or rebuilds the fixtures.
+declare -A SHA256=(
+  ["TestActivity.apk"]="3bb32dd50129690bce850124ea120aa334e708eaa7987cf2329fd1ea0467a0eb"
+  ["multidex.apk"]="b91263e9232c35a01a001b4e7dfb7094494b075c243308d768ff2a459754e79b"
+)
+
 mkdir -p "${DEST}"
 
 for name in "${FILES[@]}"; do
   echo "Fetching ${name}..."
   gh api "repos/${SOURCE_REPO}/contents/${SOURCE_PATH}/${name}?ref=${SOURCE_REF}" \
     --jq '.content' | base64 -d > "${DEST}/${name}"
+  echo "${SHA256[${name}]}  ${DEST}/${name}" | sha256sum --check --quiet \
+    || { echo "${name} failed the sha256 check; refusing to keep it" >&2; rm -f "${DEST}/${name}"; exit 1; }
   printf '  %s (%s bytes)\n' "${name}" "$(wc -c < "${DEST}/${name}" | tr -d ' ')"
 done
 
