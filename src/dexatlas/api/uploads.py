@@ -172,6 +172,11 @@ class RunningAnalyses:
         with self._lock:
             return {running.apk_path for running in self._analyses.values()}
 
+    def projects(self) -> set[str]:
+        """The ids of the analyses this process is running."""
+        with self._lock:
+            return set(self._analyses)
+
 
 #: The analyses this process is running.
 RUNNING = RunningAnalyses()
