@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1832<!--/fig-->（<!--fig:tests.fast-->1683<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1847<!--/fig-->（<!--fig:tests.fast-->1698<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1683<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1698<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1832<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1847<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -263,6 +263,8 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_platform_gate_inventory.py` | 本地门禁与 CI 门禁的差异核对：每个 CI job、每个平台相关的测试、每处平台敏感的行都要在清单里写明差异是否合法；新增一个正确的 CI job 不需要改任何数字（C15 新增） |
 | `test_unguarded_numbers.py` | 没人守的手写测量数：门禁把真值从树上算出来，与文档里那句话里的数比；红→绿可复现，清单烂了会被说出来 |
 | `test_run_render.py` | C8「渲染某一次运行」：`dexatlas runs` 列出/回看运行记录、`dexatlas render` 把已发布运行的报告、证据包与 run 记录落成目录；输出结构、退出码（未知 run/项目→2、无运行→1）、未发布或已被替换的 run 拒绝渲染、渲染只读工作区（C8 新增） |
+| `test_desktop_locator_open_source.py` | 桌面前端证据抽屉的「打开来源」按钮：包级/DEX 内/后端失败的 locator 没有单文件落点时按钮不可用并给出可读说明，文件内 locator 的行为不变；前端镜像的后端工具词汇不许漂移（Q2 走查 P3 新增） |
+| `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素（Q2 走查 P4 新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -883,10 +885,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1832<!--/fig--> 个：<!--fig:tests.fast-->1683<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1847<!--/fig--> 个：<!--fig:tests.fast-->1698<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1831<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1846<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1107,10 +1109,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:f737a3109f0f25b1769cac1b9b9e01dcb1c6a8d8e979ef875c72c2c9b9f49826",
+  "source_fingerprint": "sha256:629abe440df6fdecb8b7d24a3d5603cf1c09585f45ca2cae9385e6d10b0497f6",
   "suite": {
     "failed": 0,
-    "passed": 1831,
+    "passed": 1846,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1124,8 +1126,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1683,
+    "fast": 1698,
     "slow": 149,
-    "total": 1832
+    "total": 1847
   }
 }-->
