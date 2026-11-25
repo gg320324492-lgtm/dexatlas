@@ -10,15 +10,14 @@
  * - Phase 5 W2：run.stages（真实 pipeline 阶段事件，runs.py RunStage）存在时，
  *   时间线直接按阶段事件渲染；时间模拟仅作"无任何 run 数据"时的兜底。
  *
- * 阶段映射规则（优先级从高到低）：
- * - run.stages 非空 → 按真实阶段事件置 done/running；run 已终止却停在
- *   某阶段的格子标 error；completeness = "partial" 时按 errors 点名的
- *   工具在已完成格子上标注"部分"（skipped 态）；
- * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无 stages 字段）：
- *   pending → 全部待开始；running → 采集完成、解析进行中；completed →
- *   五阶段全部完成；failed → 解析格标失败；
+ * 阶段映射规则（优先级从高到低）写在 ../stages 里（纯函数、可被
+ * tests/test_desktop_stage_mapping.py 直接执行）：
+ * - 有 stages（真实 pipeline 阶段事件，runs.py RunStage）→ 按事件推进置
+ *   done/running；run 已终止却停在某阶段的格子标 error；completeness =
+ *   "partial" 时按 errors 点名的工具在已完成格子上标注"部分"（skipped 态）；
+ * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无阶段事件）；
  * - runs 不可用（404 / 网络）或无 run 时，回退到时间模拟并显示原角标；
- *   三种来源在角标文案中如实区分。
+ *   三种来源在角标文案中如实区分，「证据」格等推断值也在角标里说明。
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
@@ -47,7 +46,14 @@ import type {
   RunsEnvelope,
   WorkbenchHealth as WsHealth,
 } from "../api";
-import type { BackendState, BackendStatus, LogLevel, LogEntry, StageId, StageInfo, StageState } from "../types";
+import type { BackendState, BackendStatus, LogLevel, LogEntry, StageState } from "../types";
+import {
+  EVIDENCE_SLOT_NOTE,
+  STAGES,
+  deriveStageBadge,
+  deriveStageStates,
+  deriveStagesFromRun,
+} from "../stages";
 import "./Analysis.css";
 
 /** 相对基址：由 vite dev 代理（→ http://127.0.0.1:8618）转发，见文件头说明。 */
@@ -59,15 +65,6 @@ const POLL_INTERVAL_MS = 2000;
 const STAGE_TICK_MS = 2400;
 /** 404 连续多少次后提示"迟迟未入库"（2s 一次，15 次 ≈ 30s）。 */
 const NOT_FOUND_LONG_STREAK = 15;
-
-/** 分析阶段定义（§2-3 左侧阶段进度；原 mockData.STAGES 就地收编） */
-const STAGES: StageInfo[] = [
-  { id: "collect", label: "采集", description: "读取 APK 结构、manifest 与签名信息" },
-  { id: "parse", label: "解析", description: "Apktool 反编译资源与 Smali，JADX 还原 Java 源码" },
-  { id: "index", label: "索引", description: "Androguard 建立类/方法/字段符号索引" },
-  { id: "evidence", label: "证据", description: "抽取权限、组件、字符串与敏感调用点" },
-  { id: "report", label: "报告", description: "汇总为可复核的 Markdown / JSON 报告" },
-];
 
 /** 阶段状态 → StatusBadge kind */
 const STAGE_BADGE: Record<StageState, StatusKind> = {
@@ -323,153 +320,6 @@ function useStageSimulation(status: string | null): number {
   return progress;
 }
 
-function deriveStageStates(progress: number, status: string | null): Record<string, StageState> {
-  const states: Record<string, StageState> = {};
-  STAGES.forEach((stage, i) => {
-    if (status === "completed") {
-      states[stage.id] = "done";
-    } else if (status === "failed") {
-      states[stage.id] = i < progress ? "done" : i === progress ? "error" : "pending";
-    } else {
-      states[stage.id] = i < progress ? "done" : i === progress ? "running" : "pending";
-    }
-  });
-  return states;
-}
-
-/** 后端 pipeline 阶段 → 页面五阶段格子。 */
-const STAGE_TO_SLOT: Record<string, StageId> = {
-  inspect: "collect",
-  "parse-apktool": "parse",
-  "index-androguard": "index",
-  "decompile-jadx": "parse",
-  publish: "report",
-};
-
-/**
- * 阶段映射：优先用 stages 端点的真实阶段事件（Phase 5 W2），按事件推进置
- * done/running；run 未结束且 publish 未完成时，证据格按最后已完成的阶段
- * 推断。端点无 stages（旧后端写入的 run）回退到 run.status 的粗粒度
- * 映射；两者皆无时由调用方回退时间模拟。
- */
-function deriveStagesFromRun(
-  run: RunInfo | null,
-  runStages: RunStageEvent[] | null,
-): {
-  states: Record<string, StageState>;
-  partialLabels: Record<string, string>;
-} {
-  const states: Record<string, StageState> = {};
-  const partialLabels: Record<string, string> = {};
-
-  if (!run) {
-    STAGES.forEach((s) => (states[s.id] = "pending"));
-    return { states, partialLabels };
-  }
-
-  const events = runStages ?? [];
-  if (events.length > 0) {
-    STAGES.forEach((s) => (states[s.id] = "pending"));
-    let lastDoneSlot: StageId | null = null;
-    for (const event of events) {
-      const slot = STAGE_TO_SLOT[event.stage];
-      if (!slot) continue;
-      if (event.finished_at) {
-        states[slot] = "done";
-        lastDoneSlot = slot;
-      } else if (run.status === "running" || run.status === "pending") {
-        states[slot] = "running";
-      } else {
-        // run 已终止（failed/cancelled）却停在某个阶段：该格标失败
-        states[slot] = "error";
-      }
-    }
-    // 证据格没有自己的后端事件（它由各阶段的产出汇成）：把最后一个
-    // 已完成阶段之后、报告之前的格子按推断展示，避免与真实数据矛盾。
-    const evidenceState = states.evidence;
-    if (evidenceState === "pending" && lastDoneSlot && lastDoneSlot !== "report") {
-      const order: StageId[] = ["collect", "parse", "index", "evidence", "report"];
-      const lastIdx = order.indexOf(lastDoneSlot);
-      const evidenceIdx = order.indexOf("evidence");
-      if (evidenceIdx > lastIdx) states.evidence = lastIdx >= evidenceIdx - 1 ? "running" : "pending";
-    }
-    if (run.completeness === "partial") {
-      const errors = readCompletenessErrors(run);
-      const affected = new Set<string>();
-      for (const msg of errors) {
-        const tool = msg.split(":")[0]?.trim().toLowerCase() ?? "";
-        if (tool.includes("jadx") || tool.includes("apktool")) affected.add("parse");
-        if (tool.includes("androguard")) affected.add("index");
-        if (tool.includes("evidence")) affected.add("evidence");
-        if (tool.includes("report")) affected.add("report");
-      }
-      if (affected.size === 0) affected.add("report");
-      affected.forEach((id) => {
-        if (states[id] === "done") {
-          states[id] = "skipped"; // 复用 partial 徽章语义
-          partialLabels[id] = "部分";
-        }
-      });
-    }
-    return { states, partialLabels };
-  }
-
-  // ---- 回退：旧 run（无 stages 字段）按状态粗粒度映射 ----
-  if (run.status === "running") {
-    // 保守映射：采集已完成，解析进行中，其余未开始
-    states.collect = "done";
-    states.parse = "running";
-    states.index = "pending";
-    states.evidence = "pending";
-    states.report = "pending";
-    return { states, partialLabels: {} };
-  }
-
-  if (run.status === "completed") {
-    STAGES.forEach((s) => (states[s.id] = "done"));
-    if (run.completeness === "partial") {
-      // errors 形如 "jadx: ..." / "apktool: ..."，点名哪个工具没跑完
-      const errors = readCompletenessErrors(run);
-      const affected = new Set<string>();
-      for (const msg of errors) {
-        const tool = msg.split(":")[0]?.trim().toLowerCase() ?? "";
-        if (tool.includes("jadx") || tool.includes("apktool")) affected.add("parse");
-        if (tool.includes("androguard")) affected.add("index");
-        if (tool.includes("evidence")) affected.add("evidence");
-        if (tool.includes("report")) affected.add("report");
-      }
-      if (affected.size === 0) {
-        // 点不出具体工具时，标在最后的报告阶段（整体"部分完成"）
-        affected.add("report");
-      }
-      const labels: Record<string, string> = {};
-      affected.forEach((id) => {
-        states[id] = "skipped"; // 复用 partial 徽章语义
-        labels[id] = "部分";
-      });
-      return { states, partialLabels: labels };
-    }
-    return { states, partialLabels: {} };
-  }
-
-  // failed：run 已终止且未发布；把"解析"格标失败（首个非采集阶段）
-  states.collect = "done";
-  states.parse = "error";
-  states.index = "pending";
-  states.evidence = "pending";
-  states.report = "pending";
-  return { states, partialLabels: {} };
-}
-
-/** run.completeness.errors 的两种历史形状 → 字符串数组 */
-function readCompletenessErrors(run: RunInfo): string[] {
-  const raw = (run as { errors?: unknown }).errors;
-  if (!Array.isArray(raw)) return [];
-  return raw.map((e) =>
-    typeof e === "string" ? e : `${(e as { tool?: string }).tool ?? ""}: ${(e as { message?: string }).message ?? ""}`,
-  );
-}
-
 /** duration_seconds → 展示字符串 */
 function durationLabel(seconds: number | null | undefined): string | null {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return null;
@@ -586,11 +436,12 @@ export function Analysis() {
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
   const duration = durationLabel(latestRun?.duration_seconds);
   const hasStageFacts = Boolean(runStageEvents?.length);
-  const stageBadgeText = hasStageFacts
-    ? "阶段推进：后端真实阶段事件"
-    : hasRealRun
-      ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError || stagesError ? "（stages 端点不可用）" : ""}`
-      : "阶段推进为前端模拟";
+  // 角标如实说明阶段推进的来源（真实阶段事件 / run 状态映射 / 前端模拟），
+  // 以及哪些格子是推断出来的（证据格、合并了 JADX 的解析格）。
+  const stageBadge = deriveStageBadge(
+    hasStageFacts ? "stages" : hasRealRun ? "run-status" : "simulation",
+    Boolean(runsError || stagesError),
+  );
 
   const handleCancel = async () => {
     if (!projectId) return;
@@ -739,17 +590,8 @@ export function Analysis() {
               title="阶段进度"
               subtitle="采集 → 解析 → 索引 → 证据 → 报告"
               actions={
-                <span
-                  className="da-mock-badge"
-                  title={
-                    hasStageFacts
-                      ? "阶段状态读自后端 stages 端点的真实阶段事件（pipeline 推进点）"
-                      : hasRealRun
-                        ? "该 run 无阶段级数据（旧后端写入），状态由 run.status 映射，粒度由前端推断"
-                        : "后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐"
-                  }
-                >
-                  {stageBadgeText}
+                <span className="da-mock-badge" title={stageBadge.title}>
+                  {stageBadge.text}
                 </span>
               }
             />
@@ -763,6 +605,9 @@ export function Analysis() {
                       key={stage.id}
                       className={`da-stage da-stage--${state}`}
                       aria-current={state === "running" ? "step" : undefined}
+                      // 「证据」格在后端没有对应的阶段事件：把这一点说在格子上，
+                      // 读者悬停就知道这一格是推断值（复测报告 §P3）。
+                      title={stage.id === "evidence" ? EVIDENCE_SLOT_NOTE : undefined}
                     >
                       <span className="da-stage__dot" aria-hidden="true">
                         {state === "done" ? "✓" : state === "running" ? "◌" : state === "error" ? "✕" : "•"}

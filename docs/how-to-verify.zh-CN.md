@@ -117,14 +117,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里四样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 <!--fig:tests.trio-->**1852**（**1703** 快 + **149** 集成）<!--/fig-->。
+* **收集到的测试数** —— 当前这棵树上应当是 <!--fig:tests.trio-->**1866**（**1717** 快 + **149** 集成）<!--/fig-->。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是上面那个标记的值，由
   `scripts/refresh-report-figures.py` 写出来（§4），不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → <!--fig:tests.collect.fast-->1703/1852 tests collected (149 deselected)<!--/fig-->
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → <!--fig:tests.collect.slow-->149/1852 tests collected (1703 deselected)<!--/fig-->
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → <!--fig:tests.collect.fast-->1717/1866 tests collected (149 deselected)<!--/fig-->
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → <!--fig:tests.collect.slow-->149/1866 tests collected (1717 deselected)<!--/fig-->
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -146,7 +146,7 @@ bash scripts/fetch-fixtures.sh
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**拉第三方样本 | `<N> passed, <M> skipped`（退出码 0）。skip 全是 `fixture not present; run scripts/fetch-fixtures.sh`。这一行量的是**另一种跑法**，具体条数随这棵树的测试数变，所以这里不写死 |
-| 三后端齐备，**拉了**第三方样本 | **<!--fig:suite.passed-->1851<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
+| 三后端齐备，**拉了**第三方样本 | **<!--fig:suite.passed-->1865<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
