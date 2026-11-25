@@ -55,10 +55,6 @@ export default function AppLayout() {
             </NavLink>
           ))}
         </nav>
-
-        <div className="sidebar-footer">
-          <span className="badge badge-muted">v1.0.2</span>
-        </div>
       </aside>
 
       <main id="main-content" ref={mainRef} className="app-main" tabIndex={-1}>
