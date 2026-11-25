@@ -1110,7 +1110,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:5c6a8c0acd5842dead7ccf2e4f87a909e4183442f8b6de23b94ca8df4e5d7e81",
+  "source_fingerprint": "sha256:83b0dbfcf34a10b17e64af4b60d653df583058299c3412f71e5e178bc515e3fa",
   "suite": {
     "failed": 0,
     "passed": 1851,
