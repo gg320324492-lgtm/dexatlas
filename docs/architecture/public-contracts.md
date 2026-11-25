@@ -106,7 +106,8 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 | `/projects` | GET | `ProjectResponse[]`，最新在前 | 200（`src/dexatlas/api/app.py:422-424` `anchor: list_projects`） |
 | `/projects/{pid}` | GET | `ProjectResponse` | 200 / 404（`src/dexatlas/api/app.py:188-194`） |
 | `/projects/{pid}/runs` | GET | `{"project_id","total","published_run_id","runs":[RunResponse]}`，最新在前 | 200（`src/dexatlas/api/app.py:437-455` `anchor: list_runs`） |
-| `/projects/{pid}/runs/{rid}` | GET | `RunResponse` | 200 / 404（`src/dexatlas/api/app.py:248-258`） |
+| `/projects/{pid}/runs/{rid}` | GET | `RunResponse` | 200 / 404（`src/dexatlas/api/app.py:248-270` `anchor: RunResponse`） |
+| `/projects/{pid}/runs/{rid}/stages` | GET | `{"project_id","run_id","run_status","stages":[{stage,started_at,finished_at}]}` | 200 / 404（`src/dexatlas/api/app.py:471-499` `anchor: get_run_stages`） |
 | `/projects/{pid}` | DELETE | — | 204 / 404（`src/dexatlas/api/app.py:870-874` `anchor: delete_project`） |
 
 `ProjectResponse` 字段见 `src/dexatlas/api/app.py:188-220` `anchor: ProjectResponse`：`id`、`status`、
@@ -128,17 +129,24 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 `status`、`completeness`（"complete"/"partial"）、`apk_sha256`、`tool_versions`、
 `errors[]`、`started_at`、`finished_at`、`duration_seconds`、`published`。
 
-**stages（2026-11-25 新增，纯扩展字段）**：`RunResponse.stages[]` 与 workbench
-`RunSummary.stages[]`（`src/dexatlas/mcp/schemas.py`）给出该 run 走过的
-pipeline 阶段事件，按记录顺序排列。每个元素是
-`{stage, started_at, finished_at}`；stage 取值 inspect、parse-apktool、
-index-androguard、decompile-jadx、publish（与
-`Analyzer.analyze` 的实际推进点一致，`src/dexatlas/core/pipeline.py:152`；
-阶段枚举见 `src/dexatlas/core/runs.py:75` `anchor: RunStage`）。
-`finished_at` 为 null 表示该阶段尚未结束——包括 run 在阶段中途失败或被取消
-的情况。同一阶段至多出现一次；旧版本写入的 run 或在首个阶段前就结束的 run
-该字段为空数组（读作"无阶段事实"，不是错误）。字段只增不改：既有端点的
-响应形状、状态码与退出码零变化。
+**stages 端点（2026-11-25 新增，纯新增端点）**：`GET /projects/{pid}/runs/{rid}/stages`
+回答"这个 run 走到了哪一步"，响应是
+`{"project_id","run_id","run_status","stages":[{stage,started_at,finished_at}]}`，
+阶段事件按记录顺序排列。每个元素的形状是 `{stage, started_at, finished_at}`
+（模型见 `RunStageEventResponse`，`src/dexatlas/api/app.py:229-245`
+`anchor: RunStageEventResponse`）。stage 取值 inspect、parse-apktool、
+index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际推进点一致，
+`src/dexatlas/core/pipeline.py:152`；阶段枚举见 `src/dexatlas/core/runs.py:75`
+`anchor: RunStage`）。`started_at` 与 `finished_at` 是 ISO 8601 时间戳，
+`finished_at` 为 null 表示该阶段尚未结束——包括 run 在阶段中途失败或被取消的情况。
+同一阶段至多出现一次；旧版本写入的 run 或在首个阶段前就结束的 run，阶段列表是
+空数组（读作"无阶段事实"，不是错误）。
+
+**run 对象本身不带 stages**：`RunResponse` 仍是上表的 11 个字段，阶段事实另取
+stages 端点——这样既有 run 对象的字段集一个也不变。workbench 的
+`GET /api/projects/{pid}/runs/{rid}/stages` 与 REST 同形状
+（`src/dexatlas/workbench/app.py:603-616` `anchor: get_run_stages`）。端点与字段
+只增不改：既有端点的响应形状、状态码与退出码零变化。
 
 ### 2.4 符号与检索
 
@@ -388,43 +396,50 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
 `claude/agitated-diffie-f2a45f` 上完成，2026年11月17日按本节清单复跑两次。
 快照测试 `tests/test_public_contracts.py` 把同样的清单固化为回归门禁。
 
-**检查项清单共 52 项：28 REST + 6 MCP + 18 CLI**——即
+**检查项清单共 55 项：31 REST + 6 MCP + 18 CLI**——即
 `scripts/verify-public-contracts.py` 里 `check()` 调用点的条数（`_rest_requests()`
-28 个、`mcp_checks()` 6 个、`cli_checks()` 18 个）。下面三张表每行对应脚本里的一次
+31 个、`mcp_checks()` 6 个、`cli_checks()` 18 个）。下面三张表每行对应脚本里的一次
 `check()`，行数与分项数相等。
 
-**52 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
+**55 是静态条数，任何一次实跑都跑不满它。** REST 段有两个调用点只在其余分支上记：
 `server comes up` 只在服务起不来时记（起不来则本段只记这 1 项并中止），
 `X-DexAtlas-Source-* headers` 只在源码端点返回 200 时记。CLI 段的 `source` 与
 `resources` 各有一个调用点按「这次分析里有没有对应后端参与」分支，两种配置走不同的
 那条（见 §7.3）。所以实跑的**执行条数**依机器而定：
 
-| 实跑（2026年11月17日） | 可用后端 | 执行条数 | 通过 | 退出码 |
+| 实跑 | 可用后端 | 执行条数 | 通过 | 退出码 |
 |---|---|---|---|---|
-| branch `claude/contract-check-premise-197604`（commit `8483db2`） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 50（26 REST + 6 MCP + 18 CLI） | **50/50** | 0 |
-| branch `claude/contract-check-premise-197604`（commit `8483db2`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 51（27 REST + 6 MCP + 18 CLI） | **51/51** | 0 |
+| 2026年11月17日，branch `claude/contract-check-premise-197604`（commit `8483db2`） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 50（26 REST + 6 MCP + 18 CLI） | **50/50** | 0 |
+| 2026年11月17日，branch `claude/contract-check-premise-197604`（commit `8483db2`） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 51（27 REST + 6 MCP + 18 CLI） | **51/51** | 0 |
+| 2026年11月25日，worktree `eager-antonelli-ea7f79`（未提交） | 仅 androguard 4.1.4，JADX 与 Apktool 都不在环境里 | 53（29 REST + 6 MCP + 18 CLI） | **53/53** | 0 |
+| 2026年11月25日，worktree `eager-antonelli-ea7f79`（未提交） | jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 54（30 REST + 6 MCP + 18 CLI） | **54/54** | 0 |
 
 > **2026年11月20日更新**：C8 落地（`dexatlas runs` / `dexatlas render`）后，CLI 段
 > 增加 3 个调用点（runs 列表、未知 run id → 2、render 已发布运行落盘），静态总数
-> 由 49 升至 **52**。上表的两行实跑数字是**旧脚本**的记录（当时 CLI 段 15 项）；按
-> 新脚本，两行相应为 50 / 51。表中保留旧数字以忠实记录当时那两次实跑；
-> 当前配置的实跑以 `scripts/check-contract-records.py --expect <配置>` 的结果为准。
+> 由 49 升至 **52**。表中 2026年11月17日那两行实跑数字是**旧脚本**的记录（当时
+> CLI 段 15 项）；按新脚本，两行相应为 50 / 51。表中保留旧数字以忠实记录当时那
+> 两次实跑；当前配置的实跑以 `scripts/check-contract-records.py --expect <配置>`
+> 的结果为准。
 
-命令：`uv run --no-sync python scripts/verify-public-contracts.py`。本 worktree 没有
-自己的 `.venv`（`uv sync` 不在本次改动的范围内），实跑用的是主检出
-`E:\Dexatlas\.venv` 的解释器，`PYTHONPATH` 指向本 worktree 的 `src`——被测的就是本
-worktree 的代码；后端路径经 `DEXATLAS_JADX_PATH` / `DEXATLAS_APKTOOL_JAR` 指向
-`E:\Dexatlas\.scratch\backends`，临时目录指向本 worktree 的 `.scratch\tmp`。
+> **2026年11月25日更新**：Phase 5 W2 的 stages 端点进入活检，REST 段增加 3 个
+> 调用点（stages 形状、阶段顺序、无此 run → 404），静态总数由 52 升至 **55**
+> （31 REST + 6 MCP + 18 CLI）。当日两种配置各实跑一次，结果记在本节表里。
+
+命令：`uv run --no-sync python scripts/verify-public-contracts.py`。本 worktree 用
+自己的 `.venv`（`uv sync --frozen --all-extras`），后端路径经 `DEXATLAS_JADX_PATH` /
+`DEXATLAS_APKTOOL_JAR` 指向 `E:\Dexatlas\.scratch\backends`，临时目录指向本
+worktree 的 `.scratch\tmp`。
 
 两次的差在一处条件检查上：缺 JADX 时源码端点返回 404，`X-DexAtlas-Source-* headers`
-不记，REST 段执行 26 项；三后端齐备时它触发并通过，REST 段执行 27 项。CLI 段的 18
-项两种配置下都记满——分支走的是同一个调用点。
+不记，REST 段执行 29 项（2026年11月25日口径；旧脚本是 26 项）；三后端齐备时它触发
+并通过，REST 段执行 30 项（旧脚本是 27 项）。CLI 段的 18 项两种配置下都记满——分支
+走的是同一个调用点。
 
 ### 7.1 REST 实测
 
 以 `uvicorn dexatlas.api.app:app` 起服务，上传 `examples/demo-app/demo.apk` 后逐
 端点核对（脚本 `scripts/verify-public-contracts.py` 的 `_rest_requests()`，静态
-28 个调用点；服务起得来时本段实跑 27 项——`server comes up` 只在起不来的分支上记）：
+31 个调用点；服务起得来时本段实跑 30 项——`server comes up` 只在起不来的分支上记）：
 
 | 检查 | 结果 |
 |---|---|
@@ -439,6 +454,9 @@ worktree 的代码；后端路径经 `DEXATLAS_JADX_PATH` / `DEXATLAS_APKTOOL_JA
 | `GET /projects` → `ProjectResponse[]` | ✅ |
 | `GET /projects/{pid}/runs` → `{project_id,total,published_run_id,runs[]}`，RunResponse 11 字段 | ✅ |
 | `GET /projects/{pid}/runs/{rid}` → `published==True` | ✅ |
+| `GET /projects/{pid}/runs/{rid}/stages` → `{project_id,run_id,run_status,stages[]}`，`project_id`/`run_id` 对得上，`run_status` 与 run 详情一致 | ✅ |
+| 上一行的每个阶段元素 → `{stage,started_at,finished_at}`，stage ∈ 五个阶段名，时间戳按阶段顺序不减 | ✅ 本次分析的 run 由当前代码写入，阶段事实非空 |
+| `GET /projects/{pid}/runs/{rid}/stages`（无此 run） → 404 带 detail | ✅ |
 | `GET /projects/{pid}/manifest` → 200（三后端齐备时 200；本机 Apktool 缺失时 404 带 reason） | ✅ |
 | `GET /projects/{pid}/classes?limit=5` → `{project_id,total,classes}`，`len(classes) ≤ 5`，`total ≥ len(classes)` | ✅ |
 | `GET /projects/{pid}/methods?limit=5` → `{project_id,total,methods}`，`total ≥ 1` | ✅ |
@@ -459,8 +477,12 @@ worktree 的代码；后端路径经 `DEXATLAS_JADX_PATH` / `DEXATLAS_APKTOOL_JA
 
 REST 段有两项是条件检查：`server comes up` 只在服务起不来时记（起不来则本段中止，
 只记这 1 项，REST 段合计 1 项）；`X-DexAtlas-Source-* headers` 只在源码端点返回
-200 时记。缺 JADX 的实跑里后者不触发（端点返回 404），REST 段执行 26 项；三后端
-齐备的实跑里它触发并通过（源码端点答 200，四个头齐全），REST 段执行 27 项。
+200 时记。缺 JADX 的实跑里后者不触发（端点返回 404），REST 段执行 29 项；三后端
+齐备的实跑里它触发并通过（源码端点答 200，四个头齐全），REST 段执行 30 项。
+
+**这一段只覆盖 REST 面。** 阶段事实在 MCP 面上没有对应工具——§3.1 的十一个工具里
+没有它，MCP 调用方要阶段事实只能走 REST 或 workbench 的这个端点。这是一处**不对
+称**，不是一处缺口：契约没有承诺 MCP 面有它。
 
 ### 7.2 MCP 实测
 
@@ -483,7 +505,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 ### 7.3 CLI 退出码实测
 
 `CliRunner` 逐个触发（脚本 `scripts/verify-public-contracts.py` 的 `cli_checks()`，
-静态 15 个调用点）：
+静态 18 个调用点）：
 
 | 场景 | 期望 | 实测（仅 androguard / 三后端齐备） |
 |---|---|---|
@@ -530,7 +552,8 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 改动前那 2 条未通过，正是 `source`（JADX 在场、答案非空 → 0）与 `resources`
 （Apktool 在场、资源表有 `app_name` → 0）两条：脚本断言的是「无后端时的 1」，而
 §1.2 承诺的是「答案为空即 1」。改动后静态条数不变（当时仍是 49 = 28 REST + 6 MCP +
-15 CLI；2026年11月20日 C8 落地后升为 52 = 28 REST + 6 MCP + 18 CLI，见本节开头），
+15 CLI；2026年11月20日 C8 落地后升为 52 = 28 REST + 6 MCP + 18 CLI，2026年11月25日
+stages 端点进活检后升为 55 = 31 REST + 6 MCP + 18 CLI，见本节开头），
 那次实跑的条数也不变（47 / 48），变的只是那两条断言的判定依据。
 
 ## 8. 已知限制

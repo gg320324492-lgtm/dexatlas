@@ -30,6 +30,7 @@ import sys
 import tempfile
 import time
 import unittest.mock
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,19 @@ DEMO_APK = REPO_ROOT / "examples" / "demo-app" / "demo.apk"
 #: Where the server's output lands. A server that never answers has to say
 #: why, and DEVNULL is where explanations go to be lost.
 SERVER_LOG = SCRATCH / "uvicorn.log"
+
+#: The pipeline stages a run can be recorded in, as the run's stage facts
+#: name them. The pipeline reaches them in the order of
+#: ``dexatlas.core.runs.RunStage``; a run written by a build that did not
+#: take stage facts has none of them, which reads as "no stage facts" rather
+#: than as an error.
+STAGE_NAMES = {
+    "inspect",
+    "parse-apktool",
+    "index-androguard",
+    "decompile-jadx",
+    "publish",
+}
 
 
 def _free_port() -> int:
@@ -160,6 +174,30 @@ def _backends_installed() -> bool:
     )
 
 
+def _in_order(events: list[dict[str, Any]]) -> bool:
+    """Whether the stage events are in the order the pipeline reached them.
+
+    The times are read as timestamps rather than compared as text: a
+    timestamp the endpoint wrote is a fact about when the pipeline moved,
+    and the order of the list has to agree with it.
+    """
+    moments: list[datetime] = []
+    for event in events:
+        try:
+            started = datetime.fromisoformat(event["started_at"])
+            finished = (
+                None
+                if event["finished_at"] is None
+                else datetime.fromisoformat(event["finished_at"])
+            )
+        except (TypeError, ValueError):
+            return False
+        if finished is not None and finished < started:
+            return False
+        moments.append(started)
+    return moments == sorted(moments)
+
+
 def _rest_requests() -> None:
     apk_bytes = DEMO_APK.read_bytes()
     sha256 = hashlib.sha256(apk_bytes).hexdigest()
@@ -264,6 +302,45 @@ def _rest_requests() -> None:
         run_id = runs["published_run_id"]
         one_run = client.get(f"/projects/{pid}/runs/{run_id}").json()
         check("published run is published", one_run["published"] is True)
+
+        # The stage facts live on their own endpoint, so that the run
+        # detail keeps the shape it has always had. The run read here was
+        # analysed by this build, so it has stage facts: an empty list would
+        # mean the run was written by a build that did not take them, and
+        # the check says so rather than passing on an empty answer.
+        stages_response = client.get(f"/projects/{pid}/runs/{run_id}/stages")
+        stage_body = stages_response.json() if stages_response.status_code == 200 else {}
+        stage_events = stage_body.get("stages", []) if isinstance(stage_body, dict) else []
+        check(
+            "/runs/{rid}/stages shape",
+            stages_response.status_code == 200
+            and set(stage_body) == {"project_id", "run_id", "run_status", "stages"}
+            and stage_body.get("project_id") == pid
+            and stage_body.get("run_id") == run_id
+            and stage_body.get("run_status") == one_run["status"]
+            and isinstance(stage_events, list)
+            and all(
+                set(event) == {"stage", "started_at", "finished_at"}
+                and event["stage"] in STAGE_NAMES
+                and isinstance(event["started_at"], str)
+                and (event["finished_at"] is None or isinstance(event["finished_at"], str))
+                for event in stage_events
+            ),
+            f"{stages_response.status_code} {stages_response.text[:200]}",
+        )
+        check(
+            "/runs/{rid}/stages keeps the pipeline order",
+            len(stage_events) >= 1
+            and len({event["stage"] for event in stage_events}) == len(stage_events)
+            and _in_order(stage_events),
+            f"this build records stage facts, got {stage_events}",
+        )
+        missing_run = client.get(f"/projects/{pid}/runs/apk_deadbeefdeadbeef/stages")
+        check(
+            "/runs/{rid}/stages says which run is missing",
+            missing_run.status_code == 404 and "detail" in missing_run.json(),
+            f"{missing_run.status_code} {missing_run.text[:120]}",
+        )
 
         manifest = client.get(f"/projects/{pid}/manifest")
         check(
