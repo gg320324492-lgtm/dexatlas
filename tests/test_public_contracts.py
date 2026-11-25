@@ -762,10 +762,10 @@ def test_the_evidence_package_manifest_is_versioned() -> None:
 #: The counts are pinned here. A change to the script's checks has to change
 #: this, and the materials with it, in the same commit — which is the point
 #: of an invariant that is maintained by hand.
-CONTRACT_CHECK_SECTIONS = {"_rest_requests": 28, "mcp_checks": 6, "cli_checks": 18}
+CONTRACT_CHECK_SECTIONS = {"_rest_requests": 31, "mcp_checks": 6, "cli_checks": 18}
 
 #: The number those call sites add up to.
-CONTRACT_CHECK_TOTAL = 52
+CONTRACT_CHECK_TOTAL = 55
 
 #: The materials that repeat the number, and the count they have to repeat.
 #:
@@ -783,8 +783,8 @@ MATERIALS_THAT_STATE_THE_COUNT = (
 CHECK_SPLIT = re.compile(r"(\d+) REST \+ (\d+) MCP \+ (\d+) CLI")
 
 #: A number as a document writes it: "1,588" is one number, and "149" is not
-#: "52".
-STATED_NUMBER = re.compile(r"(?<![\d,])52(?![\d,])")
+#: "55".
+STATED_NUMBER = re.compile(r"(?<![\d,])55(?![\d,])")
 
 #: The root of the checked-out project.
 REPO_ROOT = Path(__file__).parent.parent

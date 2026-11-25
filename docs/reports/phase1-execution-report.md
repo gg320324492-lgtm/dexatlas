@@ -74,7 +74,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
 | 测试数 | <!--fig:tests.total-->1832<!--/fig-->（<!--fig:tests.fast-->1683<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行） | ≥80% |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -885,7 +885,7 @@ uv run python scripts/refresh-report-figures.py
 ```bash
 uv run pytest          # 收集 <!--fig:tests.total-->1832<!--/fig--> 个：<!--fig:tests.fast-->1683<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行）
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行）
                       # 完整环境下的结果：<!--fig:suite.passed-->1831<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
@@ -1052,7 +1052,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/paths.py": [36, 2],
       "core/pipeline.py": [543, 34],
       "core/runs.py": [106, 0],
-      "core/storage.py": [403, 13],
+      "core/storage.py": [403, 14],
       "mcp/__init__.py": [2, 0],
       "mcp/errors.py": [21, 1],
       "mcp/schemas.py": [200, 0],
@@ -1089,7 +1089,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/app.py": [222, 6],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 533,
+    "missing": 534,
     "statements": 8001
   },
   "history": {
@@ -1107,7 +1107,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:88eb4745b884bfe6ca412013f6b58101f3a4830aefa5d2fffcc976ac62adc425",
+  "source_fingerprint": "sha256:f737a3109f0f25b1769cac1b9b9e01dcb1c6a8d8e979ef875c72c2c9b9f49826",
   "suite": {
     "failed": 0,
     "passed": 1831,
