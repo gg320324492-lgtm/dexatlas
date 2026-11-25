@@ -200,6 +200,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
 | `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
+| `test_desktop_stage_mapping.py` | 桌面分析页的阶段映射：完成态五格全完成、运行中「证据」格进行中、无阶段事件的旧 run 走状态兜底、失败与取消态；「证据」格等推断值在角标里如实说明（Phase 5 W2 复测 P1/P3 修复新增） |
 | `test_upload_lifecycle.py` | 上传的保留与清理；正在运行的分析可以被取消 |
 | `test_androguard_isolation.py` | 后端的运行时隔离：宿主的日志不被删；不受信的 DEX 在单独的进程里解析；越界的资源被记下来 |
 | `test_evidence_invariants.py` | 已验证证据的不变量：引用落不在分析之内，就不许记成 verified；模型的说法永远不是事实 |
