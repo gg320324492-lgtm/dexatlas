@@ -41,6 +41,12 @@ import type {
   SymbolHit,
   WorkbenchHealth,
 } from "./types";
+import {
+  SIDECAR_PORT_RETRY_WAIT_MS,
+  sidecarBaseUrl,
+  subscribeSidecarStatus,
+  waitForSidecarPort,
+} from "./sidecarEndpoint";
 
 /**
  * Tauri 发布形态下的后端访问适配（X2-P1；Phase 5 W1 起接侧车实际端口）。
@@ -70,29 +76,6 @@ function resolveFetch(): Promise<typeof fetch> {
     return TAURI_FETCH;
   }
   return Promise.resolve(fetch.bind(globalThis));
-}
-
-/**
- * 侧车端点解析（Phase 5 W1）。
- *
- * Tauri 运行时优先向 Rust 壳查询侧车实际端口（`get_sidecar_status` 命令），
- * 侧车未就绪/未启动时回退 127.0.0.1:8618；非 Tauri 环境（vite dev 代理）
- * 保持相对路径。返回 null 表示"暂无可用端口"，由调用方决定等待或报错。
- */
-async function resolveSidecarBaseUrl(): Promise<string | null> {
-  if (!isTauriRuntime()) {
-    return null;
-  }
-  try {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const status = await invoke<{ port: number | null }>("get_sidecar_status");
-    if (status && typeof status.port === "number" && status.port > 0) {
-      return `http://127.0.0.1:${status.port}/api`;
-    }
-  } catch {
-    // 命令不可用（旧壳/非 Tauri）：按"拿不到侧车端口"处理，走 8618 回退。
-  }
-  return FALLBACK_BASE_URL;
 }
 
 /** 侧车端口拿不到时的回退地址（与 X2 时代的固定端口一致）。 */
@@ -185,24 +168,60 @@ export class DexAtlasClient {
   private readonly fetchImpl: Promise<typeof fetch>;
   /** 侧车端口解析完成后 resolve；请求会等它（避免打到 8618 回退端口）。 */
   private readonly ready: Promise<void>;
+  /** 最近一次已知的侧车端口（null = 还没拿到 / 拿不到）。 */
+  private sidecarPort: number | null = null;
 
   constructor(options: DexAtlasClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? defaultBaseUrl()).replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl
       ? Promise.resolve(options.fetchImpl)
       : resolveFetch();
-    // Tauri 运行时把 baseUrl 改写为侧车实际端口；拿不到时保持 8618 回退。
-    // 浏览器/dev 环境返回 null，baseUrl 原样保留（vite 代理）。
-    this.ready = resolveSidecarBaseUrl().then((url) => {
-      if (url) {
-        this.baseUrl = url.replace(/\/+$/, "");
-      }
-    });
+    // 侧车的端口是它启动之后才有的，构造这一刻还拿不到。所以这里**不是**
+    // 一次性解析：先有界等它（waitForSidecarPort），等不到就回退 8618，
+    // 但回退不是终态——下面的事件订阅会在端口出现/变化时重新解析。
+    this.ready = this.resolveSidecarEndpoint();
+    void this.watchSidecarEndpoint();
   }
 
   /** 当前 baseUrl（测试与设置页排障用；侧车就绪后为实际端口）。 */
   get effectiveBaseUrl(): string {
     return this.baseUrl;
+  }
+
+  // -------------------------------------------------------------------------
+  // 侧车端点：端口出现或变化时重新解析 baseUrl
+  // -------------------------------------------------------------------------
+
+  /**
+   * 有界等待侧车端口；拿到就切换 baseUrl。
+   *
+   * 旧实现在构造时一次性解析端口——那时侧车还没起来，于是 baseUrl 被永久
+   * 锁在 8618 回退端口上（打包 exe 真机验收 2026-11-25 的假阳性根因）。
+   */
+  private async resolveSidecarEndpoint(): Promise<void> {
+    this.applySidecarPort(await waitForSidecarPort());
+  }
+
+  /** 端口变了就重新解析 baseUrl（侧车重启后会换端口）。 */
+  private applySidecarPort(port: number | null): void {
+    if (port === null || port === this.sidecarPort) {
+      return;
+    }
+    this.sidecarPort = port;
+    this.baseUrl = sidecarBaseUrl(port).replace(/\/+$/, "");
+  }
+
+  /**
+   * 订阅 `sidecar:status`：侧车就绪（端口出现）或重启（端口变化）时，
+   * 重新解析 baseUrl。
+   */
+  private async watchSidecarEndpoint(): Promise<void> {
+    await subscribeSidecarStatus((status) => {
+      const port = status.port;
+      if (typeof port === "number" && port > 0) {
+        this.applySidecarPort(port);
+      }
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -369,18 +388,35 @@ export class DexAtlasClient {
     // 等侧车端口解析完成：Tauri 下避免首批请求抢在 baseUrl 改写前打到
     // 8618 回退端口（侧车实际端口是系统分配的，几乎不会是 8618）。
     await this.ready;
-    let response: Response;
     try {
-      response = await (await this.fetchImpl)(`${this.baseUrl}${path}`, init);
+      return await this.fetchOnce(path, init);
     } catch (cause) {
-      // fetch 只在网络层失败时 reject（断连、DNS、CORS 等）
-      throw new ApiError(
-        `无法连接 DexAtlas 后端（${this.baseUrl}${path}）：${String(cause)}`,
-        undefined,
-        cause,
-      );
+      // 打不通：端口可能是在首次解析**之后**才出现的（冷启动慢、事件漏收）。
+      // 重新解析一次端口；换了端口就再试一次，换不了就如实报错。
+      const port = await waitForSidecarPort(SIDECAR_PORT_RETRY_WAIT_MS);
+      if (port !== null && port !== this.sidecarPort) {
+        this.applySidecarPort(port);
+        try {
+          return await this.fetchOnce(path, init);
+        } catch (retryCause) {
+          throw this.connectionError(path, retryCause);
+        }
+      }
+      throw this.connectionError(path, cause);
     }
-    return response;
+  }
+
+  private async fetchOnce(path: string, init?: RequestInit): Promise<Response> {
+    // fetch 只在网络层失败时 reject（断连、DNS、CORS 等）
+    return (await this.fetchImpl)(`${this.baseUrl}${path}`, init);
+  }
+
+  private connectionError(path: string, cause: unknown): ApiError {
+    return new ApiError(
+      `无法连接 DexAtlas 后端（${this.baseUrl}${path}）：${String(cause)}`,
+      undefined,
+      cause,
+    );
   }
 
   private async ensureOk(response: Response): Promise<void> {

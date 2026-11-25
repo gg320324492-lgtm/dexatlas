@@ -13,12 +13,25 @@ export interface BackendCommandConfig {
   args: string[];
 }
 
-/** Tauri 侧 get_sidecar_status 的返回形状（serde camelCase）。 */
+/**
+ * Tauri 侧 get_sidecar_status 的返回形状（serde camelCase）。
+ *
+ * 这也是 `sidecar:status` 事件的载荷形状 —— **同一份定义**，
+ * 端口解析模块（api/sidecarEndpoint.ts）复用它，不要另起一份。
+ */
 export interface SidecarStatus {
   running: boolean;
   port: number | null;
   program: string | null;
   message: string;
+  /**
+   * 后端**根本没起来**（Rust 侧 spawn 失败，如命令不在 PATH）。
+   *
+   * 只有"从来没能启动"时为 true：还在启动中是 false，运行过之后崩溃退出
+   * 也是 false（那时端口仍然知道，UI 如实显示退出即可）。
+   * 可选是因为老壳没有这个字段 —— 那时按 false 处理。
+   */
+  failed?: boolean;
 }
 
 /** 是否运行在 Tauri WebView 内（与 api/client.ts 的判定保持一致）。 */
