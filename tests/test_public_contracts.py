@@ -83,6 +83,7 @@ EXPECTED_REST_ROUTES = {
     ("DELETE", "/projects/{project_id}"),
     ("GET", "/projects/{project_id}/runs"),
     ("GET", "/projects/{project_id}/runs/{run_id}"),
+    ("GET", "/projects/{project_id}/runs/{run_id}/stages"),
     ("POST", "/projects/{project_id}/cancel"),
     ("GET", "/projects/{project_id}/manifest"),
     ("GET", "/projects/{project_id}/classes"),

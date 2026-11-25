@@ -276,10 +276,14 @@ def _project_id(apk: Path) -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_the_rest_api_run_detail_carries_stages(
+def test_the_rest_api_run_stages_endpoint_carries_stages(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """GET /projects/{pid}/runs/{rid} returns the stages, newest run first."""
+    """GET /projects/{pid}/runs/{rid}/stages returns the stages.
+
+    The run detail's own shape keeps the contract's original field set —
+    the stage facts are this endpoint's, not the run row's.
+    """
     from dexatlas.api.app import app
     from dexatlas.config.settings import get_settings
 
@@ -293,9 +297,15 @@ def test_the_rest_api_run_detail_carries_stages(
         run = result.run
         assert run is not None
         with TestClient(app) as client:
-            response = client.get(f"/projects/{project_id_of(result)}/runs/{run.id}")
+            detail = client.get(f"/projects/{project_id_of(result)}/runs/{run.id}")
+            response = client.get(f"/projects/{project_id_of(result)}/runs/{run.id}/stages")
+        assert detail.status_code == 200
+        assert "stages" not in detail.json(), "the run detail keeps its original shape"
         assert response.status_code == 200
         body = response.json()
+        assert body["project_id"] == project_id_of(result)
+        assert body["run_id"] == run.id
+        assert body["run_status"] == run.status.value
         assert [stage["stage"] for stage in body["stages"]] == _stages_of(run)
         for stage in body["stages"]:
             assert stage["finished_at"] is not None
@@ -305,10 +315,10 @@ def test_the_rest_api_run_detail_carries_stages(
         get_settings.cache_clear()
 
 
-def test_the_workbench_run_detail_carries_stages(
+def test_the_workbench_run_stages_endpoint_carries_stages(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """GET /api/projects/{pid}/runs/{rid} returns the same stage facts."""
+    """GET /api/projects/{pid}/runs/{rid}/stages returns the same stage facts."""
     from dexatlas.workbench.app import create_app
 
     _patch_dex_reader(monkeypatch, "com.example.demo.Crypto")
@@ -320,11 +330,38 @@ def test_the_workbench_run_detail_carries_stages(
 
     app = create_app(analyzer)
     with TestClient(app) as client:
-        response = client.get(f"/api/projects/{project_id_of(result)}/runs/{run.id}")
+        detail = client.get(f"/api/projects/{project_id_of(result)}/runs/{run.id}")
+        response = client.get(f"/api/projects/{project_id_of(result)}/runs/{run.id}/stages")
+    assert detail.status_code == 200
+    assert "stages" not in detail.json(), "the run detail keeps its original shape"
     assert response.status_code == 200
     body = response.json()
+    assert body["run_id"] == run.id
+    assert body["run_status"] == run.status.value
     assert [stage["stage"] for stage in body["stages"]] == _stages_of(run)
     assert all(stage["finished_at"] for stage in body["stages"])
+
+
+def test_the_stages_endpoint_of_an_unknown_run_is_404(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unknown run, or another project's run, is the contract's 404."""
+    from dexatlas.api.app import app
+    from dexatlas.config.settings import get_settings
+
+    _patch_dex_reader(monkeypatch, "com.example.demo.Crypto")
+    settings.ensure_workspace()
+    get_settings.cache_clear()
+    app.dependency_overrides[get_settings] = lambda: settings
+    try:
+        analyzer = Analyzer(settings)
+        result = analyzer.analyze(minimal_apk, include_apktool=False, include_jadx=False)
+        pid = project_id_of(result)
+        with TestClient(app) as client:
+            assert client.get(f"/projects/{pid}/runs/run_missing/stages").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+        get_settings.cache_clear()
 
 
 def project_id_of(result) -> str:

@@ -231,7 +231,7 @@ FAILED test_a_declaration_that_names_no_citation_is_reported
 这是绝大多数情况，也是契约表 59 条里的绝大多数。
 
 **中 —— 锚点是一段源码。** 引用指向一条路由、一个 JSON 键、一个装饰器、或 docstring
-里的一句话。锚点得挑一段**有辨识度**的字面量。例：`src/dexatlas/api/app.py:430-433`
+里的一句话。锚点得挑一段**有辨识度**的字面量。例：`src/dexatlas/api/app.py:421-424`
 `anchor: @app.get("/projects"` —— 锚点就是那条路由的装饰器。这类的难点是**挑**：
 挑得太短会误匹配，挑得太长会被一次措辞调整打断。
 
@@ -327,7 +327,7 @@ FAILED test_a_declaration_that_names_no_citation_is_reported
 1 条「范围是空的」）。这一轮把它们逐条改掉：
 
 - **孤儿声明 3 条**：两处改成**真的绑定对**（`src/dexatlas/cli/main.py:295-297`
-  `anchor: version` 与 `src/dexatlas/api/app.py:430-433`
+  `anchor: version` 与 `src/dexatlas/api/app.py:421-424`
   `anchor: @app.get("/projects"`），一处改成散文 —— 一处讲的是「假如范围开得很宽」
   的假设，本来就不该是活引用。
 - **引用模糊 1 条**：`app.py` 在仓库里不止一份（`api/app.py` 与 `mcp/server.py`），

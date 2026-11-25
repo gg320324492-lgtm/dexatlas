@@ -53,7 +53,7 @@
 |---|---|---|
 | 阶段进度 | 左列 | 采集 → 解析 → 索引 → 证据 → 报告 五阶段时间线；每阶段 `StatusBadge`（pending/running/done/error/skipped）。数据来自 run 轮询：`RunStatus`（`src/dexatlas/core/runs.py:52` `anchor: RunStatus`）与 `RunCompleteness`（`src/dexatlas/core/runs.py:121` `anchor: RunCompleteness`） |
 | 实时日志 | 中间 | 等宽字体滚动区，按级别着色（info/debug/warn/error/success）。日志来自 Tauri 侧车进程对分析进程 stdout/stderr 的转发——现有后端没有日志流契约，桌面端不得为此新增 REST 端点；run 级错误另见 `run.errors` |
-| 后端状态 | 右列 | Apktool / JADX / Androguard 三卡片：版本、可用性、当前阶段。数据来自 `GET /backends`（`src/dexatlas/api/app.py:378-379` `anchor: def list_backends(`）；缺失后端显示 `missing_error` 的安装提示（`src/dexatlas/tools/base.py:144` `anchor: missing_error`） |
+| 后端状态 | 右列 | Apktool / JADX / Androguard 三卡片：版本、可用性、当前阶段。数据来自 `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`）；缺失后端显示 `missing_error` 的安装提示（`src/dexatlas/tools/base.py:144` `anchor: missing_error`） |
 
 顶部提供「取消分析」入口（REST 取消端点，`src/dexatlas/api/app.py:452-457`），取消后 run 的状态记为枚举值 `CANCELLED`（`src/dexatlas/core/runs.py:68-71` `anchor: CANCELLED`），界面呈现「已按请求停止」，不混入失败语义。
 
@@ -61,9 +61,9 @@
 
 三栏：**列表 / 主体 / 证据抽屉**。
 
-- **左列·证据列表：** 符号、字符串、权限、组件、汇聚点条目，带来源工具标签（JADX/Apktool/Androguard）与等级（verified/lead/insufficient）。支持关键字与类别筛选。数据来自证据列表端点（`src/dexatlas/api/app.py:824-825` `anchor: def list_evidence(`），每条含来源工具、版本与 locator。
-- **中间·主体：** 两种视图切换——源码阅读（class/method source，`src/dexatlas/api/app.py:637` 与 `src/dexatlas/api/app.py:699`，响应头带 `X-DexAtlas-Source-Kind`/`X-DexAtlas-Source-Locator`，见 `src/dexatlas/api/app.py:841-846`）与调用关系（callers/callees，`src/dexatlas/api/app.py:785` `anchor: xrefs`）。长包名、长签名、长路径换行显示，不截断。
-- **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:296-297` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:451` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
+- **左列·证据列表：** 符号、字符串、权限、组件、汇聚点条目，带来源工具标签（JADX/Apktool/Androguard）与等级（verified/lead/insufficient）。支持关键字与类别筛选。数据来自证据列表端点（`src/dexatlas/api/app.py:846-847` `anchor: def list_evidence(`），每条含来源工具、版本与 locator。
+- **中间·主体：** 两种视图切换——源码阅读（class/method source，`src/dexatlas/api/app.py:692` 与 `src/dexatlas/api/app.py:754`，响应头带 `X-DexAtlas-Source-Kind`/`X-DexAtlas-Source-Locator`，见 `src/dexatlas/api/app.py:869-874`）与调用关系（callers/callees，`src/dexatlas/api/app.py:807` `anchor: xrefs`）。长包名、长签名、长路径换行显示，不截断。
+- **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:296-297` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:462` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
 - 顶部 `PartialBanner`：run 的 `completeness=partial` 或存在 `errors` 时常驻，列明未完成的步骤；横幅不阻塞下方数据展示。
 
 ### 3.5 设置页（补充单 2-5）
@@ -179,15 +179,15 @@
 
 | 页面/能力 | 调用的现有能力 | 说明 |
 |---|---|---|
-| 首页·项目列表 | MCP 工具 `list_projects`（`src/dexatlas/mcp/tools/projects.py:81` `anchor: list_projects`）或 REST `GET /projects`（`src/dexatlas/api/app.py:431-432` `anchor: def list_projects(`） | 同一函数，两种既有暴露 |
-| 首页·上传分析 | REST `POST /analyze`（202，`src/dexatlas/api/app.py:393-399` `anchor: def analyze(`）或 workbench `POST /api/analyze`（`src/dexatlas/workbench/app.py:262-263`） | 复用共享上传策略与后台分析（`src/dexatlas/api/uploads.py:361` `anchor: run_background_analysis`）；同哈希已分析直接返回既有项目 |
+| 首页·项目列表 | MCP 工具 `list_projects`（`src/dexatlas/mcp/tools/projects.py:91` `anchor: list_projects`）或 REST `GET /projects`（`src/dexatlas/api/app.py:422-423` `anchor: def list_projects(`） | 同一函数，两种既有暴露 |
+| 首页·上传分析 | REST `POST /analyze`（202，`src/dexatlas/api/app.py:384-390` `anchor: def analyze(`）或 workbench `POST /api/analyze`（`src/dexatlas/workbench/app.py:262-263`） | 复用共享上传策略与后台分析（`src/dexatlas/api/uploads.py:361` `anchor: run_background_analysis`）；同哈希已分析直接返回既有项目 |
 | 分析页·进度 | REST `GET /projects/{id}/runs` 与 `GET /projects/{id}/runs/{run_id}`（`src/dexatlas/api/app.py:417-440`） | run 的 status/completeness/errors 驱动三区 |
-| 分析页·后端状态 | REST `GET /backends`（`src/dexatlas/api/app.py:378-379` `anchor: def list_backends(`） | available/missing/versions |
+| 分析页·后端状态 | REST `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`） | available/missing/versions |
 | 详情页·检索 | MCP `search_symbols`（`src/dexatlas/mcp/tools/symbols.py:86` `anchor: search_symbols`） | 关键字 → 符号 |
 | 详情页·源码 | MCP `class_source` / `method_source`（`src/dexatlas/mcp/tools/symbols.py:227`、`src/dexatlas/mcp/tools/symbols.py:227`） | Java 优先，Smali 回退 |
 | 详情页·调用关系 | MCP `find_callers` / `find_callees`（`src/dexatlas/mcp/tools/references.py:56`、`src/dexatlas/mcp/tools/references.py:56`） | callers/callees 图 |
 | 证据与抽屉 | MCP `get_evidence`（`src/dexatlas/mcp/tools/evidence.py:14` `anchor: get_evidence`）、`resolve_locator`（`src/dexatlas/mcp/tools/evidence.py:38` `anchor: resolve_locator`） | 证据记录与 locator 解析 |
-| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:362-363` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:806`） | json/markdown 两种既有格式 |
+| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:362-363` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:856`） | json/markdown 两种既有格式 |
 | Agent 问答 | workbench `GET /api/agent/config`、`POST /api/projects/{id}/agent/tasks`、`GET /api/agent/tasks/{id}[/report]`（`src/dexatlas/workbench/app.py:361-456`） | 未配置模型时 `configured=false`，界面拒答 |
 
 **边界红线：**

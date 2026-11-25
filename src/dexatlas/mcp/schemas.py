@@ -152,6 +152,23 @@ class RunStageEventSummary(BaseModel):
     part way through."""
 
 
+class RunStages(BaseModel):
+    """The pipeline stages of one run, as their own read-only answer.
+
+    Kept apart from ``RunSummary`` so the run's own shape — the one the MCP
+    tools and the run rows have always had — does not grow fields a caller
+    has not asked for; the stage facts are a separate question.
+    """
+
+    project_id: str
+    run_id: str
+    run_status: str
+    stages: list[RunStageEventSummary] = Field(default_factory=list)
+    """The stages in the order recorded. Empty for a run recorded by a build
+    that did not take stage facts, or one that ended before the first stage —
+    which reads as 'no stage facts', not as an error."""
+
+
 class RunSummary(BaseModel):
     """One attempt at analysing an APK."""
 
@@ -162,12 +179,6 @@ class RunSummary(BaseModel):
     started_at: str
     finished_at: str | None = None
     duration_seconds: float | None = None
-    stages: list[RunStageEventSummary] = Field(default_factory=list)
-    """The pipeline stages this run has been through, in the order recorded.
-
-    Empty for a run recorded by a build that did not take stage facts, or one
-    that ended before the first stage — which reads as 'no stage facts', not
-    as an error."""
 
 
 class EvidenceCatalogEntry(BaseModel):
@@ -478,6 +489,8 @@ __all__ = [
     "ProjectList",
     "ProjectStatus",
     "ProjectSummary",
+    "RunStageEventSummary",
+    "RunStages",
     "RunSummary",
     "SourceView",
     "SymbolList",

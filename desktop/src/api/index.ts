@@ -35,6 +35,7 @@ export type {
   RunInfo,
   RunStage,
   RunStageEvent,
+  RunStagesEnvelope,
   RunsEnvelope,
   SymbolHit,
   UntrustedText,

@@ -36,6 +36,7 @@ import type {
   ProjectSummary,
   ReportFormat,
   RunInfo,
+  RunStagesEnvelope,
   RunsEnvelope,
   SymbolHit,
   WorkbenchHealth,
@@ -342,6 +343,16 @@ export class DexAtlasClient {
       return raw as RunsEnvelope;
     }
     throw new ApiError(`/projects/${projectId}/runs 返回了无法识别的形状`, undefined, raw);
+  }
+
+  /**
+   * 某一轮 run 的真实阶段事件（Phase 5 W2，独立只读端点）。
+   * run 详情对象本身不带 stages；阶段事实从这里取。
+   */
+  async getRunStages(projectId: string, runId: string): Promise<RunStagesEnvelope> {
+    return this.request<RunStagesEnvelope>(
+      `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/stages`,
+    );
   }
 
   // -------------------------------------------------------------------------

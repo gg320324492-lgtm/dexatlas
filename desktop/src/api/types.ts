@@ -83,6 +83,17 @@ export interface RunsEnvelope {
 }
 
 /**
+ * Phase 5 W2 独立只读端点 GET …/runs/{run_id}/stages 的响应。
+ * run 详情对象不带 stages；阶段事实从该端点取。
+ */
+export interface RunStagesEnvelope {
+  project_id: string;
+  run_id: string;
+  run_status: string;
+  stages: RunStageEvent[];
+}
+
+/**
  * mcp/schemas.py:68 Completeness.errors — workbench 实际返回字符串数组
  * （mcp/tools/projects.py:106 把 ToolError 格式化为 "tool: message"）。
  * 历史响应可能仍是对象数组，页面侧做两种形状的兼容。

@@ -60,10 +60,11 @@ def test_a_watched_sentence_with_the_wrong_number_is_reported() -> None:
     checker = _checker()
     truths = checker.facts()
     statement = _statement("portfolio-tests-total")
+    pct = f"{truths['report_coverage_pct']:g}"
     text = (
         "Strict mypy typing, ruff lint/format, "
-        "<!--fig:tests.total-->1,999<!--/fig--> tests at "
-        "<!--fig:coverage.pct-->93.3%<!--/fig--> coverage."
+        f"<!--fig:tests.total-->1,999<!--/fig--> tests at "
+        f"<!--fig:coverage.pct-->{pct}%<!--/fig--> coverage."
     )
     findings = checker.check_text(statement, text, truths)
     assert len(findings) == 1, findings
@@ -79,9 +80,10 @@ def test_the_same_sentence_with_the_right_number_is_silent() -> None:
     truths = checker.facts()
     statement = _statement("portfolio-tests-total")
     total = int(truths["report_tests_total"])
+    pct = f"{truths['report_coverage_pct']:g}"
     text = (
         f"Strict mypy typing, <!--fig:tests.total-->{total:,}<!--/fig--> tests at "
-        f"<!--fig:coverage.pct-->93.3%<!--/fig--> coverage."
+        f"<!--fig:coverage.pct-->{pct}%<!--/fig--> coverage."
     )
     assert checker.check_text(statement, text, truths) == []
 
@@ -108,11 +110,12 @@ def test_a_group_that_does_not_take_part_is_simply_not_checked() -> None:
         "groups": {"tests": "report_tests_total", "pct": "report_coverage_pct"},
     }
     total = int(truths["report_tests_total"])
+    pct = f"{truths['report_coverage_pct']:g}"
     only_tests = checker.check_text(statement, f"{total:,} tests", truths)
     assert only_tests == [], only_tests
-    both = checker.check_text(statement, f"{total:,} tests, 93.3% coverage", truths)
+    both = checker.check_text(statement, f"{total:,} tests, {pct}% coverage", truths)
     assert both == [], both
-    wrong = checker.check_text(statement, "1,999 tests, 93.3% coverage", truths)
+    wrong = checker.check_text(statement, f"1,999 tests, {pct}% coverage", truths)
     assert len(wrong) == 1, wrong
 
 

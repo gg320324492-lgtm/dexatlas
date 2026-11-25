@@ -43,6 +43,7 @@ import { ApiError, dexatlas } from "../api";
 import type {
   ProjectDetailEnvelope as WsProjectStatus,
   RunInfo,
+  RunStageEvent,
   RunsEnvelope,
   WorkbenchHealth as WsHealth,
 } from "../api";
@@ -346,12 +347,15 @@ const STAGE_TO_SLOT: Record<string, StageId> = {
 };
 
 /**
- * 阶段映射：优先用 run.stages（Phase 5 W2 真实阶段事实），按事件推进置
+ * 阶段映射：优先用 stages 端点的真实阶段事件（Phase 5 W2），按事件推进置
  * done/running；run 未结束且 publish 未完成时，证据格按最后已完成的阶段
- * 推断。没有 stages 字段（旧后端写入的 run）回退到 run.status 的粗粒度
+ * 推断。端点无 stages（旧后端写入的 run）回退到 run.status 的粗粒度
  * 映射；两者皆无时由调用方回退时间模拟。
  */
-function deriveStagesFromRun(run: RunInfo | null): {
+function deriveStagesFromRun(
+  run: RunInfo | null,
+  runStages: RunStageEvent[] | null,
+): {
   states: Record<string, StageState>;
   partialLabels: Record<string, string>;
 } {
@@ -363,7 +367,7 @@ function deriveStagesFromRun(run: RunInfo | null): {
     return { states, partialLabels };
   }
 
-  const events = run.stages ?? [];
+  const events = runStages ?? [];
   if (events.length > 0) {
     STAGES.forEach((s) => (states[s.id] = "pending"));
     let lastDoneSlot: StageId | null = null;
@@ -492,6 +496,53 @@ function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
   });
 }
 
+/**
+ * 轮询最新 run 的阶段事件（Phase 5 W2 独立端点）。runs 拉取成功且有
+ * run id 后开始轮询；端点不可用（404 = 旧后端）时如实记录一次。
+ */
+function useRunStagesPolling(
+  projectId: string | undefined,
+  runId: string | null | undefined,
+  active: boolean,
+): { stages: RunStageEvent[] | null; stagesError: string | null } {
+  const [stages, setStages] = useState<RunStageEvent[] | null>(null);
+  const [stagesError, setStagesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!projectId || !runId || !active) return;
+    let stopped = false;
+    let busy = false;
+
+    const poll = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const envelope = await dexatlas.getRunStages(projectId, runId);
+        if (!stopped) {
+          setStages(envelope.stages);
+          setStagesError(null);
+        }
+      } catch (err) {
+        if (!stopped) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setStagesError((prev) => (prev === msg ? prev : msg));
+        }
+      } finally {
+        busy = false;
+      }
+    };
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [projectId, runId, active]);
+
+  return { stages, stagesError };
+}
+
 export function Analysis() {
   const { projectId } = useParams();
   const [retryNonce, setRetryNonce] = useState(0);
@@ -502,7 +553,15 @@ export function Analysis() {
   // 优先取最新一轮真实 run；runs 为空时回退项目信封里的 runs
   const latestRun = runs[0] ?? project?.runs[0] ?? null;
   const hasRealRun = Boolean(runs.length) || Boolean(project?.runs.length);
-  const runDerived = useMemo(() => deriveStagesFromRun(latestRun), [latestRun]);
+  const { stages: runStageEvents, stagesError } = useRunStagesPolling(
+    projectId,
+    latestRun?.id ?? null,
+    Boolean(project),
+  );
+  const runDerived = useMemo(
+    () => deriveStagesFromRun(latestRun, runStageEvents),
+    [latestRun, runStageEvents],
+  );
   const progress = useStageSimulation(hasRealRun ? null : status);
   // 有真实 run 时用映射结果，否则回退时间模拟
   const stageStates = useMemo(
@@ -526,11 +585,11 @@ export function Analysis() {
   const ended = completed || failed;
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
   const duration = durationLabel(latestRun?.duration_seconds);
-  const hasStageFacts = Boolean(latestRun?.stages?.length);
+  const hasStageFacts = Boolean(runStageEvents?.length);
   const stageBadgeText = hasStageFacts
     ? "阶段推进：后端真实阶段事件"
     : hasRealRun
-      ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError ? "（runs 端点不可用）" : ""}`
+      ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError || stagesError ? "（stages 端点不可用）" : ""}`
       : "阶段推进为前端模拟";
 
   const handleCancel = async () => {
@@ -684,7 +743,7 @@ export function Analysis() {
                   className="da-mock-badge"
                   title={
                     hasStageFacts
-                      ? "阶段状态读自后端 run.stages 的真实阶段事件（pipeline 推进点）"
+                      ? "阶段状态读自后端 stages 端点的真实阶段事件（pipeline 推进点）"
                       : hasRealRun
                         ? "该 run 无阶段级数据（旧后端写入），状态由 run.status 映射，粒度由前端推断"
                         : "后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐"

@@ -18,8 +18,8 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,819（1,670 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
-| 一方代码覆盖率 | 93.3%（7,375 / 7,904 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| 测试总数 | 1,830（1,681 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 一方代码覆盖率 | 93.3%（7,467 / 8,001 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
 | M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
@@ -45,8 +45,8 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,819 automated tests, 93.3% coverage` | 1,612 / 93.3% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,819 tests, coverage and dead-code gates` | 1,612 |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,829 automated tests, 91.1% coverage` | 1,612 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,829 tests, coverage and dead-code gates` | 1,612 |
 | 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,612 tests at 93.3% coverage` | 1,612 / 93.3% |
 | 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,612 automated tests at 93.3% coverage` | 1,612 / 93.3% |
 
@@ -386,13 +386,13 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 在 `E:\Dexatlas`（共享树，本轮**未改动**）里，`docs/reports/phase1-execution-report.md`
 的未提交改动**一度**把覆盖率写成了 **35.4%（2,699/7,631）**，弱模块表里
 `core/pipeline.py` 18.2%、`cli/main.py` 23.0%、`tools/androguard/worker.py` 0.0%——
-这是多会话并发测量互相清掉 `.coverage` 之后的残缺结果，不是真值（真值是 93.3%：
-7,117/7,631）。按项目已有的经验（并发测量会污染覆盖率），**共享树的发版测量需要
+这是多会话并发测量互相清掉 `.coverage` 之后的残缺结果，不是当时的真值（v1.1.0
+发版时是 93.3%：7,117/7,631；Phase 5 W2 的测量轮已随代码变化更新，见下）。按项目已有的经验（并发测量会污染覆盖率），**共享树的发版测量需要
 重跑并核对弱模块表**才能落盘。**发版那一轮已照此重跑并落盘**：弱模块表复原
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
-**当前 `docs/reports/phase1-execution-report.md` 落盘的就是复原后的值**
-（1,612 / 93.3%），共享树在该文件上也没有未提交改动。
+**当前 `docs/reports/phase1-execution-report.md` 落盘的是最近一轮完整测量的值**
+（1,830 tests / 93.3%，7,467/8,001 行；Phase 5 W2 的测量轮）。
 
 ---
 
