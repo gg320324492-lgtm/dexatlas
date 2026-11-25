@@ -64,6 +64,7 @@
 - **左列·证据列表：** 符号、字符串、权限、组件、汇聚点条目，带来源工具标签（JADX/Apktool/Androguard）与等级（verified/lead/insufficient）。支持关键字与类别筛选。数据来自证据列表端点（`src/dexatlas/api/app.py:846-847` `anchor: def list_evidence(`），每条含来源工具、版本与 locator。
 - **中间·主体：** 两种视图切换——源码阅读（class/method source，`src/dexatlas/api/app.py:692` 与 `src/dexatlas/api/app.py:754`，响应头带 `X-DexAtlas-Source-Kind`/`X-DexAtlas-Source-Locator`，见 `src/dexatlas/api/app.py:869-874`）与调用关系（callers/callees，`src/dexatlas/api/app.py:807` `anchor: xrefs`）。长包名、长签名、长路径换行显示，不截断。
 - **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:296-297` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:462` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
+- **「打开来源」按钮：** 只有 locator 指向后端输出树里的一个文件时才可用。包级（`apk-reader:*`，如 `zip-entries`）、DEX 内（`androguard:*`）与后端未完成（`<工具>:error/...`）三类**没有单文件落点**，按钮置为 disabled，并在抽屉里给出可读说明（「包级来源：没有单文件落点 …」），不留一个点了没反应的按钮。判据在 `desktop/src/locators.ts`：工具前缀按后端 `src/dexatlas/core/locators.py` 的词汇镜像（`apk-reader` / `androguard` / `jadx`·`apktool` / `error/`），问过 `/locators/resolve` 之后以后端的回答为准——后端说那个地方不在这次分析里，按钮就不可用。
 - 顶部 `PartialBanner`：run 的 `completeness=partial` 或存在 `errors` 时常驻，列明未完成的步骤；横幅不阻塞下方数据展示。
 
 ### 3.5 设置页（补充单 2-5）
@@ -168,6 +169,7 @@
 
 - **全链路键盘可达：** 拖拽上传（Enter/Space 打开文件选择）、导航、筛选、证据跳转、locator 解析、报告导出、返回，全部 Tab/Enter 完成。
 - **焦点可见：** 统一焦点环（§4.3）；浮层用 `useFocusTrap` 限制 Tab 循环，关闭后焦点还原到触发元素。
+- **键盘走查（Q2 走查 P4，浏览器面板实测）：** 六个页面（首页/详情/分析/证据/报告/设置）的 Tab 顺序逐页盘点过，每个可聚焦元素都有焦点环（全局 `:focus-visible` 规则）；skip-link 是每一页的第一跳，聚焦时由 `clip-path` 解除显形并画出焦点环，跳转落点 `main` 在键盘聚焦时画出内侧焦点环（`desktop/src/components/AppLayout.css` 的 `.app-main:focus-visible`——`.app-main:focus` 的轮廓抑制不再盖住它）；证据抽屉的焦点陷阱在首尾两端环绕，Esc 关闭后焦点回到触发元素。走查环境（浏览器面板）拿不到窗口焦点，`:focus` 相关渲染以静态层叠核实，未取像素证据；`Dialog` 组件目前没有任何页面在用。
 - **触控目标：** 交互元素最小 44px 命中区域。
 - **语义化与标注：** 浮层 `role="dialog"` + `aria-modal`；Tab 组用 `tablist/tab/tabpanel`；图标按钮带 `aria-label`；状态不只靠颜色（徽章带图标与文字）。
 - **动效克制：** 所有过渡 ≤140ms；`prefers-reduced-motion` 下停用呼吸/进度动画。

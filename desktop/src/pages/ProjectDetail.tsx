@@ -16,6 +16,7 @@ import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { ApiError, dexatlas as client, downloadText } from "../api";
+import { openSourceState } from "../locators";
 import type {
   CompletenessError,
   EvidenceRecord,
@@ -175,6 +176,15 @@ export function ProjectDetail() {
     setResolution(null);
     setDrawerOpen(true);
   };
+
+  /**
+   * 「打开来源」按钮的状态：locator 没有单文件落点（包级、DEX 内、后端未完成）
+   * 时按钮不可用并给出说明；问过后端之后以后端的回答为准。
+   */
+  const openSource = useMemo(
+    () => openSourceState(selected?.provenance[0] ?? "", resolution),
+    [selected, resolution],
+  );
 
   /** resolve 按钮：调后端 /locators/resolve，展示真实解析路径。 */
   const resolveSelected = async () => {
@@ -401,6 +411,9 @@ export function ProjectDetail() {
                 <Button
                   variant="secondary"
                   size="sm"
+                  disabled={!openSource.openable}
+                  title={openSource.openable ? undefined : openSource.note}
+                  aria-describedby={openSource.openable ? undefined : "da-ev-open-source-hint"}
                   onClick={() =>
                     window.alert(
                       `来源文件（后端解析）：${displayLocator(selected.provenance)}\n完整 provenance：${selected.provenance.join("\n")}`,
@@ -413,6 +426,11 @@ export function ProjectDetail() {
                   {resolving ? "解析中…" : "resolve"}
                 </Button>
               </div>
+              {openSource.note && (
+                <p className="da-ev-drawer__hint" id="da-ev-open-source-hint">
+                  {openSource.note}
+                </p>
+              )}
               {resolution && (
                 <div className="da-ev-drawer__resolution" role="status">
                   <div>

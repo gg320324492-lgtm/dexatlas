@@ -120,7 +120,14 @@
   outline-offset: 2px;
 }
 
-/* 点击跳转后 main 需要能接收焦点（tabIndex={-1}），去掉默认轮廓由 focus-visible 补。 */
+/* 点击跳转后 main 需要能接收焦点（tabIndex={-1}）。
+   鼠标或程序聚焦不画焦点环；键盘用户走 skip-link 跳进来时必须看得见焦点落在哪，
+   所以 :focus-visible 时补一圈内侧描边——这一条规则要留在 :focus 之后，
+   同样的特异度下后者才会赢。 */
 .app-main:focus {
   outline: none;
+}
+.app-main:focus-visible {
+  outline: 2px solid var(--color-lavender);
+  outline-offset: -2px;
 }
