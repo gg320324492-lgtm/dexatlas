@@ -136,6 +136,22 @@ class ProjectList(BaseModel):
     limit: int
 
 
+class RunStageEventSummary(BaseModel):
+    """One recorded transition of a run through one pipeline stage."""
+
+    stage: str
+    """The pipeline stage: ``inspect``, ``parse-apktool``, ``index-androguard``,
+    ``decompile-jadx`` or ``publish``."""
+
+    started_at: str
+    """When the pipeline entered the stage."""
+
+    finished_at: str | None = None
+    """When the pipeline left the stage, or nothing while it is still running —
+    including a stage the run never left because it failed or was cancelled
+    part way through."""
+
+
 class RunSummary(BaseModel):
     """One attempt at analysing an APK."""
 
@@ -146,6 +162,12 @@ class RunSummary(BaseModel):
     started_at: str
     finished_at: str | None = None
     duration_seconds: float | None = None
+    stages: list[RunStageEventSummary] = Field(default_factory=list)
+    """The pipeline stages this run has been through, in the order recorded.
+
+    Empty for a run recorded by a build that did not take stage facts, or one
+    that ended before the first stage — which reads as 'no stage facts', not
+    as an error."""
 
 
 class EvidenceCatalogEntry(BaseModel):

@@ -7,18 +7,18 @@
  * - Q2 批次二 X3：阶段进度优先读取真实 run 数据。在项目状态轮询之外并行轮询
  *   GET /api/projects/{id}/runs（workbench PR #5 起），用最新一轮 run 的
  *   status/completeness/tool_versions/duration_seconds 映射到五阶段视图。
+ * - Phase 5 W2：run.stages（真实 pipeline 阶段事件，runs.py RunStage）存在时，
+ *   时间线直接按阶段事件渲染；时间模拟仅作"无任何 run 数据"时的兜底。
  *
- * 阶段映射规则（run 是后端分析的一次完整尝试，无法细分到五阶段内部）：
- * - run.status = "pending"  → 仅"采集"待开始，其余 pending；
- * - run.status = "running"  → "采集"完成、"解析"进行中，其余 pending
- *   （后端只有一个运行信号，无法判断具体卡在哪个阶段，按最保守的早期阶段展示）；
- * - run.status = "completed"→ 五阶段全部完成；若 run.completeness = "partial"，
- *   在对应阶段（按 completeness.errors 里点名的工具）标注"部分"（skipped 态，
- *   复用 PartialBanner 的 partial 语义）；
- * - run.status = "failed"   → 按 progress 前的格子标 error。
- * - run.tool_versions / duration_seconds 有值时展示在阶段卡。
- * - runs 不可用（404 / 网络）或无 run 时，回退到原时间模拟并显示原角标；
- *   映射到的真实部分与保留模拟的粒度在角标文案中如实区分。
+ * 阶段映射规则（优先级从高到低）：
+ * - run.stages 非空 → 按真实阶段事件置 done/running；run 已终止却停在
+ *   某阶段的格子标 error；completeness = "partial" 时按 errors 点名的
+ *   工具在已完成格子上标注"部分"（skipped 态）；
+ * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无 stages 字段）：
+ *   pending → 全部待开始；running → 采集完成、解析进行中；completed →
+ *   五阶段全部完成；failed → 解析格标失败；
+ * - runs 不可用（404 / 网络）或无 run 时，回退到时间模拟并显示原角标；
+ *   三种来源在角标文案中如实区分。
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
@@ -46,7 +46,7 @@ import type {
   RunsEnvelope,
   WorkbenchHealth as WsHealth,
 } from "../api";
-import type { BackendState, BackendStatus, LogLevel, LogEntry, StageInfo, StageState } from "../types";
+import type { BackendState, BackendStatus, LogLevel, LogEntry, StageId, StageInfo, StageState } from "../types";
 import "./Analysis.css";
 
 /** 相对基址：由 vite dev 代理（→ http://127.0.0.1:8618）转发，见文件头说明。 */
@@ -302,8 +302,8 @@ function useRunsPolling(projectId: string | undefined, active: boolean): {
 }
 
 /**
- * 阶段推进模拟：后端无阶段级进度接口，按时间近似推进（每 STAGE_TICK_MS 一格），
- * 最多推进到最后一格；completed 时全部置完成，failed 时停在当前格标失败。
+ * 阶段推进模拟：仅在后端连 run 状态都拿不到时兜底（按时间近似推进，每
+ * STAGE_TICK_MS 一格），最多推进到倒数第二格；completed/failed 由真实状态对齐。
  * 返回已完成格数（0..STAGES.length）。
  */
 function useStageSimulation(status: string | null): number {
@@ -336,27 +336,81 @@ function deriveStageStates(progress: number, status: string | null): Record<stri
   return states;
 }
 
+/** 后端 pipeline 阶段 → 页面五阶段格子。 */
+const STAGE_TO_SLOT: Record<string, StageId> = {
+  inspect: "collect",
+  "parse-apktool": "parse",
+  "index-androguard": "index",
+  "decompile-jadx": "parse",
+  publish: "report",
+};
+
 /**
- * 阶段映射：把一轮真实 run 的状态折算到五阶段。
- * 规则见文件头注释。partial 时按 completeness.errors 点名的工具落到对应阶段。
+ * 阶段映射：优先用 run.stages（Phase 5 W2 真实阶段事实），按事件推进置
+ * done/running；run 未结束且 publish 未完成时，证据格按最后已完成的阶段
+ * 推断。没有 stages 字段（旧后端写入的 run）回退到 run.status 的粗粒度
+ * 映射；两者皆无时由调用方回退时间模拟。
  */
 function deriveStagesFromRun(run: RunInfo | null): {
   states: Record<string, StageState>;
   partialLabels: Record<string, string>;
 } {
   const states: Record<string, StageState> = {};
+  const partialLabels: Record<string, string> = {};
 
   if (!run) {
     STAGES.forEach((s) => (states[s.id] = "pending"));
-    return { states, partialLabels: {} };
+    return { states, partialLabels };
   }
 
-  if (run.status === "pending") {
-    // 仅采集待开始：后端尚未产出任何阶段结果
+  const events = run.stages ?? [];
+  if (events.length > 0) {
     STAGES.forEach((s) => (states[s.id] = "pending"));
-    return { states, partialLabels: {} };
+    let lastDoneSlot: StageId | null = null;
+    for (const event of events) {
+      const slot = STAGE_TO_SLOT[event.stage];
+      if (!slot) continue;
+      if (event.finished_at) {
+        states[slot] = "done";
+        lastDoneSlot = slot;
+      } else if (run.status === "running" || run.status === "pending") {
+        states[slot] = "running";
+      } else {
+        // run 已终止（failed/cancelled）却停在某个阶段：该格标失败
+        states[slot] = "error";
+      }
+    }
+    // 证据格没有自己的后端事件（它由各阶段的产出汇成）：把最后一个
+    // 已完成阶段之后、报告之前的格子按推断展示，避免与真实数据矛盾。
+    const evidenceState = states.evidence;
+    if (evidenceState === "pending" && lastDoneSlot && lastDoneSlot !== "report") {
+      const order: StageId[] = ["collect", "parse", "index", "evidence", "report"];
+      const lastIdx = order.indexOf(lastDoneSlot);
+      const evidenceIdx = order.indexOf("evidence");
+      if (evidenceIdx > lastIdx) states.evidence = lastIdx >= evidenceIdx - 1 ? "running" : "pending";
+    }
+    if (run.completeness === "partial") {
+      const errors = readCompletenessErrors(run);
+      const affected = new Set<string>();
+      for (const msg of errors) {
+        const tool = msg.split(":")[0]?.trim().toLowerCase() ?? "";
+        if (tool.includes("jadx") || tool.includes("apktool")) affected.add("parse");
+        if (tool.includes("androguard")) affected.add("index");
+        if (tool.includes("evidence")) affected.add("evidence");
+        if (tool.includes("report")) affected.add("report");
+      }
+      if (affected.size === 0) affected.add("report");
+      affected.forEach((id) => {
+        if (states[id] === "done") {
+          states[id] = "skipped"; // 复用 partial 徽章语义
+          partialLabels[id] = "部分";
+        }
+      });
+    }
+    return { states, partialLabels };
   }
 
+  // ---- 回退：旧 run（无 stages 字段）按状态粗粒度映射 ----
   if (run.status === "running") {
     // 保守映射：采集已完成，解析进行中，其余未开始
     states.collect = "done";
@@ -472,9 +526,12 @@ export function Analysis() {
   const ended = completed || failed;
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
   const duration = durationLabel(latestRun?.duration_seconds);
-  const stageBadgeText = hasRealRun
-    ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError ? "（runs 端点不可用）" : ""}`
-    : "阶段推进为前端模拟";
+  const hasStageFacts = Boolean(latestRun?.stages?.length);
+  const stageBadgeText = hasStageFacts
+    ? "阶段推进：后端真实阶段事件"
+    : hasRealRun
+      ? `阶段推进：后端 run 状态 + 前端粒度模拟${runsError ? "（runs 端点不可用）" : ""}`
+      : "阶段推进为前端模拟";
 
   const handleCancel = async () => {
     if (!projectId) return;
@@ -531,7 +588,9 @@ export function Analysis() {
               : notFound
                 ? " · 等待入库"
                 : " · 读取中…"}
-            {active && activeStageLabel ? ` · 模拟阶段：${activeStageLabel}` : ""}
+            {active && activeStageLabel
+              ? ` · ${hasStageFacts ? "当前阶段" : "模拟阶段"}：${activeStageLabel}`
+              : ""}
           </p>
         </div>
         <div className="analysis__actions">
@@ -615,7 +674,7 @@ export function Analysis() {
         />
       ) : (
         <div className="analysis__grid">
-          {/* 左：阶段进度（优先真实 run 映射，粒度不足处模拟，见角标） */}
+          {/* 左：阶段进度（stages 真实事件 → run 状态映射 → 时间模拟，见角标） */}
           <Card className="analysis__stages" aria-label="阶段进度">
             <CardHeader
               title="阶段进度"
@@ -624,9 +683,11 @@ export function Analysis() {
                 <span
                   className="da-mock-badge"
                   title={
-                    hasRealRun
-                      ? "阶段状态由后端 run 的 status/completeness 映射；run 之内无阶段级接口，粒度由前端推断"
-                      : "后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐"
+                    hasStageFacts
+                      ? "阶段状态读自后端 run.stages 的真实阶段事件（pipeline 推进点）"
+                      : hasRealRun
+                        ? "该 run 无阶段级数据（旧后端写入），状态由 run.status 映射，粒度由前端推断"
+                        : "后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐"
                   }
                 >
                   {stageBadgeText}

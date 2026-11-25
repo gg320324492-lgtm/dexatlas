@@ -33,6 +33,8 @@ export type {
   ProjectSummary,
   ReportFormat,
   RunInfo,
+  RunStage,
+  RunStageEvent,
   RunsEnvelope,
   SymbolHit,
   UntrustedText,

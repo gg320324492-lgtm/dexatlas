@@ -85,29 +85,29 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 
 | 端点 | 方法 | 响应 | 说明 |
 |---|---|---|---|
-| `/health` | GET | `{"status":"ok","version":str,"backends":{name: version\|null}}` | 存活探针 + 后端可用性；null = 未安装（`src/dexatlas/api/app.py:340-346` `anchor: health`） |
-| `/backends` | GET | `{"available":[str],"missing":[str],"versions":{}}` | 部署可用的后端（`src/dexatlas/api/app.py:350-356` `anchor: list_backends`） |
+| `/health` | GET | `{"status":"ok","version":str,"backends":{name: version\|null}}` | 存活探针 + 后端可用性；null = 未安装（`src/dexatlas/api/app.py:368-374` `anchor: health`） |
+| `/backends` | GET | `{"available":[str],"missing":[str],"versions":{}}` | 部署可用的后端（`src/dexatlas/api/app.py:378-384` `anchor: list_backends`） |
 
 ### 2.2 分析
 
 | 端点 | 方法 | 请求 | 响应 | 状态码 |
 |---|---|---|---|---|
 | `/analyze` | POST | multipart 字段 `file`（APK） | `AnalyzeJobResponse{project_id,status,detail}` | 202；同哈希且非 failed 的项目已存在时直接返回既有项目（`src/dexatlas/api/app.py:365-399` `anchor: analyze`） |
-| `/projects/{pid}/cancel` | POST | — | `{"project_id","status":"cancelling"}` | 202；无运行中分析则 404（`src/dexatlas/api/app.py:457-470` `anchor: cancel_analysis`） |
+| `/projects/{pid}/cancel` | POST | — | `{"project_id","status":"cancelling"}` | 202；无运行中分析则 404（`src/dexatlas/api/app.py:485-498` `anchor: cancel_analysis`） |
 
 分析是后台任务（`run_background_analysis`，`src/dexatlas/api/uploads.py`）。
 `/analyze` 的幂等语义：同字节重复上传返回已有项目，不重复分析；failed 项目
-重新上传会重试（`src/dexatlas/api/app.py:380-392` `anchor: ProjectStatus.FAILED`）。
+重新上传会重试（`src/dexatlas/api/app.py:408` `anchor: ProjectStatus.FAILED`）。
 
 ### 2.3 项目与运行
 
 | 端点 | 方法 | 响应 | 状态码 |
 |---|---|---|---|
-| `/projects` | GET | `ProjectResponse[]`，最新在前 | 200（`src/dexatlas/api/app.py:403-405` `anchor: list_projects`） |
+| `/projects` | GET | `ProjectResponse[]`，最新在前 | 200（`src/dexatlas/api/app.py:431-433` `anchor: list_projects`） |
 | `/projects/{pid}` | GET | `ProjectResponse` | 200 / 404（`src/dexatlas/api/app.py:188-194`） |
-| `/projects/{pid}/runs` | GET | `{"project_id","total","published_run_id","runs":[RunResponse]}`，最新在前 | 200（`src/dexatlas/api/app.py:418-436` `anchor: list_runs`） |
-| `/projects/{pid}/runs/{rid}` | GET | `RunResponse` | 200 / 404（`src/dexatlas/api/app.py:229-239`） |
-| `/projects/{pid}` | DELETE | — | 204 / 404（`src/dexatlas/api/app.py:820-824` `anchor: delete_project`） |
+| `/projects/{pid}/runs` | GET | `{"project_id","total","published_run_id","runs":[RunResponse]}`，最新在前 | 200（`src/dexatlas/api/app.py:446-464` `anchor: list_runs`） |
+| `/projects/{pid}/runs/{rid}` | GET | `RunResponse` | 200 / 404（`src/dexatlas/api/app.py:248-258`） |
+| `/projects/{pid}` | DELETE | — | 204 / 404（`src/dexatlas/api/app.py:848-852` `anchor: delete_project`） |
 
 `ProjectResponse` 字段见 `src/dexatlas/api/app.py:188-220` `anchor: ProjectResponse`：`id`、`status`、
 `apk_sha256`、`apk_path`（文件名，不含目录——目录布局不发布）、`apk_size_bytes`、
@@ -128,31 +128,43 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 `status`、`completeness`（"complete"/"partial"）、`apk_sha256`、`tool_versions`、
 `errors[]`、`started_at`、`finished_at`、`duration_seconds`、`published`。
 
+**stages（2026-11-25 新增，纯扩展字段）**：`RunResponse.stages[]` 与 workbench
+`RunSummary.stages[]`（`src/dexatlas/mcp/schemas.py`）给出该 run 走过的
+pipeline 阶段事件，按记录顺序排列。每个元素是
+`{stage, started_at, finished_at}`；stage 取值 inspect、parse-apktool、
+index-androguard、decompile-jadx、publish（与
+`Analyzer.analyze` 的实际推进点一致，`src/dexatlas/core/pipeline.py:152`；
+阶段枚举见 `src/dexatlas/core/runs.py:75` `anchor: RunStage`）。
+`finished_at` 为 null 表示该阶段尚未结束——包括 run 在阶段中途失败或被取消
+的情况。同一阶段至多出现一次；旧版本写入的 run 或在首个阶段前就结束的 run
+该字段为空数组（读作"无阶段事实"，不是错误）。字段只增不改：既有端点的
+响应形状、状态码与退出码零变化。
+
 ### 2.4 符号与检索
 
 | 端点 | 方法 | 查询参数 | 响应 | 状态码 |
 |---|---|---|---|---|
-| `/projects/{pid}/manifest` | GET | — | manifest 文档（`ManifestInfo.model_dump`） | 200 / 404（无 manifest，如 Apktool 未装；`src/dexatlas/api/app.py:546-554` `anchor: get_manifest`） |
-| `/projects/{pid}/classes` | GET | `prefix`、`limit`(1..1000,默认200) | `{"project_id","total","classes":[ClassRef]}` | 200（`src/dexatlas/api/app.py:557-570`） |
-| `/projects/{pid}/methods` | GET | `class`、`limit`(1..1000,默认200) | `{"project_id","total","methods":[MethodRef]}` | 200（`src/dexatlas/api/app.py:573-586`） |
+| `/projects/{pid}/manifest` | GET | — | manifest 文档（`ManifestInfo.model_dump`） | 200 / 404（无 manifest，如 Apktool 未装；`src/dexatlas/api/app.py:574-582` `anchor: get_manifest`） |
+| `/projects/{pid}/classes` | GET | `prefix`、`limit`(1..1000,默认200) | `{"project_id","total","classes":[ClassRef]}` | 200（`src/dexatlas/api/app.py:585-599`） |
+| `/projects/{pid}/methods` | GET | `class`、`limit`(1..1000,默认200) | `{"project_id","total","methods":[MethodRef]}` | 200（`src/dexatlas/api/app.py:601-615`） |
 | `/projects/{pid}/resources` | GET | `name`、`limit`(1..1000,默认200) | `{"project_id","total","resources":[ResourceString]}` | 200（`src/dexatlas/api/app.py:589-606`） |
 | `/projects/{pid}/resource-references` | GET | `res_type`、`res_name`、`limit` | `{"project_id","total","references":[ResourceReference]}` | 200（`src/dexatlas/api/app.py:609-634`） |
-| `/projects/{pid}/xrefs/{method_id:path}` | GET | — | `{"project_id","method_id","call_sites","call_edges","total","total_unit":"call_sites","references":[CallSite]}` | 200（`src/dexatlas/api/app.py:758-781` `anchor: get_references`） |
-| `/projects/{pid}/search` | GET | `q`(必填)、`limit`(1..200,默认50) | `{"project_id","query","results":[…]}` | 200（`src/dexatlas/api/app.py:784-792`） |
-| `/projects/{pid}/evidence` | GET | — | `{"project_id","total","evidence":[Evidence]}` | 200（`src/dexatlas/api/app.py:796-803` `anchor: list_evidence`） |
+| `/projects/{pid}/xrefs/{method_id:path}` | GET | — | `{"project_id","method_id","call_sites","call_edges","total","total_unit":"call_sites","references":[CallSite]}` | 200（`src/dexatlas/api/app.py:786-809` `anchor: get_references`） |
+| `/projects/{pid}/search` | GET | `q`(必填)、`limit`(1..200,默认50) | `{"project_id","query","results":[…]}` | 200（`src/dexatlas/api/app.py:812-821`） |
+| `/projects/{pid}/evidence` | GET | — | `{"project_id","total","evidence":[Evidence]}` | 200（`src/dexatlas/api/app.py:824-831` `anchor: list_evidence`） |
 
 `xrefs` 的 `method_id` 回显规范化拼写（`canonical_method_id`）；`total` 的单位是
 调用点，由 `total_unit: "call_sites"` 明示，`call_edges` 单独给出
-（`src/dexatlas/api/app.py:764-780`）。
+（`src/dexatlas/api/app.py:801-817`）。
 
 ### 2.5 源码
 
 | 端点 | 方法 | 参数 | 响应 | 状态码 |
 |---|---|---|---|---|
-| `/projects/{pid}/classes/{class_name:path}/source` | GET | `format=text\|json`（默认 text） | text：源码正文 + `X-DexAtlas-Source-*` 头；json：含 provenance 的文档 | 200 / 404（`src/dexatlas/api/app.py:642-661` `anchor: get_class_source`） |
-| `/projects/{pid}/methods/{class_name:path}/{method_name}` | GET | `format`、`descriptor` | 同上 | 200 / 404 / 409（重载歧义，返回候选；`src/dexatlas/api/app.py:704-754` `anchor: get_method_source`）/ 400（descriptor 不合法，`src/dexatlas/api/app.py:724-727` `anchor: A name that matches more than one overload is answered with`） |
+| `/projects/{pid}/classes/{class_name:path}/source` | GET | `format=text\|json`（默认 text） | text：源码正文 + `X-DexAtlas-Source-*` 头；json：含 provenance 的文档 | 200 / 404（`src/dexatlas/api/app.py:670-689` `anchor: get_class_source`） |
+| `/projects/{pid}/methods/{class_name:path}/{method_name}` | GET | `format`、`descriptor` | 同上 | 200 / 404 / 409（重载歧义，返回候选；`src/dexatlas/api/app.py:704-754` `anchor: get_method_source`）/ 400（descriptor 不合法，`src/dexatlas/api/app.py:752-755` `anchor: A name that matches more than one overload is answered with`） |
 
-溯源响应头（`_SOURCE_HEADERS`，`src/dexatlas/api/app.py:269-286`）：
+溯源响应头（`_SOURCE_HEADERS`，`src/dexatlas/api/app.py:297-315`）：
 
 | 头 | 含义 |
 |---|---|
@@ -161,7 +173,7 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 | `X-DexAtlas-Source-Locator` | 源码在该后端输出树中的位置 |
 | `X-DexAtlas-Source-Tool-Version` | 该后端的版本 |
 
-JSON 形状（`_SOURCE_JSON_SCHEMA`，`src/dexatlas/api/app.py:289-313`）：
+JSON 形状（`_SOURCE_JSON_SCHEMA`，`src/dexatlas/api/app.py:317-341`）：
 `{project_id, class_name, method?, descriptor?, kind, provenance:[{tool,
 tool_version?, apk_sha256, locator}], text}`。
 
@@ -169,15 +181,15 @@ tool_version?, apk_sha256, locator}], text}`。
 
 | 端点 | 方法 | 参数 | 响应 |
 |---|---|---|---|
-| `/projects/{pid}/report` | GET | `format=json\|markdown`（默认 json） | JSON 文档（§5）或 `text/markdown`（`src/dexatlas/api/app.py:806-816`） |
+| `/projects/{pid}/report` | GET | `format=json\|markdown`（默认 json） | JSON 文档（§5）或 `text/markdown`（`src/dexatlas/api/app.py:833-843`） |
 
 ### 2.7 上传管理
 
 | 端点 | 方法 | 响应 | 状态码 |
 |---|---|---|---|
-| `/uploads` | GET | `UploadResponse[]`：`{sha256,name,size_bytes,age_seconds,expires_in_seconds}` | 200（`src/dexatlas/api/app.py:474-499` `anchor: list_uploads`） |
-| `/uploads/{sha256}` | DELETE | — | 204 / 404（`src/dexatlas/api/app.py:503-530` `anchor: delete_upload`） |
-| `/uploads/cleanup` | POST | `{"removed":int,"names":[str]}` | 200（`src/dexatlas/api/app.py:534-542` `anchor: cleanup_uploads`） |
+| `/uploads` | GET | `UploadResponse[]`：`{sha256,name,size_bytes,age_seconds,expires_in_seconds}` | 200（`src/dexatlas/api/app.py:502-527` `anchor: list_uploads`） |
+| `/uploads/{sha256}` | DELETE | — | 204 / 404（`src/dexatlas/api/app.py:531-558` `anchor: delete_upload`） |
+| `/uploads/cleanup` | POST | `{"removed":int,"names":[str]}` | 200（`src/dexatlas/api/app.py:562-570` `anchor: cleanup_uploads`） |
 
 上传保留窗口默认 24h，可用 `DEXATLAS_UPLOAD_RETENTION_SECONDS` 覆盖
 （`src/dexatlas/api/uploads.py:67-74`）；文件名最长 255 字节
@@ -186,7 +198,7 @@ tool_version?, apk_sha256, locator}], text}`。
 ### 2.8 错误形状
 
 校验/未找到类错误是 FastAPI 标准 `{"detail": str}`。源码端点的 409 携带
-`{"detail","class_name","method","candidates":[…]}`（`src/dexatlas/api/app.py:738-747` `anchor: candidates`）。
+`{"detail","class_name","method","candidates":[…]}`（`src/dexatlas/api/app.py:767-774` `anchor: candidates`）。
 后端失败不抛异常：它们是 `ToolError` 值，随项目与运行记录返回
 （`src/dexatlas/core/models.py:55-71` `anchor: ToolError`）。
 
@@ -232,7 +244,7 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 
 ### 3.2 响应形状与"有界、说清"语义
 
-`SourceView`（`src/dexatlas/mcp/schemas.py:282-315`）用 `found: bool` 区分"分析
+`SourceView`（`src/dexatlas/mcp/schemas.py:327-360`）用 `found: bool` 区分"分析
 查过但没有"（`found=false` + `reason`）与"分析没跑过"；歧义名在 `candidates`
 里列 descriptor。`text_offset`/`text_total_chars` 说明本页在整篇源码中的位置
 （`offset=0`、`limit=200000` 时整篇返回）；agent transcript 对超过 4000 字符
@@ -263,7 +275,7 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 
 两个传输与三种报告对"点/边"使用同一组数：`call_site_count` 是
 `reference_count` 的别名（`src/dexatlas/api/app.py:205-211`、
-`src/dexatlas/mcp/tools/projects.py:51`）。`xrefs` 响应用 `total_unit:
+`src/dexatlas/mcp/tools/projects.py:52`）。`xrefs` 响应用 `total_unit:
 "call_sites"` 把单位写死（`src/dexatlas/api/app.py:775-779`）。
 
 证据三级（`EvidenceLevel`，`src/dexatlas/core/models.py:537-571`）：
@@ -492,7 +504,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
 `source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
-自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:983-998` 的
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1031-1046` 的
 `_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
 - 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺

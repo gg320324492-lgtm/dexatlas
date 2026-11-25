@@ -226,6 +226,25 @@ class AnalyzeJobResponse(BaseModel):
     detail: str = Field(description="Where to poll for the finished analysis.")
 
 
+class RunStageEventResponse(BaseModel):
+    """One recorded transition of a run through one pipeline stage."""
+
+    stage: str = Field(
+        description=(
+            "The pipeline stage: 'inspect', 'parse-apktool', "
+            "'index-androguard', 'decompile-jadx' or 'publish'."
+        )
+    )
+    started_at: str = Field(description="When the pipeline entered the stage.")
+    finished_at: str | None = Field(
+        description=(
+            "When the pipeline left the stage, or nothing while the stage is "
+            "still running — including a stage the run never left because it "
+            "failed or was cancelled part way through."
+        )
+    )
+
+
 class RunResponse(BaseModel):
     """One analysis run of a project."""
 
@@ -248,6 +267,15 @@ class RunResponse(BaseModel):
     duration_seconds: float | None
     published: bool = Field(
         description="Whether this run's results are the ones the project publishes."
+    )
+    stages: list[RunStageEventResponse] = Field(
+        default_factory=list,
+        description=(
+            "The pipeline stages this run has been through, in the order "
+            "recorded. Empty for a run recorded by a build that did not take "
+            "stage facts, or one that ended before the first stage — which "
+            "reads as 'no stage facts', not as an error."
+        ),
     )
 
 
@@ -949,6 +977,14 @@ def _run_response(run: AnalysisRun, published: bool, settings: Settings) -> RunR
         finished_at=run.finished_at.isoformat() if run.finished_at else None,
         duration_seconds=run.duration_seconds,
         published=published,
+        stages=[
+            RunStageEventResponse(
+                stage=event.stage.value,
+                started_at=event.started_at.isoformat(),
+                finished_at=event.finished_at.isoformat() if event.finished_at else None,
+            )
+            for event in run.stages
+        ],
     )
 
 

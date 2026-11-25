@@ -40,10 +40,10 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 - **JADX 不产出方法、字段、交叉引用里的任何一条。** JADX 后端只产出 `ClassRef`
   （`tools/jadx/adapter.py:303-310`）。方法表、字段表、交叉引用表 100% 来自 Androguard。
   **JADX 在方法上的唯一贡献是 `decompiled` 这个标志**：它是 JADX 对「这个方法我反编译出来了」的
-  回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:1308-1325` 的 `_apply_decompilation`）。
+  回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:1349-1366` 的 `_apply_decompilation`）。
   它是**状态**，不是结构——方法的签名、描述符、访问标志仍然全部来自 Androguard。
 - **Apktool 不产出任何符号。** 它产出 manifest、Smali 文件和资源表里的文本；
-  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:695-719` 的 `class_source` / `method_source`），
+  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:749-773` 的 `class_source` / `method_source`），
   资源字符串则进 `resources` 表，也进全文索引（见 5.4）。
 - **资源覆盖了一部分，不是全部。** Apktool 会把 `res/` 解码到工作区，`src/` 里现在**有**代码读它：
   `read_resources()` 读 `res/values*/` 下的文本声明（`tools/apktool/adapter.py:233-355`），
@@ -57,7 +57,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 ## 2. 冲突时谁说了算
 
 只有一类结论有两个后端都看得到：**类**。Androguard 从 DEX 定义读到一个类，JADX 从它写出的
-`.java` 文件读到同一个类。合并规则写在 `core/pipeline.py:1185-1223` 的 `_merge_classes` 里，
+`.java` 文件读到同一个类。合并规则写在 `core/pipeline.py:1249-1287` 的 `_merge_classes` 里，
 不是「谁后跑谁覆盖」：
 
 | 字段 | 规则 | 实际效果 |
@@ -70,7 +70,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | `provenance` | 拼接 | **两条都留**，谁也不覆盖谁 |
 
 合并的**顺序**就是执行顺序：Apktool → Androguard → JADX
-（`core/pipeline.py:236` 的 `include_apktool`、`core/pipeline.py:253` 的 `include_androguard`、`core/pipeline.py:268` 的 `include_jadx`）。Apktool 不产出 `ClassRef`，
+（`core/pipeline.py:246` 的 `include_apktool`、`core/pipeline.py:265` 的 `include_androguard`、`core/pipeline.py:282` 的 `include_jadx`）。Apktool 不产出 `ClassRef`，
 所以真正参与合并的只有 Androguard（先）和 JADX（后）。
 
 Androguard 先跑不是因为它更重要，是因为它是**结构**的正确来源（`docs/architecture/README.md`
@@ -101,7 +101,7 @@ JADX 报 `interface` 时结果是 `interface`，哪怕 Androguard 报的是 `cla
 
 **还有一处不是「冲突」，是分工：** `MethodRef.decompiled`（这个方法有没有被反编译成
 Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所以这条标志是
-**JADX 写、Androguard 的那条方法上记**（`core/pipeline.py:1308-1325` 的 `_apply_decompilation`）。
+**JADX 写、Androguard 的那条方法上记**（`core/pipeline.py:1349-1366` 的 `_apply_decompilation`）。
 它不是结构，合并规则对它不适用：方法表里没有第二个来源跟它抢。
 
 ---
@@ -125,7 +125,7 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 还有一个项目级的版本表 `Project.tool_versions: dict[str, str | None]`
 （`models.py:764`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
 （`core/storage.py:234`）。它和 `provenance.tool_version` 是**两份独立的数据**——
-管道把同一份版本表交给证据构造器（`core/pipeline.py:198-205` 的 `tool_versions`），
+管道把同一份版本表交给证据构造器（`core/pipeline.py:214-218` 的 `tool_versions`），
 所以两份数据现在说的是同一件事。
 
 ### 3.1.1 交叉引用自己带的信息：调用方式
@@ -218,7 +218,7 @@ locator 的格式**每个后端都一样**。`Backend.provenance()`（`tools/bas
   声明文本不是文字，ID 映射要读 `resources.arsc`。
   见 5.4。
 - **旧接口返回的 Smali 仍然不带出处。** `class_source` / `method_source`
-  （`core/pipeline.py:695-718`）为了不破坏既有契约，仍然返回裸字符串，
+  （`core/pipeline.py:759-782`）为了不破坏既有契约，仍然返回裸字符串，
   **返回值本身说不出这是 Apktool 的输出**。带出处的形式是
   `class_source_document` / `method_source_document`（`core/pipeline.py:765-901`），
   它们返回 `SourceDocument`（`models.py:1025-1054`）：文本、表示形式（Java 还是 Smali）、
@@ -381,9 +381,9 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
 
 **`method_count` 报 11，`methods` 表里也是 11 行。** 这一点不是自动成立的：
 Androguard 把两个 DEX 里的 `SharedConfig` 各索引一遍，会得到 14 个方法；
-`methods` 表的主键是 `(project_id, class_name, name, descriptor)`（`core/storage.py:275-284`），
+`methods` 表的主键是 `(project_id, class_name, name, descriptor)`（`core/storage.py:285-295`），
 重复的被 `INSERT OR REPLACE` 折叠掉了，而计数一度取的是**折叠前**的列表长度。
-现在计数由表自己量（`core/pipeline.py:336` 的 `class_count`），折叠掉的那三个方法没有丢——
+现在计数由表自己量（`core/pipeline.py:352` 的 `class_count`），折叠掉的那三个方法没有丢——
 它们合并成了一条带两份 provenance 的方法。详见 6.2。
 
 ### 4.4 五个自建样本的实际结果
@@ -546,7 +546,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 这一行整个不出现——不是 0，是「没有这一说」。
 同理，方法表里的 `decompiled` 全部是 `false`：没有反编译器，就没有反编译出来的 Java。
 
-这时候 `class_source` 会落到 Smali（`core/pipeline.py:708-716`）：
+这时候 `class_source` 会落到 Smali（`core/pipeline.py:749-757`）：
 
 ```smali
 .class public final Lcom/example/demo/Crypto;
@@ -1032,14 +1032,14 @@ ring;
 
 **当时的现象：** multidex-app 报 14，`methods` 表 11 行。
 `project.method_count` 数的是折叠前的列表——那版写法已经不在了，
-现在是表自己量的（`core/pipeline.py:336` 的 `class_count`）——
-而 `methods` 表的主键会折叠重复（`core/storage.py:275-284`）。
+现在是表自己量的（`core/pipeline.py:352` 的 `class_count`）——
+而 `methods` 表的主键会折叠重复（`core/storage.py:285-295`）。
 **类在多个 DEX 里重复定义时就会不一致。**
 
 **现在的行为：** 计数由表自己量——`Store.save_symbols` 数的是它写进去的行数
 （`core/storage.py:914-920`），管道报的是这个数。**报出来的数就是查得到的数。**
 折叠掉的那三个方法也没有丢：它们合并成了一条带两份 provenance 的方法
-（`core/pipeline.py:1225-1251` 的 `_merge_methods`），就像一个类被两个后端看到时那样。
+（`core/pipeline.py:1289-1315` 的 `_merge_methods`），就像一个类被两个后端看到时那样。
 
 ### 6.3 `dexatlas classes` 只显示前两条 provenance（已修）
 
@@ -1057,7 +1057,7 @@ androguard:classes.dex#com.example.multidex.SharedConfig
 androguard:classes2.dex#com.example.multidex.SharedConfig
 ```
 
-第三条（JADX）被截掉了，而 REST API（`api/app.py:735-759` 返回完整的
+第三条（JADX）被截掉了，而 REST API（`api/app.py:785-810` 返回完整的
 `model_dump`）返回的是**全部三条**——**CLI 看到的比 API 看到的少**。
 
 **现在的行为：** 默认仍然只显示前两条（一个类可能有几十条来源，全倒出来没法看），
@@ -1088,7 +1088,7 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 报告里看不到「谁调用了什么」这一层，只能在索引里查。
 
 **现在的行为：** 管道会为**这个 APK 自己的、被调用过的方法**各记一条证据
-（`core/pipeline.py:677` 调用 `core/evidence.py:452-481` 的
+（`core/pipeline.py:718` 调用 `core/evidence.py:452-481` 的
 `add_cross_references`）。粒度是**被调用的方法**，不是「调用」：
 一个被五十处调用的方法是**一条**结论。调用库代码（`java.lang.StringBuilder.append`）
 **不产生记录**——那是关于 JDK 的事实，不是关于这个应用的结论；
@@ -1125,7 +1125,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 才赋值的，于是 builder 手里永远是一份空字典。
 
 **现在的行为：** 管道先探测版本，再把**同一份**版本表交给证据构造器
-（`core/pipeline.py:198-205` 的 `tool_versions`），`EvidenceBuilder` 把它当成构造参数
+（`core/pipeline.py:214-218` 的 `tool_versions`），`EvidenceBuilder` 把它当成构造参数
 （`core/evidence.py:71-125`）——不是「记得填」，是「不给就写不出证据」。
 `tool_version` 为 `None` 现在只有一种含义：**这个工具这次没跑**
 （比如它压根没装，见 4.6）。

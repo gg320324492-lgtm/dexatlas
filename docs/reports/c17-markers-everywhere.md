@@ -52,7 +52,7 @@ uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1775 tests
    不是插图。页面上它们仍以 `<!--fig:…-->` 标记包裹，渲染出来只有数字与句子本身。
 
 **页面改法**：两页 §2.3 的两条命令行注释里，期望输出换成
-`<!--fig:tests.collect.fast-->1670/1819 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1819 tests collected (1670 deselected)<!--/fig-->`；
+`<!--fig:tests.collect.fast-->1680/1829 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1829 tests collected (1680 deselected)<!--/fig-->`；
 §4 的清单补一句「collect 期望输出也是这套标记写的」。
 
 **守卫改法**（`tests/test_how_to_verify.py`）：
@@ -118,7 +118,7 @@ Markdown 它就变——此前要人手跟。`prose-to-markers.md` §4 留的方
   （测试套件的常规做法）而没有那份脚本时返回 `None`，该图形**不写**（与徽章的空值规则一致：
   空数比错数好，什么都不说比说错强）。
 - `render_figures()` 暴露 `documents.count`；它进 `FENCED_KEYS`（那两页把它写在围栏里）。
-- 两页换成 `documents read: <!--fig:documents.count-->148<!--/fig-->`，说明段改为
+- 两页换成 `documents read: <!--fig:documents.count-->157<!--/fig-->`，说明段改为
   「由测量脚本按 §4 写出，仓库增删文档后下次测量自动变」。
 
 当前实跑：`documents read: 173`（`git ls-files '*.md'` 减 `.github/issues/`）。

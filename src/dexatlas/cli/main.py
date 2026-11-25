@@ -898,11 +898,14 @@ def export(
         err_console.print(f"[red]Could not build the evidence package:[/red] {exc}")
         raise ExitCode(code=EXIT_FAILED) from exc
 
+    # Two lines, not one: the summary is the reader's count of the archive,
+    # and a narrow terminal folds a single long line mid-phrase — the count
+    # lands on the next line with a stray "\" where the break was. The path
+    # is the longer half, so it goes first, and the count stays whole.
     console.print(
-        f"[bold green]{mark(OK)}[/bold green] evidence package {mark(ARROW)} "
-        f"[bold]{output}[/bold] "
-        f"({package_file_summary(manifest)}, apk {manifest['apk_sha256'][:16]})"
+        f"[bold green]{mark(OK)}[/bold green] evidence package {mark(ARROW)} [bold]{output}[/bold]"
     )
+    console.print(f"({package_file_summary(manifest)}, apk {manifest['apk_sha256'][:16]})")
 
 
 @app.command()

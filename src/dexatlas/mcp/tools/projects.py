@@ -16,6 +16,7 @@ from dexatlas.mcp.schemas import (
     ProjectList,
     ProjectStatus,
     ProjectSummary,
+    RunStageEventSummary,
     RunSummary,
     UntrustedText,
 )
@@ -66,6 +67,14 @@ def run_summary(run: AnalysisRun) -> RunSummary:
         started_at=run.started_at.isoformat(),
         finished_at=run.finished_at.isoformat() if run.finished_at else None,
         duration_seconds=run.duration_seconds,
+        stages=[
+            RunStageEventSummary(
+                stage=event.stage.value,
+                started_at=event.started_at.isoformat(),
+                finished_at=event.finished_at.isoformat() if event.finished_at else None,
+            )
+            for event in run.stages
+        ],
     )
 
 

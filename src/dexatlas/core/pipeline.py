@@ -52,6 +52,7 @@ from dexatlas.core.runs import (
     AnalysisRun,
     CancellationToken,
     RunCompleteness,
+    RunStage,
     RunStatus,
 )
 from dexatlas.core.storage import Store
@@ -176,9 +177,14 @@ class Analyzer:
         cannot leave half-written results behind.
         """
         started = time.monotonic()
+        run_started_at = datetime.now(UTC)
         apk = metadata if metadata is not None else inspect_apk(apk_path)
         project = Project.create(apk)
         run = AnalysisRun.start(project.id, apk.sha256)
+        # The inspect stage spans from the call to this method: validation,
+        # hashing and the DEX inventory all happen before the first backend.
+        run.record_stage_start(RunStage.INSPECT, when=run_started_at)
+        run.record_stage_end(RunStage.INSPECT)
 
         # Every run writes into a directory of its own. Two analyses of one
         # APK then cannot write over each other's decompiled output, and a
@@ -195,6 +201,10 @@ class Analyzer:
         self._store.begin_run(project)
         run.status = RunStatus.RUNNING
         self._store.create_run(run)
+        # The run row exists now, so the inspect stage's record can be
+        # written through to it for any reader that polls while the
+        # backends run.
+        self._stage(run, RunStage.INSPECT, end=True)
 
         try:
             # The versions are probed before the evidence is built, because the
@@ -235,7 +245,9 @@ class Analyzer:
 
             if include_apktool:
                 _check_cancelled(cancellation)
+                self._stage(run, RunStage.PARSE_APKTOOL)
                 manifest, apktool_resources, errors = self._run_apktool(project, workspace, builder)
+                self._stage(run, RunStage.PARSE_APKTOOL, end=True)
                 resources.extend(apktool_resources)
                 for apktool_error in errors:
                     project.errors.append(apktool_error)
@@ -252,7 +264,9 @@ class Analyzer:
 
             if include_androguard:
                 _check_cancelled(cancellation)
+                self._stage(run, RunStage.INDEX_ANDROGUARD)
                 extracted = self._run_androguard(apk.path, project, builder)
+                self._stage(run, RunStage.INDEX_ANDROGUARD, end=True)
                 # The classes the DEX reader found. The evidence declares these
                 # and not the decompiler's: the DEX reader is the one that read
                 # the class definitions out of the bytecode.
@@ -267,9 +281,11 @@ class Analyzer:
 
             if include_jadx:
                 _check_cancelled(cancellation)
+                self._stage(run, RunStage.DECOMPILE_JADX)
                 jadx_classes, jadx_errors, jadx_status = self._run_jadx(
                     apk.path, project, workspace, builder
                 )
+                self._stage(run, RunStage.DECOMPILE_JADX, end=True)
                 classes.extend(jadx_classes)
                 for jadx_error in jadx_errors:
                     project.errors.append(jadx_error)
@@ -364,7 +380,9 @@ class Analyzer:
 
             _check_cancelled(cancellation)
             if project.status is ProjectStatus.COMPLETED:
+                self._stage(run, RunStage.PUBLISH)
                 self._store.publish_run(project, run, staged, manifest)
+                self._stage(run, RunStage.PUBLISH, end=True)
                 # The result carries what the workspace now stores, not what
                 # this run's model held: ``Project.create`` stamped
                 # ``created_at`` with *this* analysis's clock, and a
@@ -502,6 +520,29 @@ class Analyzer:
         run.status = status
         run.finished_at = datetime.now(UTC)
         return run
+
+    def _stage(self, run: AnalysisRun, stage: RunStage, *, end: bool = False) -> None:
+        """Record a stage transition on the run, and write it down at once.
+
+        The record is written when the transition happens, not when the run
+        ends: a caller polling the run while the analysis is still going
+        reads the stages the pipeline has actually reached. Each transition
+        upserts the run's one row — the same write the run's own status
+        changes take, and no other IO.
+
+        A stage fact that cannot be written must not stop the analysis: the
+        run's final record (completed, failed or cancelled) carries whatever
+        the pipeline reached in memory, and the log is where a failed write
+        is visible.
+        """
+        if end:
+            run.record_stage_end(stage)
+        else:
+            run.record_stage_start(stage)
+        try:
+            self._store.update_run(run)
+        except Exception:
+            logger.exception("could not record stage %s on run %s", stage.value, run.id)
 
     # -- backend steps -----------------------------------------------------
 
