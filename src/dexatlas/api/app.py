@@ -226,6 +226,25 @@ class AnalyzeJobResponse(BaseModel):
     detail: str = Field(description="Where to poll for the finished analysis.")
 
 
+class RunStageEventResponse(BaseModel):
+    """One recorded transition of a run through one pipeline stage."""
+
+    stage: str = Field(
+        description=(
+            "The pipeline stage: 'inspect', 'parse-apktool', "
+            "'index-androguard', 'decompile-jadx' or 'publish'."
+        )
+    )
+    started_at: str = Field(description="When the pipeline entered the stage.")
+    finished_at: str | None = Field(
+        description=(
+            "When the pipeline left the stage, or nothing while the stage is "
+            "still running — including a stage the run never left because it "
+            "failed or was cancelled part way through."
+        )
+    )
+
+
 class RunResponse(BaseModel):
     """One analysis run of a project."""
 
@@ -447,6 +466,37 @@ def get_run(
     if run is None or run.project_id != project_id:
         raise HTTPException(status_code=404, detail=f"no run {run_id!r} for {project_id!r}")
     return _run_response(run, run.id == published, settings)
+
+
+@app.get("/projects/{project_id}/runs/{run_id}/stages", tags=["analysis"])
+def get_run_stages(project_id: str, run_id: str, analyzer: AnalyzerDep) -> dict[str, Any]:
+    """The pipeline stages one run has been through, in the order recorded.
+
+    A read-only companion to the run detail: the run's own response keeps
+    its original shape, and the stage facts — which build up while the
+    analysis is still going — live here. ``stages`` is empty for a run
+    recorded by a build that did not take stage facts, or one that ended
+    before the first stage, which reads as "no stage facts", not as an
+    error. A stage whose ``finished_at`` is nothing is the one the pipeline
+    is inside, or never left because the run failed or was cancelled.
+    """
+    with analyzer.store.reading() as view:
+        run = view.get_run(run_id)
+    if run is None or run.project_id != project_id:
+        raise HTTPException(status_code=404, detail=f"no run {run_id!r} for {project_id!r}")
+    return {
+        "project_id": project_id,
+        "run_id": run.id,
+        "run_status": run.status.value,
+        "stages": [
+            RunStageEventResponse(
+                stage=event.stage.value,
+                started_at=event.started_at.isoformat(),
+                finished_at=event.finished_at.isoformat() if event.finished_at else None,
+            )
+            for event in run.stages
+        ],
+    }
 
 
 @app.post(

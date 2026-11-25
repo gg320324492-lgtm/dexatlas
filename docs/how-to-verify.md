@@ -144,14 +144,14 @@ uv run --no-sync pytest -q
 
 **正常会看到什么：** 一行点号和一行汇总。汇总行里四样东西要一起读：
 
-* **收集到的测试数** —— 当前这棵树上应当是 <!--fig:tests.trio-->**1819**（**1670** 快 + **149** 集成）<!--/fig-->。
+* **收集到的测试数** —— 当前这棵树上应当是 <!--fig:tests.trio-->**1830**（**1681** 快 + **149** 集成）<!--/fig-->。
   「快 / 集成」= fast / slow 两套：fast 是 pytest 没标 `slow` 的用例，slow 是标了
   `@pytest.mark.slow`、要真调外部后端的集成用例。  这三个数是上面那个标记的值，由
   `scripts/refresh-report-figures.py` 写出来（§4），不由人手抄；你可以这样自己数一遍：
 
   ```bash
-  uv run --no-sync pytest --collect-only -q -m "not slow"   # → <!--fig:tests.collect.fast-->1670/1819 tests collected (149 deselected)<!--/fig-->
-  uv run --no-sync pytest --collect-only -q -m "slow"         # → <!--fig:tests.collect.slow-->149/1819 tests collected (1670 deselected)<!--/fig-->
+  uv run --no-sync pytest --collect-only -q -m "not slow"   # → <!--fig:tests.collect.fast-->1681/1830 tests collected (149 deselected)<!--/fig-->
+  uv run --no-sync pytest --collect-only -q -m "slow"         # → <!--fig:tests.collect.slow-->149/1830 tests collected (1681 deselected)<!--/fig-->
   ```
 
 * **passed 的数量** —— 应当等于收集数减去 skip 数，即**没有 failed、没有 error**。
@@ -169,7 +169,7 @@ uv run --no-sync pytest -q
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `<N> passed, <M> skipped`（退出码 0）。skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh` 与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`。这一行量的是**另一种跑法**，具体条数随这棵树的测试数变，所以这里不写死 |
-| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1818<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
+| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1829<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -218,7 +218,7 @@ facts:
   package version: 1.1.0
   changelog: 1.1.0, 1.0.2, 1.0.1, 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
   newest release: v1.1.0
-documents read: <!--fig:documents.count-->148<!--/fig-->
+documents read: <!--fig:documents.count-->157<!--/fig-->
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
@@ -466,7 +466,7 @@ uv run --no-sync python scripts/refresh-report-figures.py --check    # 只比较
 它们在源文件里长这样——标记是 HTML 注释，渲染出来只有一个数字：
 
 ```text
-<!--fig:documents.count-->148<!--/fig-->
+<!--fig:documents.count-->157<!--/fig-->
 ```
 
 **改了会怎样？**

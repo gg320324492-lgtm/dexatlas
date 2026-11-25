@@ -39,9 +39,9 @@ from dexatlas.core.models import (
     canonical_descriptor,
     canonical_method_id,
 )
-from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStatus
+from dexatlas.core.runs import AnalysisRun, RunCompleteness, RunStageEvent, RunStatus
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 #: The longest a name may be in the search index, in characters.
 #:
@@ -265,7 +265,8 @@ CREATE TABLE IF NOT EXISTS analysis_runs (
     started_at       TEXT NOT NULL,
     finished_at      TEXT,
     duration_seconds REAL,
-    workspace        TEXT
+    workspace        TEXT,
+    stages           TEXT NOT NULL DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS classes (
@@ -408,8 +409,8 @@ ON CONFLICT(id) DO UPDATE SET
 _RUN_UPSERT = """
 INSERT INTO analysis_runs (
     id, project_id, apk_sha256, status, completeness, tool_versions, errors,
-    started_at, finished_at, duration_seconds, workspace
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    started_at, finished_at, duration_seconds, workspace, stages
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(id) DO UPDATE SET
     status           = excluded.status,
     completeness     = excluded.completeness,
@@ -417,7 +418,8 @@ ON CONFLICT(id) DO UPDATE SET
     errors           = excluded.errors,
     finished_at      = excluded.finished_at,
     duration_seconds = excluded.duration_seconds,
-    workspace        = excluded.workspace
+    workspace        = excluded.workspace,
+    stages           = excluded.stages
 """
 
 
@@ -542,6 +544,14 @@ def _migrate(connection: sqlite3.Connection) -> None:
         connection.execute("DROP TABLE resources")
         connection.execute(_RESOURCES_TABLE)
         connection.executescript(_RESOURCES_INDEXES)
+
+    run_columns = {row["name"] for row in connection.execute("PRAGMA table_info(analysis_runs)")}
+    if run_columns and "stages" not in run_columns:
+        # The pipeline stages a run went through, as a JSON list of events. A
+        # run recorded before the column existed went through stages nobody
+        # wrote down: the column reads as an empty list, which says "no stage
+        # facts" rather than "no stages ran".
+        connection.execute("ALTER TABLE analysis_runs ADD COLUMN stages TEXT NOT NULL DEFAULT '[]'")
 
 
 def _table_names(connection: sqlite3.Connection) -> set[str]:
@@ -1405,6 +1415,7 @@ def _save_run(connection: sqlite3.Connection, run: AnalysisRun) -> None:
             run.finished_at.isoformat() if run.finished_at else None,
             run.duration_seconds,
             str(run.workspace) if run.workspace else None,
+            json.dumps([e.model_dump(mode="json") for e in run.stages]),
         ),
     )
 
@@ -1530,6 +1541,13 @@ def _row_to_project(row: sqlite3.Row) -> Project:
 
 
 def _row_to_run(row: sqlite3.Row) -> AnalysisRun:
+    # The stages column is read by name, not by position: a database opened
+    # before the column existed carries no stage facts, and that is the truth
+    # about a run recorded by a build that did not take them.
+    try:
+        stages_raw = row["stages"]
+    except (IndexError, KeyError):
+        stages_raw = "[]"
     return AnalysisRun(
         id=row["id"],
         project_id=row["project_id"],
@@ -1542,6 +1560,7 @@ def _row_to_run(row: sqlite3.Row) -> AnalysisRun:
         finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
         duration_seconds=row["duration_seconds"],
         workspace=Path(row["workspace"]) if row["workspace"] else None,
+        stages=[RunStageEvent.model_validate(e) for e in json.loads(stages_raw)],
     )
 
 

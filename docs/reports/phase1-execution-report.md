@@ -53,7 +53,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 | 证据等级（verified/lead/insufficient） | 完成 | 反直觉输入的专门测试 |
 | SQLite + FTS5 存储与检索 | 完成 | 单元测试 + 注入测试 |
 | CLI（<!--fig:cli.commands-->15<!--/fig--> 个命令） | 完成 | 每个命令都被真实执行 |
-| REST API（<!--fig:api.endpoints-->23<!--/fig--> 个端点） | 完成 | httpx 测试客户端 |
+| REST API（<!--fig:api.endpoints-->24<!--/fig--> 个端点） | 完成 | httpx 测试客户端 |
 | JSON / Markdown 报告导出 | 完成 | 快照式断言 |
 
 ### 1.2 工程指标
@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1819<!--/fig-->（<!--fig:tests.fast-->1670<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7375<!--/fig-->/<!--fig:coverage.total-->7904<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1830<!--/fig-->（<!--fig:tests.fast-->1681<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1670<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1681<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1819<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1830<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -198,6 +198,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_docstring_claims.py` | 文档字符串声称的，必须就是代码做的：两个后端的分工、迁移加了什么、摄取读了多少 |
 | `test_method_resolution.py` | 方法按描述符解析：同名重载必须报歧义并列出候选，不许挑一个（v0.1.3 之后新增） |
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
+| `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
 | `test_upload_lifecycle.py` | 上传的保留与清理；正在运行的分析可以被取消 |
 | `test_androguard_isolation.py` | 后端的运行时隔离：宿主的日志不被删；不受信的 DEX 在单独的进程里解析；越界的资源被记下来 |
 | `test_evidence_invariants.py` | 已验证证据的不变量：引用落不在分析之内，就不许记成 verified；模型的说法永远不是事实 |
@@ -881,10 +882,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1819<!--/fig--> 个：<!--fig:tests.fast-->1670<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1830<!--/fig--> 个：<!--fig:tests.fast-->1681<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7375<!--/fig-->/<!--fig:coverage.total-->7904<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1818<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7467<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1829<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1010,9 +1011,9 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
 
 <!--report-figures:{
   "code": {
-    "api_endpoints": 23,
+    "api_endpoints": 24,
     "cli_commands": 15,
-    "documents": 148,
+    "documents": 157,
     "sample_apks": 5
   },
   "coverage": {
@@ -1033,11 +1034,11 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "agent/sufficiency.py": [31, 1],
       "agent/tool_executor.py": [368, 35],
       "api/__init__.py": [3, 0],
-      "api/app.py": [309, 22],
+      "api/app.py": [320, 21],
       "api/uploads.py": [184, 14],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
-      "cli/main.py": [389, 17],
+      "cli/main.py": [390, 17],
       "config/__init__.py": [3, 0],
       "config/settings.py": [34, 1],
       "core/__init__.py": [3, 0],
@@ -1048,17 +1049,17 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/methods.py": [218, 10],
       "core/models.py": [343, 5],
       "core/paths.py": [36, 2],
-      "core/pipeline.py": [523, 32],
-      "core/runs.py": [70, 0],
-      "core/storage.py": [396, 11],
+      "core/pipeline.py": [543, 34],
+      "core/runs.py": [106, 0],
+      "core/storage.py": [403, 14],
       "mcp/__init__.py": [2, 0],
       "mcp/errors.py": [21, 1],
-      "mcp/schemas.py": [187, 0],
+      "mcp/schemas.py": [200, 0],
       "mcp/security.py": [28, 3],
       "mcp/server.py": [57, 12],
       "mcp/tools/__init__.py": [1, 0],
       "mcp/tools/evidence.py": [29, 1],
-      "mcp/tools/projects.py": [46, 4],
+      "mcp/tools/projects.py": [48, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
       "mcp/tools/symbols.py": [71, 1],
@@ -1084,11 +1085,11 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/__init__.py": [0, 0],
       "workbench/__main__.py": [69, 29],
       "workbench/agent_tasks.py": [180, 14],
-      "workbench/app.py": [215, 5],
+      "workbench/app.py": [222, 6],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 529,
-    "statements": 7904
+    "missing": 534,
+    "statements": 8001
   },
   "history": {
     "v0.1.0": {
@@ -1105,10 +1106,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:d66c1e969b9ef061d3a9ba68dd2855f486e08c73a13dba030685e8079a700b12",
+  "source_fingerprint": "sha256:32bee1822e9875280eb6d2370191e1dd0924ae9fff8f54c96f2219cbe1567f27",
   "suite": {
     "failed": 0,
-    "passed": 1818,
+    "passed": 1829,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1122,8 +1123,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1670,
+    "fast": 1681,
     "slow": 149,
-    "total": 1819
+    "total": 1830
   }
 }-->

@@ -72,6 +72,52 @@ class RunStatus(StrEnum):
     """The analysis was stopped on request."""
 
 
+class RunStage(StrEnum):
+    """A stage of the pipeline, in the order the pipeline reaches it.
+
+    The names are the pipeline's own progression points
+    (:meth:`~dexatlas.core.pipeline.Analyzer.analyze`): the APK is inspected,
+    Apktool decodes it, Androguard indexes it, JADX decompiles it, and the
+    result is published. A stage event records when the pipeline entered or
+    left one of these; the list of stages a run went through is the
+    observable form of "where the analysis got to".
+    """
+
+    INSPECT = "inspect"
+    """The APK is being read and validated."""
+
+    PARSE_APKTOOL = "parse-apktool"
+    """Apktool is decoding the manifest, the resources and the Smali."""
+
+    INDEX_ANDROGUARD = "index-androguard"
+    """Androguard is reading the DEX symbol graph."""
+
+    DECOMPILE_JADX = "decompile-jadx"
+    """JADX is decompiling the Java sources."""
+
+    PUBLISH = "publish"
+    """The staged results are being published into the workspace."""
+
+
+class RunStageEvent(BaseModel):
+    """One recorded transition of a run through one pipeline stage.
+
+    ``started_at`` says when the pipeline entered the stage; ``finished_at``
+    says when it left it, or is ``None`` while the stage is still running —
+    including the stage the run never left because it failed or was
+    cancelled part way through.
+    """
+
+    stage: RunStage
+    """Which pipeline stage this event belongs to."""
+
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    """When the pipeline entered the stage."""
+
+    finished_at: datetime | None = None
+    """When the pipeline left the stage, or ``None`` while it is running."""
+
+
 class RunCompleteness(StrEnum):
     """How much of what the run set out to read it actually read.
 
@@ -127,6 +173,16 @@ class AnalysisRun(BaseModel):
     errors: list[ToolError] = Field(default_factory=list)
     """What went wrong, in the run that went wrong."""
 
+    stages: list[RunStageEvent] = Field(default_factory=list)
+    """The pipeline stages this run has been through, in the order recorded.
+
+    Each stage appears at most once; a stage whose ``finished_at`` is
+    ``None`` is the one the pipeline is inside (or never left, when the run
+    ended mid-stage). A run analysed by an older build — or one that failed
+    before the first stage was recorded — carries none, and a reader of the
+    contract treats that as "no stage facts", not as an error.
+    """
+
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     """When the run began."""
 
@@ -166,6 +222,40 @@ class AnalysisRun(BaseModel):
             tool_versions=dict(tool_versions or {}),
             workspace=workspace,
         )
+
+    def record_stage_start(self, stage: RunStage, *, when: datetime | None = None) -> None:
+        """Record that the pipeline entered ``stage``.
+
+        The event is appended if the stage has not been entered before; a
+        stage that is recorded again keeps its original start — the pipeline
+        reaches each stage once, and a re-entry is a caller's mistake, not a
+        second attempt.
+        """
+        moment = when if when is not None else datetime.now(UTC)
+        existing = self.stage_event(stage)
+        if existing is not None:
+            return
+        self.stages.append(RunStageEvent(stage=stage, started_at=moment))
+
+    def record_stage_end(self, stage: RunStage, *, when: datetime | None = None) -> None:
+        """Record that the pipeline left ``stage``.
+
+        A stage that was never entered is recorded first — an end without a
+        start would be an event a reader cannot place in the sequence. A
+        stage that already finished keeps its recorded end: the finish time
+        is a fact about when the pipeline moved on, not a value to overwrite.
+        """
+        moment = when if when is not None else datetime.now(UTC)
+        existing = self.stage_event(stage)
+        if existing is None:
+            self.stages.append(RunStageEvent(stage=stage, started_at=moment))
+            existing = self.stages[-1]
+        if existing.finished_at is None:
+            existing.finished_at = moment
+
+    def stage_event(self, stage: RunStage) -> RunStageEvent | None:
+        """This run's event for ``stage``, or ``None`` before it was reached."""
+        return next((event for event in self.stages if event.stage is stage), None)
 
     @property
     def finished(self) -> bool:

@@ -600,6 +600,21 @@ def create_app(analyzer: Analyzer) -> FastAPI:
             "published": run.id == published
         }
 
+    @app.get("/api/projects/{project_id}/runs/{run_id}/stages")
+    def get_run_stages(project_id: str, run_id: str) -> dict[str, Any]:
+        """The pipeline stages one run has been through, in the order recorded.
+
+        The run's own response keeps its original shape; the stage facts —
+        which build up while the analysis is still going — live here, read
+        through the same MCP tool the run rows use so the shape stays the
+        MCP contract's.
+        """
+        with analyzer.store.reading() as view:
+            run = view.get_run(run_id)
+        if run is None or run.project_id != project_id:
+            raise HTTPException(status_code=404, detail=f"no run {run_id!r} for {project_id!r}")
+        return project_tools.run_stages(project_id, run).model_dump(mode="json")
+
     @app.post("/api/projects/{project_id}/cancel", status_code=202)
     def cancel_analysis(project_id: str) -> dict[str, Any]:
         """Ask the analysis that is running for a project to stop.

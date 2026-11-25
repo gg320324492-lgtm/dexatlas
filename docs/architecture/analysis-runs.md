@@ -136,7 +136,7 @@ raised: the project is gone from the database either way.
 
 ## The schema
 
-The workspace schema is at version 7 (`SCHEMA_VERSION`,
+The workspace schema is at version 8 (`SCHEMA_VERSION`,
 `src/dexatlas/core/storage.py:44`). The two things this page is about are the
 ones version 4 added:
 
@@ -145,7 +145,10 @@ ones version 4 added:
 
 Versions 5 to 7 only added the `call_sites` table, the `resource_references`
 table and a `projects.apk_metadata` column; none of them changes what this
-page describes.
+page describes. Version 8 added the `analysis_runs.stages` column — the JSON
+list of pipeline stage events a run went through (Phase 5 W2); a row from an
+older schema reads as an empty list, which says "no stage facts" rather than
+"no stages ran".
 
 The migration is additive. A workspace written before runs existed opens,
 keeps its symbols and its evidence, and has no published run to point at —

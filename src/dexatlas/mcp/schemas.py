@@ -136,6 +136,39 @@ class ProjectList(BaseModel):
     limit: int
 
 
+class RunStageEventSummary(BaseModel):
+    """One recorded transition of a run through one pipeline stage."""
+
+    stage: str
+    """The pipeline stage: ``inspect``, ``parse-apktool``, ``index-androguard``,
+    ``decompile-jadx`` or ``publish``."""
+
+    started_at: str
+    """When the pipeline entered the stage."""
+
+    finished_at: str | None = None
+    """When the pipeline left the stage, or nothing while it is still running —
+    including a stage the run never left because it failed or was cancelled
+    part way through."""
+
+
+class RunStages(BaseModel):
+    """The pipeline stages of one run, as their own read-only answer.
+
+    Kept apart from ``RunSummary`` so the run's own shape — the one the MCP
+    tools and the run rows have always had — does not grow fields a caller
+    has not asked for; the stage facts are a separate question.
+    """
+
+    project_id: str
+    run_id: str
+    run_status: str
+    stages: list[RunStageEventSummary] = Field(default_factory=list)
+    """The stages in the order recorded. Empty for a run recorded by a build
+    that did not take stage facts, or one that ended before the first stage —
+    which reads as 'no stage facts', not as an error."""
+
+
 class RunSummary(BaseModel):
     """One attempt at analysing an APK."""
 
@@ -456,6 +489,8 @@ __all__ = [
     "ProjectList",
     "ProjectStatus",
     "ProjectSummary",
+    "RunStageEventSummary",
+    "RunStages",
     "RunSummary",
     "SourceView",
     "SymbolList",

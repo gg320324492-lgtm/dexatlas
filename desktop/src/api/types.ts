@@ -43,6 +43,22 @@ export interface ProjectSummary {
   truncated: boolean;
 }
 
+/** runs.py RunStage — pipeline 的阶段推进点（Phase 5 W2 起随 run 返回） */
+export type RunStage =
+  | "inspect"
+  | "parse-apktool"
+  | "index-androguard"
+  | "decompile-jadx"
+  | "publish";
+
+/** runs.py RunStageEvent — 一次进入/离开某阶段的事件 */
+export interface RunStageEvent {
+  stage: RunStage | string;
+  started_at: string;
+  /** null = 阶段尚未结束（含中途失败/取消） */
+  finished_at: string | null;
+}
+
 /** mcp/schemas.py:139 RunSummary — 一次分析尝试 */
 export interface RunInfo {
   id: string;
@@ -54,6 +70,8 @@ export interface RunInfo {
   duration_seconds: number | null;
   /** workbench PR #5 起附加：该轮是否为项目当前发布的快照 */
   published?: boolean;
+  /** Phase 5 W2 起随 run 返回的 pipeline 阶段事件；空数组 = 无阶段事实 */
+  stages?: RunStageEvent[];
 }
 
 /** workbench GET /api/projects/{id}/runs 的响应信封（app.py list_runs） */
@@ -62,6 +80,17 @@ export interface RunsEnvelope {
   total: number;
   published_run_id: string | null;
   runs: RunInfo[];
+}
+
+/**
+ * Phase 5 W2 独立只读端点 GET …/runs/{run_id}/stages 的响应。
+ * run 详情对象不带 stages；阶段事实从该端点取。
+ */
+export interface RunStagesEnvelope {
+  project_id: string;
+  run_id: string;
+  run_status: string;
+  stages: RunStageEvent[];
 }
 
 /**
