@@ -73,10 +73,10 @@ README 里用的是双引号，两种都合法。）
 | `7136/7650 行` | `docs/reports/phase1-execution-report.md:77` | `<!--fig:coverage.covered-->` 与 `<!--fig:coverage.total-->` |
 | `1695` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.total-->` |
 | `1546 快 + 149 集成` | `docs/reports/phase1-execution-report.md:76` | `<!--fig:tests.fast-->` 与 `<!--fig:tests.slow-->` |
-| `28 REST` | `scripts/verify-public-contracts.py:164` | `_rest_requests()` 里的检查调用点数 |
-| `6 MCP` | `scripts/verify-public-contracts.py:421` | `mcp_checks()` 里的检查调用点数 |
-| `15 CLI` | `scripts/verify-public-contracts.py:509` | `cli_checks()` 里的检查调用点数 |
-| `49`（清单条数） | 上面三行之和 | 静态条数，不是任何一次实跑的通过数 |
+| `31 REST` | `scripts/verify-public-contracts.py:201` | `_rest_requests()` 里的检查调用点数 |
+| `6 MCP` | `scripts/verify-public-contracts.py:497` | `mcp_checks()` 里的检查调用点数 |
+| `18 CLI` | `scripts/verify-public-contracts.py:586` | `cli_checks()` 里的检查调用点数 |
+| `55`（清单条数） | 上面三行之和 | 静态条数，不是任何一次实跑的通过数 |
 | `11`（MCP 只读工具） | `src/dexatlas/mcp/server.py:105-328` | `server.tool` 的注册处数 |
 | `Apache-2.0` | `pyproject.toml:10` | 许可证标识 |
 | `v1.0.0` | `src/dexatlas/__init__.py:11` | 版本号的唯一来源 |
@@ -88,13 +88,13 @@ README 里用的是双引号，两种都合法。）
 **图上的标签是脚本自己的措辞**，中英各一套，在 `scripts/make-social-preview.py` 的
 `LABELS` 字典里。这张表登记的是**数**的出处；标签的出处是那一个字典。
 
-**「49」是清单的条数，不是接口的数量。** 那三个数是检查调用点的条数
-（28 REST + 6 MCP + 15 CLI，合计 49 项），不是接口数：REST 端点另有其数（报告 §1.2 的
+**「55」是清单的条数，不是接口的数量。** 那三个数是检查调用点的条数
+（31 REST + 6 MCP + 18 CLI，合计 55 项），不是接口数：REST 端点另有其数（报告 §1.2 的
 `<!--fig:api.endpoints-->`），MCP 工具另有其数（上表第 14 行）。
 
 图上的副行因此写明是**检查项**的条数：英文是
-「Static count: 28 REST + 6 MCP + 15 CLI checks」（合计 49 项），中文是
-「静态条数：28 REST + 6 MCP + 15 CLI 项检查」（合计 49 项）。
+「Static count: 31 REST + 6 MCP + 18 CLI checks」（合计 55 项），中文是
+「静态条数：31 REST + 6 MCP + 18 CLI 项检查」（合计 55 项）。
 
 ## 5. 重新生成这两张图
 

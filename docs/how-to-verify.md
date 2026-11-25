@@ -169,7 +169,7 @@ uv run --no-sync pytest -q
 | 环境 | 汇总行 |
 |---|---|
 | 三后端齐备（Apktool、JADX、androguard 三个后端都在），**没**取第三方样本 | `<N> passed, <M> skipped`（退出码 0）。skip **全部**出自缺样本，理由只有两种：`fixture not present; run scripts/fetch-fixtures.sh` 与 `fixture TestActivity.apk not present; run scripts/fetch-fixtures.sh`。这一行量的是**另一种跑法**，具体条数随这棵树的测试数变，所以这里不写死 |
-| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1860<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
+| 三后端齐备，**取了**第三方样本 | **<!--fig:suite.passed-->1859<!--/fig--> passed**、**<!--fig:suite.skipped-->1<!--/fig--> skipped**、**<!--fig:suite.xfailed-->0<!--/fig--> xfailed**——那一条 skip 是 POSIX 版的 launcher 测试，在 Windows 上按设计跳过（Windows 版在它上面那条）；xfail 一栏是空的，因为这个项目没有预期失败的用例。这就是报告里记录的那次完整测量（报告里的 `fig:suite.passed` / `fig:suite.skipped` / `fig:suite.xfailed` 三个标记） |
 **看到 `skipped` 非零时，别把它读成通过。** 退出码 0 只说明「没有失败」，
 不说明「该跑的都跑了」。
 
@@ -288,23 +288,23 @@ export DEXATLAS_APKTOOL_JAR="<apktool.jar 的路径>"
 
 **退出码 0。**
 
-**为什么实跑是 51 项，不是 52？** 契约表 §7 写得很清楚：**52 是脚本里 `check()` 调用点
-的静态条数**（28 REST + 6 MCP + 18 CLI），任何一次实跑都跑不满它——
+**为什么实跑是 54 项，不是 55？** 契约表 §7 写得很清楚：**55 是脚本里 `check()` 调用点
+的静态条数**（31 REST + 6 MCP + 18 CLI），任何一次实跑都跑不满它——
 `server comes up` 只在服务起不来时记，`X-DexAtlas-Source-* headers` 只在源码端点
-返回 200 时记。所以（2026年11月20日 C8 落地后的脚本口径；CLI 段 18 项）：
+返回 200 时记。所以（2026年11月25日 stages 端点进活检后的脚本口径；CLI 段 18 项）：
 
 | 可用后端 | 实跑执行条数 | 通过 | 退出码 |
 |---|---|---|---|
-| jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 51（27 REST + 6 MCP + 18 CLI） | 51/51 | 0 |
-| 仅 androguard 4.1.4 | 50（26 REST + 6 MCP + 18 CLI） | 50/50 | 0 |
+| jadx 1.5.2 + apktool 2.11.1 + androguard 4.1.4 | 54（30 REST + 6 MCP + 18 CLI） | 54/54 | 0 |
+| 仅 androguard 4.1.4 | 53（29 REST + 6 MCP + 18 CLI） | 53/53 | 0 |
 
 **CLI 段的 `source` 与 `resources` 各有一个调用点按「这次分析里有没有对应后端参与」
 分支**：有 JADX 就断言它真的打出了源码（退出 0），没有就断言它按契约降级（退出 1、
 答案为空）。两种配置都过，才算门禁绿。
 
 **但「本地绿」不等于「CI 绿」——先问一句「这台机器是不是 CI 那台」。** 上面的活检
-脚本在**装没装后端两种配置下都退出 0**：没装 JADX / Apktool 时它跑 50 条断言
-（少一条源码端点的 header 断言），三个后端齐备时跑 51 条，退出码一样是 0。所以一台
+脚本在**装没装后端两种配置下都退出 0**：没装 JADX / Apktool 时它跑 53 条断言
+（少一条源码端点的 header 断言），三个后端齐备时跑 54 条，退出码一样是 0。所以一台
 没装后端的机器跑出来的「绿」，**没有验过带 JADX 的那几条断言**；而 CI 里有一道 job
 是**刻意不装后端**的——两道门的期望不同（`contracts` 与 `contracts-without-jadx`）。
 契约表 §7 记着这个分叉，下面这条命令替你问这个问题：

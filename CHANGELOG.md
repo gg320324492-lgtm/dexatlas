@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **公共契约活检覆盖 Phase 5 W2 的 stages 端点。**
+  `scripts/verify-public-contracts.py` 的 REST 段新增 3 个调用点：
+  `GET /projects/{pid}/runs/{rid}/stages` 的响应形状
+  （`{project_id,run_id,run_status,stages[]}`）、阶段事实按 pipeline 顺序与时间戳
+  排列、以及无此 run → 404 带 detail。静态条数由 52 升至 **55**
+  （31 REST + 6 MCP + 18 CLI）。
+
+### Changed
+
+- **契约表的 stages 说明改为以实现为准。** 阶段事实住在独立只读端点上，run 对象
+  （`RunResponse`）的字段集一个也没有变——既有端点的响应形状、状态码与退出码
+  零变化。`docs/architecture/public-contracts.md` §2.3 与 §7 同步更新。
+
 ## [1.1.0] — 2026-11-25
 
 ### Added
