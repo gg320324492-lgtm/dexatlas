@@ -3,6 +3,8 @@
  * Q2-M2-D：列表来自 GET /api/projects（真实项目），导出按钮调
  * GET /api/projects/{id}/report?format=markdown|json，Blob + a[download] 下载，
  * 文件名 {project_id}.md/.json；下载中 loading 态，失败 ErrorState。
+ * 「生成时间」按本地时区显示，并附一行 UTC 标注（后端给的是 UTC 时刻，
+ * 见 ../datetime 的规则）。
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +14,7 @@ import { LoadingState } from "../components/states/LoadingState";
 import { EmptyState } from "../components/states/EmptyState";
 import { describeError, dexatlas as client, downloadText } from "../api";
 import type { ProjectSummary } from "../api";
+import { timestampParts } from "../datetime";
 import "./ReportsPage.css";
 
 type Format = "markdown" | "json";
@@ -106,46 +109,63 @@ export default function ReportsPage() {
                 <th>APK</th>
                 <th>状态</th>
                 <th>证据数</th>
-                <th>生成时间</th>
+                <th>生成时间（本地）</th>
                 <th>
                   <span className="visually-hidden">操作</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {(projects ?? []).map((p) => (
-                <tr key={p.id}>
-                  <td className="report-id">{p.id}</td>
-                  <td className="report-project">{p.apk_name}</td>
-                  <td>
-                    <span className={`badge ${p.status === "completed" ? "badge-success" : "badge-muted"}`}>
-                      {p.status}
-                    </span>
-                  </td>
-                  <td>{p.evidence_count} 条</td>
-                  <td className="report-time">{p.created_at.slice(0, 19).replace("T", " ")}</td>
-                  <td>
-                    <div className="report-actions">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={exporting !== null}
-                        onClick={() => void doExport(p, "markdown")}
-                      >
-                        {exporting?.id === p.id && exporting.format === "markdown" ? "导出中…" : "导出 Markdown"}
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        disabled={exporting !== null}
-                        onClick={() => void doExport(p, "json")}
-                      >
-                        {exporting?.id === p.id && exporting.format === "json" ? "导出中…" : "导出 JSON"}
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {(projects ?? []).map((p) => {
+                // 后端给的是 UTC 时刻（created_at = datetime.now(UTC)），直接切前
+                // 19 个字符就是把 UTC 的墙上时间当本地时间显示（打包 exe 二次
+                // 验收实测差 8 小时）。这里按本地时区显示，并保留一行 UTC 标注。
+                const parts = timestampParts(p.created_at);
+                return (
+                  <tr key={p.id}>
+                    <td className="report-id">{p.id}</td>
+                    <td className="report-project">{p.apk_name}</td>
+                    <td>
+                      <span className={`badge ${p.status === "completed" ? "badge-success" : "badge-muted"}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td>{p.evidence_count} 条</td>
+                    <td className="report-time">
+                      {parts ? (
+                        <>
+                          <span className="report-time__local">
+                            {parts.local} {parts.offset}
+                          </span>
+                          <span className="report-time__utc">UTC {parts.utc}</span>
+                        </>
+                      ) : (
+                        <span className="report-time__local">时间未知</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="report-actions">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={exporting !== null}
+                          onClick={() => void doExport(p, "markdown")}
+                        >
+                          {exporting?.id === p.id && exporting.format === "markdown" ? "导出中…" : "导出 Markdown"}
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={exporting !== null}
+                          onClick={() => void doExport(p, "json")}
+                        >
+                          {exporting?.id === p.id && exporting.format === "json" ? "导出中…" : "导出 JSON"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

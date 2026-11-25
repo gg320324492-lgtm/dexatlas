@@ -16,6 +16,19 @@
 .report-time {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+/* 本地时间：正文色；下面的 UTC 标注弱化一档，供读者核对换算。 */
+.report-time__local {
+  display: block;
+  color: var(--color-text-secondary);
+}
+
+.report-time__utc {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 .report-actions {
