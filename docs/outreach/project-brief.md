@@ -47,7 +47,7 @@ recorded as verified. A backend that fails is reported as a value, not a
 crash: an APK that defeats the decompiler still yields a manifest, an index
 and a report that says which steps did not run.
 
-- 1,612 automated tests, 93.3% coverage, mypy strict, ruff, and a CI pipeline
+- 1,819 automated tests, 93.3% coverage, mypy strict, ruff, and a CI pipeline
   across Python 3.12/3.13 and multiple backend configurations.
 - Full documentation with three complete case studies on first-party sample
   APKs that anyone can reproduce from the repository.
@@ -82,7 +82,7 @@ and a report that says which steps did not run.
 - **Benchmark harness.** Scripted and real-model comparison runs with
   committed traces and reproducible metrics; scripted and real-model results
   are reported separately and never mixed.
-- **Engineering quality gates.** 1,612 tests, coverage and dead-code gates,
+- **Engineering quality gates.** 1,819 tests, coverage and dead-code gates,
   strict typing, lint/format, documentation citation checks, and CI across
   multiple Python and backend configurations.
 
@@ -106,7 +106,7 @@ captured as values and surfaced in the report instead of aborting the run.
 - The agent is a bounded single-loop assistant over a completed analysis; it
   is not a general autonomous vulnerability finder, and its default budget
   and known open issues are documented.
-- The current release is `v1.0.0` (tagged 2026-11-17); the public contract
+- The current release is `v1.1.0` (tagged 2026-11-25); the public contract
   covers the documented CLI/API/MCP surfaces.
 
 ## Links
