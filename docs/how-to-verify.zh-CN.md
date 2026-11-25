@@ -191,17 +191,15 @@ uv run --no-sync python scripts/check-version-claims.py --base auto
 
 ```text
 facts:
-  tags: handover-2026-11-10, phase1-acceptance-2026-10-21, v0.1.0, v0.1.1, v0.1.2, v0.1.3, v0.2.0, v1.0.0, v1.0.1
-  package version: 1.0.1
-  changelog: 1.0.1, 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
-  newest release: v1.0.1
-documents read: <!--fig:documents.count-->146<!--/fig-->
+  tags: handover-2026-11-10, phase1-acceptance-2026-10-21, v0.1.0, v0.1.1, v0.1.2, v0.1.3, v0.2.0, v1.0.0, v1.0.1, v1.0.2, v1.1.0
+  package version: 1.1.0
+  changelog: 1.1.0, 1.0.2, 1.0.1, 1.0.0, 0.2.0, 0.1.3, 0.1.2, 0.1.1, 0.1.0
+  newest release: v1.1.0
+documents read: <!--fig:documents.count-->147<!--/fig-->
   skipped: v0.1.0: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.1: the report of that release has no measured coverage, so only its test count is checked
   skipped: v0.1.2: the report of that release has no measured coverage, so only its test count is checked
-findings: 2 (2 already in 9e1aa616)
-  docs/releases/v0.2.0.md:326  release-coverage  it says the coverage of the release is 91.0%, the measured coverage is 91.6%
-  CHANGELOG.md:1072  release-coverage  it says the coverage of the release is 93.9%, the measured coverage is 91.6%
+findings: 0
 
 Every version claim matches the repository.
 ```
@@ -212,10 +210,12 @@ Every version claim matches the repository.
 
 **`documents read` 那行是活的。** 它数的是**当前这棵树里 Markdown 的份数**（`fig:documents.count` 标记，由测量脚本按 §4 写出）——本文件也是被数的之一，所以仓库每增删一份 Markdown，下次测量这个数就自己变。
 
-`findings: 2` 里那两条是**历史遗留、且已被登记在案**的（`2 already in 9e1aa616`）：
-两份文档在描述**已发布的历史版本**时引用了当时的覆盖率，而门禁用当前树的覆盖率
-作参照，所以差一个百分点。门禁知道它们是历史事实，不判失败——但它**把这两条摆在你
-面前**，而不是藏起来。这是这个项目的习惯：**已知偏差要写出来，不要静音**。
+**v1.0.2 之前这里曾列出两条 `findings: 2`**：两份文档在描述**已发布的历史版本**时
+引用了当时的覆盖率，而门禁用当前树的覆盖率作参照，所以差一个百分点。门禁知道它们
+是历史事实，不判失败——但它**把这两条摆在你面前**，而不是藏起来。这是这个项目的
+习惯：**已知偏差要写出来，不要静音**。v1.1.0 发版前这两处数字已按各自版本的实测值
+改正（v0.2.0 发布说明改为 91.6%，CHANGELOG 里 v0.1.3 修正记录的旧措辞加了引号
+标注），现在的实测输出是 `findings: 0`。
 
 ### 2.6 门禁三：公共契约活检（需要三个后端）
 
