@@ -23,6 +23,7 @@ points it somewhere else.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -80,6 +81,59 @@ _BUILD_HINT = (
     "`npm run build --prefix src/dexatlas/workbench/web`"
 )
 
+logger = logging.getLogger(__name__)
+
+
+def _reconcile_orphaned_runs(analyzer: Analyzer) -> int:
+    """Mark the runs a previous process left ``running`` as failed, and say how many.
+
+    A workbench that dies mid-analysis cannot finish the run it started: the
+    run's row stays ``running`` for ever, the project reads as "in progress"
+    to every later caller, and the cancel endpoint -- which asks the
+    *process-wide* ``RUNNING`` table, empty in the new process -- answers
+    409 for a project nothing is analysing. The record is a lie about the
+    world, so the start-up sweep rewrites it: the run and its project become
+    ``failed``, and the error says the process ended before the analysis
+    did.
+
+    An analysis this process is itself running is registered in ``RUNNING``
+    under its project id, so the sweep skips those: a restart that happens
+    to serve a request while one of its own analyses is in flight must not
+    fail that analysis out from under it.
+    """
+    from dexatlas.core.models import ProjectStatus, ToolError, ToolErrorCode
+    from dexatlas.core.runs import RunStatus
+
+    store = analyzer.store
+    live = RUNNING.projects()
+    reconciled = 0
+    for project in store.list_projects():
+        if project.status is not ProjectStatus.RUNNING or project.id in live:
+            continue
+        for run in store.list_runs(project.id):
+            if run.status is not RunStatus.RUNNING or run.finished:
+                continue
+            run.status = RunStatus.FAILED
+            run.finished_at = datetime.now(UTC)
+            run.errors = [
+                ToolError(
+                    tool="workbench",
+                    code=ToolErrorCode.ANALYSIS_FAILED,
+                    message=(
+                        "the server process running this analysis ended before the "
+                        "analysis finished; the run was never completed or cancelled"
+                    ),
+                    detail=run.id,
+                )
+            ]
+            store.update_run(run)
+            store.set_project_state(project.id, ProjectStatus.FAILED, run.errors)
+            reconciled += 1
+            logger.warning(
+                "reconciled orphaned run %s for project %s as failed", run.id, project.id
+            )
+    return reconciled
+
 
 def create_app(analyzer: Analyzer) -> FastAPI:
     """Build the workbench API + static front end around one ready Analyzer."""
@@ -97,6 +151,10 @@ def create_app(analyzer: Analyzer) -> FastAPI:
     # the framework reads it. The staging, inspection and storage behind the
     # upload endpoint are the same shared policy the REST API runs.
     app.add_middleware(UploadSizeLimitMiddleware, limit=lambda: ingest.MAX_APK_BYTES)
+    # A server that died mid-analysis left its runs saying "running" for
+    # ever. The sweep runs before the first request is served, so the
+    # dashboard reads a workspace whose state is already true.
+    _reconcile_orphaned_runs(analyzer)
 
     @app.exception_handler(RequestError)
     def request_error(request: Request, exc: RequestError) -> JSONResponse:

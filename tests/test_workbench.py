@@ -1486,6 +1486,89 @@ def test_cancel_without_a_running_analysis_is_a_conflict(client: TestClient) -> 
     assert response.status_code == 409
 
 
+# -- the start-up sweep: runs a dead process left saying "running" -----------
+
+
+def test_start_up_reconciles_an_orphaned_running_run_as_failed(tmp_path: Path) -> None:
+    """A run that a dead process left ``running`` becomes ``failed`` at start-up.
+
+    A workbench that dies mid-analysis cannot finish the run it started: the
+    run and its project read as "in progress" to every later caller, and the
+    cancel endpoint -- which asks the *process-wide* ``RUNNING`` table, empty
+    in the new process -- answers 409 for a project nothing is analysing.
+    The start-up sweep rewrites the lie: the run and its project become
+    ``failed``, and the recorded error says the process ended first.
+    """
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    settings = Settings(workspace=tmp_path / "workspace")
+    analyzer = Analyzer(settings)
+    pid = Project.new_id(FAKE_SHA256)
+    analyzer.store.save_project(
+        Project(
+            id=pid,
+            apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+            status=ProjectState.RUNNING,
+        ),
+        tmp_path / "workspace" / "projects" / pid,
+        manifest=None,
+    )
+    run = AnalysisRun.start(pid, FAKE_SHA256)
+    run.status = RunStatus.RUNNING
+    analyzer.store.create_run(run)
+
+    with TestClient(create_app(analyzer)):
+        pass
+
+    failed_run = analyzer.store.get_run(run.id)
+    assert failed_run is not None and failed_run.status is RunStatus.FAILED
+    assert failed_run.finished_at is not None
+    assert len(failed_run.errors) == 1
+    failed_project = analyzer.store.get_project(pid)
+    assert failed_project is not None and failed_project.status is ProjectState.FAILED
+    assert "ended" in failed_project.errors[0].message
+
+
+def test_start_up_leaves_runs_this_process_started_alone(tmp_path: Path) -> None:
+    """A run the live process registered in ``RUNNING`` is not reconciled.
+
+    The sweep runs at start-up, before any analysis this process will start,
+    so in practice it never races one. The guard is that the sweep looks at
+    the database, not at ``RUNNING``: a run that *is* in the table but that
+    some other path wrote as ``running`` into the store -- the pipeline does,
+    the moment a run begins -- is this process's own live work, and the
+    sweep's idempotence (a second start finds nothing ``running``) is what
+    keeps a restart from failing its own in-flight analyses.
+    """
+    from dexatlas.api.uploads import RUNNING
+    from dexatlas.core.runs import AnalysisRun, RunStatus
+
+    settings = Settings(workspace=tmp_path / "workspace")
+    analyzer = Analyzer(settings)
+    pid = Project.new_id(FAKE_SHA256)
+    analyzer.store.save_project(
+        Project(
+            id=pid,
+            apk=ApkMetadata(sha256=FAKE_SHA256, size_bytes=1, path=Path("demo.apk")),
+            status=ProjectState.RUNNING,
+        ),
+        tmp_path / "workspace" / "projects" / pid,
+        manifest=None,
+    )
+    run = AnalysisRun.start(pid, FAKE_SHA256)
+    run.status = RunStatus.RUNNING
+    analyzer.store.create_run(run)
+    RUNNING.start(pid, Path("uploads") / "demo.apk")
+    try:
+        with TestClient(create_app(analyzer)):
+            pass
+    finally:
+        RUNNING.finish(pid)
+
+    live = analyzer.store.get_run(run.id)
+    assert live is not None and live.status is RunStatus.RUNNING
+
+
 def _staged_snapshot(project: Project, workspace: Path) -> Path:
     """A staged database holding the project's own rows, the way the pipeline publishes."""
     from dexatlas.core.storage import Store
