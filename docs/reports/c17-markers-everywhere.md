@@ -52,7 +52,7 @@ uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1775 tests
    不是插图。页面上它们仍以 `<!--fig:…-->` 标记包裹，渲染出来只有数字与句子本身。
 
 **页面改法**：两页 §2.3 的两条命令行注释里，期望输出换成
-`<!--fig:tests.collect.fast-->1698/1847 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1847 tests collected (1698 deselected)<!--/fig-->`；
+`<!--fig:tests.collect.fast-->1712/1861 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1861 tests collected (1712 deselected)<!--/fig-->`；
 §4 的清单补一句「collect 期望输出也是这套标记写的」。
 
 **守卫改法**（`tests/test_how_to_verify.py`）：
