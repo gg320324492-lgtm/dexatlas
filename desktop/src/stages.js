@@ -2,13 +2,13 @@
  * 分析页的阶段映射 —— 纯函数，无 React 依赖，可被直接执行。
  *
  * 【为什么是 .js 而不是 .ts】
- * 这个模块要被仓库里的 Python 回归测试直接执行
- * （tests/test_desktop_stage_mapping.py）：CI 的 Python 测试 job 不安装
- * npm 依赖，GitHub runner 自带的 Node 又低于 22.6（没有类型擦除），
- * 因此模块必须是「Node 能直接跑」的 ESM JavaScript。类型并没有因此
- * 丢失：desktop/tsconfig.json 打开了 allowJs + checkJs，tsc 会按 JSDoc
- * 里的类型逐行检查本文件，桌面端 npm run build 仍然是全量类型检查
- * （tsc --noEmit && vite build）。
+ * 这个模块是**无依赖的纯 ESM**：不改一行就能被 Node 直接执行、被 vitest
+ * 直接 import、被浏览器直接加载——桌面端的三种用法读的是同一份文件，不必
+ * 先构建一步。类型并没有因此丢失：desktop/tsconfig.json 打开了
+ * allowJs + checkJs，tsc 会按 JSDoc 里的类型逐行检查本文件，桌面端
+ * npm run build 仍然是全量类型检查（tsc --noEmit && vite build）。
+ * 它的单元测试在 desktop/src/stages.test.ts（vitest），由 CI 的 desktop
+ * job 跑；阶段映射的回归从此有了自己的拦截网，不必再靠别的语言读源码。
  *
  * 【映射规则】（优先级从高到低）
  * 1. 有阶段事件（Phase 5 W2 的 stages 端点）→ 按事件置 done / running；

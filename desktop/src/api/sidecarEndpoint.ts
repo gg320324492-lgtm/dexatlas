@@ -59,22 +59,36 @@ export async function querySidecarStatus(): Promise<SidecarStatus | null> {
 }
 
 /**
+ * 侧车状态的读取方式。
+ *
+ * 默认是 {@link querySidecarStatus}（Tauri 的 `get_sidecar_status`）。单元测试
+ * 注入一个假的提供者，于是「有界等待」这套逻辑可以被直接执行——不必真的起
+ * 一个侧车进程，也不必真的装一个 Tauri 壳。
+ */
+export type SidecarStatusProvider = () => Promise<SidecarStatus | null>;
+
+/**
  * 有界等待侧车端口。
  *
  * 返回端口号；等不到就返回 null——三种收场：拿到端口、壳说后端起不来
  * （`failed`）、超时。**返回 null 不等于"永远没有"**：调用方仍应订阅事件，
  * 端口后来出现时照样能改写 baseUrl。
+ *
+ * @param timeoutMs 等待上限（毫秒）
+ * @param pollMs 轮询间隔（毫秒）
+ * @param statusProvider 状态来源（测试注入用；默认走 Tauri）
  */
 export async function waitForSidecarPort(
   timeoutMs: number = SIDECAR_PORT_WAIT_MS,
   pollMs: number = SIDECAR_PORT_POLL_MS,
+  statusProvider: SidecarStatusProvider = querySidecarStatus,
 ): Promise<number | null> {
   if (!isTauriRuntime()) {
     return null;
   }
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const status = await querySidecarStatus();
+    const status = await statusProvider();
     const port = status?.port;
     if (typeof port === "number" && port > 0) {
       return port;

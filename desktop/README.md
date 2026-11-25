@@ -50,6 +50,8 @@ dev 浏览器模式走 vite 代理（`/api`），不涉及端口。
 npm install          # 在 desktop/ 内执行
 npm run dev          # 仅前端（Vite，端口 5173）
 npm run build        # 前端类型检查 + 产物构建
+npm run test         # 桌面端单元测试（vitest）
+npm run test:watch   # 同上，改成监听模式
 npm run tauri dev    # Tauri 桌面窗口（开发模式，自动拉起侧车后端）
 npm run tauri build  # 桌面应用打包
 ```
@@ -58,6 +60,26 @@ Windows 上 Rust 构建需要 MSVC 环境：在 cmd 里先
 `call "E:\VS2022BuildTools\VC\Auxiliary\Build\vcvarsall.bat" x64`
 （路径按本机 Build Tools 安装位置调整），再执行 `cargo check` /
 `npm run tauri dev`。
+
+## 测试
+
+桌面前端的单元测试用 **vitest**，测试文件在 `src/` 旁边（`src/**/*.test.ts`）：
+
+```bash
+npm run test         # 跑一遍
+npm run test:watch   # 监听
+```
+
+被测的是纯逻辑那一层——阶段映射（`src/stages.js`）、locator 落点分类
+（`src/locators.ts`）、侧车端口解析（`src/api/sidecarEndpoint.ts` 与
+`src/api/client.ts`）。断言的是**行为**（函数返回什么、baseUrl 变没变），
+不是源码里有没有某个字符串。
+
+纯函数测试不开 DOM 环境，所以不必装 happy-dom / jsdom；要渲染组件时再在那个
+测试文件上加 `// @vitest-environment jsdom`。
+
+这些测试由 CI 的 `desktop` job 跑（`npm ci` → `npm run build` → `npm run test`）；
+`npm run build` 里的 `tsc --noEmit` 也会把测试文件一起类型检查一遍。
 
 依赖安装在 `desktop/node_modules`，Rust 构建产物在 `desktop/src-tauri/target`，
 均不入库。

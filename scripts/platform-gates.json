@@ -37,6 +37,14 @@
       "local_counterpart": "uv run --no-sync pytest -q",
       "note": "The same suite with DEXATLAS_JADX_PATH emptied: the JADX-dependent tests are the ones that stop running, so this job's pass count is lower than the full job's for a reason that is not a failure."
     },
+    "desktop": {
+      "runs_on": "ubuntu-latest",
+      "gate_scripts": [],
+      "temp_redirect": "n/a",
+      "reason": "the job installs the front end's npm dependencies and runs node; it installs nothing with uv on the host, so there is no temporary directory to move",
+      "local_counterpart": "npm run build && npm run test (in desktop/)",
+      "note": "The desktop front end had no CI job at all before this one: its regressions were Python assertions about the source text. The job now runs the real unit tests (vitest) and type-checks the front end (tsc --noEmit, part of npm run build). It is a separate toolchain from the Python one -- npm, not uv -- so it is a separate job rather than a step in the test job."
+    },
     "m3-comparison": {
       "runs_on": "ubuntu-latest",
       "gate_scripts": [],
@@ -290,6 +298,15 @@
         "test-partial-backends"
       ],
       "note": "It runs in the test suite, so it runs wherever the suite runs. This is the mechanism half of the method: the reconciliation is not a command a person has to remember."
+    },
+    {
+      "name": "the desktop front end's unit tests",
+      "command": "npm run test && npm run build   (in desktop/)",
+      "script": null,
+      "ci_jobs": [
+        "desktop"
+      ],
+      "note": "A different toolchain from the rest of this list -- npm, not uv -- so it is a separate entry with its own command rather than a step of the Python suite. The front end's regressions are not the Python suite's business: before this entry existed, the desktop had no test runner at all."
     }
   ]
 }
