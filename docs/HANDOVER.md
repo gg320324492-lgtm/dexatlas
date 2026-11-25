@@ -101,8 +101,12 @@ independent acceptance passed on 2026-11-20. Phase 4 (M11–M15) is complete:
 portfolio closure, software design and Workbench UI, scoped by
 [`docs/roadmap/phase4-plan.md`](roadmap/phase4-plan.md) (final decision
 A + D + G). v1.0.2 ships the Phase 4 documentation, dependency-hardening and
-measurement follow-up. The project is now in **Portfolio Freeze** unless real
-user signals arrive. Read [`docs/status.md`](status.md) for the current state
+measurement follow-up. **v1.1.0 (2026-11-25) ships the Q2 desktop application
+(Tauri + React, scoped by
+[`docs/roadmap/phase4-q2-supplement.md`](roadmap/phase4-q2-supplement.md)) and
+the post-Q2 stability batch.** The project is now in a **partial unfreeze
+(option B)**: only desktop-app defects, performance and usability work is
+open; new features need re-review. Read [`docs/status.md`](status.md) for the current state
 and its open gaps.
 
 ### Smaller things that are still open

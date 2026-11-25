@@ -5,6 +5,49 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-11-25
+
+### Added
+
+- **原创桌面应用（Tauri 2 + React 19 + TypeScript）。** Phase 4 Q2 补充单授权的
+  新前端形态，与既有 CLI/REST/MCP/Workbench 并存：设计规范（信息架构、视觉
+  token、19 组件清单、状态矩阵、键盘行为，[desktop-app.md](docs/architecture/desktop-app.md)）、
+  21 个基础组件与组件画廊、六个核心页面（首页拖拽上传、分析进行中三区、项目
+  详情三栏 + 证据抽屉、证据检索、报告导出、设置）。信息架构、视觉语言与验收
+  标准按用户批准的四步法确定，验收记录见
+  [phase4-q2-acceptance.md](docs/reports/phase4-q2-acceptance.md)。
+- **桌面端真实后端接线。** 桌面应用通过 vite 代理 / Tauri HTTP 能力调用既有
+  FastAPI 能力，不复制分析逻辑：上传走 `POST /api/analyze`，项目/证据/报告/
+  符号搜索/locator 解析全部来自真实后端；分析页阶段进度由 runs 状态驱动
+  （无阶段级进度接口的粒度部分为前端模拟并如实标注）。
+- **Windows 构建链与可分发产物。** MSVC 工具链就位后 `npx tauri build` 产出
+  自包含 release exe 与 MSI/NSIS 安装包；发布形态经真机验证（原生 fetch 被
+  CORS 拦、plugin-http 通道 200，首页/详情/导出全链路可用）。
+- **Tauri 原型真机性能基线。** 九项测量（冷启动、路由、渲染、导出、轮询
+  CPU/内存、缩放稳定性）全部达标，问题清单 P1–P8 逐项闭环，记录见
+  [phase4-q2-perf-walkthrough.md](docs/reports/phase4-q2-perf-walkthrough.md)。
+- **workbench 补齐桌面端依赖的端点。** `GET /api/backends`、
+  `GET /api/projects/{id}/runs`、`GET /api/projects/{id}/runs/{run_id}`、
+  `POST /api/projects/{id}/cancel`（202/409），复用 MCP 契约形状；9 例回归
+  测试先红后绿。
+
+### Fixed
+
+- **workbench 启动时把死进程遗留的 running run 对账为 failed。** 一个在分析
+  中途死掉的 workbench 会把 run 与项目永远留在 "running"，cancel 端点对新
+  进程回答 409。启动清扫在服务第一个请求前把孤儿 run/项目如实改写为 failed
+  并记录原因；跳过本进程活着的分析，幂等。新增 2 例回归测试。
+
+### Changed
+
+- **桌面端稳定性与可访问性。** 分析页轮询指数退避重试 + 手动刷新；首页项目
+  列表骨架屏；上传边界提示（超大文件、同 hash 已分析项目）；错误文案统一
+  （describeError，去掉 `undefined:` 前缀）；核心链路 skip-link；日志长 token
+  断行修复；1920 宽屏内容 max-width 居中；导出按钮文案统一。
+- **完整测量落盘。** 测试总数与覆盖率数字由
+  `scripts/refresh-report-figures.py` 对发布树重新生成（新增桌面端与 workbench
+  测试后套件 1808 → 1819）。
+
 ## [1.0.2] — 2026-11-24
 
 ### Added
@@ -1153,10 +1196,10 @@ release says so rather than counting them in.
 - **The READMEs pointed at finished work as the current backlog.** The eight tasks that
   planned Phase 1 are archived under `.github/issues/v0.1.0/planned/`; what is
   outstanding is the Phase 1 source review.
-- **The v0.1.3 release notes quoted a hand-copied coverage figure.** They said 93.9%,
-  which belonged to an earlier tree; the release's own generated report measured
-  94.0% (1857/1975 lines) from the tree it was cut from. They now state the
-  measured figure.
+- **The v0.1.3 release notes quoted a hand-copied coverage figure.** They had said
+  `93.9%`, which belonged to an earlier tree; the release's own generated report
+  measured 94.0% (1857/1975 lines) from the tree it was cut from. They now state
+  the measured figure.
 - **The `[0.1.0]` entry counted 208 tests; the release shipped 204.** A commit made
   after the release overwrote the entry with the test count of the tree at the time.
   The tag measures 204, and the v0.1.0 release notes said 204. The `[0.1.1]` entry
@@ -1516,7 +1559,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v0.2.0...v1.0.0

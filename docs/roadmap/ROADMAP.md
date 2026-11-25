@@ -11,13 +11,14 @@ what comes next.
   closed on 2026-11-22, M8 delivered (macOS unverified, as disclosed), M9
   showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.2
   (2026-11-24) is the Phase 4 documentation, dependency-hardening and measurement
-  follow-up. Per-milestone evidence
+  follow-up; **v1.1.0 (2026-11-25) is the Q2 desktop application and the
+  post-Q2 stability batch**. Per-milestone evidence
   is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
   [Phase 3 plan](phase3-plan.md). The project is now in **Phase 4** — portfolio
   closure, software design and Workbench UI — scoped by
   [phase4-plan.md](phase4-plan.md) (final decision A + D + G; the project freezes
   after Phase 4 unless real user signals arrive).
-- **Plan version:** 2026-11-24 (Phase 4 Q2 desktop-app supplement added; Phase 3 and Phase 4 history retained)
+- **Plan version:** 2026-11-25 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
   new work front inside this repository — Tauri + React, light "studio" visual
   language, evidence-chain-first — scoped by

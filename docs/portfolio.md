@@ -128,8 +128,8 @@ methodology and its disclosures are in [docs/benchmarks/](benchmarks/comparison.
 
 ## Licensing and status
 
-Apache-2.0. Early development; actively developed on the v1.0.x line, and the
-current release is v1.0.2. Known
+Apache-2.0. Early development; actively developed on the v1.x line, and the
+current release is v1.1.0. Known
 limitations are disclosed in the documentation rather than papered over — see
 [docs/status.md](status.md) for the honest list, including which agent
 configurations complete a question within default budgets.
