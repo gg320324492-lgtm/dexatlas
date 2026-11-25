@@ -145,7 +145,9 @@ index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际�
 **run 对象本身不带 stages**：`RunResponse` 仍是上表的 11 个字段，阶段事实另取
 stages 端点——这样既有 run 对象的字段集一个也不变。workbench 的
 `GET /api/projects/{pid}/runs/{rid}/stages` 与 REST 同形状
-（`src/dexatlas/workbench/app.py:603-616` `anchor: get_run_stages`）。端点与字段
+（`src/dexatlas/workbench/app.py:603-616` `anchor: get_run_stages`）；MCP 面的形状经
+`src/dexatlas/mcp/tools/projects.py:74-92` `anchor: def run_stages` 与
+`src/dexatlas/mcp/schemas.py:155-170` 的 `RunStages` 定义。端点与字段
 只增不改：既有端点的响应形状、状态码与退出码零变化。
 
 ### 2.4 符号与检索

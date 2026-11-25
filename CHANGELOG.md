@@ -9,18 +9,79 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **桌面应用侧车进程（Phase 5 W1）。** Tauri 壳启动时按配置拉起现有 DexAtlas
+  后端（默认 `python -m dexatlas.workbench`，强制 `--port 0` 由系统分配端口），
+  从后端输出抓取实际端口并注入前端，为动态端口放行 HTTP capability；侧车
+  退出/崩溃时页面如实显示错误（不造数据）；设置页可修改后端命令并重启；
+  应用退出时结束整棵后端进程树。（PR #13，`3625862`）
+- **分析 run 的阶段级进度契约（Phase 5 W2）。** pipeline 在 `inspect` →
+  `parse-apktool` → `index-androguard` → `decompile-jadx` → `publish` 五个
+  推进点记录阶段事件，schema v8 以 JSON 列持久化（旧库迁移后旧行读作「无阶段
+  事实」）；新增独立只读端点 `GET /api/projects/{id}/runs/{run_id}/stages`
+  （REST 与 workbench 同形状）。既有 run 对象字段集不变，纯新增。
+  11 例契约测试，含「阶段顺序与 pipeline 一致」「埋点不改变分析结果」。
+  （PR #14，`9614cb0`）
 - **公共契约活检覆盖 Phase 5 W2 的 stages 端点。**
   `scripts/verify-public-contracts.py` 的 REST 段新增 3 个调用点：
   `GET /projects/{pid}/runs/{rid}/stages` 的响应形状
   （`{project_id,run_id,run_status,stages[]}`）、阶段事实按 pipeline 顺序与时间戳
   排列、以及无此 run → 404 带 detail。静态条数由 52 升至 **55**
-  （31 REST + 6 MCP + 18 CLI）。
+  （31 REST + 6 MCP + 18 CLI）。（PR #18）
+- **Phase 5 验收与证据入库。** 新增
+  [Phase 5 验收报告](docs/reports/phase5-acceptance.md)：W1–W4 的逐项判据、
+  证据与未覆盖项，以及端到端走查与打包 exe 二次验收的结论；走查截图 4 张与
+  打包 exe 二次验收截图 12 张入库 `docs/assets/phase5/`。
+- **C12 外发备料与发版后运营清单。** `docs/outreach/`（含 ≤5,000 字符压缩稿
+  与核对表模板）与 `docs/ops/post-release-checklist.md`；按作者指示只备料，
+  不执行、不外发。
+- **桌面端回归测试改为 vitest 真单测。** `desktop/` 引入 vitest，阶段映射、
+  locator 落点、侧车端点解析三组断言从「Python 读源码做字符串断言」变为真单测；
+  CI 新增桌面测试 job。（PR #22，`33e4ba9`）
 
 ### Changed
 
+- **分析页阶段时间线不再以模拟为主。** 桌面分析页优先读 stages 端点并按真实
+  阶段事件渲染；旧 run 回退 `run.status` 映射；时间模拟仅作「无任何 run 数据」
+  时的兜底，三种来源在角标文案中如实区分（「前端模拟代码删除」未字面完成，
+  见验收报告 §3.4）。
 - **契约表的 stages 说明改为以实现为准。** 阶段事实住在独立只读端点上，run 对象
   （`RunResponse`）的字段集一个也没有变——既有端点的响应形状、状态码与退出码
-  零变化。`docs/architecture/public-contracts.md` §2.3 与 §7 同步更新。
+  零变化。`docs/architecture/public-contracts.md` §2.3 与 §7 同步更新。（PR #18）
+- **证据抽屉的「打开来源」不再点不动。** locator 没有单文件落点时（`apk-reader:*`
+  包级、`androguard:*` DEX 内、`<tool>:error/*` 后端未完成），按钮禁用并给出可见
+  说明；文件内 locator 的行为不变。落点判定按后端 `core/locators.py` 的工具词汇
+  镜像实现，由测试盯着不许漂移。（Q2 走查 P3）
+- **跳过链接的落点补上焦点环。** `.app-main:focus { outline: none }` 的特异度压过
+  全局 `:focus-visible`，而注释所说的补偿规则并不存在——键盘用户按 skip-link
+  跳过来时落点没有焦点环。补上 `:focus-visible` 规则。（Q2 走查 P4）
+- **桌面端回归的载体从 Python 源码断言变为 vitest。** `tests/` 下三个读桌面源码
+  做字符串断言的测试删除（阶段映射、locator 落点、侧车端点），同等断言由
+  `desktop/` 的 vitest 用例承担；Python 套件的规模随之减少，测量数字随测量走。
+  （PR #22，`33e4ba9`）
+
+### Fixed
+
+- **完成态的「证据」格不再永远显示「待处理」。** W2 的阶段映射里，后端最后一个
+  阶段 `publish` 映射到「报告」格，于是完成态上「证据」格的推断被条件挡掉，
+  页面显示「证据 • 待处理」而同一页顶部写着「已完成」、横幅写着「12 条证据」
+  （9/9 复现）。阶段映射抽成纯函数 `desktop/src/stages.js`，完成态按 publish
+  的结束事件置完成，运行中的推断保持不变。
+- **侧车在安装形态下起不来。** `backend_cwd()` 推断不出仓库根就返回错误，而
+  spawn 处用的是短路写法——推断失败时进程**从未被尝试启动**，即使设置页把后端
+  命令配成绝对路径也不行。cwd 改为可选，失败原因按「路径不存在 / 不在 PATH」
+  如实呈现。
+- **前端不再把 baseUrl 锁死在 8618 回退。** 客户端是模块级单例，构造那一刻侧车
+  还在启动、端口尚未出现，于是此后所有请求都打 8618 而不是自己的侧车。改为首次
+  请求前有界等待端口、订阅 `sidecar:status` 在端口变化时重解析。
+- **重启侧车时旧实例不再覆盖新状态。** 旧实例的退出线程会把新实例的状态盖掉，
+  新写的失败原因被吃掉，显示成「已异常退出」。
+- **工作区迁移补回测试覆盖。** W2 新增的 v7 → v8 迁移（`analysis_runs.stages`）
+  在完整套件里从未被执行过；新增回归测试，迁移路径从此被守住。
+- **三处陈旧文案改为与实现一致。** 打包 exe 二次验收实测撞出：证据页错误描述
+  硬编码回退端口 `8618`（真实端口在侧车自己的随机端口上）、分析页脚注写「无
+  `/api/backends` 端点」（实测 200）、报告页「生成时间」显示 UTC 原始串。
+  三处改为取实际后端地址、改述 `/api/backends` 的语义（只说明「装没装」，
+  不说明「这次用了哪个版本」）、时间改成本地时区 + UTC 双行。（PR #21，`59bb9c9`）
 
 ## [1.1.0] — 2026-11-25
 

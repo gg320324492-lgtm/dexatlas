@@ -14,10 +14,16 @@ what comes next.
   follow-up; **v1.1.0 (2026-11-25) is the Q2 desktop application and the
   post-Q2 stability batch**. Per-milestone evidence
   is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
-  [Phase 3 plan](phase3-plan.md). The project is now in **Phase 4** — portfolio
+  [Phase 3 plan](phase3-plan.md). The project is in **Phase 4** — portfolio
   closure, software design and Workbench UI — scoped by
   [phase4-plan.md](phase4-plan.md) (final decision A + D + G; the project freezes
-  after Phase 4 unless real user signals arrive).
+  after Phase 4 unless real user signals arrive), and since 2026-11-25 in
+  **Phase 5 (Q2 follow-up)** — desktop self-containment and stage-level
+  observability — scoped by [phase5-plan.md](phase5-plan.md). Phase 5's
+  engineering work is merged; **its acceptance is not complete** (the packaged
+  exe has not been verified without a pre-started backend, and the end-to-end
+  walkthrough has not been re-run after W2) — see the
+  [Phase 5 acceptance report](../reports/phase5-acceptance.md).
 - **Plan version:** 2026-11-25 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
   new work front inside this repository — Tauri + React, light "studio" visual
@@ -36,14 +42,20 @@ what comes next.
   back-filled in [phase4-q2-closure.md](phase4-q2-closure.md). Post-Q2 boundary:
   **partial unfreeze** (defect/performance/usability fixes only; new features
   re-review) — recorded in [status.md](../status.md).
-- **Phase 5 (Q2 follow-up), planned 2026-11-25:** make the desktop application
-  self-contained and stage-observable — a Tauri sidecar that spawns the real
-  DexAtlas backend (W1), a stage-level progress contract recorded by the
-  pipeline and served as read-only run fields (W2), C12 outreach material
-  preparation (W3) and a post-release operations checklist (W4). Scoped by
-  [phase5-plan.md](phase5-plan.md) under the same partial-unfreeze boundary;
-  the author approved the four work items on 2026-11-25 ("finish the
-  development work completely; no formal operations yet").
+- **Phase 5 (Q2 follow-up), engineering delivered 2026-11-25:** make the
+  desktop application self-contained and stage-observable — a Tauri sidecar
+  that spawns the real DexAtlas backend (W1, PR #13), a stage-level progress
+  contract recorded by the pipeline (W2, PR #14: an independent read-only
+  `GET /projects/{pid}/runs/{rid}/stages`; the run objects' field sets stay
+  unchanged), C12 outreach material preparation (W3) and a post-release
+  operations checklist (W4). Scoped by [phase5-plan.md](phase5-plan.md) under
+  the same partial-unfreeze boundary; the author approved the four work items
+  on 2026-11-25 ("finish the development work completely; no formal operations
+  yet"). **Acceptance is not complete:** the sidecar is verified in `tauri
+  dev` form only; no packaged exe has been built or run without a pre-started
+  backend, and the walkthrough predates W2. Per-item evidence and open items
+  are in the [Phase 5 acceptance report](../reports/phase5-acceptance.md).
+  No version bump; the release decision remains open.
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from

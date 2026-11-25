@@ -1,8 +1,9 @@
 # DexAtlas Studio（桌面应用）
 
 DexAtlas 的原创桌面应用，技术栈：**Tauri 2 + React 19 + TypeScript + Vite**。
-产品决策与验收标准见 `docs/roadmap/phase4-q2-supplement.md`；侧车接入的
-阶段目标见 `docs/roadmap/phase5-plan.md`（W1）。
+产品决策与验收标准见 `docs/roadmap/phase4-q2-supplement.md`；侧车接入与
+阶段级进度的阶段目标见 `docs/roadmap/phase5-plan.md`（W1/W2），验收记录见
+`docs/reports/phase5-acceptance.md`（**打包 exe 全链路尚未验证**，见该报告 §6）。
 
 ## 结构
 
@@ -43,6 +44,31 @@ DexAtlas 的原创桌面应用，技术栈：**Tauri 2 + React 19 + TypeScript +
   但回退**不是终态**——端口后来出现仍会改写。
 
 dev 浏览器模式走 vite 代理（`/api`），不涉及端口。
+
+**已知边界：** 默认侧车命令是开发形态（`python -m dexatlas.workbench`，工作
+目录从 exe 路径上溯找含 `src/dexatlas` 的仓库根）。安装到 Program Files 的
+打包产物没有这个仓库根，需要在设置页把后端命令指向已安装的
+`dexatlas-workbench`。**含侧车的打包产物尚未构建与真机验证**
+（`docs/reports/phase5-acceptance.md` §2、§6）。
+
+## 阶段级进度（Phase 5 W2）
+
+后端为每个分析 run 记录 pipeline 阶段事件（`inspect` → `parse-apktool` →
+`index-androguard` → `decompile-jadx` → `publish`），桌面分析页轮询只读端点：
+
+```text
+GET /api/projects/{project_id}/runs/{run_id}/stages
+→ {project_id, run_id, run_status, stages:[{stage, started_at, finished_at}]}
+```
+
+- 有 `stages` 时时间线按真实事件渲染；旧 run 没有阶段事实时回退
+  `run.status` 的粗粒度映射；连 run 都取不到时才回退按时间模拟——三种
+  来源在时间线角标文案中如实区分。
+- `finished_at` 为 null 表示该阶段尚未结束：可能正在进行，也可能是 run
+  失败/被取消时停在那一阶段。
+- 这是**独立只读端点**，既有 run 对象（REST `RunResponse` / workbench
+  `RunSummary`）不携带 `stages`，字段集与此前一致。REST 侧的同一端点是
+  `GET /projects/{pid}/runs/{rid}/stages`。
 
 ## 运行
 
