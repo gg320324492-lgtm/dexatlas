@@ -217,7 +217,7 @@ export interface HealthInfo extends WorkbenchHealth {
   backends?: Record<string, string | null>;
 }
 
-/** GET /api/backends（api/app.py:349）— workbench 未提供该端点 */
+/** GET /api/backends（api/app.py:349；workbench 自 PR #18 起提供同一形状） */
 export interface BackendInfo {
   available: string[];
   missing: string[];

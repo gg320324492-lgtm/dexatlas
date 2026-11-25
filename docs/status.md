@@ -24,10 +24,10 @@
 | | |
 |---|---|
 | 已发布版本 | v0.1.0 · v0.1.1 · v0.1.2 · v0.1.3 · v0.2.0（2026-11-14 已发布，见[发版说明](releases/v0.2.0.md)） · v1.0.0（2026-11-17 已发布，见[发版说明](releases/v1.0.0.md)） · v1.0.1（2026-11-21 已发布，[GitHub Release](https://github.com/gg320324492-lgtm/dexatlas/releases/tag/v1.0.1)） · v1.0.2（2026-11-24 已发布） · **v1.1.0**（2026-11-25 已发布，Q2 桌面应用 + 稳定性批次，见[发版说明](releases/v1.1.0.md)） |
-| 测试 | <!--fig:tests.total-->1840<!--/fig--> 个（<!--fig:tests.fast-->1691<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
+| 测试 | <!--fig:tests.total-->1849<!--/fig--> 个（<!--fig:tests.fast-->1700<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
-| CI | **14 个 workflow job、tag 上 15 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 14 次）：Lint / Python 3.12 / 3.13 / 部分后端 / 桌面端单测 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
+| CI | **13 个 workflow job、tag 上 14 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 13 次）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
 > M6 层级 2 的执行层修复（判分链路、预算分类、重试、检索兜底）已在本分支
@@ -51,15 +51,14 @@
 > （现状披露）为最终定稿路径**，不再追加修复轮或模型调用。本页其余测量数字
 > 仍对应修复前代码（`main` `fbca3d5` 及更早）。
 
-**CI 的十四个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
-矩阵，展开后是**十五次并行运行**；下表逐行列出这十五次运行）：
+**CI 的十三个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
+矩阵，展开后是**十四次并行运行**；下表逐行列出这十四次运行）：
 
 | Job | 覆盖什么 |
 |---|---|
 | Tests (Python 3.12) | 全部后端 |
 | Tests (Python 3.13) | **两个外部后端都不在**——JADX 和 Apktool 需要 Java，Androguard 是 Python 包，还在 |
 | Tests (Apktool only, no JADX) | **Apktool 在、JADX 不在**——Smali 回退存在的理由 |
-| Desktop unit tests | 桌面前端（Tauri 2 + React 19）的真单测（vitest）：阶段映射、locator 分类、侧车端口解析；顺带跑 `tsc --noEmit` 把前端和它的测试一起类型检查一遍 |
 | M3 comparison stays reproducible | 从已提交的 92 题对比 trace 重算八项指标，**报告与数据保持可复现** |
 | Docker image builds and analyses a bundled sample | 镜像里三个后端真的能跑；镜像自带的样本在镜像内分析得通（退出码 0，类/方法/调用点/调用边的计数非空） |
 | Dependency audit | 锁文件的已知漏洞 |
