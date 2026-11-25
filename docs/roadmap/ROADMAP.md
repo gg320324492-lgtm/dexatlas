@@ -36,6 +36,14 @@ what comes next.
   back-filled in [phase4-q2-closure.md](phase4-q2-closure.md). Post-Q2 boundary:
   **partial unfreeze** (defect/performance/usability fixes only; new features
   re-review) — recorded in [status.md](../status.md).
+- **Phase 5 (Q2 follow-up), planned 2026-11-25:** make the desktop application
+  self-contained and stage-observable — a Tauri sidecar that spawns the real
+  DexAtlas backend (W1), a stage-level progress contract recorded by the
+  pipeline and served as read-only run fields (W2), C12 outreach material
+  preparation (W3) and a post-release operations checklist (W4). Scoped by
+  [phase5-plan.md](phase5-plan.md) under the same partial-unfreeze boundary;
+  the author approved the four work items on 2026-11-25 ("finish the
+  development work completely; no formal operations yet").
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
   source review, and the next phase's issue list is written from the review, not from
