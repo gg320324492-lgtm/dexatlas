@@ -161,6 +161,55 @@ def test_the_migration_still_runs_on_an_older_workspace(tmp_path: Path) -> None:
     assert "resource_count" in columns
 
 
+def test_a_v7_workspace_gains_the_stages_column(tmp_path: Path) -> None:
+    """A workspace written before the stages column existed is migrated.
+
+    The v7 -> v8 migration adds ``analysis_runs.stages``. A run recorded
+    before the column existed went through stages nobody wrote down, so the
+    column reads as an empty list -- "no stage facts", not "no stages ran".
+    Nothing in the suite reached this path before: the workspace tests open a
+    fresh v8 database (the column is already there) or downgrade to a schema
+    that has no ``analysis_runs`` table at all.
+    """
+    path = tmp_path / "dexatlas.db"
+    with _writing(path) as connection:
+        connection.execute("CREATE TABLE schema_info (version INTEGER NOT NULL)")
+        connection.execute("INSERT INTO schema_info (version) VALUES (7)")
+        connection.execute(_V1_PROJECTS)
+        connection.execute(
+            """
+            CREATE TABLE analysis_runs (
+                id               TEXT PRIMARY KEY,
+                project_id       TEXT NOT NULL,
+                apk_sha256       TEXT NOT NULL,
+                status           TEXT NOT NULL,
+                completeness     TEXT NOT NULL DEFAULT 'complete',
+                tool_versions    TEXT NOT NULL DEFAULT '{}',
+                errors           TEXT NOT NULL DEFAULT '[]',
+                started_at       TEXT NOT NULL,
+                finished_at      TEXT,
+                duration_seconds REAL,
+                workspace        TEXT
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO analysis_runs (id, project_id, apk_sha256, status, started_at)"
+            " VALUES ('run-old', 'p-old', 'sha', 'completed', '2026-01-01T00:00:00+00:00')"
+        )
+
+    Store.open(path)
+
+    with _reading(path) as connection:
+        columns = {row["name"] for row in connection.execute("PRAGMA table_info(analysis_runs)")}
+    assert "stages" in columns, "the migration did not add the stages column"
+
+    with _reading(path) as connection:
+        row = connection.execute("SELECT stages FROM analysis_runs").fetchone()
+    assert row is not None
+    assert row["stages"] == "[]", "a run recorded before the column existed reads as an empty list"
+
+
 def test_a_missing_table_is_created(tmp_path: Path) -> None:
     """A workspace that lost a table gets it back, whatever version it records."""
     path = tmp_path / "dexatlas.db"
