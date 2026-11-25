@@ -18,8 +18,8 @@
  *   getEvidence 归一化为 {project_id, total, evidence}。
  * - workbench 自 PR #5 起提供 GET /api/projects/{id}/runs（信封
  *   {project_id, total, published_run_id, runs: [... & {published}]}）与
- *   /cancel；仍没有 /api/backends：getBackends 会得到 404，调用方按
- *   "后端未提供"如实处理。
+ *   /cancel；PR #18 起补齐 GET /api/backends（{available, missing, versions}），
+ *   更老的后端仍会 404，调用方按"后端未提供"如实处理。
  * - 错误体是 MCP RequestError 的 as_dict（mcp/errors.py:27）：
  *   {code, message, detail}，HTTP 404=unknown_project、400=其余请求错误。
  */

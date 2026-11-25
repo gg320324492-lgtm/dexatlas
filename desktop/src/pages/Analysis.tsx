@@ -21,8 +21,9 @@
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
- * - 8618 是只读 workbench API：没有 /api/backends 路由。后端状态区以最近分析
- *   轮次的 tool_versions 推断各后端参与情况；取消按钮调用
+ * - workbench 提供 GET /api/backends（列出本机已安装/缺失的分析后端），但它只
+ *   说明"装没装"；本页的后端状态区仍以最近分析轮次的 tool_versions 推断各后端
+ *   参与情况（"这次参与了没有"）；取消按钮调用
  *   POST /api/projects/{id}/cancel，对 404/失败如实提示。
  * - API 基址用相对 /api：依赖 vite dev 代理转发到 8618（M2-A 的 vite.config.ts
  *   代理合并后即生效；合并前可用临时代理配置验证）。后端未返回 CORS 头，
@@ -329,7 +330,10 @@ function durationLabel(seconds: number | null | undefined): string | null {
   return `${m}m${String(s).padStart(2, "0")}s`;
 }
 
-/** 后端状态：workbench 无 /api/backends，用最近轮次的 tool_versions 如实推断。 */
+/**
+ * 后端状态：workbench 的 /api/backends 只说明"装没装"，这里用最近轮次的
+ * tool_versions 如实推断"这次参与了没有"。
+ */
 function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
   const latest = project?.runs[0];
   const versions = latest?.tool_versions ?? {};
@@ -702,7 +706,7 @@ export function Analysis() {
                 ))}
               </ul>
               <p className="da-backend__note">
-                8618 为只读 workbench API，无 /api/backends 端点；以上由最近分析轮次的 tool_versions 推断。
+                workbench 提供 GET /api/backends（本机已安装/缺失的分析后端），它只说明"装没装"；以上状态取自最近分析轮次的 tool_versions，说明"这次分析实际用了哪个版本"。
               </p>
             </CardBody>
           </Card>

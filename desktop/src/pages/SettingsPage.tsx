@@ -7,8 +7,8 @@ import "./SettingsPage.css";
 
 /**
  * 设置页：版本信息与后端配置收纳处（补充单 2-5）。
- * Q2-M3-T1：不再内置假配置。后端清单来自 GET /api/backends；当前 8618
- * 的 workbench 未提供该端点（HTTP 404），页面如实显示"该端点在后端未提供"。
+ * Q2-M3-T1：不再内置假配置。后端清单来自 GET /api/backends（workbench 自
+ * PR #18 起提供该端点）；更老的后端返回 404 时，页面如实显示"该端点在后端未提供"。
  * 版本信息来自 GET /api/health（{version, workspace}）。
  * Phase 5 W1：新增 DexAtlas 后端命令路径配置（Tauri 本地配置 backend.json），
  * 保存后按新配置重启侧车；浏览器/dev 环境保存仅本地提示，不写真实配置。

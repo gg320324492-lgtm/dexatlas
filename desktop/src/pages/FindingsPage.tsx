@@ -5,6 +5,7 @@ import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { describeError, dexatlas } from "../api";
 import type { EvidenceRecord, ProjectSummary } from "../api";
+import { backendAddress } from "../backendAddress";
 import "./FindingsPage.css";
 
 /** 证据等级 → 徽章语义（core/models.py:537 EvidenceLevel；不做推断）。 */
@@ -117,6 +118,9 @@ export default function FindingsPage() {
   }
 
   if (error && !projects) {
+    // 地址取自客户端**实际**用的 baseUrl：侧车端口由系统分配，写死的回退
+    // 端口会把人指向另一台机器上的另一个后端；端口不可知时如实说不知道。
+    const address = backendAddress(dexatlas.effectiveBaseUrl);
     return (
       <div className="page">
         <header className="page-header">
@@ -124,7 +128,7 @@ export default function FindingsPage() {
         </header>
         <ErrorState
           title="证据加载失败"
-          description="无法读取项目列表。请确认 DexAtlas 后端（127.0.0.1:8618）正在运行。"
+          description={`无法读取项目列表。请确认 DexAtlas 后端正在运行（${address ?? "后端地址未知"}）。`}
           detail={error}
           onRetry={loadProjects}
         />
