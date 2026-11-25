@@ -42,14 +42,14 @@ import type {
 } from "./types";
 
 /**
- * Tauri 发布形态下的后端访问适配（X2-P1）。
+ * Tauri 发布形态下的后端访问适配（X2-P1；Phase 5 W1 起接侧车实际端口）。
  *
  * 打包后的 exe 运行在 tauri://localhost（生产 origin），而 workbench 后端
- * 在 http://127.0.0.1:8618 且不带 CORS 头，浏览器环境直接 fetch 会被 CORS
+ * 在 http://127.0.0.1:<port> 且不带 CORS 头，浏览器环境直接 fetch 会被 CORS
  * 拦截（X2 走查 CDP 实测 MissingAllowOriginHeader）。Tauri 环境下改用
  * @tauri-apps/plugin-http 的 fetch：请求走 Rust 侧 HTTP 插件发出，不受
- * WebKit/CORS 约束（capability 已放行 8618）。dev / 浏览器环境保持原生
- * fetch（vite 代理转发）。
+ * WebKit/CORS 约束（capability 由 Rust 侧按侧车实际端口动态放行）。
+ * dev / 浏览器环境保持原生 fetch（vite 代理转发）。
  */
 const TAURI_FETCH = import("@tauri-apps/plugin-http").then(
   (m) => m.fetch as typeof fetch,
@@ -72,15 +72,41 @@ function resolveFetch(): Promise<typeof fetch> {
 }
 
 /**
+ * 侧车端点解析（Phase 5 W1）。
+ *
+ * Tauri 运行时优先向 Rust 壳查询侧车实际端口（`get_sidecar_status` 命令），
+ * 侧车未就绪/未启动时回退 127.0.0.1:8618；非 Tauri 环境（vite dev 代理）
+ * 保持相对路径。返回 null 表示"暂无可用端口"，由调用方决定等待或报错。
+ */
+async function resolveSidecarBaseUrl(): Promise<string | null> {
+  if (!isTauriRuntime()) {
+    return null;
+  }
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const status = await invoke<{ port: number | null }>("get_sidecar_status");
+    if (status && typeof status.port === "number" && status.port > 0) {
+      return `http://127.0.0.1:${status.port}/api`;
+    }
+  } catch {
+    // 命令不可用（旧壳/非 Tauri）：按"拿不到侧车端口"处理，走 8618 回退。
+  }
+  return FALLBACK_BASE_URL;
+}
+
+/** 侧车端口拿不到时的回退地址（与 X2 时代的固定端口一致）。 */
+const FALLBACK_BASE_URL = "http://127.0.0.1:8618/api";
+
+/**
  * 发布/浏览器形态下前端与后端不同源（vite dev 端口、tauri://localhost），
- * 相对路径 "/api" 无法指向 8618；dev 模式由 vite 代理处理，这里只补
+ * 相对路径 "/api" 无法指向侧车；dev 模式由 vite 代理处理，这里只补
  * 非 dev 场景的绝对地址。Tauri 内不用拼：plugin-http 直接吃完整 URL。
  */
 function defaultBaseUrl(): string {
   if (import.meta.env.DEV) {
     return "/api";
   }
-  return "http://127.0.0.1:8618/api";
+  return FALLBACK_BASE_URL;
 }
 
 /** 客户端可调的统一错误。status 为 undefined 表示请求根本没到服务器。 */
@@ -154,14 +180,28 @@ export function describeError(err: unknown): string {
 }
 
 export class DexAtlasClient {
-  private readonly baseUrl: string;
+  private baseUrl: string;
   private readonly fetchImpl: Promise<typeof fetch>;
+  /** 侧车端口解析完成后 resolve；请求会等它（避免打到 8618 回退端口）。 */
+  private readonly ready: Promise<void>;
 
   constructor(options: DexAtlasClientOptions = {}) {
     this.baseUrl = (options.baseUrl ?? defaultBaseUrl()).replace(/\/+$/, "");
     this.fetchImpl = options.fetchImpl
       ? Promise.resolve(options.fetchImpl)
       : resolveFetch();
+    // Tauri 运行时把 baseUrl 改写为侧车实际端口；拿不到时保持 8618 回退。
+    // 浏览器/dev 环境返回 null，baseUrl 原样保留（vite 代理）。
+    this.ready = resolveSidecarBaseUrl().then((url) => {
+      if (url) {
+        this.baseUrl = url.replace(/\/+$/, "");
+      }
+    });
+  }
+
+  /** 当前 baseUrl（测试与设置页排障用；侧车就绪后为实际端口）。 */
+  get effectiveBaseUrl(): string {
+    return this.baseUrl;
   }
 
   // -------------------------------------------------------------------------
@@ -315,6 +355,9 @@ export class DexAtlasClient {
   }
 
   private async raw(path: string, init?: RequestInit): Promise<Response> {
+    // 等侧车端口解析完成：Tauri 下避免首批请求抢在 baseUrl 改写前打到
+    // 8618 回退端口（侧车实际端口是系统分配的，几乎不会是 8618）。
+    await this.ready;
     let response: Response;
     try {
       response = await (await this.fetchImpl)(`${this.baseUrl}${path}`, init);

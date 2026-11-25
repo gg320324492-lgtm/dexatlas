@@ -7,6 +7,13 @@
 
 export { DexAtlasClient, ApiError, describeError, dexatlas, downloadText } from "./client";
 export type { DexAtlasClientOptions } from "./client";
+export {
+  loadBackendCommandConfig,
+  saveBackendCommandConfig,
+  getSidecarStatus,
+  isTauriRuntime,
+} from "./sidecar";
+export type { BackendCommandConfig, SidecarStatus, SaveOutcome } from "./sidecar";
 
 export type {
   AnalyzeAccepted,
