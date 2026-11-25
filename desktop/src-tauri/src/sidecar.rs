@@ -15,7 +15,7 @@
 
 use std::io::{BufRead, BufReader};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -34,6 +34,12 @@ pub struct SidecarStatus {
     pub program: Option<String>,
     /// 人能读的状态说明（启动中 / 已就绪 / 已退出 + 退出码等）。
     pub message: String,
+    /// 后端**根本没起来**（spawn 失败，如命令不在 PATH）。
+    ///
+    /// 前端据此不必空等端口：这是"确定不会来了"，与"还在启动中"不同。
+    /// 运行过之后退出的侧车不算 `failed`——端口仍然知道，UI 如实显示退出即可。
+    #[serde(default)]
+    pub failed: bool,
 }
 
 impl SidecarStatus {
@@ -43,6 +49,7 @@ impl SidecarStatus {
             port: None,
             program: Some(program.to_string()),
             message: "正在启动 DexAtlas 后端…".into(),
+            failed: false,
         }
     }
 
@@ -52,6 +59,7 @@ impl SidecarStatus {
             port: Some(port),
             program: Some(program.to_string()),
             message: format!("DexAtlas 后端已就绪（127.0.0.1:{port}）"),
+            failed: false,
         }
     }
 
@@ -65,6 +73,7 @@ impl SidecarStatus {
                 Some(code) => format!("DexAtlas 后端已异常退出（exit code {code}）。请检查后端命令与 Python 环境，或在设置页修改后端命令。"),
                 None => "DexAtlas 后端进程已终止（被杀或因错误中断）。请检查后端命令与 Python 环境，或在设置页修改后端命令。".into(),
             },
+            failed: false,
         }
     }
 
@@ -73,7 +82,8 @@ impl SidecarStatus {
             running: false,
             port: None,
             program: Some(program.to_string()),
-            message: format!("未能启动 DexAtlas 后端（{reason}）。未检测到 DexAtlas 后端，请安装（pip install -e . 或 uv sync）或在设置页指定后端命令路径。"),
+            message: format!("未能启动 DexAtlas 后端：{reason}。未检测到 DexAtlas 后端：请在设置页把后端命令写成已装好 dexatlas 包的 Python 绝对路径。"),
+            failed: true,
         }
     }
 }
@@ -87,6 +97,12 @@ pub struct SidecarState {
     child: Mutex<Option<Arc<Mutex<Child>>>>,
     /// 已向 http 插件放行的端口，避免重复注入 capability。
     allowed_port: AtomicU16,
+    /// 侧车实例序号：每次 spawn 自增。
+    ///
+    /// 只有**当前实例**的线程能改状态。旧实例的退出/日志线程若继续改写，
+    /// 会把新实例的状态覆盖掉——例如"保存设置 → 重启 → 新命令起不来"时，
+    /// 旧进程的退出码会把"未能启动：找不到后端命令"盖成"已异常退出"。
+    instance: AtomicU64,
 }
 
 impl SidecarState {
@@ -101,11 +117,22 @@ impl SidecarState {
                 port: None,
                 program: None,
                 message: "DexAtlas 后端尚未启动。".into(),
+                failed: false,
             })
     }
 
     fn set_status(&self, status: SidecarStatus) {
         *self.status.lock().expect("sidecar status mutex poisoned") = Some(status);
+    }
+
+    /// 开启一个新的侧车实例，返回它的序号。
+    fn begin_instance(&self) -> u64 {
+        self.instance.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    /// 这个线程是否仍在负责当前那一个侧车实例。
+    fn is_current_instance(&self, instance: u64) -> bool {
+        self.instance.load(Ordering::SeqCst) == instance
     }
 }
 
@@ -225,25 +252,66 @@ fn allow_backend_port(app: &AppHandle<impl Runtime>, port: u16) {
     }
 }
 
+/// 启动后端命令。
+///
+/// `cwd` 是**可选**的工作目录：`None` 表示"推断不到仓库根"（安装形态）。
+/// 推断不到**不是**拒绝启动的理由——那样绝对路径的后端命令永远不会被执行。
+/// 旧实现把两件事用 `and_then` 串死：cwd 推断失败 ⇒ 短路 ⇒ `Command::new`
+/// 从未被调用 ⇒ 安装形态下侧车从未被拉起。
+fn spawn_backend(
+    program: &str,
+    args: &[String],
+    cwd: Option<&std::path::Path>,
+) -> std::io::Result<Child> {
+    let mut command = Command::new(program);
+    command.args(args);
+    if let Some(dir) = cwd {
+        command.current_dir(dir);
+    }
+    command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+}
+
+/// 命令里是否带了目录部分（`python` 与 `E:\venv\Scripts\python.exe` 的区别）。
+fn has_directory_component(program: &str) -> bool {
+    std::path::Path::new(program).components().count() > 1
+}
+
+/// spawn 失败的原因（人话）。
+///
+/// 分两种最常见的情况：
+/// - 命令是个裸名字（`python`）而 PATH 里没有它 ⇒ 让用户去设置页写绝对路径；
+/// - 命令本身带了路径但那个路径不存在 ⇒ 直接点名那个路径。
+fn spawn_failure_reason(program: &str, err: &std::io::Error) -> String {
+    if err.kind() == std::io::ErrorKind::NotFound {
+        if has_directory_component(program) {
+            format!("找不到后端命令 `{program}`：路径不存在或不可执行")
+        } else {
+            format!("命令 `{program}` 不是绝对路径，且不在 PATH 中（找不到该可执行文件）")
+        }
+    } else {
+        format!("启动后端命令 `{program}` 失败：{err}")
+    }
+}
+
 /// 启动侧车。返回是否真的 spawn 出了进程（失败时已把原因写进状态）。
 pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
     let command = load_backend_command(&app);
     let program = command.program.clone();
     let args = with_dynamic_port(command.args);
+    // 换一个实例序号：上一个实例的线程从此不再有资格改状态。
+    let instance = app.state::<SidecarState>().begin_instance();
     let status = SidecarStatus::starting(&program);
     app.state::<SidecarState>().set_status(status);
 
-    let child = match backend_cwd(&app).and_then(|dir| {
-        Command::new(&program)
-            .args(&args)
-            .current_dir(dir)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-    }) {
+    let cwd = backend_cwd(&app);
+    let child = match spawn_backend(&program, &args, cwd.as_deref()) {
         Ok(child) => child,
         Err(err) => {
-            let failure = SidecarStatus::spawn_failed(&program, &err.to_string());
+            let reason = spawn_failure_reason(&program, &err);
+            let failure = SidecarStatus::spawn_failed(&program, &reason);
             app.state::<SidecarState>().set_status(failure);
             // 前端可能还没就绪，启动失败也要补发一次事件
             let _ = app.emit("sidecar:status", app.state::<SidecarState>().status());
@@ -270,7 +338,7 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
                 Ok(_) => {
                     let trimmed = line.trim_end();
                     eprintln!("[backend-stdout] {trimmed}");
-                    note_backend_line(&stdout_app, trimmed);
+                    note_backend_line(&stdout_app, instance, trimmed);
                 }
                 Err(err) => {
                     eprintln!("[backend-stdout] 读取失败：{err}");
@@ -294,7 +362,7 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
                 Ok(_) => {
                     let trimmed = line.trim_end();
                     eprintln!("[backend-stderr] {trimmed}");
-                    note_backend_line(&stderr_app, trimmed);
+                    note_backend_line(&stderr_app, instance, trimmed);
                 }
                 Err(err) => {
                     eprintln!("[backend-stderr] 读取失败：{err}");
@@ -317,9 +385,12 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
                 Ok(Some(status)) => {
                     let code = status.code();
                     let state = wait_app.state::<SidecarState>();
-                    let current = state.status();
-                    state.set_status(current.exited(code));
-                    let _ = wait_app.emit("sidecar:status", state.status());
+                    // 已有更新的实例接管 ⇒ 这个旧实例不该再改状态。
+                    if state.is_current_instance(instance) {
+                        let current = state.status();
+                        state.set_status(current.exited(code));
+                        let _ = wait_app.emit("sidecar:status", state.status());
+                    }
                     break;
                 }
                 Ok(None) => {}
@@ -331,10 +402,13 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
         }
         if !backend_process_alive() {
             let state = wait_app.state::<SidecarState>();
-            let current = state.status();
-            // kill 的退出码拿不到（进程树已散），按异常终止如实报告
-            state.set_status(current.exited(None));
-            let _ = wait_app.emit("sidecar:status", state.status());
+            // 同上：旧实例的退出不覆盖新实例的状态。
+            if state.is_current_instance(instance) {
+                let current = state.status();
+                // kill 的退出码拿不到（进程树已散），按异常终止如实报告
+                state.set_status(current.exited(None));
+                let _ = wait_app.emit("sidecar:status", state.status());
+            }
             break;
         }
         thread::sleep(std::time::Duration::from_millis(500));
@@ -372,21 +446,26 @@ fn backend_process_alive() -> bool {
 }
 
 /// 侧车后端的工作目录：仓库根（保证 `python -m dexatlas.workbench` 能找到包）。
-fn backend_cwd(_app: &AppHandle<impl Runtime>) -> std::result::Result<std::path::PathBuf, std::io::Error> {
-    // dev 形态：target/debug 的上四级是 desktop/，再上是仓库根。
-    // 打包形态：exe 在安装目录，无法反推仓库——此时依赖后端命令本身是
-    // 绝对路径（如 venv 的 python.exe），workbench 自带前端，cwd 无关紧要。
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent().and_then(|p| p.ancestors().nth(4)) {
-            if dir.join("src").join("dexatlas").exists() {
-                return Ok(dir.to_path_buf());
-            }
-        }
+///
+/// **推断不到仓库根不是错误**：安装形态下 exe 位于安装目录，反推不出仓库，
+/// 此时后端命令应当是绝对路径（如 venv 的 python.exe），workbench 自带前端，
+/// cwd 无关紧要。返回 `None` 的含义是"不设 cwd"，**不是"不启动"**。
+fn backend_cwd(_app: &AppHandle<impl Runtime>) -> Option<std::path::PathBuf> {
+    repo_root_from_exe(&std::env::current_exe().ok()?)
+}
+
+/// 从 exe 路径反推仓库根。
+///
+/// dev 形态：`target/debug`（或 `target/release`）的上四级是 `desktop/`，
+/// 再上一级是仓库根——该目录下确有 `src/dexatlas` 才认。
+/// 打包形态：exe 在安装目录，祖先链里没有 `src/dexatlas` ⇒ `None`。
+fn repo_root_from_exe(exe: &std::path::Path) -> Option<std::path::PathBuf> {
+    let dir = exe.parent()?.ancestors().nth(4)?;
+    if dir.join("src").join("dexatlas").exists() {
+        Some(dir.to_path_buf())
+    } else {
+        None
     }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        "未找到 DexAtlas 仓库根（侧车后端命令需为绝对路径）",
-    ))
 }
 
 /// 从 workbench/uvicorn 的启动行里抓实际端口。
@@ -404,10 +483,16 @@ fn parse_serving_port(line: &str) -> Option<u16> {
 }
 
 /// 后端每行输出统一处理：抓到端口就放行 + 更新状态 + 广播。
-fn note_backend_line(app: &AppHandle<impl Runtime>, line: &str) {
+///
+/// `instance` 是这个输出属于哪一次侧车：旧实例的迟到输出不得覆盖
+/// 新实例的状态（旧端口会把刚启动好的新侧车盖成"另一个端口已就绪"）。
+fn note_backend_line(app: &AppHandle<impl Runtime>, instance: u64, line: &str) {
     if let Some(port) = parse_serving_port(line) {
         allow_backend_port(app, port);
         let state = app.state::<SidecarState>();
+        if !state.is_current_instance(instance) {
+            return;
+        }
         if state.allowed_port.load(Ordering::SeqCst) != port {
             state.allowed_port.store(port, Ordering::SeqCst);
             let program = state.status().program.unwrap_or_else(|| "dexatlas".into());
@@ -572,5 +657,86 @@ mod tests {
         assert_eq!(command.program, "python");
         assert_eq!(command.args, vec!["-m", "dexatlas.workbench"]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// 一个必定能启动的跨平台命令（用来证明 spawn 确实被尝试过）。
+    fn noop_command() -> (String, Vec<String>) {
+        if cfg!(windows) {
+            ("cmd".into(), vec!["/C".into(), "exit".into()])
+        } else {
+            ("sh".into(), vec!["-c".into(), "exit".into()])
+        }
+    }
+
+    #[test]
+    fn install_directory_is_not_mistaken_for_the_repo_root() {
+        // 打包形态：exe 在安装目录，祖先链里没有 src/dexatlas。
+        let exe = std::path::Path::new(r"C:\Users\pc\AppData\Local\DexAtlas Studio\dexatlas-desktop.exe");
+        assert_eq!(repo_root_from_exe(exe), None);
+    }
+
+    #[test]
+    fn spawn_is_attempted_even_when_the_repo_root_cannot_be_inferred() {
+        // 回归：旧实现把 cwd 推断与 spawn 用 and_then 串起来，推断失败 ⇒ 短路
+        // ⇒ Command::new 从未被调用 ⇒ 安装形态下侧车永远起不来。
+        let exe = std::path::Path::new(r"C:\Users\pc\AppData\Local\DexAtlas Studio\dexatlas-desktop.exe");
+        let cwd = repo_root_from_exe(exe);
+        assert!(cwd.is_none(), "安装目录不该被当成仓库根");
+        let (program, args) = noop_command();
+        let mut child = spawn_backend(&program, &args, cwd.as_deref())
+            .expect("推断不出仓库根时也必须尝试启动后端命令");
+        let _ = child.wait();
+    }
+
+    #[test]
+    fn spawn_failure_reason_explains_a_bare_command_name() {
+        let err = std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "The system cannot find the file specified.",
+        );
+        let reason = spawn_failure_reason("python", &err);
+        assert!(reason.contains("不是绝对路径"), "原因要说清命令不是绝对路径：{reason}");
+        assert!(reason.contains("PATH"), "原因要说清 PATH 里也没有：{reason}");
+    }
+
+    #[test]
+    fn spawn_failure_reason_explains_a_missing_absolute_path() {
+        let err = std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "The system cannot find the file specified.",
+        );
+        let reason = spawn_failure_reason(r"E:\missing\python.exe", &err);
+        assert!(reason.contains(r"E:\missing\python.exe"), "原因要点名那个路径：{reason}");
+        assert!(!reason.contains("不是绝对路径"), "绝对路径不该被说成缺 PATH：{reason}");
+    }
+
+    #[test]
+    fn only_a_spawn_failure_marks_the_backend_as_failed() {
+        // 前端靠 failed 区分"还在启动中"与"确定起不来"，别把两者混为一谈。
+        assert!(SidecarStatus::spawn_failed("python", "原因").failed);
+        assert!(!SidecarStatus::starting("python").failed);
+        assert!(!SidecarStatus::ready(1234, "python").failed);
+        assert!(!SidecarStatus::ready(1234, "python").exited(Some(1)).failed);
+    }
+
+    #[test]
+    fn an_old_sidecar_instance_may_not_overwrite_the_new_status() {
+        // 回归：重启侧车时，旧进程的退出线程会把"未能启动：找不到后端命令"
+        // 盖成"已异常退出（exit code 1）"，新实例的真实原因就丢了。
+        let state = SidecarState::default();
+        let first = state.begin_instance();
+        state.set_status(SidecarStatus::starting("python"));
+        let second = state.begin_instance();
+
+        assert_ne!(first, second, "每次 spawn 都该换一个实例序号");
+        assert!(!state.is_current_instance(first), "旧实例不得再改状态");
+        assert!(state.is_current_instance(second), "新实例才该改状态");
+
+        // 旧实例的退出状态不该被写进去
+        if state.is_current_instance(first) {
+            state.set_status(state.status().exited(Some(1)));
+        }
+        assert!(!state.status().failed);
+        assert!(state.status().message.contains("正在启动"), "状态仍是新实例的：{}", state.status().message);
     }
 }
