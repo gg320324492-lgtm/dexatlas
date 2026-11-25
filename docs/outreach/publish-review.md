@@ -18,8 +18,8 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,612（1,465 快 + 147 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
-| 一方代码覆盖率 | 93.3%（7,117 / 7,631 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| 测试总数 | 1,819（1,670 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 一方代码覆盖率 | 93.3%（7,375 / 7,904 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
 | M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
@@ -45,8 +45,8 @@
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
 |---|---|---|---|---|
-| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,612 automated tests, 93.3% coverage` | 1,612 / 93.3% |
-| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,612 tests, coverage and dead-code gates` | 1,612 |
+| 1 | `project-brief.md` §Short description | `~1,540 automated tests, 93.1% coverage` | `1,819 automated tests, 93.3% coverage` | 1,612 / 93.3% |
+| 2 | `project-brief.md` §Deliverables | `~1,540 tests, coverage and dead-code gates` | `1,819 tests, coverage and dead-code gates` | 1,612 |
 | 3 | `scope-backend-automation.md` §What I offer | `~1,540 tests at 93.1% coverage` | `1,612 tests at 93.3% coverage` | 1,612 / 93.3% |
 | 4 | `cover-letter-templates.md` Template 1 | `~1,540 automated tests at 93.1% coverage` | `1,612 automated tests at 93.3% coverage` | 1,612 / 93.3% |
 
@@ -68,7 +68,7 @@
 
 | # | 文件 | 修正前 | 修正后（现文件里的版本句） |
 |---|---|---|---|
-| 8 | `project-brief.md` §Honest limitations | `in early development (v0.2.x)` | `The current release is v1.0.0 (tagged 2026-11-17)` |
+| 8 | `project-brief.md` §Honest limitations | `in early development (v0.2.x)` | `The current release is v1.1.0 (tagged 2026-11-25)` |
 
 `v0.2.x` 不是一个 tag，也不是一个可核对的版本号，所以第一轮把它收紧成了当时
 真实存在的 `v0.2.0`（那一版的意思是「当前最新版本就是 v0.2.0」）。这种句子要靠
@@ -78,7 +78,7 @@
 **发版已落地，这一句已经按 §7 第 1 条改过一遍。** `v1.0.0` 于 2026-11-17 打上
 tag（`git for-each-ref refs/tags/v1.0.0`），`src/dexatlas/__init__.py` 的
 `__version__` 是 `1.0.0`，`project-brief.md` §Honest limitations 现在写
-`The current release is v1.0.0 (tagged 2026-11-17)`，后半句是
+`The current release is v1.1.0 (tagged 2026-11-25)`，后半句是
 `; the public contract covers the documented CLI/API/MCP surfaces.`。
 **下次发版仍要按 §7 第 1 条回来改这一句。**
 
@@ -311,7 +311,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 
 1. **版本号会过期（`v1.0.0` 已发，下一个版本还要再改）。**
    `project-brief.md` §Honest limitations 现在写
-   `The current release is v1.0.0 (tagged 2026-11-17)`——这句是真的
+   `The current release is v1.1.0 (tagged 2026-11-25)`——这句是真的
    （`git for-each-ref refs/tags/v1.0.0`），但它说的是「当前最新版本」。
    **再发一个 tag，这句就变成假话**，`scripts/check-version-claims.py` 会直接
    报出来。发版 commit 之后要回来改这一句。
