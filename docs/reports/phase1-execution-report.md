@@ -200,8 +200,6 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
 | `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
-| `test_desktop_sidecar_endpoint.py` | 桌面端怎么找到后端的真实端口：首次请求前有界等待侧车端口、`sidecar:status` 端口变化即重写 baseUrl、不在构造时锁死回退、状态形状只有一份定义（Phase 5 W1 打包 exe 验收修复新增） |
-| `test_desktop_stage_mapping.py` | 桌面分析页的阶段映射：完成态五格全完成、运行中「证据」格进行中、无阶段事件的旧 run 走状态兜底、失败与取消态；「证据」格等推断值在角标里如实说明（Phase 5 W2 复测 P1/P3 修复新增） |
 | `test_upload_lifecycle.py` | 上传的保留与清理；正在运行的分析可以被取消 |
 | `test_androguard_isolation.py` | 后端的运行时隔离：宿主的日志不被删；不受信的 DEX 在单独的进程里解析；越界的资源被记下来 |
 | `test_evidence_invariants.py` | 已验证证据的不变量：引用落不在分析之内，就不许记成 verified；模型的说法永远不是事实 |
@@ -265,8 +263,18 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_platform_gate_inventory.py` | 本地门禁与 CI 门禁的差异核对：每个 CI job、每个平台相关的测试、每处平台敏感的行都要在清单里写明差异是否合法；新增一个正确的 CI job 不需要改任何数字（C15 新增） |
 | `test_unguarded_numbers.py` | 没人守的手写测量数：门禁把真值从树上算出来，与文档里那句话里的数比；红→绿可复现，清单烂了会被说出来 |
 | `test_run_render.py` | C8「渲染某一次运行」：`dexatlas runs` 列出/回看运行记录、`dexatlas render` 把已发布运行的报告、证据包与 run 记录落成目录；输出结构、退出码（未知 run/项目→2、无运行→1）、未发布或已被替换的 run 拒绝渲染、渲染只读工作区（C8 新增） |
-| `test_desktop_locator_open_source.py` | 桌面前端证据抽屉的「打开来源」按钮：包级/DEX 内/后端失败的 locator 没有单文件落点时按钮不可用并给出可读说明，文件内 locator 的行为不变；前端镜像的后端工具词汇不许漂移（Q2 走查 P3 新增） |
+| `test_desktop_locator_vocabulary.py` | 桌面前端镜像的后端 locator 工具词汇不许漂移（`apk-reader` / `androguard` / `error/` / 输出树后端）：这是一条**跨语言**的守卫，只有 Python 能读后端源码，所以它留在这一侧（Q2 走查 P3 新增） |
 | `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素（Q2 走查 P4 新增） |
+
+**桌面前端另有一套单测（vitest）**，在 `desktop/` 下自己跑、自己装依赖、
+自己一个 CI job（`desktop`），不进上面这张表——那是 pytest 的分布表：
+
+| 文件 | 覆盖内容 |
+|------|----------|
+| `desktop/src/stages.test.ts` | 桌面分析页的阶段映射：完成态五格全完成、运行中「证据」格进行中、无阶段事件的旧 run 走状态兜底、失败与取消态、partial 的「部分」徽章；「证据」格等推断值在角标里如实说明；页面不得自带一份映射（Phase 5 W2 复测 P1/P3 修复新增，2026-11-26 由 `test_desktop_stage_mapping.py` 迁来） |
+| `desktop/src/locators.test.ts` | 证据抽屉的「打开来源」按钮：包级/DEX 内/后端失败的 locator 没有单文件落点时按钮不可用并给出可读说明，文件内 locator 的行为不变；后端的回答一旦问过就说了算（Q2 走查 P3 新增，2026-11-26 由 `test_desktop_locator_open_source.py` 迁来） |
+| `desktop/src/api/sidecarEndpoint.test.ts` | 桌面端怎么找到后端的真实端口：首次请求前**有界等待**侧车端口（拿到端口 / 壳说起不来 / 超时三种收场），非 Tauri 环境一律没有端口（Phase 5 W1 打包 exe 验收修复新增，2026-11-26 由 `test_desktop_sidecar_endpoint.py` 迁来） |
+| `desktop/src/api/client.test.ts` | 端口变化即重写 baseUrl，构造时不把回退端口锁死——这两条以前是「源码里有这句就算过」的断言，现在是行为（2026-11-26 由 `test_desktop_sidecar_endpoint.py` 迁来） |
 
 ### 2.2 几类值得注意的测试
 

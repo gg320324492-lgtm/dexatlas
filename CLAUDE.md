@@ -76,9 +76,10 @@ the wrong code.
 
 ### The gates
 
-CI runs thirteen jobs (fourteen parallel runs on a tag — the test job is a 3.12/3.13
+CI runs fourteen jobs (fifteen parallel runs on a tag — the test job is a 3.12/3.13
 matrix): lint/format/mypy, tests on Python 3.12 (every backend), tests on
-Python 3.13 (no external backends), tests with Apktool only, the M3
+Python 3.13 (no external backends), tests with Apktool only, the desktop
+front end's unit tests, the M3
 comparison re-run, the Docker image, the dependency audit, the live
 public-contract check and the same one without the Java backends, the M10
 acceptance self-check, a job that checks every gate is run by something, a job
@@ -87,6 +88,10 @@ checks the outward texts agree on the release numbers, and the job that
 re-measures the report against the tagged tree.
 The same configurations are worth running by hand before a push — the three
 backend configurations are separate configurations, not one.
+
+The desktop front end has its own toolchain and its own door: `npm run test`
+(vitest) in `desktop/`, checked by the `desktop` CI job. A regression there
+is not caught by the Python suite, and vice versa.
 
 ### Measuring the project
 

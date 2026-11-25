@@ -297,6 +297,41 @@ jobs:
       - name: Enforce coverage threshold
         run: uv run coverage report --fail-under=80
 
+  # The desktop front end (Tauri 2 + React 19) had no test runner at all:
+  # every regression on it was a Python assertion about the *source text*
+  # under desktop/src, and a mapping bug (a finished run showing 「证据 ·
+  # 待处理」 next to 「已完成」) could reach a release with nothing red.
+  # The unit tests are vitest's now (desktop/src/**/*.test.ts), and this job
+  # is what turns them into a gate instead of a document.
+  #
+  # Two things make it a gate rather than a decoration:
+  # - `npm run test` fails the job when a test fails, and `npm run build`
+  #   (tsc --noEmit) type-checks the front end *and* the test files, which
+  #   no other job did before;
+  # - the job is declared in scripts/platform-gates.json, so deleting it
+  #   turns scripts/check-platform-gates.py red instead of quietly removing
+  #   the front end's only net.
+  desktop:
+    name: Desktop unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # vitest 5 asks for node ^22.12 || ^24 || >=26.
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type-check and build the front end
+        run: npm run build
+      - name: Run the desktop unit tests
+        run: npm run test
+
   m3-comparison:
     name: M3 comparison stays reproducible
     runs-on: ubuntu-latest
