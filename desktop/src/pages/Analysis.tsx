@@ -8,16 +8,19 @@
  *   GET /api/projects/{id}/runs（workbench PR #5 起），用最新一轮 run 的
  *   status/completeness/tool_versions/duration_seconds 映射到五阶段视图。
  * - Phase 5 W2：run.stages（真实 pipeline 阶段事件，runs.py RunStage）存在时，
- *   时间线直接按阶段事件渲染；时间模拟仅作"无任何 run 数据"时的兜底。
+ *   时间线直接按阶段事件渲染。Phase 5 收尾删除了前端时间模拟：拿不到后端
+ *   事实时如实显示拿不到，不再按时间推进五格。
  *
  * 阶段映射规则（优先级从高到低）写在 ../stages 里（纯函数、可被
- * tests/test_desktop_stage_mapping.py 直接执行）：
+ * desktop/src/stages.test.ts 直接执行）：
  * - 有 stages（真实 pipeline 阶段事件，runs.py RunStage）→ 按事件推进置
  *   done/running；run 已终止却停在某阶段的格子标 error；completeness =
  *   "partial" 时按 errors 点名的工具在已完成格子上标注"部分"（skipped 态）；
- * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无阶段事件）；
- * - runs 不可用（404 / 网络）或无 run 时，回退到时间模拟并显示原角标；
- *   三种来源在角标文案中如实区分，「证据」格等推断值也在角标里说明。
+ * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无阶段事件），角标只
+ *   标注真实来源（stages / run-status），「证据」格等推断值也在角标里说明；
+ * - 无 run 数据时五格全部"待处理"（状态未知），角标不标来源；runs 请求
+ *   失败（404 / 网络）时阶段卡片显示可读错误与重试入口——不画一个看起来
+ *   在推进的时间线。
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
@@ -52,7 +55,6 @@ import {
   EVIDENCE_SLOT_NOTE,
   STAGES,
   deriveStageBadge,
-  deriveStageStates,
   deriveStagesFromRun,
 } from "../stages";
 import "./Analysis.css";
@@ -62,8 +64,6 @@ const API_BASE = "/api";
 
 /** 轮询间隔：pending/running 时每 2s 读一次项目状态。 */
 const POLL_INTERVAL_MS = 2000;
-/** 阶段模拟推进间隔（前端模拟，非后端数据）。 */
-const STAGE_TICK_MS = 2400;
 /** 404 连续多少次后提示"迟迟未入库"（2s 一次，15 次 ≈ 30s）。 */
 const NOT_FOUND_LONG_STREAK = 15;
 
@@ -257,15 +257,27 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 }
 
 /** 并行轮询 runs 列表：与项目状态轮询独立，runs 拉取失败不阻塞状态展示。 */
-function useRunsPolling(projectId: string | undefined, active: boolean): {
+function useRunsPolling(
+  projectId: string | undefined,
+  active: boolean,
+  retryNonce: number,
+): {
   runs: RunInfo[];
   runsError: string | null;
 } {
   const [runs, setRuns] = useState<RunInfo[]>([]);
   const [runsError, setRunsError] = useState<string | null>(null);
+  const observedProjectRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     if (!projectId || !active) return;
+    // 换项目时先清掉上一个项目的 run：留着它会让新页面短暂显示旧项目的
+    // 阶段事实（甚至把旧项目的阶段事件当成新项目的来源）。
+    if (observedProjectRef.current !== projectId) {
+      observedProjectRef.current = projectId;
+      setRuns([]);
+      setRunsError(null);
+    }
     let stopped = false;
     let busy = false;
 
@@ -295,30 +307,9 @@ function useRunsPolling(projectId: string | undefined, active: boolean): {
       stopped = true;
       window.clearInterval(timer);
     };
-  }, [projectId, active]);
+  }, [projectId, active, retryNonce]);
 
   return { runs, runsError };
-}
-
-/**
- * 阶段推进模拟：仅在后端连 run 状态都拿不到时兜底（按时间近似推进，每
- * STAGE_TICK_MS 一格），最多推进到倒数第二格；completed/failed 由真实状态对齐。
- * 返回已完成格数（0..STAGES.length）。
- */
-function useStageSimulation(status: string | null): number {
-  const [progress, setProgress] = useState(0);
-  useEffect(() => {
-    if (status === "completed") {
-      setProgress(STAGES.length);
-      return;
-    }
-    if (status === "failed" || status === null) return;
-    const timer = window.setInterval(() => {
-      setProgress((p) => Math.min(p + 1, STAGES.length - 1));
-    }, STAGE_TICK_MS);
-    return () => window.clearInterval(timer);
-  }, [status]);
-  return progress;
 }
 
 /** duration_seconds → 展示字符串 */
@@ -361,9 +352,24 @@ function useRunStagesPolling(
 ): { stages: RunStageEvent[] | null; stagesError: string | null } {
   const [stages, setStages] = useState<RunStageEvent[] | null>(null);
   const [stagesError, setStagesError] = useState<string | null>(null);
+  const polledRunRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!projectId || !runId || !active) return;
+    if (!projectId || !runId || !active) {
+      // 没有 run（或还没拿到 run）：清掉上一个项目/轮次留下的阶段事件。
+      // 否则角标会把旧项目的「真实阶段事件」标到当前页上——来源不真实，
+      // 比没有来源更糟。
+      polledRunRef.current = null;
+      setStages(null);
+      setStagesError(null);
+      return;
+    }
+    const key = `${projectId}:${runId}`;
+    if (polledRunRef.current !== key) {
+      polledRunRef.current = key;
+      setStages(null);
+      setStagesError(null);
+    }
     let stopped = false;
     let busy = false;
 
@@ -400,10 +406,11 @@ function useRunStagesPolling(
 export function Analysis() {
   const { projectId } = useParams();
   const [retryNonce, setRetryNonce] = useState(0);
+  const [runsRetryNonce, setRunsRetryNonce] = useState(0);
   const { project, health, pollError, notFound, notFoundLong, logs, pushLog } = useProjectPolling(projectId, retryNonce);
   const status = project?.project.status ?? null;
   const active = status === "pending" || status === "running";
-  const { runs, runsError } = useRunsPolling(projectId, Boolean(project));
+  const { runs, runsError } = useRunsPolling(projectId, Boolean(project), runsRetryNonce);
   // 优先取最新一轮真实 run；runs 为空时回退项目信封里的 runs
   const latestRun = runs[0] ?? project?.runs[0] ?? null;
   const hasRealRun = Boolean(runs.length) || Boolean(project?.runs.length);
@@ -416,13 +423,10 @@ export function Analysis() {
     () => deriveStagesFromRun(latestRun, runStageEvents),
     [latestRun, runStageEvents],
   );
-  const progress = useStageSimulation(hasRealRun ? null : status);
-  // 有真实 run 时用映射结果，否则回退时间模拟
-  const stageStates = useMemo(
-    () => (hasRealRun ? runDerived.states : deriveStageStates(progress, status)),
-    [hasRealRun, runDerived, progress, status],
-  );
-  const partialLabels = hasRealRun ? runDerived.partialLabels : {};
+  // 没有 run 数据时 deriveStagesFromRun(null, null) 把五格全部置为待处理；
+  // 页面如实说明「状态未知」，不按时间推进（模拟路径已删除）。
+  const stageStates = runDerived.states;
+  const partialLabels = runDerived.partialLabels;
   const backends = useMemo(() => deriveBackends(project), [project]);
   const [cancelNotice, setCancelNotice] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -440,12 +444,14 @@ export function Analysis() {
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
   const duration = durationLabel(latestRun?.duration_seconds);
   const hasStageFacts = Boolean(runStageEvents?.length);
-  // 角标如实说明阶段推进的来源（真实阶段事件 / run 状态映射 / 前端模拟），
-  // 以及哪些格子是推断出来的（证据格、合并了 JADX 的解析格）。
-  const stageBadge = deriveStageBadge(
-    hasStageFacts ? "stages" : hasRealRun ? "run-status" : "simulation",
-    Boolean(runsError || stagesError),
-  );
+  // 角标只标注真实来源（阶段事件 / run 状态）；没有 run 数据时不标来源，
+  // 卡片正文如实说明「状态未知」。角标标题同时说明哪些格子是推断出来的
+  //（证据格、合并了 JADX 的解析格）。
+  const stageBadge = hasStageFacts
+    ? deriveStageBadge("stages")
+    : hasRealRun
+      ? deriveStageBadge("run-status", Boolean(runsError || stagesError))
+      : null;
 
   const handleCancel = async () => {
     if (!projectId) return;
@@ -503,7 +509,7 @@ export function Analysis() {
                 ? " · 等待入库"
                 : " · 读取中…"}
             {active && activeStageLabel
-              ? ` · ${hasStageFacts ? "当前阶段" : "模拟阶段"}：${activeStageLabel}`
+              ? ` · ${hasStageFacts ? "当前阶段" : "推断阶段"}：${activeStageLabel}`
               : ""}
           </p>
         </div>
@@ -535,8 +541,11 @@ export function Analysis() {
           />
         ) : null}
         {pollError && project ? <PartialBanner tone="warning" message={`轮询失败，正在重试：${pollError}`} /> : null}
-        {project && runsError ? (
-          <PartialBanner tone="warning" message={`阶段进度回退为前端模拟（runs 数据不可用）：${runsError}`} />
+        {project && runsError && hasRealRun ? (
+          <PartialBanner
+            tone="warning"
+            message={`runs 端点不可用，阶段进度改按项目详情里的 run 数据映射：${runsError}`}
+          />
         ) : null}
         {cancelNotice ? (
           <PartialBanner tone="danger" message={cancelNotice} onDismiss={() => setCancelNotice(null)} />
@@ -588,67 +597,84 @@ export function Analysis() {
         />
       ) : (
         <div className="analysis__grid">
-          {/* 左：阶段进度（stages 真实事件 → run 状态映射 → 时间模拟，见角标） */}
+          {/* 左：阶段进度（stages 真实事件 → run 状态映射；无数据时如实显示未知） */}
           <Card className="analysis__stages" aria-label="阶段进度">
             <CardHeader
               title="阶段进度"
               subtitle="采集 → 解析 → 索引 → 证据 → 报告"
               actions={
-                <span className="da-mock-badge" title={stageBadge.title}>
-                  {stageBadge.text}
-                </span>
+                stageBadge ? (
+                  <span className="da-mock-badge" title={stageBadge.title}>
+                    {stageBadge.text}
+                  </span>
+                ) : undefined
               }
             />
             <CardBody>
-              <ol className="da-stage-list">
-                {STAGES.map((stage) => {
-                  const state = stageStates[stage.id] ?? "pending";
-                  const partial = partialLabels[stage.id];
-                  return (
-                    <li
-                      key={stage.id}
-                      className={`da-stage da-stage--${state}`}
-                      aria-current={state === "running" ? "step" : undefined}
-                      // 「证据」格在后端没有对应的阶段事件：把这一点说在格子上，
-                      // 读者悬停就知道这一格是推断值（复测报告 §P3）。
-                      title={stage.id === "evidence" ? EVIDENCE_SLOT_NOTE : undefined}
-                    >
-                      <span className="da-stage__dot" aria-hidden="true">
-                        {state === "done" ? "✓" : state === "running" ? "◌" : state === "error" ? "✕" : "•"}
-                      </span>
-                      <div className="da-stage__text">
-                        <div className="da-stage__label">
-                          {stage.label}
-                          {partial ? <span className="da-stage__partial">{partial}</span> : null}
-                        </div>
-                        <div className="da-stage__desc">{stage.description}</div>
-                      </div>
-                      <StatusBadge
-                        kind={STAGE_BADGE[state]}
-                        label={partial ? "部分" : undefined}
-                        pulse={state === "running"}
-                      />
-                    </li>
-                  );
-                })}
-              </ol>
-              {hasRealRun && latestRun ? (
-                <div className="da-stage-meta">
-                  <span>
-                    run <code className="da-code">{latestRun.id.slice(0, 8)}</code> · {latestRun.status}
-                    {latestRun.completeness === "partial" ? " · partial" : ""}
-                    {duration ? ` · ${duration}` : ""}
-                  </span>
-                  {Object.keys(latestRun.tool_versions ?? {}).length > 0 ? (
-                    <span className="da-stage-meta__tools">
-                      {Object.entries(latestRun.tool_versions)
-                        .filter(([, v]) => v)
-                        .map(([k, v]) => `${k} v${v}`)
-                        .join(" · ")}
-                    </span>
+              {!hasRealRun && runsError ? (
+                <ErrorState
+                  title="阶段进度无法取得"
+                  description={`后端不可用，阶段进度无法取得：${runsError}`}
+                  onRetry={() => setRunsRetryNonce((n) => n + 1)}
+                />
+              ) : (
+                <>
+                  <ol className="da-stage-list">
+                    {STAGES.map((stage) => {
+                      const state = stageStates[stage.id] ?? "pending";
+                      const partial = partialLabels[stage.id];
+                      return (
+                        <li
+                          key={stage.id}
+                          className={`da-stage da-stage--${state}`}
+                          aria-current={state === "running" ? "step" : undefined}
+                          // 「证据」格在后端没有对应的阶段事件：把这一点说在格子上，
+                          // 读者悬停就知道这一格是推断值（复测报告 §P3）。
+                          title={stage.id === "evidence" ? EVIDENCE_SLOT_NOTE : undefined}
+                        >
+                          <span className="da-stage__dot" aria-hidden="true">
+                            {state === "done" ? "✓" : state === "running" ? "◌" : state === "error" ? "✕" : "•"}
+                          </span>
+                          <div className="da-stage__text">
+                            <div className="da-stage__label">
+                              {stage.label}
+                              {partial ? <span className="da-stage__partial">{partial}</span> : null}
+                            </div>
+                            <div className="da-stage__desc">{stage.description}</div>
+                          </div>
+                          <StatusBadge
+                            kind={STAGE_BADGE[state]}
+                            label={partial ? "部分" : undefined}
+                            pulse={state === "running"}
+                          />
+                        </li>
+                      );
+                    })}
+                  </ol>
+                  {!hasRealRun ? (
+                    <p className="da-stage-unknown">
+                      后端尚未返回任何 run 数据：五个阶段的状态未知，这里不推测进度。
+                    </p>
                   ) : null}
-                </div>
-              ) : null}
+                  {hasRealRun && latestRun ? (
+                    <div className="da-stage-meta">
+                      <span>
+                        run <code className="da-code">{latestRun.id.slice(0, 8)}</code> · {latestRun.status}
+                        {latestRun.completeness === "partial" ? " · partial" : ""}
+                        {duration ? ` · ${duration}` : ""}
+                      </span>
+                      {Object.keys(latestRun.tool_versions ?? {}).length > 0 ? (
+                        <span className="da-stage-meta__tools">
+                          {Object.entries(latestRun.tool_versions)
+                            .filter(([, v]) => v)
+                            .map(([k, v]) => `${k} v${v}`)
+                            .join(" · ")}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              )}
             </CardBody>
           </Card>
 

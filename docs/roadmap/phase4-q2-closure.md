@@ -21,7 +21,7 @@ Q2 桌面应用阶段结束时，项目必须能回答三个问题：
 | 2 | 视觉 token 与组件清单 | `desktop/src/styles/tokens.css` + 设计文档 §4 | ✅ 完成 |
 | 3 | 组件库与组件画廊 | `desktop/src/components/`（19 组件 + states）+ `/gallery` 画廊页 | ✅ 完成（`520bf4d`） |
 | 4 | 首页：拖拽上传 + 最近项目 | `desktop/src/pages/HomePage.tsx` | ✅ 完成（`7c53a7d` + `17bbd95` 接真实数据） |
-| 5 | 分析进行中页：进度/日志/后端状态 | `desktop/src/pages/Analysis.tsx` | ✅ 完成（`c92879b`；阶段推进为前端模拟，页面有角标注明） |
+| 5 | 分析进行中页：进度/日志/后端状态 | `desktop/src/pages/Analysis.tsx` | ✅ 完成（`c92879b`；阶段推进当时为前端模拟，页面有角标注明；该模拟已在 Phase 5 收尾删除） |
 | 6 | 项目详情三栏 + 证据抽屉 | `desktop/src/pages/ProjectDetail.tsx` | ✅ 完成（`1d7623b`） |
 | 7 | 证据与 locator 解析视图 | `desktop/src/pages/EvidencePage.tsx` + `desktop/src/pages/FindingsPage.tsx` | ✅ 完成（T1 `34a2790` 真实化） |
 | 8 | 报告导出页 | `desktop/src/pages/ReportsPage.tsx` | ✅ 完成（`1d7623b`；Markdown/JSON 导出） |

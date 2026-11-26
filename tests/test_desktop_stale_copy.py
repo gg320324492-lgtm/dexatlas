@@ -15,10 +15,10 @@ true:
    written at 18:46 UTC showed as ``2026-11-25 18:46:07`` on a UTC+8 machine
    instead of ``2026-11-26 02:46:07``.
 
-The desktop app has no test runner in this repository, so — like
-``test_desktop_stage_mapping.py`` — the behaviour is checked by executing the
-shipped plain-ESM modules with Node, and the wiring is checked by reading the
-page sources.  Every test here goes red on the pre-fix tree.
+The desktop front end has its own vitest suite under ``desktop/``, but this
+check spans the shipped page sources and the plain-ESM modules they import, so
+the behaviour is checked by executing those modules with Node and the wiring by
+reading the page sources.  Every test here goes red on the pre-fix tree.
 """
 
 from __future__ import annotations

@@ -17,7 +17,8 @@
  * 2. 否则按 run.status 粗粒度映射（旧后端写入的 run 没有阶段事件）：
  *    pending → 全部待处理；running → 采集完成、解析进行中；
  *    completed → 五阶段全部完成；failed / cancelled → 采集完成、解析标失败。
- * 3. 两者皆无时由调用方回退前端时间模拟（deriveStageStates）。
+ * 3. 没有 run 数据时五格全部「待处理」：状态未知就是未知，这里不按时间
+ *    推测进度（前端时间模拟已在 Phase 5 收尾删除）。
  *
  * 【「证据」格是推断值】
  * 后端的五个阶段里没有「证据」：inspect → 采集、parse-apktool 与
@@ -84,7 +85,7 @@ export const PARSE_SLOT_NOTE = "「解析」格合并了后端的 parse-apktool 
 /**
  * 阶段推进的角标：如实说明数据来源。
  *
- * @param {"stages" | "run-status" | "simulation"} source
+ * @param {"stages" | "run-status"} source
  * @param {boolean} [stagesUnavailable] stages 端点不可用（404 / 网络）
  * @returns {{ text: string, title: string }}
  */
@@ -95,46 +96,17 @@ export function deriveStageBadge(source, stagesUnavailable = false) {
       title: `阶段状态读自后端 stages 端点的真实阶段事件（pipeline 推进点）。${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
     };
   }
-  if (source === "run-status") {
-    return {
-      text: `阶段推进：后端 run 状态 + 前端粒度模拟${stagesUnavailable ? "（stages 端点不可用）" : ""}`,
-      title: `该 run 无阶段级数据（旧后端写入），状态由 run.status 映射，粒度由前端推断；${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
-    };
-  }
   return {
-    text: "阶段推进为前端模拟",
-    title: `后端 runs 不可用，阶段推进由前端按时间模拟，完成/失败时与真实状态对齐；${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
+    text: `阶段推进：后端 run 状态${stagesUnavailable ? "（stages 端点不可用）" : ""}`,
+    title: `该 run 无阶段级数据（旧后端写入），格子的状态按 run.status 静态映射，不随时间推进；${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
   };
-}
-
-/**
- * 阶段推进模拟：仅在后端连 run 状态都拿不到时兜底（按时间近似推进）。
- * 返回每个格子的状态。
- *
- * @param {number} progress 已完成的格数（0..STAGES.length）
- * @param {string | null} status
- * @returns {Record<string, StageState>}
- */
-export function deriveStageStates(progress, status) {
-  /** @type {Record<string, StageState>} */
-  const states = {};
-  STAGES.forEach((stage, i) => {
-    if (status === "completed") {
-      states[stage.id] = "done";
-    } else if (status === "failed") {
-      states[stage.id] = i < progress ? "done" : i === progress ? "error" : "pending";
-    } else {
-      states[stage.id] = i < progress ? "done" : i === progress ? "running" : "pending";
-    }
-  });
-  return states;
 }
 
 /**
  * 阶段映射：优先用 stages 端点的真实阶段事件（Phase 5 W2），按事件推进置
  * done/running；run 未结束且 publish 未完成时，证据格按最后已完成的阶段
  * 推断。端点无 stages（旧后端写入的 run）回退到 run.status 的粗粒度
- * 映射；两者皆无时由调用方回退时间模拟。
+ * 映射；没有 run 数据时五格全部待处理（状态未知，不做时间推测）。
  *
  * @param {RunFacts | null} run
  * @param {StageEvent[] | null} runStages
@@ -147,6 +119,8 @@ export function deriveStagesFromRun(run, runStages) {
   const partialLabels = {};
 
   if (!run) {
+    // 没有 run 数据：五个格子的状态未知，全部如实显示「待处理」。
+    // 这里不按时间推进——拿不到后端事实时不编造一个看起来像事实的进度。
     STAGES.forEach((s) => (states[s.id] = "pending"));
     return { states, partialLabels };
   }
