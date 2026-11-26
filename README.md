@@ -190,6 +190,9 @@ DexAtlas is built around fixing that:
 | **1** | `v0.1.3` | Evidence That Points Back | Cross-references become evidence, locators travel with the report, the docs are checked                      |
 | **2** | `v0.2.0` | Agentic Intelligence      | Agent planning, MCP server, evidence verification, resumable tasks, React workbench                          |
 | **3** | `v1.0.0` (tag 2026-11-17) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar, post-fix narrow verification converted 2/6 then 3/6 after the budget-efficiency fixes — both below the ≥4/6 gate, moved to state-of-record disclosure), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (passed 2026-11-20) |
+| **4** | `v1.0.2` | Portfolio Closure | M11–M15: documentation claims realigned with the code, the Workbench UI and accessibility work, dependencies hardened, and a fresh measurement of the tagged tree |
+| **4 Q2** | `v1.1.0` | Desktop Application | The original Tauri + React desktop app (DexAtlas Studio), authorized after M15 closed and scoped by the [Q2 supplement](docs/roadmap/phase4-q2-supplement.md) |
+| **5** | (no release yet) | Desktop Self-Containment & Stage Observability | The Tauri sidecar that spawns the real backend, the stage-level progress contract the pipeline records, C12 outreach material and the post-release checklist — engineering delivered and accepted 2026-11-26 |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 
@@ -597,7 +600,7 @@ fixtures are fetched with `scripts/fetch-fixtures.sh`.
 - **[Analysis coverage & provenance](docs/analysis-provenance.md)** — which backend
   produced which conclusion, and how to check it yourself; worth reading before
   trusting a figure a decompiler produced (Chinese; 分析覆盖度与证据来源)
-- **[Roadmap](docs/roadmap/ROADMAP.md)** — three phases, and where this stands
+- **[Roadmap](docs/roadmap/ROADMAP.md)** — five phases (Phase 4 Q2 included), and where this stands
 - **[Phase 2 plan](docs/roadmap/phase2-plan.md)** — written after the source review,
   against the code that exists
 - **[Phase 3 plan](docs/roadmap/phase3-plan.md)** — the portfolio plan: reproducible

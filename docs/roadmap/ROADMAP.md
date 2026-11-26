@@ -7,14 +7,15 @@ This document is the working contract for how DexAtlas grows. It is a plan, not 
 promise of features — the README describes what actually ships, this file describes
 what comes next.
 
-- **Current phase:** Phase 3 delivered — M5–M7 shipped, M6's B1 acceptance line
+- **Current phase:** Phase 5 (Q2 follow-up) — delivered and accepted 2026-11-26.
+  The history behind it: Phase 3 delivered — M5–M7 shipped, M6's B1 acceptance line
   closed on 2026-11-22, M8 delivered (macOS unverified, as disclosed), M9
   showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.2
   (2026-11-24) is the Phase 4 documentation, dependency-hardening and measurement
   follow-up; **v1.1.0 (2026-11-25) is the Q2 desktop application and the
   post-Q2 stability batch**. Per-milestone evidence
   is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
-  [Phase 3 plan](phase3-plan.md). The project is in **Phase 4** — portfolio
+  [Phase 3 plan](phase3-plan.md). The project was in **Phase 4** — portfolio
   closure, software design and Workbench UI — scoped by
   [phase4-plan.md](phase4-plan.md) (final decision A + D + G; the project freezes
   after Phase 4 unless real user signals arrive), and since 2026-11-25 in
@@ -23,8 +24,11 @@ what comes next.
   engineering work is merged **and its acceptance is complete** (the packaged
   exe was verified in installed form without a pre-started backend, and the
   end-to-end walkthrough was re-run after W2) — see the
-  [Phase 5 acceptance report](../reports/phase5-acceptance.md).
-- **Plan version:** 2026-11-25 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4 history retained)
+  [Phase 5 acceptance report](../reports/phase5-acceptance.md). What comes
+  after it is **not decided yet**: the remaining open items need either another
+  platform or a recorded decision, and the next phase is scoped by such a
+  decision, not by this document.
+- **Plan version:** 2026-11-26 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4/5 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
   new work front inside this repository — Tauri + React, light "studio" visual
   language, evidence-chain-first — scoped by
@@ -106,7 +110,10 @@ extracting unauthorized data, or reproducing proprietary application code. See
 | Phase 1  | `v0.1.2`  | Acceptance Checklist  | ✅ Shipped 2026-10-20                                        |
 | Phase 1  | `v0.1.3`  | Evidence That Points Back | ✅ Shipped 2026-10-20                                   |
 | Phase 2  | `v0.2.0`  | Agentic Intelligence   | ✅ Shipped 2026-11-14 — M0–M3 + the workbench; M4 review passed 2026-11-14 |
-| Phase 3  | `v1.0.0`  | Production-Ready       | Extensible, deliverable, maintainable platform with real users  |
+| Phase 3  | `v1.0.0`  | Production-Ready       | ✅ Shipped 2026-11-17 — M5–M10; M10 independent acceptance passed 2026-11-20 |
+| Phase 4  | `v1.0.2`  | Portfolio Closure      | ✅ Shipped 2026-11-24 — M11–M15; documentation, dependency hardening and a fresh measurement of the tagged tree |
+| Phase 4 Q2 | `v1.1.0` | Desktop Application    | ✅ Shipped 2026-11-25 — the Tauri + React desktop app, by explicit author authorization after M15 closed |
+| Phase 5  | (no release yet) | Desktop Self-Containment & Stage Observability | ✅ Engineering delivered and accepted 2026-11-26 — the sidecar process, the stage-level progress contract, C12 outreach material and the post-release checklist; the release decision remains open |
 
 **Promotion rule:** a phase is complete when its exit checklist passes *and* the source
 review raises no blocking findings. Promotion is not a calendar event.
