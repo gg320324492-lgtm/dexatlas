@@ -3,7 +3,8 @@
 DexAtlas 的原创桌面应用，技术栈：**Tauri 2 + React 19 + TypeScript + Vite**。
 产品决策与验收标准见 `docs/roadmap/phase4-q2-supplement.md`；侧车接入与
 阶段级进度的阶段目标见 `docs/roadmap/phase5-plan.md`（W1/W2），验收记录见
-`docs/reports/phase5-acceptance.md`（**打包 exe 全链路尚未验证**，见该报告 §6）。
+`docs/reports/phase5-acceptance.md`（**安装形态已真机验证**，见该报告 §2；仍然
+开放的边界见其 §7）。
 
 ## 结构
 
@@ -47,9 +48,17 @@ dev 浏览器模式走 vite 代理（`/api`），不涉及端口。
 
 **已知边界：** 默认侧车命令是开发形态（`python -m dexatlas.workbench`，工作
 目录从 exe 路径上溯找含 `src/dexatlas` 的仓库根）。安装到 Program Files 的
-打包产物没有这个仓库根，需要在设置页把后端命令指向已安装的
-`dexatlas-workbench`。**含侧车的打包产物尚未构建与真机验证**
-（`docs/reports/phase5-acceptance.md` §2、§6）。
+打包产物没有这个仓库根——但**这不是问题**：侧车的工作目录是**可选**的，
+推断不出仓库根时照样 spawn，只是**不设 cwd**（PR #20 修掉了此前用短路写法
+导致「推断失败 = 根本不启动」的那个缺陷）。真机验收时后端命令配成绝对路径
+（`E:\DexAtlas\.venv\Scripts\python.exe -m dexatlas.workbench`）。
+
+**安装形态已真机验证**（`docs/reports/phase5-acceptance.md` §2）：NSIS 安装器
+静默安装后启动 exe，侧车自动拉起并监听**自己的端口**（实测 64074），前端
+请求打在那个端口上而不是 8618 回退端口——验收全程 8618 无任何监听。上传 →
+分析 → 证据 → 导出全链路可用；杀掉侧车后页面显示可读错误而不是白屏；正常
+关闭 exe 后整棵进程树被清理。**仍然开放**的边界见该报告 §7（macOS/Linux
+不纳入、打包 exe 未跑装了 jadx + apktool 的配置、MSI 安装路径未验证等）。
 
 ## 阶段级进度（Phase 5 W2）
 

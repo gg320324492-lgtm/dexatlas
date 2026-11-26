@@ -58,6 +58,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   做字符串断言的测试删除（阶段映射、locator 落点、侧车端点），同等断言由
   `desktop/` 的 vitest 用例承担；Python 套件的规模随之减少，测量数字随测量走。
   （PR #22，`33e4ba9`）
+- **Phase 5 状态回填。** `docs/status.md`、`docs/roadmap/ROADMAP.md`、
+  `docs/roadmap/phase5-plan.md` 与 `desktop/README.md` 记录 Phase 5 的验收结论：
+  工程交付与**验收动作**都已完成（打包 exe 安装形态二次验收 a–d 全通过、W2
+  合入后已复测），并**逐项列出仍然开放的边界**，不把「做完了」写成
+  「什么都没剩」。未 bump 版本，`__version__` 不变。
 
 ### Fixed
 

@@ -20,9 +20,9 @@ what comes next.
   after Phase 4 unless real user signals arrive), and since 2026-11-25 in
   **Phase 5 (Q2 follow-up)** — desktop self-containment and stage-level
   observability — scoped by [phase5-plan.md](phase5-plan.md). Phase 5's
-  engineering work is merged; **its acceptance is not complete** (the packaged
-  exe has not been verified without a pre-started backend, and the end-to-end
-  walkthrough has not been re-run after W2) — see the
+  engineering work is merged **and its acceptance is complete** (the packaged
+  exe was verified in installed form without a pre-started backend, and the
+  end-to-end walkthrough was re-run after W2) — see the
   [Phase 5 acceptance report](../reports/phase5-acceptance.md).
 - **Plan version:** 2026-11-25 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
@@ -42,7 +42,7 @@ what comes next.
   back-filled in [phase4-q2-closure.md](phase4-q2-closure.md). Post-Q2 boundary:
   **partial unfreeze** (defect/performance/usability fixes only; new features
   re-review) — recorded in [status.md](../status.md).
-- **Phase 5 (Q2 follow-up), engineering delivered 2026-11-25:** make the
+- **Phase 5 (Q2 follow-up), engineering delivered and accepted 2026-11-26:** make the
   desktop application self-contained and stage-observable — a Tauri sidecar
   that spawns the real DexAtlas backend (W1, PR #13), a stage-level progress
   contract recorded by the pipeline (W2, PR #14: an independent read-only
@@ -51,10 +51,17 @@ what comes next.
   operations checklist (W4). Scoped by [phase5-plan.md](phase5-plan.md) under
   the same partial-unfreeze boundary; the author approved the four work items
   on 2026-11-25 ("finish the development work completely; no formal operations
-  yet"). **Acceptance is not complete:** the sidecar is verified in `tauri
-  dev` form only; no packaged exe has been built or run without a pre-started
-  backend, and the walkthrough predates W2. Per-item evidence and open items
-  are in the [Phase 5 acceptance report](../reports/phase5-acceptance.md).
+  yet"). **Acceptance is complete:** the packaged exe was verified in installed
+  form (NSIS installer, no pre-started backend, port 8618 vacant throughout) —
+  the sidecar comes up on its own port and the frontend talks to that port, not
+  to the 8618 fallback; the walkthrough was re-run after W2. The defects those
+  two rounds exposed were fixed by PR #18 (contract doc contradicted the
+  implementation), #19 (completed run showed the evidence slot as "pending"),
+  #20 (sidecar never spawned in installed form; frontend pinned to 8618) and
+  #21 (three stale texts); the walkthrough's own P1/P3/P4 by PR #15/#17. Per-item
+  evidence is in the [Phase 5 acceptance report](../reports/phase5-acceptance.md);
+  items that remain open are listed in its §7 (macOS/Linux is explicitly out of
+  scope, and the frontend time simulation survives as a labelled fallback).
   No version bump; the release decision remains open.
 - **Owner:** @gg320324492-lgtm
 - **Review protocol:** see [`Review Protocol`](#review-protocol). Every phase ends with a
