@@ -9,6 +9,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Phase 5 尚未完成的目标清单。** 新增
+  [Phase 5 尚未完成的目标清单](docs/reports/phase5-remaining-goals.md)：把散在
+  验收报告、失败/取消走查报告、真机补测报告、状态页与发版后运营清单里的未完成项
+  收成一处，分四类——A 解冻范围内可直接做（4 件）、B 等作者提供账号/渠道/决策
+  （4 件）、C 明确不在执行单范围内、记录在案不追（3 件）、D 需外部样本或别的机器
+  （4 件）。**只做盘点与归类，不承诺执行**；并指出 Q2 报告里那条「三个端点不存在」
+  的限制已被 Phase 5 关闭。
 - **桌面应用侧车进程（Phase 5 W1）。** Tauri 壳启动时按配置拉起现有 DexAtlas
   后端（默认 `python -m dexatlas.workbench`，强制 `--port 0` 由系统分配端口），
   从后端输出抓取实际端口并注入前端，为动态端口放行 HTTP capability；侧车
@@ -41,9 +48,10 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - **分析页阶段时间线不再以模拟为主。** 桌面分析页优先读 stages 端点并按真实
-  阶段事件渲染；旧 run 回退 `run.status` 映射；时间模拟仅作「无任何 run 数据」
-  时的兜底，三种来源在角标文案中如实区分（「前端模拟代码删除」未字面完成，
-  见验收报告 §3.4）。
+  阶段事件渲染；旧 run 回退 `run.status` 映射。**2026-11-26 收尾批次已把时间模拟
+  路径整段删除**（此前它只是「无任何 run 数据」时的兜底，并被如实标注）：现在拿不到
+  后端事实时，五格如实显示「待处理」（状态未知），runs 请求失败时显示「后端不可用，
+  阶段进度无法取得」与重试入口，角标只标注真实来源（stages / run-status）。
 - **契约表的 stages 说明改为以实现为准。** 阶段事实住在独立只读端点上，run 对象
   （`RunResponse`）的字段集一个也没有变——既有端点的响应形状、状态码与退出码
   零变化。`docs/architecture/public-contracts.md` §2.3 与 §7 同步更新。（PR #18）
