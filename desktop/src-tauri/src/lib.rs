@@ -48,6 +48,12 @@ pub fn run() {
         .expect("error while building tauri application")
         .run(|app_handle, event| {
             // 应用退出时结束侧车子进程，避免留下孤儿后端。
+            //
+            // 这里等的是 `RunEvent::Exit`（"即将退出"），不是
+            // `RunEvent::ExitRequested`（"请求退出"，还可以被 veto 掉）——
+            // 两者不是一回事，注释里写哪个就得是哪个。另外两层兜底：状态被
+            // 丢弃时 `SidecarState::drop` 收尾；宿主被 `taskkill /F` 强杀时
+            // 这两层都跑不了，由 Windows 的作业对象接手（见 sidecar.rs）。
             if let tauri::RunEvent::Exit = event {
                 shutdown_sidecar(app_handle);
             }

@@ -199,7 +199,7 @@
 3. 上传是唯一写路径，走与分析管线相同的 `stage_upload` + `Analyzer.analyze`；证据与报告只读。
 4. 新增读取的字段必须先在消费的类型层对齐既有返回形状（如 `ProjectSummary`，`src/dexatlas/mcp/schemas.py:93` `anchor: ProjectSummary`），不发明字段。
 
-### 8.1 侧车进程的两条约定
+### 8.1 侧车进程的三条约定
 
 2026-11-25 的打包 exe 真机验收（`docs/reports/` 外的验收记录）暴露了两个
 实现缺陷，都出在"壳 ↔ 侧车"这一层，与后端契约无关：
@@ -218,6 +218,18 @@
    `sidecar:status` 事件驱动重新解析，端口变化就改写 baseUrl；回退端口
    （`http://127.0.0.1:8618/api`）保留给老壳与非 Tauri 环境，但只是兜底，
    不是终态。
+3. **后端不得比宿主活得更久。** 侧车后端是应用 spawn 出来的子进程。应用正常
+   退出时 Rust 代码还跑得了，可以主动结束它（`RunEvent::Exit` → 按进程树
+   kill）；被 `taskkill /F` 强杀时 Rust 一行也跑不了，剩下的只有操作系统。
+   Windows 上用**作业对象**（Job Object）兜底：子进程在**执行第一条指令之前**
+   就被放进一个带 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的作业（`CREATE_SUSPENDED`
+   → 加入作业 → 恢复主线程），宿主进程一死（正常退出、崩溃、被强杀都一样——
+   系统会关闭它的全部句柄），作业里的整棵进程树随之被终止。
+   挂起创建是必需的：venv 里的 `python.exe` 是个转发器，它会再拉起真正的解释器
+   （实测进程树是 exe → venv python → 真解释器），它自己拉出来的后代必须继承
+   作业身份——否则强杀之后留下的恰恰是那个真正在监听端口的孙进程。
+   实现见 `desktop/src-tauri/src/sidecar.rs`（`job` 模块与 `ManagedChild`）。
+   其它平台没有等价机制，那里只剩应用自己收尾。
 
 ### 8.2 界面上不得写死的三件事
 
