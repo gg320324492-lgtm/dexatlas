@@ -86,9 +86,10 @@ GET /api/projects/{project_id}/runs/{run_id}/stages
 → {project_id, run_id, run_status, stages:[{stage, started_at, finished_at}]}
 ```
 
-- 有 `stages` 时时间线按真实事件渲染；旧 run 没有阶段事实时回退
-  `run.status` 的粗粒度映射；连 run 都取不到时才回退按时间模拟——三种
-  来源在时间线角标文案中如实区分。
+- 有 `stages` 时时间线按真实事件渲染；旧 run 没有阶段事实时按 `run.status`
+  的粗粒度映射，角标如实标注「后端 run 状态」。前端时间模拟已删除：没有
+  任何 run 数据时五格如实显示「待处理」（状态未知），runs 请求失败时显示
+  「后端不可用，阶段进度无法取得」并提供重试。
 - `finished_at` 为 null 表示该阶段尚未结束：可能正在进行，也可能是 run
   失败/被取消时停在那一阶段。
 - 这是**独立只读端点**，既有 run 对象（REST `RunResponse` / workbench

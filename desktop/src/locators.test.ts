@@ -17,6 +17,8 @@ import {
   classifyLocator,
   DEX_BACKEND,
   ERROR_PREFIX,
+  formatBytes,
+  inlineSourceOf,
   openSourceState,
   OUTPUT_BACKENDS,
 } from "./locators";
@@ -132,6 +134,70 @@ describe("openSourceState —— 按钮的可用性", () => {
   });
 });
 
+describe("inlineSourceOf —— resolve 响应里的源码视图", () => {
+  it("成功且有文本：路径、行数、字节、截断标记一起给出", () => {
+    const view = inlineSourceOf({
+      resolved: true,
+      reason: "E:\\ws\\jadx\\sources\\demo\\Crypto.java",
+      kind: "java",
+      text: { text: "class Crypto {\n  sign();\n}\n", bytes: 28, truncated: false, notice: "n" },
+      provenance: ["jadx:sources/demo/Crypto.java#sign"],
+    });
+    expect(view).not.toBeNull();
+    expect(view?.path).toContain("Crypto.java");
+    expect(view?.kind).toBe("java");
+    expect(view?.lines).toBe(3);
+    expect(view?.bytesLabel).toBe("28 B");
+    expect(view?.truncated).toBe(false);
+    expect(view?.code).toContain("sign()");
+    expect(view?.notice).toBe("n");
+  });
+
+  it("截断的文本如实说明", () => {
+    const view = inlineSourceOf({
+      resolved: true,
+      reason: "E:\\ws\\jadx\\sources\\Big.java",
+      kind: "smali",
+      text: { text: ".class LBig;", bytes: 99999, truncated: true },
+      provenance: [],
+    });
+    expect(view?.truncated).toBe(true);
+    expect(view?.code).toBe(".class LBig;");
+  });
+
+  it("解析成功但没有文件（DEX 内符号）：不给源码视图", () => {
+    const view = inlineSourceOf({
+      resolved: true,
+      reason: "dex 内的符号",
+      kind: null,
+      text: null,
+      provenance: [],
+    });
+    expect(view).toBeNull();
+  });
+
+  it("解析失败：不给源码视图", () => {
+    const view = inlineSourceOf({
+      resolved: false,
+      reason: "不在这次分析里",
+      kind: null,
+      text: null,
+      provenance: [],
+    });
+    expect(view).toBeNull();
+  });
+});
+
+describe("formatBytes —— 字节数的人类可读展示", () => {
+  it("四个数量级", () => {
+    expect(formatBytes(0)).toBe("0 B");
+    expect(formatBytes(999)).toBe("999 B");
+    expect(formatBytes(1024)).toBe("1.0 KB");
+    expect(formatBytes(64 * 1024)).toBe("64.0 KB");
+    expect(formatBytes(1024 * 1024)).toBe("1.0 MB");
+  });
+});
+
 describe("结构守卫 —— 抽屉把状态接到了按钮上", () => {
   it("抽屉从 locator 推出按钮状态", () => {
     expect(projectDetailSource).toContain("openSourceState(");
@@ -150,12 +216,15 @@ describe("结构守卫 —— 抽屉把状态接到了按钮上", () => {
     expect(hint.slice(0, 400)).toContain('id="da-ev-open-source-hint"');
   });
 
-  it("文件级 locator 的点击行为不变", () => {
-    // 找的是 JSX 文本节点，不是注释里提到「打开来源」的那句话。
-    const at = projectDetailSource.search(/>\s*打开来源\s*</);
+  it("文件级 locator 的点击真的去解析（不再弹窗）", () => {
+    // 标签是忙/闲三元里的字符串字面量，锚在它上面，不是 JSX 文本节点。
+    const at = projectDetailSource.indexOf('"打开来源"');
     expect(at).toBeGreaterThan(-1);
     const button = projectDetailSource.slice(Math.max(0, at - 1200), at);
     expect(button).toContain("onClick");
-    expect(button).toContain("displayLocator(selected.provenance)");
+    // 修复后点击与「resolve」共用 resolveSelected()；window.alert 调用不许回来。
+    expect(button).toContain("resolveSelected");
+    expect(button).not.toContain("window.alert(");
+    expect(projectDetailSource).not.toContain("window.alert(");
   });
 });

@@ -68,7 +68,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [phase1-findings-ledger.md](phase1-findings-ledger.md) | Phase 1 复现台账（基准 `8df894b`）：每一条评审发现是怎么验出来的、现状指针在哪里。 | 要重跑或核对某条发现的复现步骤时看它。 |
 | [phase2-issue-list.md](phase2-issue-list.md) | Phase 2 开工清单（基准 `8df894b`）：评审之后按发现整理的待办 issue，编号、范围与处置状态。 | 想核对「Phase 2 当时打算修什么」时看它。 |
 | [phase3-baseline.md](phase3-baseline.md) | Phase 3 M5 基线校准：对外声明有什么证据、三份 benchmark 能否从原始 trace 重算、还剩哪些问题。 | 想确认「对外说的每个数都能重算」时看它。 |
-| [phase5-acceptance.md](phase5-acceptance.md) | Phase 5 验收报告（基线 `origin/main` @ `33e4ba9`）：W1 侧车（安装形态二次验收 a–d 全通过）、W2 阶段契约（复测 ①–⑤，⑤ 的文档过时与完成态缺陷已由 PR #18/#19 修好）、W3/W4 备料的逐项判据与证据，含 16 张截图。**明确写出仍然开放的项**（见 §7：macOS/Linux 不纳入、打包 exe 未跑装了 jadx/apktool 的配置、MSI 未验证、「前端模拟代码删除」未字面完成等）。 | 要引用「Phase 5 做到哪一步」时看它；判据与证据都在里面，未覆盖的项也都在里面。 |
+| [phase5-acceptance.md](phase5-acceptance.md) | Phase 5 验收报告（基线 `origin/main` @ `33e4ba9`）：W1 侧车（安装形态二次验收 a–d 全通过）、W2 阶段契约（复测 ①–⑤，⑤ 的文档过时与完成态缺陷已由 PR #18/#19 修好）、W3/W4 备料的逐项判据与证据，含 16 张截图。**明确写出仍然开放的项**（见 §7：macOS/Linux 不纳入、打包 exe 未跑装了 jadx/apktool 的配置、MSI 未验证等；「前端模拟代码删除」已于 2026-11-26 收尾完成）。 | 要引用「Phase 5 做到哪一步」时看它；判据与证据都在里面，未覆盖的项也都在里面。 |
 
 ## 2. M4 / M8 验收与模型可禁用性
 

@@ -51,7 +51,7 @@
 
 | 区 | 位置 | 内容与数据来源 |
 |---|---|---|
-| 阶段进度 | 左列 | 采集 → 解析 → 索引 → 证据 → 报告 五阶段时间线；每阶段 `StatusBadge`（pending/running/done/error/skipped）。数据来自 run 轮询：`RunStatus`（`src/dexatlas/core/runs.py:52` `anchor: RunStatus`）与 `RunCompleteness`（`src/dexatlas/core/runs.py:121` `anchor: RunCompleteness`） |
+| 阶段进度 | 左列 | 采集 → 解析 → 索引 → 证据 → 报告 五阶段时间线；每阶段 `StatusBadge`（pending/running/done/error/skipped）。数据来自 run 轮询：`RunStatus`（`src/dexatlas/core/runs.py:52` `anchor: RunStatus`）与 `RunCompleteness`（`src/dexatlas/core/runs.py:121` `anchor: RunCompleteness`）；阶段事件来自只读端点 `GET /api/projects/{id}/runs/{run_id}/stages`。没有阶段事件时按 run.status 粗粒度映射；没有任何 run 数据时五格如实显示「待处理」（状态未知），runs 请求失败时显示「后端不可用，阶段进度无法取得」与重试入口——**前端时间模拟已删除**（Phase 5 收尾），拿不到后端事实时不再按时间推进 |
 | 实时日志 | 中间 | 等宽字体滚动区，按级别着色（info/debug/warn/error/success）。日志来自 Tauri 侧车进程对分析进程 stdout/stderr 的转发——现有后端没有日志流契约，桌面端不得为此新增 REST 端点；run 级错误另见 `run.errors` |
 | 后端状态 | 右列 | Apktool / JADX / Androguard 三卡片：版本、可用性、当前阶段。数据来自 `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`）；缺失后端显示 `missing_error` 的安装提示（`src/dexatlas/tools/base.py:144` `anchor: missing_error`） |
 
@@ -64,7 +64,7 @@
 - **左列·证据列表：** 符号、字符串、权限、组件、汇聚点条目，带来源工具标签（JADX/Apktool/Androguard）与等级（verified/lead/insufficient）。支持关键字与类别筛选。数据来自证据列表端点（`src/dexatlas/api/app.py:846-847` `anchor: def list_evidence(`），每条含来源工具、版本与 locator。
 - **中间·主体：** 两种视图切换——源码阅读（class/method source，`src/dexatlas/api/app.py:692` 与 `src/dexatlas/api/app.py:754`，响应头带 `X-DexAtlas-Source-Kind`/`X-DexAtlas-Source-Locator`，见 `src/dexatlas/api/app.py:869-874`）与调用关系（callers/callees，`src/dexatlas/api/app.py:807` `anchor: xrefs`）。长包名、长签名、长路径换行显示，不截断。
 - **右侧·证据抽屉：** `Drawer` 承载选中证据的完整记录：provenance locator 列表 + 每条 locator 的「解析」动作。解析走 `GET /api/projects/{id}/locators/resolve`（`src/dexatlas/workbench/app.py:296-297` `anchor: resolve_locator`），返回 `LocatorResolution`（`src/dexatlas/mcp/schemas.py:462` `anchor: LocatorResolution`）：`resolved` 布尔 + `reason` 人话 + 命中的源码文本。解析失败如实显示原因（「反编译器未安装」与「该文件不在本次分析中」是两种事实）。
-- **「打开来源」按钮：** 只有 locator 指向后端输出树里的一个文件时才可用。包级（`apk-reader:*`，如 `zip-entries`）、DEX 内（`androguard:*`）与后端未完成（`<工具>:error/...`）三类**没有单文件落点**，按钮置为 disabled，并在抽屉里给出可读说明（「包级来源：没有单文件落点 …」），不留一个点了没反应的按钮。判据在 `desktop/src/locators.ts`：工具前缀按后端 `src/dexatlas/core/locators.py` 的词汇镜像（`apk-reader` / `androguard` / `jadx`·`apktool` / `error/`），问过 `/locators/resolve` 之后以后端的回答为准——后端说那个地方不在这次分析里，按钮就不可用。
+- **「打开来源」按钮：** 只有 locator 指向后端输出树里的一个文件时才可用。包级（`apk-reader:*`，如 `zip-entries`）、DEX 内（`androguard:*`）与后端未完成（`<工具>:error/...`）三类**没有单文件落点**，按钮置为 disabled，并在抽屉里给出可读说明（「包级来源：没有单文件落点 …」），不留一个点了没反应的按钮。判据在 `desktop/src/locators.ts`：工具前缀按后端 `src/dexatlas/core/locators.py` 的词汇镜像（`apk-reader` / `androguard` / `jadx`·`apktool` / `error/`），问过 `/locators/resolve` 之后以后端的回答为准——后端说那个地方不在这次分析里，按钮就不可用。文件内 locator（`jadx:` / `apktool:`）点击后走同一个 resolve 调用（`desktop/src/pages/ProjectDetail.tsx` 的 `resolveSelected`），源码在抽屉内联展示：后端返回的解析路径（解析成功时真实路径在 `src/dexatlas/core/locators.py:270` `anchor: def resolve` 的返回值里）、行数、字节数与截断标记，代码块等宽可滚动；不弹窗、不开新窗口。
 - 顶部 `PartialBanner`：run 的 `completeness=partial` 或存在 `errors` 时常驻，列明未完成的步骤；横幅不阻塞下方数据展示。
 
 ### 3.5 设置页（补充单 2-5）
