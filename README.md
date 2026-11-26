@@ -23,6 +23,10 @@ An open-source, evidence-first Android reverse engineering and mobile applicatio
 > measured, and how to reproduce it, is in the
 > [execution report](docs/reports/phase1-execution-report.md).
 
+**Feedback:** [open an issue](https://github.com/gg320324492-lgtm/dexatlas/issues/new/choose) — bug reports,
+feature requests and questions all go there. The repository is public, so you do not
+need an account to read the existing issues.
+
   <sub>[Every figure on the card below, and the file it was read from](docs/reports/social-preview-howto.md)</sub>
 
   <img src=".github/social-preview.png" alt="DexAtlas — From APK to Evidence" width="900">

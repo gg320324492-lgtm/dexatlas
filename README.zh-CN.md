@@ -20,6 +20,9 @@
 >（Windows 上的 POSIX launcher 测试）与汇总单列的预期结果。测的是什么、
 > 怎么复现，见[执行报告](docs/reports/phase1-execution-report.md)。
 
+**反馈：** [提一个 issue](https://github.com/gg320324492-lgtm/dexatlas/issues/new/choose)——缺陷报告、
+功能建议与提问都发到那里。仓库是公开的，**读已有的 issue 不需要账号**。
+
   <sub>[下面这张卡片上每一个数，以及它是从哪个文件读出来的](docs/reports/social-preview-howto.md)</sub>
 
   <img src=".github/social-preview.zh-CN.png" alt="DexAtlas — 从 APK 到可核查的证据" width="900">
