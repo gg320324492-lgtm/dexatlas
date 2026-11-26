@@ -25,7 +25,7 @@
 - **代码基线：** `origin/main` @ `33e4ba9`（`Merge pull request #22`）。本报告在 `docs/phase5-closure` 分支上写，该分支相对 `origin/main` **只改文档与截图**，不改 `src/`、`tests/`、`desktop/src`、`scripts/`。
 - **打包形态（二次验收）：** Windows 11 10.0.26300；MSVC 2022 Build Tools；`npm run tauri build` 退出码 0，产出 NSIS 与 MSI 两个 bundle；NSIS 安装器静默安装到用户目录，退出码 0。**验收全程 8618 端口无任何监听**——因此前端只要能取到数据，就必然是打到了侧车自己的端口。
 - **开发形态（复测与走查）：** 后端 `uv run dexatlas-workbench`（`127.0.0.1:8618`），前端 Vite dev（`5173`，HashRouter）；JADX 1.5.2 / Apktool 2.11.1 / Androguard 4.1.4。
-- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1849<!--/fig--> 个（<!--fig:tests.fast-->1700<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1848<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
+- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1855<!--/fig--> 个（<!--fig:tests.fast-->1706<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1854<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
 
 ## 2. W1 — 侧车进程真接入
 
@@ -242,7 +242,7 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 6. **「前端模拟代码删除」—— 未字面完成。** 模拟降级为「连 run 状态都拿不到」时的兜底，三种来源在角标（`desktop/src/pages/Analysis.tsx:446`）与横幅（`:539`）中如实区分。执行单 §2.1 的判据原文是「前端模拟代码删除」，按字面仍未完成；按意图（不再以模拟冒充真实阶段）已满足。
 7. **failed / cancelled run 的时间线 —— 未实跑验证。** W2 复测实测的是 completed run 与运行中的 run；**失败/取消路径**只有代码路径与测试覆盖，没有真机走查。（partial 徽章在打包形态下倒是出现过——`exe-04` 的「报告」格标着「部分」——但那是**后端缺失**导致的 partial，与「分析部分失败」未必是同一条路径。）
 8. **MCP 面是否该暴露阶段工具 —— 未决。** `run_stages` 未注册为 MCP 工具（工具清单仍是 11 个），阶段事实只走 REST 与 workbench。这是设计取舍，不是缺陷，但**没有记录谁做的取舍**。
-9. **文件内 locator 的「打开来源」仍走 `window.alert`。** 文案写「来源文件（后端解析）」，但它既不解析也不打开文件——文案与行为有出入。这是 P3 修复时按任务边界（「文件内 locator 的行为保持不变」）留下的，**未验证**是否值得改。
+9. **文件内 locator 的「打开来源」仍走 `window.alert`。** 文案写「来源文件（后端解析）」，但它既不解析也不打开文件——文案与行为有出入。这是 P3 修复时按任务边界（「文件内 locator 的行为保持不变」）留下的。**已在本分支修复**：点击改走后端 `/locators/resolve`（后端本就返回源码文本、真实路径、字节数与截断标记，无需新端点），源码在抽屉内联展示并附可核对信息；无落点 locator 的禁用与说明不变。回归测试见 `tests/test_desktop_open_source_inline.py` 与 `desktop/src/locators.test.ts`。
 10. **阶段格与后端阶段不是一一对应（复测 P3，低危）。** 前端五格是「采集/解析/索引/证据/报告」，后端五阶段是 `inspect / parse-apktool / index-androguard / decompile-jadx / publish`：「解析」格**合并了两个后端阶段**，「证据」格**在后端没有对应阶段**、状态是推断的。这两点写在角标的 `title` 提示里（`desktop/src/stages.js:76` `EVIDENCE_SLOT_NOTE`、`:82` `PARSE_SLOT_NOTE`，由 `deriveStageBadge()` `:91` 组装），但**角标正文仍写「阶段推进：后端真实阶段事件」**——只在悬停提示里说清楚，屏幕上一眼看过去是夸大了。**未拆格**。
 11. **run 完成后仍每 2s 轮询 stages 端点（复测 P4，低危）。** 轮询的第三个参数传的是 `Boolean(project)`——「项目存在」而不是「run 还在跑」（`desktop/src/pages/Analysis.tsx:410`），所以 run 结束后请求仍在发。**未改**。
 12. **W4 运营清单的账号口径 —— 1 处不一致。** §6.2 已写明位置，不影响「只备料不执行」的结论。

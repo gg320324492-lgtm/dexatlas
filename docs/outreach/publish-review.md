@@ -18,7 +18,7 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,849（1,700 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
+| 测试总数 | 1,855（1,706 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
 | 一方代码覆盖率 | 93.3%（7,468 / 8,001 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
@@ -392,7 +392,7 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 **当前 `docs/reports/phase1-execution-report.md` 落盘的是最近一轮完整测量的值**
-（1,849 tests / 93.3%，7,468/8,001 行；打包 exe 二次验收修文案后的测量轮）。
+（1,855 tests / 93.3%，7,468/8,001 行；打包 exe 二次验收修文案后的测量轮）。
 
 ---
 

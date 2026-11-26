@@ -1,8 +1,10 @@
 /**
  * 项目详情页 — 三栏布局：左列证据列表 / 中间源码或调用图主体 / 右侧证据抽屉（§2-4）。
  * Q2-M2-D：数据来自真实后端 GET /api/projects/{id} 与 /evidence；
- * 证据抽屉展示后端真实 locator（provenance 串），"打开来源"/"resolve" 调
- * /locators/resolve 显示真实机器路径。partial 横幅由项目 errors 真实生成。
+ * 证据抽屉展示后端真实 locator（provenance 串），"resolve" 调
+ * /locators/resolve 显示真实机器路径；「打开来源」对文件内 locator
+ * 内联展示后端返回的源码与可核对信息（路径/行数/字节/截断），文案与
+ * 行为一致——不再弹 window.alert。partial 横幅由项目 errors 真实生成。
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,7 +18,7 @@ import { EmptyState } from "../components/states/EmptyState";
 import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { ApiError, dexatlas as client, downloadText } from "../api";
-import { openSourceState } from "../locators";
+import { inlineSourceOf, openSourceState } from "../locators";
 import type {
   CompletenessError,
   EvidenceRecord,
@@ -185,6 +187,12 @@ export function ProjectDetail() {
     () => openSourceState(selected?.provenance[0] ?? "", resolution),
     [selected, resolution],
   );
+
+  /**
+   * 「打开来源」内联展示的源码：resolve 成功且后端给了文件文本时才有。
+   * 路径、行数、字节数、截断标记都来自后端响应，不是前端推的。
+   */
+  const inlineSource = useMemo(() => inlineSourceOf(resolution), [resolution]);
 
   /** resolve 按钮：调后端 /locators/resolve，展示真实解析路径。 */
   const resolveSelected = async () => {
@@ -414,13 +422,9 @@ export function ProjectDetail() {
                   disabled={!openSource.openable}
                   title={openSource.openable ? undefined : openSource.note}
                   aria-describedby={openSource.openable ? undefined : "da-ev-open-source-hint"}
-                  onClick={() =>
-                    window.alert(
-                      `来源文件（后端解析）：${displayLocator(selected.provenance)}\n完整 provenance：${selected.provenance.join("\n")}`,
-                    )
-                  }
+                  onClick={() => void resolveSelected()}
                 >
-                  打开来源
+                  {resolving ? "解析中…" : "打开来源"}
                 </Button>
                 <Button variant="primary" size="sm" disabled={resolving} onClick={() => void resolveSelected()}>
                   {resolving ? "解析中…" : "resolve"}
@@ -431,16 +435,13 @@ export function ProjectDetail() {
                   {openSource.note}
                 </p>
               )}
-              {resolution && (
+              {resolution && !inlineSource && (
                 <div className="da-ev-drawer__resolution" role="status">
                   <div>
                     resolved：{String(resolution.resolved)}
                     {resolution.kind ? ` · kind=${resolution.kind}` : ""}
                   </div>
                   {resolution.reason && <div className="da-ev-drawer__resolution-path">{resolution.reason}</div>}
-                  {resolution.text && (
-                    <pre className="da-ev-drawer__resolution-text">{resolution.text.text.slice(0, 800)}</pre>
-                  )}
                 </div>
               )}
             </div>
@@ -465,6 +466,21 @@ export function ProjectDetail() {
               <span className="da-ev-drawer__label">来源后端</span>
               {originOf(selected.provenance)}
             </div>
+            {inlineSource && (
+              <div className="da-ev-source" role="region" aria-label="来源源码">
+                <span className="da-ev-drawer__label">来源文件</span>
+                <code className="da-ev-source__path" title={inlineSource.path}>
+                  {inlineSource.path}
+                </code>
+                <div className="da-ev-source__meta">
+                  {inlineSource.kind} · {inlineSource.lines} 行 · {inlineSource.bytesLabel}
+                  {inlineSource.truncated && " · 后端已截断（上限 200 行 / 64 KB）"}
+                </div>
+                <pre className="da-ev-source__code" tabIndex={0} title={inlineSource.notice}>
+                  {inlineSource.code}
+                </pre>
+              </div>
+            )}
             <div className="da-ev-drawer__field">
               <span className="da-ev-drawer__label">detail</span>
               <pre className="da-ev-drawer__detail">{JSON.stringify(selected.detail, null, 2)}</pre>
