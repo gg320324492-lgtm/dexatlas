@@ -368,14 +368,13 @@ jobs:
       - name: Use the stable Rust toolchain
         run: rustup default stable
       - name: Keep generated files in .scratch
+        # This job runs on a Windows runner, where the default shell is
+        # PowerShell; the bash spelling of this step would not parse there.
         run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
-          {
-            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
-            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
-            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
-          } >> "$GITHUB_ENV"
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\.scratch\tmp" | Out-Null
+          "TMPDIR=$env:GITHUB_WORKSPACE\.scratch\tmp" >> $env:GITHUB_ENV
+          "TEMP=$env:GITHUB_WORKSPACE\.scratch\tmp" >> $env:GITHUB_ENV
+          "TMP=$env:GITHUB_WORKSPACE\.scratch\tmp" >> $env:GITHUB_ENV
       - name: Run the Rust unit tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --lib
 
