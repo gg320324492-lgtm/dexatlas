@@ -1,13 +1,21 @@
 # 发版后运营清单 — v1.1.0 起
 
-**日期：** 2026-11-25 · **性质：** 运营备料（作者指示"先不正式运行"，本清单只列动作，不含任何需要作者账号的执行步骤）· **适用：** v1.1.0 及之后的每个版本
+**日期：** 2026-11-25 · **性质：** 运营备料（作者指示"先不正式运行"）· **适用：** v1.1.0 及之后的每个版本
+
+> **账号口径（2026-11-26 核对后写准）：** 本清单**只列动作，不含执行动作**；其中
+> **需要作者账号的只有两处**，都在下面标了出来——§4 的 release 页浏览/下载数
+> （GitHub Insights 是私有数据，只有仓库所有者看得到），以及 §1 第 1 项里
+> 「assets 是否可下载」的那一下点击。其余每一步都可以用免登录的方式做：
+> release 页面、issues 页与 tag 指向都是**公开可读**的（2026-11-26 实测：
+> release 页 HTTP 200、issues 页 HTTP 200、`git ls-remote --tags` 免账号
+> 可读）。
 
 ## 1. 发布当天（每版必做）
 
 | # | 动作 | 位置 | 完成判据 | 账号需求 |
 |---|---|---|---|---|
-| 1 | 核对 GitHub Release 页面渲染（正文、tag、assets） | https://github.com/gg320324492-lgtm/dexatlas/releases | 正文与 `docs/releases/<tag>.md` 一致；tag 指向发版提交 | 作者（或已登录 CI） |
-| 2 | 核对 tag CI 全绿（14 项，含 tag-only 测量门禁） | Actions | 全部 success（tag-only 项按设计 skip） | 无 |
+| 1 | 核对 GitHub Release 页面渲染（正文、tag、assets） | https://github.com/gg320324492-lgtm/dexatlas/releases | 正文与 `docs/releases/<tag>.md` 一致；tag 指向发版提交 | 渲染与 tag 指向：免登录可读；点 assets 下载需作者账号 |
+| 2 | 核对 tag CI 全绿（15 个 job，tag 上 16 次并行运行，含 tag-only 测量门禁） | Actions | 全部 success（tag-only 项按设计 skip） | 无 |
 | 3 | `check-release-numbers --tag <tag>` 退出码 0 | 本地 | mismatches 0、published body read | 无 |
 | 4 | README 徽章与 status.md 的版本行与发布一致 | 仓库 | 三处同版本号 | 无 |
 
@@ -24,12 +32,12 @@
 | 渠道 | 用途 | 现状 |
 |---|---|---|
 | GitHub Issues | 缺陷与功能请求的主台账 | 已可用（仓库公开） |
-| GitHub Discussions | 使用问答与反馈（需作者开启 Discussions） | 未开启 |
-| README 徽章下方"反馈"链接 | 把读者引到 Issues | 待加一行链接 |
+| GitHub Discussions | 使用问答与反馈（需作者开启 Discussions） | 未开启——**开启需要作者账号** |
+| README 徽章下方"反馈"链接 | 把读者引到 Issues | **已加**（2026-11-26，两份 README 的徽章区各一行） |
 
 ## 4. 指标（记录，不设目标）
 
-- 每版 release 页面浏览/下载（GitHub Insights，需作者账号查看）
+- 每版 release 页面浏览/下载（GitHub Insights，**私有数据，需作者账号查看**）
 - issue 新增/关闭数（可由 CI 或脚本按周统计，无需账号）
 - 桌面安装包构建产物体积与启动时间（已在性能基线报告记录口径）
 
