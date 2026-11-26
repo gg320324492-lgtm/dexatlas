@@ -13,7 +13,13 @@
 
 import { describe, expect, it } from "vitest";
 import * as stagesModule from "./stages";
-import { deriveStageBadge, deriveStagesFromRun, STAGES } from "./stages";
+import {
+  deriveStageBadge,
+  deriveStagesFromRun,
+  isTerminalStatus,
+  pollUntilTerminal,
+  STAGES,
+} from "./stages";
 import type { RunStageEvent } from "./api/types";
 
 /** 页面上的五个格子，顺序即页面上的顺序。 */
@@ -230,16 +236,23 @@ describe("deriveStagesFromRun —— 没有 run", () => {
 });
 
 describe("deriveStageBadge —— 角标如实说明数据来源", () => {
-  it("有 stages 时说数据来自后端真实阶段事件", () => {
+  it("有 stages 时说清楚：事件是后端给的，对应关系是前端映射的", () => {
     const badge = deriveStageBadge("stages");
-    expect(badge.text).toBe("阶段推进：后端真实阶段事件");
+    expect(badge.text).toBe("阶段推进：后端阶段事件 + 前端映射");
+    // 旧文案整句都说成后端给的（"后端真实阶段事件"），读者分不清哪部分是
+    // 后端事实、哪部分是前端映射：这条断言在旧实现上会红。
+    expect(badge.text).not.toContain("真实阶段事件");
+    expect(badge.title).toContain("后端事实");
+    expect(badge.title).toContain("前端");
   });
 
   it("旧 run 说清楚是后端 run 状态，不再声称前端模拟", () => {
     const badge = deriveStageBadge("run-status", false);
-    expect(badge.text).toBe("阶段推进：后端 run 状态");
+    expect(badge.text).toBe("阶段推进：后端 run 状态 + 前端映射");
     expect(badge.text).not.toContain("模拟");
     expect(badge.title).toContain("不随时间推进");
+    // 格子是前端按 run.status 映射出来的，这句话要说在明面上。
+    expect(badge.title).toContain("前端");
   });
 
   it("stages 端点不可用时不能藏起来", () => {
@@ -254,6 +267,132 @@ describe("deriveStageBadge —— 角标如实说明数据来源", () => {
       expect(title).toContain("推断");
       expect(title).toContain("parse-apktool");
     }
+  });
+});
+
+describe("isTerminalStatus —— 终态只有一份口径", () => {
+  it("completed / failed / cancelled 都是终态", () => {
+    expect(isTerminalStatus("completed")).toBe(true);
+    expect(isTerminalStatus("failed")).toBe(true);
+    expect(isTerminalStatus("cancelled")).toBe(true);
+  });
+
+  it("pending / running 不是终态", () => {
+    expect(isTerminalStatus("pending")).toBe(false);
+    expect(isTerminalStatus("running")).toBe(false);
+  });
+
+  it("没读到状态就不算终态（宁可多问一次后端）", () => {
+    expect(isTerminalStatus(null)).toBe(false);
+    expect(isTerminalStatus(undefined)).toBe(false);
+    expect(isTerminalStatus("")).toBe(false);
+    // 后端将来新增的状态：在读到它之前，前端不替它做决定。
+    expect(isTerminalStatus("queued")).toBe(false);
+  });
+});
+
+/** 假的定时器：记下清掉过哪些句柄，并能手动触发每一次「到点」。 */
+function fakeScheduler() {
+  const cleared: number[] = [];
+  let nextHandle = 1;
+  let onTick: (() => void) | null = null;
+  return {
+    cleared,
+    scheduler: {
+      setInterval: (fn: () => void) => {
+        onTick = fn;
+        return nextHandle++;
+      },
+      clearInterval: (handle: number) => {
+        cleared.push(handle);
+      },
+    },
+    fire: () => {
+      onTick?.();
+    },
+  };
+}
+
+/** 让挂起的 await 链跑完（要好几拍微任务）。 */
+function flush(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+describe("pollUntilTerminal —— 进了终态就停", () => {
+  it("还没进终态时定时器继续转", async () => {
+    const fake = fakeScheduler();
+    let calls = 0;
+    const poller = pollUntilTerminal({
+      poll: async () => {
+        calls += 1;
+      },
+      isTerminal: () => false,
+      intervalMs: 2000,
+      scheduler: fake.scheduler,
+    });
+
+    await flush();
+    expect(calls).toBe(1); // 立刻拉一次
+    fake.fire();
+    await flush();
+    expect(calls).toBe(2);
+    expect(fake.cleared).toEqual([]); // 还不是终态：不停
+
+    poller.stop();
+    expect(fake.cleared).toHaveLength(1);
+  });
+
+  it("run 进终态后定时器被清掉，不再发请求", async () => {
+    const fake = fakeScheduler();
+    let calls = 0;
+    let status = "running";
+    const poller = pollUntilTerminal({
+      poll: async () => {
+        calls += 1;
+      },
+      isTerminal: () => isTerminalStatus(status),
+      intervalMs: 2000,
+      scheduler: fake.scheduler,
+    });
+
+    await flush();
+    expect(calls).toBe(1);
+    expect(fake.cleared).toEqual([]);
+
+    // 这一轮跑完了：后端把 run.status 写成终态。
+    status = "completed";
+    fake.fire();
+    await flush();
+    expect(calls).toBe(2);
+    expect(fake.cleared).toEqual([1]); // 定时器被清掉了
+
+    fake.fire(); // 定时器已经清掉：不会再有请求
+    await flush();
+    expect(calls).toBe(2);
+
+    poller.stop();
+  });
+
+  it("cancelled 也算终态（被取消的分析不会再变）", async () => {
+    const fake = fakeScheduler();
+    let calls = 0;
+    const poller = pollUntilTerminal({
+      poll: async () => {
+        calls += 1;
+      },
+      isTerminal: () => isTerminalStatus("cancelled"),
+      intervalMs: 2000,
+      scheduler: fake.scheduler,
+    });
+
+    await flush();
+    expect(calls).toBe(1);
+    expect(fake.cleared).toEqual([1]); // 第一次读完就是终态：立刻停
+
+    fake.fire();
+    await flush();
+    expect(calls).toBe(1);
+    poller.stop();
   });
 });
 

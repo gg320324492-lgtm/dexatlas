@@ -2,25 +2,40 @@
  * 分析进行中页 — 左侧阶段进度 + 中间状态时间线 + 右侧后端状态（§2-3）。
  *
  * Q2-M2-C 真实后端接线（如实披露，无编造能力）：
- * - 数据源：workbench 后端 GET /api/projects/{id}（pending/running 时每 2s 轮询，
- *   completed/failed 停止）与 GET /api/health。
+ * - 数据源：workbench 后端 GET /api/projects/{id}（每 2s 轮询一次，进了
+ *   终态就停）与 GET /api/health。
  * - Q2 批次二 X3：阶段进度优先读取真实 run 数据。在项目状态轮询之外并行轮询
  *   GET /api/projects/{id}/runs（workbench PR #5 起），用最新一轮 run 的
  *   status/completeness/tool_versions/duration_seconds 映射到五阶段视图。
- * - Phase 5 W2：run.stages（真实 pipeline 阶段事件，runs.py RunStage）存在时，
- *   时间线直接按阶段事件渲染。Phase 5 收尾删除了前端时间模拟：拿不到后端
- *   事实时如实显示拿不到，不再按时间推进五格。
+ * - Phase 5 W2：run.stages（后端 pipeline 的阶段事件，runs.py RunStage）
+ *   存在时，时间线直接按阶段事件渲染。Phase 5 收尾删除了前端时间模拟：
+ *   拿不到后端事实时如实显示拿不到，不再按时间推进五格。
+ *
+ * 【后端事实 vs 前端映射——两件事，别混成一件】
+ * - 后端给的**事实**：阶段事件（GET /api/projects/{id}/runs/{run_id}/stages）、
+ *   run 的 status、项目的 status；
+ * - 前端做的**映射**：五个格子分别对应哪个后端阶段、哪一格算「推进到位」、
+ *   「证据」格怎么推断（映射规则在 ../stages 的 STAGE_TO_SLOT）。
+ * 页面上的角标与注释都按这条线措辞：事件是后端给的，对应关系是前端定的。
  *
  * 阶段映射规则（优先级从高到低）写在 ../stages 里（纯函数、可被
  * desktop/src/stages.test.ts 直接执行）：
- * - 有 stages（真实 pipeline 阶段事件，runs.py RunStage）→ 按事件推进置
+ * - 有 stages（后端 pipeline 的阶段事件，runs.py RunStage）→ 按事件推进置
  *   done/running；run 已终止却停在某阶段的格子标 error；completeness =
  *   "partial" 时按 errors 点名的工具在已完成格子上标注"部分"（skipped 态）；
  * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无阶段事件），角标只
- *   标注真实来源（stages / run-status），「证据」格等推断值也在角标里说明；
+ *   标注数据来源（stages / run-status），并说明格子是前端的映射、「证据」
+ *   格等推断值也在角标里说明；
  * - 无 run 数据时五格全部"待处理"（状态未知），角标不标来源；runs 请求
  *   失败（404 / 网络）时阶段卡片显示可读错误与重试入口——不画一个看起来
  *   在推进的时间线。
+ *
+ * 【轮询什么时候停】
+ * 三处轮询（项目状态、runs 列表、阶段事件）都走 ../stages 的
+ * pollUntilTerminal：终态判据是后端返回的状态字段（project.status /
+ * run.status），口径只有一份（../stages 的 isTerminalStatus：completed /
+ * failed / cancelled；项目的状态域里没有 cancelled——被取消的分析把项目
+ * 留在 failed）。进了终态就清掉定时器：项目跑完之后不该再每两秒问一次后端。
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
@@ -56,6 +71,8 @@ import {
   STAGES,
   deriveStageBadge,
   deriveStagesFromRun,
+  isTerminalStatus,
+  pollUntilTerminal,
 } from "../stages";
 import "./Analysis.css";
 
@@ -141,6 +158,8 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
   const prevRunCountRef = useRef(0);
   const notFoundStreakRef = useRef(0);
   const lastErrorRef = useRef<string | null>(null);
+  // 最近一次读到的项目状态：终态判定读它（判据是后端字段，不是时间）。
+  const latestStatusRef = useRef<string | null>(null);
 
   const pushLog = useCallback((level: LogLevel, source: string, message: string) => {
     logIdRef.current += 1;
@@ -160,16 +179,10 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     prevRunCountRef.current = 0;
     notFoundStreakRef.current = 0;
     lastErrorRef.current = null;
+    latestStatusRef.current = null;
 
     let stopped = false;
     let busy = false;
-    let timer: number | undefined;
-    const stop = () => {
-      if (timer !== undefined) {
-        window.clearInterval(timer);
-        timer = undefined;
-      }
-    };
 
     const poll = async () => {
       if (busy || stopped) return;
@@ -207,7 +220,9 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
         }
 
         setProject(data);
-        if (status === "completed" || status === "failed") stop();
+        // 终态判定交给 pollUntilTerminal：判据是后端返回的 project.status，
+        // 与 runs 轮询共用同一份口径（../stages 的 isTerminalStatus）。
+        latestStatusRef.current = status;
       } catch (err) {
         if (stopped) return;
         const code = err instanceof ApiError ? err.status : 0;
@@ -236,8 +251,13 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
     };
 
     pushLog("info", "轮询", `开始轮询 GET ${API_BASE}/projects/${projectId}（每 ${POLL_INTERVAL_MS / 1000}s）`);
-    void poll();
-    timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    // 轮询规则在 ../stages 的 pollUntilTerminal：进了终态（completed /
+    // failed / cancelled）就清掉定时器，不再空转地问后端。
+    const poller = pollUntilTerminal({
+      poll,
+      isTerminal: () => isTerminalStatus(latestStatusRef.current),
+      intervalMs: POLL_INTERVAL_MS,
+    });
     void dexatlas
       .getHealth()
       .then((h) => {
@@ -249,14 +269,21 @@ function useProjectPolling(projectId: string | undefined, retryNonce: number): P
 
     return () => {
       stopped = true;
-      stop();
+      poller.stop();
     };
   }, [projectId, retryNonce, pushLog]);
 
   return { project, health, pollError, notFound, notFoundLong, logs, pushLog };
 }
 
-/** 并行轮询 runs 列表：与项目状态轮询独立，runs 拉取失败不阻塞状态展示。 */
+/**
+ * 并行轮询 runs 列表：与项目状态轮询独立，runs 拉取失败不阻塞状态展示。
+ *
+ * 【什么时候停】最新一轮 run 进了终态就停：判据是后端返回的 run.status
+ * （completed / failed / cancelled，见 ../stages 的 isTerminalStatus），和
+ * 项目状态轮询共用同一份口径。跑完了还每两秒问一次后端，问的是一个不会
+ * 变的答案——那不是「还在跑」，只是空转。
+ */
 function useRunsPolling(
   projectId: string | undefined,
   active: boolean,
@@ -268,6 +295,8 @@ function useRunsPolling(
   const [runs, setRuns] = useState<RunInfo[]>([]);
   const [runsError, setRunsError] = useState<string | null>(null);
   const observedProjectRef = useRef<string | undefined>(undefined);
+  // 最近一次读到的最新一轮 run 的状态：终态判定读它（判据是后端字段）。
+  const latestRunStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!projectId || !active) return;
@@ -277,6 +306,7 @@ function useRunsPolling(
       observedProjectRef.current = projectId;
       setRuns([]);
       setRunsError(null);
+      latestRunStatusRef.current = null;
     }
     let stopped = false;
     let busy = false;
@@ -289,6 +319,8 @@ function useRunsPolling(
         if (!stopped) {
           setRuns(envelope.runs);
           setRunsError(null);
+          // runs[0] 是最新一轮；它进终态，这轮轮询就到此为止。
+          latestRunStatusRef.current = envelope.runs[0]?.status ?? null;
         }
       } catch (err) {
         if (!stopped) {
@@ -301,11 +333,14 @@ function useRunsPolling(
       }
     };
 
-    void poll();
-    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    const poller = pollUntilTerminal({
+      poll,
+      isTerminal: () => isTerminalStatus(latestRunStatusRef.current),
+      intervalMs: POLL_INTERVAL_MS,
+    });
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      poller.stop();
     };
   }, [projectId, active, retryNonce]);
 
@@ -344,6 +379,10 @@ function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
 /**
  * 轮询最新 run 的阶段事件（Phase 5 W2 独立端点）。runs 拉取成功且有
  * run id 后开始轮询；端点不可用（404 = 旧后端）时如实记录一次。
+ *
+ * 【什么时候停】该 run 进了终态就停：判据是 stages 端点返回的 run_status
+ * （后端字段），口径与另两处轮询相同（../stages 的 isTerminalStatus）。
+ * run 结束之后阶段事件不会再变，继续问只是白问。
  */
 function useRunStagesPolling(
   projectId: string | undefined,
@@ -353,11 +392,13 @@ function useRunStagesPolling(
   const [stages, setStages] = useState<RunStageEvent[] | null>(null);
   const [stagesError, setStagesError] = useState<string | null>(null);
   const polledRunRef = useRef<string | null>(null);
+  // 最近一次读到的该 run 的状态：终态判定读它（判据是后端字段）。
+  const latestRunStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!projectId || !runId || !active) {
       // 没有 run（或还没拿到 run）：清掉上一个项目/轮次留下的阶段事件。
-      // 否则角标会把旧项目的「真实阶段事件」标到当前页上——来源不真实，
+      // 否则角标会把旧项目的阶段事件标到当前页上——来源不真实，
       // 比没有来源更糟。
       polledRunRef.current = null;
       setStages(null);
@@ -367,6 +408,7 @@ function useRunStagesPolling(
     const key = `${projectId}:${runId}`;
     if (polledRunRef.current !== key) {
       polledRunRef.current = key;
+      latestRunStatusRef.current = null;
       setStages(null);
       setStagesError(null);
     }
@@ -381,6 +423,8 @@ function useRunStagesPolling(
         if (!stopped) {
           setStages(envelope.stages);
           setStagesError(null);
+          // 端点同时返回这一轮 run 的状态：它进终态，阶段事件就定型了。
+          latestRunStatusRef.current = envelope.run_status ?? null;
         }
       } catch (err) {
         if (!stopped) {
@@ -392,11 +436,14 @@ function useRunStagesPolling(
       }
     };
 
-    void poll();
-    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    const poller = pollUntilTerminal({
+      poll,
+      isTerminal: () => isTerminalStatus(latestRunStatusRef.current),
+      intervalMs: POLL_INTERVAL_MS,
+    });
     return () => {
       stopped = true;
-      window.clearInterval(timer);
+      poller.stop();
     };
   }, [projectId, runId, active]);
 
@@ -444,7 +491,8 @@ export function Analysis() {
   const activeStageLabel = STAGES.find((s) => stageStates[s.id] === "running")?.label;
   const duration = durationLabel(latestRun?.duration_seconds);
   const hasStageFacts = Boolean(runStageEvents?.length);
-  // 角标只标注真实来源（阶段事件 / run 状态）；没有 run 数据时不标来源，
+  // 角标只标注数据来源（阶段事件 / run 状态），并写明哪一部分是后端给的
+  // 事实、哪一部分是前端做的映射；没有 run 数据时不标来源，
   // 卡片正文如实说明「状态未知」。角标标题同时说明哪些格子是推断出来的
   //（证据格、合并了 JADX 的解析格）。
   const stageBadge = hasStageFacts
@@ -597,7 +645,7 @@ export function Analysis() {
         />
       ) : (
         <div className="analysis__grid">
-          {/* 左：阶段进度（stages 真实事件 → run 状态映射；无数据时如实显示未知） */}
+          {/* 左：阶段进度（后端阶段事件 → 前端映射；无数据时如实显示未知） */}
           <Card className="analysis__stages" aria-label="阶段进度">
             <CardHeader
               title="阶段进度"

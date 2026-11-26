@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1863<!--/fig-->（<!--fig:tests.fast-->1714<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1874<!--/fig-->（<!--fig:tests.fast-->1725<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7482<!--/fig-->/<!--fig:coverage.total-->8015<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1714<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1725<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1863<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1874<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -192,6 +192,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_upload_isolation.py` | 两个同名上传不会写到同一个路径去；分析读到的字节必须和它的元数据对得上 |
 | `test_jadx_relative_paths.py` | 默认配置（相对工作区）下 JADX 的输出路径只有一个意思，Java 反编译真的生效 |
 | `test_analysis_failure.py` | 分析崩了必须说得清：项目不留在 `running`，错误被记下，异常照样传出去 |
+| `test_empty_result.py` | 分析跑完却什么也没读到时，失败同样要落库：项目行与 run 行都记 `failed` 并带一条说得清原因的错误，界面才不会永远停在「分析中」；空的结果**不**发布，已发布的快照保持原样，取消与异常路径不变（Phase 5 收尾新增） |
 | `test_analysis_duration.py` | 这次分析花了多久：CLI 和 API 导出的是同一个数，而且不是 0 |
 | `test_report_cross_reference_units.py` | 「有证据的交叉引用」和「索引的交叉引用」必须同一个单位 |
 | `test_evidence_table_window.py` | 证据表只有 200 行时，结论级的记录不能被挤掉，截断必须在表前说清楚 |
@@ -268,6 +269,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素（Q2 走查 P4 新增） |
 | `test_desktop_no_stage_simulation.py` | 分析页的阶段时间线不再有前端时间模拟：模块不再导出按时间推进的函数、无 run 数据五格如实「待处理」、runs 请求失败显示「后端不可用，阶段进度无法取得」与重试入口（Phase 5 收尾新增） |
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
+| `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -888,10 +890,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1863<!--/fig--> 个：<!--fig:tests.fast-->1714<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1874<!--/fig--> 个：<!--fig:tests.fast-->1725<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7468<!--/fig-->/<!--fig:coverage.total-->8001<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1862<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7482<!--/fig-->/<!--fig:coverage.total-->8015<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1873<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1019,7 +1021,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 24,
     "cli_commands": 15,
-    "documents": 158,
+    "documents": 160,
     "sample_apks": 5
   },
   "coverage": {
@@ -1055,7 +1057,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/methods.py": [218, 10],
       "core/models.py": [343, 5],
       "core/paths.py": [36, 2],
-      "core/pipeline.py": [543, 34],
+      "core/pipeline.py": [557, 34],
       "core/runs.py": [106, 0],
       "core/storage.py": [403, 13],
       "mcp/__init__.py": [2, 0],
@@ -1095,7 +1097,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 533,
-    "statements": 8001
+    "statements": 8015
   },
   "history": {
     "v0.1.0": {
@@ -1112,10 +1114,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:2bf9a1b17402eaa48086c854bd0d04d67f452fb863d7f684d526be9499b94985",
+  "source_fingerprint": "sha256:2d6e71ac51061bb0c51d6e21ccea4b40f6eada3767089c0a3b9bd7eb516b0bc9",
   "suite": {
     "failed": 0,
-    "passed": 1862,
+    "passed": 1873,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1129,8 +1131,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1714,
+    "fast": 1725,
     "slow": 149,
-    "total": 1863
+    "total": 1874
   }
 }-->
