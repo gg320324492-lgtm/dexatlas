@@ -28,7 +28,7 @@
 | 测试 | <!--fig:tests.total-->1863<!--/fig--> 个（<!--fig:tests.fast-->1714<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） |
 | 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig--> |
 | 类型检查 / lint | `mypy` strict、`ruff` lint + format，均通过 |
-| CI | **14 个 workflow job、tag 上 15 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 14 次）：Lint / Python 3.12 / 3.13 / 部分后端 / M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
+| CI | **15 个 workflow job、tag 上 16 次并行运行**（`test` 是 3.12/3.13 矩阵；「只在 tag 上跑的测量比对」在 push 与 PR 上跳过，所以那边是 15 次）：Lint / Python 3.12 / 3.13 / 部分后端 / 桌面前端单测 / 桌面端 Rust 单测（仅 Windows）/ M3 对比重跑 / Docker / 依赖审计 / 公共契约活检（带 Java 后端与不带两种）/ M10 自查 / 门禁覆盖自查 / 社交预览卡片核对 / 对外文本发布数字核对 / 只在 tag 上跑的测量比对。每次 push 到 `main`、PR 到 `main`、推 `v*` tag 都会跑一遍；**每一次 run 的逐 job 结论见 [CI run 记录](reports/v1.0.0-ci-run-record.md)** |
 | 成熟度评估 | 修复前的基线 **5.50 / 10**（六个加权维度，见[评估报告](reports/phase1-maturity-assessment.md)）；今天的分数要重跑才有 |
 
 > M6 层级 2 的执行层修复（判分链路、预算分类、重试、检索兜底）已在本分支
@@ -52,8 +52,8 @@
 > （现状披露）为最终定稿路径**，不再追加修复轮或模型调用。本页其余测量数字
 > 仍对应修复前代码（`main` `fbca3d5` 及更早）。
 
-**CI 的十四个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
-矩阵，展开后是**十五次并行运行**；下表逐行列出这十五次运行）：
+**CI 的十五个 workflow job 各自覆盖一种配置**，不是重复（`test` 是 3.12/3.13
+矩阵，展开后是**十六次并行运行**；下表逐行列出这十六次运行）：
 
 | Job | 覆盖什么 |
 |---|---|
@@ -71,6 +71,7 @@
 | Social preview card | 仓库首页那张卡片上的数要与报告里的数一致——图片没法被人 diff，所以这一步由机器做 |
 | The outward texts agree on the release numbers | 对外文本里手抄的发布数字要与执行报告一致（`scripts/check-release-numbers.py`） |
 | Desktop unit tests | 桌面前端的单元测试（`npm run test`，vitest）：阶段映射、locator 落点分类、侧车端口解析——桌面端此前零测试，这些回归只有真单测能守 |
+| Desktop Rust unit tests | 桌面端 Rust 侧的单元测试（`cargo test --lib`，**只在 Windows 上跑**）：作业对象兜底、侧车生命周期——被测代码（Job Object）只存在于 Windows，别处跑等于什么都没测 |
 | The report's figures describe the tagged tree | **只在推 tag 时跑**：用 `refresh-report-figures.py --check` 重测一遍并比对，报告里的数字必须描述被 tag 的那棵树 |
 
 第三个 job 存在的原因值得记一句：它曾经**从未在 CI 上跑过**，

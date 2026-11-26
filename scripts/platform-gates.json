@@ -45,6 +45,14 @@
       "local_counterpart": "npm run build && npm run test (in desktop/)",
       "note": "The desktop front end had no CI job at all before this one: its regressions were Python assertions about the source text. The job now runs the real unit tests (vitest) and type-checks the front end (tsc --noEmit, part of npm run build). It is a separate toolchain from the Python one -- npm, not uv -- so it is a separate job rather than a step in the test job."
     },
+    "desktop-rust": {
+      "runs_on": "windows-latest",
+      "gate_scripts": [],
+      "temp_redirect": "yes",
+      "reason": "the job moves TMPDIR/TEMP/TMP into the workspace so that the compiler's and the linker's scratch files land beside the repository instead of on the runner's system drive",
+      "local_counterpart": "cargo test --manifest-path desktop/src-tauri/Cargo.toml --lib",
+      "note": "The Rust side of the desktop application had no CI job at all: its unit tests -- including the ones that decide whether a killed host leaves an orphan backend behind -- ran nowhere but on the machine that wrote them. The job runs on Windows on purpose, because the code under test is the Windows Job Object FFI, which is compiled out on other platforms. A third toolchain (cargo), so it is a separate job rather than a step of the npm one."
+    },
     "m3-comparison": {
       "runs_on": "ubuntu-latest",
       "gate_scripts": [],
@@ -307,6 +315,15 @@
         "desktop"
       ],
       "note": "A different toolchain from the rest of this list -- npm, not uv -- so it is a separate entry with its own command rather than a step of the Python suite. The front end's regressions are not the Python suite's business: before this entry existed, the desktop had no test runner at all."
+    },
+    {
+      "name": "the desktop application's Rust unit tests",
+      "command": "cargo test --manifest-path desktop/src-tauri/Cargo.toml --lib",
+      "script": null,
+      "ci_jobs": [
+        "desktop-rust"
+      ],
+      "note": "A third toolchain -- cargo -- and a third platform for the same gate: the Windows Job Object FFI that keeps a killed host from leaving an orphan backend only exists on Windows, so this gate can only be run there. Before this entry existed, the Rust tests ran nowhere but on the machine that wrote them, which makes them a document rather than a gate."
     }
   ]
 }
