@@ -100,7 +100,7 @@
 - **R-1（信息，按设计）**：`check-release-numbers.py` 对 `docs/how-to-verify{,.zh-CN}.md` 报 `coverage.pct not written (report: 93.3)`——这两份文档未手写覆盖率数字，脚本设计如此；非缺陷。
 - **R-2（信息，按设计）**：`check-release-numbers.py` 对 `docs/reports/v1.0.0-github-release-body.md` 报 `missing document`——该可选文件不存在，脚本 stderr 提示后继续，已有 releases/v1.0.0.md 与 GitHub 已发布正文兜底；非缺陷。
 - **R-3（流程注意）**：`check-release-numbers.py --strict` 在发布说明就绪后才应作为发布门；当前普通模式已 PASS，strict 亦 PASS，但若后续新增 release body 文件需重跑。
-- **R-4（信息，证据补强）**：本次完整 pytest 实测 1807 passed / 1 skipped（545.05s），与执行报告 `<!--fig:suite.passed-->1807`、`<!--fig:suite.skipped-->1` 标记一致（见 `docs/reports/phase1-execution-report.md:893`），实测闭环了报告数字与当前树的一致性。
+- **R-4（信息，证据补强）**：本次完整 pytest 实测 1807 passed / 1 skipped（545.05s），与执行报告 `<!--fig:suite.passed-->1807`、`<!--fig:suite.skipped-->1` 标记一致（见 `docs/reports/phase1-execution-report.md:895`），实测闭环了报告数字与当前树的一致性。
 - **R-5（低危，既有行为，建议后续修）**：Workbench 上传屏的轮询把项目 `failed` 终态并入成功分支——`status.project.status === "completed" || status.project.status === "failed"` 都进入 `done`，绿 ✓ 显示「analysis finished: <name>」并提供「open the project」入口（`src/dexatlas/workbench/web/src/App.tsx:228`、`src/dexatlas/workbench/web/src/App.tsx:314`）。该行为由 `903195c`（2026-11-14，已含于 v1.0.0）引入，**不是 Phase 4 改动**；失败项目在跳转后的项目页有红 ✕ 徽章与 completeness errors 明示，故误导仅限上传屏的瞬时文案。建议后续把 `failed` 分支改走 `UploadPhase["failed"]`；不阻断本次发布。
 - **R-6（低危备忘）**：`Tabs` 组件（`src/dexatlas/workbench/web/src/components.tsx:275`）缺 `aria-controls`/关联 tabpanel/roving tabIndex；当前未被任何页面使用，属潜伏项，采用前应补全 tab 模式。
 

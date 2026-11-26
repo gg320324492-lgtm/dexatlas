@@ -28,7 +28,7 @@
 - **代码基线：** `origin/main` @ `33e4ba9`（`Merge pull request #22`）。本报告在 `docs/phase5-closure` 分支上写，该分支相对 `origin/main` **只改文档与截图**，不改 `src/`、`tests/`、`desktop/src`、`scripts/`。
 - **打包形态（二次验收）：** Windows 11 10.0.26300；MSVC 2022 Build Tools；`npm run tauri build` 退出码 0，产出 NSIS 与 MSI 两个 bundle；NSIS 安装器静默安装到用户目录，退出码 0。**验收全程 8618 端口无任何监听**——因此前端只要能取到数据，就必然是打到了侧车自己的端口。
 - **开发形态（复测与走查）：** 后端 `uv run dexatlas-workbench`（`127.0.0.1:8618`），前端 Vite dev（`5173`，HashRouter）；JADX 1.5.2 / Apktool 2.11.1 / Androguard 4.1.4。
-- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1878<!--/fig--> 个（<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1877<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
+- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1880<!--/fig--> 个（<!--fig:tests.fast-->1731<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1879<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
 
 ## 2. W1 — 侧车进程真接入
 
@@ -297,6 +297,28 @@ WebView2 里的样子）——本轮在打包 exe 里复验了取消路径，并
 原文「确认取消本次分析？已生成的中间结果将被丢弃。」；取消后项目记 failed、
 错误为 `the analysis was cancelled before it completed`、**未发布任何结果**。
 
+### 7.6 A5：一个窄栏里的布局缺陷（2026-11-27 收尾，已修）
+
+**现象：** 分析进行中页左栏（280px）的卡片头里，「阶段进度」四个字**一个一个
+竖着排**下来，标题被压到约 20px 宽。角标「阶段推进：后端阶段事件 + 前端映射」
+是一句 `nowrap` 的长话，占去大半宽度。
+
+**根因：** 卡片头的三块（标题 / 副标题 / 角标）是并排的 flex，而
+`.da-card__actions` 写着 `flex-shrink: 0`（不缩），标题那一块
+`.da-card__heading` 只有 `min-width: 0`、没有 `flex: 1`——于是让路的永远是
+标题。
+
+**修法：** 标题块 `flex: 1 1 auto`（占满角标让出的空间），actions 允许收缩并
+有自己的 `min-width: 0`，阶段角标允许换行。全应用只有阶段进度卡用了长角标，
+其余卡片（链接、按钮、徽章、搜索框）不受影响。
+
+**验证：** 重新打包的 exe 里复验，标题横排、角标在自己的框里折成三行，左栏
+读起来是完整的（阶段进度 → 五格 → run 记录）。
+
+**回归测试：** `tests/test_desktop_card_header_layout.py` 2 例——读 CSS 钉住
+那两条规则（与 `test_desktop_keyboard_accessibility.py` 读 CSS 断言焦点环同一
+种做法）。布局没有单元测试能测，所以规则本身被钉在这里。
+
 ## 8. 判定与下一步
 
 **可以宣布的：**
@@ -309,6 +331,7 @@ WebView2 里的样子）——本轮在打包 exe 里复验了取消路径，并
 - **界面不再有夸大与多余**：角标说明「后端阶段事件 + 前端映射」，run 进终态即停止轮询（§7.1 第 10、11 项）。
 - **「前端时间模拟兜底」已删除**（2026-11-26 收尾）：模拟路径已删除，无 run 数据时五格如实显示状态未知，runs 请求失败时显示可读错误与重试入口。
 - **后端状态区不再把「版本还在探测」说成「未安装」**（2026-11-26 收尾，§7.5）：打包 exe 里实测到的界面假话，后端补落库、前端改三态，两边都有回归测试。
+- **窄栏里的卡片标题不再被角标挤成竖排**（2026-11-27 收尾，§7.6）：重新打包的 exe 里复验，标题横排、角标折行。
 
 **不能宣布的：**
 
