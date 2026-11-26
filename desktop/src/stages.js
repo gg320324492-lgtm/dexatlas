@@ -26,6 +26,14 @@
  * 证据由 pipeline 在 publish 之前产出（src/dexatlas/core/pipeline.py:345
  * 建证据，:383 才发布），所以「证据」格的状态只能推断，页面角标必须
  * 如实说明这一点（见 deriveStageBadge）。
+ *
+ * 【什么算终态、什么时候停止轮询】
+ * 后端有两套状态字段：「一个项目怎么样了」（project.status）与「这一轮
+ * 分析怎么了」（run.status）。本模块给出唯一一份终态口径
+ * （isTerminalStatus），并给出「进了终态就停」的轮询规则
+ * （pollUntilTerminal）。规则放在这里，是因为它必须能在没有 DOM 的地方
+ * 被直接执行和测试（CI 的 desktop job 跑 vitest，环境是 node）；页面只
+ * 负责把后端的事实画出来，不自己决定「什么时候算结束」。
  */
 
 /**
@@ -85,6 +93,13 @@ export const PARSE_SLOT_NOTE = "「解析」格合并了后端的 parse-apktool 
 /**
  * 阶段推进的角标：如实说明数据来源。
  *
+ * 【两件事要分开说】
+ * - 后端给的**事实**：阶段事件（stages 端点）或 run 的状态字段；
+ * - 前端做的**映射**：五个格子分别对应哪个后端阶段、哪一格算「推进到位」。
+ * 角标只写一句短话，所以正文里点明后半句是前端的映射，展开说明放在
+ * title（悬停可见）里；两处都不能含糊，否则读者会以为格子上的状态是
+ * 后端直接报出来的。
+ *
  * @param {"stages" | "run-status"} source
  * @param {boolean} [stagesUnavailable] stages 端点不可用（404 / 网络）
  * @returns {{ text: string, title: string }}
@@ -92,14 +107,117 @@ export const PARSE_SLOT_NOTE = "「解析」格合并了后端的 parse-apktool 
 export function deriveStageBadge(source, stagesUnavailable = false) {
   if (source === "stages") {
     return {
-      text: "阶段推进：后端真实阶段事件",
-      title: `阶段状态读自后端 stages 端点的真实阶段事件（pipeline 推进点）。${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
+      text: "阶段推进：后端阶段事件 + 前端映射",
+      title: `阶段事件读自后端 stages 端点（pipeline 推进点，后端事实）；五格与后端阶段的对应关系、哪一格算「推进到位」，由前端的映射与推断决定（desktop/src/stages.js）。${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
     };
   }
   return {
-    text: `阶段推进：后端 run 状态${stagesUnavailable ? "（stages 端点不可用）" : ""}`,
-    title: `该 run 无阶段级数据（旧后端写入），格子的状态按 run.status 静态映射，不随时间推进；${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
+    text: `阶段推进：后端 run 状态 + 前端映射${stagesUnavailable ? "（stages 端点不可用）" : ""}`,
+    title: `该 run 无阶段级数据（旧后端写入），格子的状态由前端按 run.status 静态映射，不随时间推进；${PARSE_SLOT_NOTE}；${EVIDENCE_SLOT_NOTE}。`,
   };
+}
+
+/**
+ * 终态集合：completed / failed / cancelled。
+ *
+ * 【两个状态字段，一套口径】
+ * - run.status（src/dexatlas/core/runs.py:52 RunStatus）：pending / running /
+ *   completed / failed / cancelled；
+ * - project.status（src/dexatlas/core/models.py:748 ProjectStatus）：pending /
+ *   running / completed / failed —— 没有 cancelled：被取消的分析把项目留在
+ *   failed（src/dexatlas/core/pipeline.py:490 _record_cancellation「Leave the
+ *   project failed, and say that it was cancelled」）。
+ * 各处轮询（项目状态、runs 列表、阶段事件）因此共用这一个判定：项目落在
+ * completed/failed 时停，run 落在 completed/failed/cancelled 时停。
+ *
+ * @type {readonly string[]}
+ */
+export const TERMINAL_STATUSES = ["completed", "failed", "cancelled"];
+
+/**
+ * 这个状态是不是终态（不会再变了）。
+ *
+ * 未知状态（null、空串、后端将来新增的状态）一律算「不是终态」：宁可多问
+ * 一次后端，也不要在没读到事实时假装已经结束——那会让页面停在半路而没人
+ * 知道它在等什么。
+ *
+ * @param {string | null | undefined} status 后端返回的状态字段值
+ * @returns {boolean}
+ */
+export function isTerminalStatus(status) {
+  return typeof status === "string" && TERMINAL_STATUSES.includes(status);
+}
+
+/**
+ * 定时器来源：浏览器里是 window 的那套，测试里注入假的（node 环境没有
+ * window，而且真定时器会让测试等真实时间）。
+ *
+ * @typedef {Object} PollScheduler
+ * @property {(fn: () => void, ms: number) => number} setInterval
+ * @property {(handle: number) => void} clearInterval
+ */
+
+/** 默认的定时器来源：全局 setInterval（浏览器与 node 都有）。 @type {PollScheduler} */
+const DEFAULT_SCHEDULER = {
+  setInterval: (fn, ms) => globalThis.setInterval(fn, ms),
+  clearInterval: (handle) => globalThis.clearInterval(handle),
+};
+
+/**
+ * 轮询一个后端事实源，进了终态就停。
+ *
+ * 【终态判定依据】isTerminal()，由调用方给出，判据只能是后端返回的状态
+ * 字段（项目的 project.status、run 的 run.status）——不是时间，也不是前端
+ * 的猜测。终态集合见 isTerminalStatus；页面上的各处轮询共用它。
+ *
+ * 【为什么停】项目已经跑完（或失败、取消）之后，定时器还在转就等于每两秒
+ * 问一次后端一个不会变的答案：白花请求，也让「还在跑」的错觉留在页面上。
+ * 判定为终态后立刻清掉定时器；组件卸载时调用 stop() 也能清。
+ *
+ * @param {Object} options
+ * @param {() => Promise<void> | void} options.poll 一次轮询；错误由页面层自己如实记录
+ * @param {() => boolean} options.isTerminal 终态判定
+ * @param {number} options.intervalMs 轮询间隔（毫秒）
+ * @param {PollScheduler} [options.scheduler] 定时器来源（默认全局；测试注入假的）
+ * @returns {{ stop: () => void }} stop() 手动停（组件卸载时调用）
+ */
+export function pollUntilTerminal({
+  poll,
+  isTerminal,
+  intervalMs,
+  scheduler = DEFAULT_SCHEDULER,
+}) {
+  let stopped = false;
+  /** @type {number | undefined} */
+  let handle;
+
+  const stop = () => {
+    stopped = true;
+    if (handle !== undefined) {
+      scheduler.clearInterval(handle);
+      handle = undefined;
+    }
+  };
+
+  const tick = async () => {
+    if (stopped) return;
+    try {
+      await poll();
+    } catch {
+      // poll 的错误由页面层如实记录并继续轮询；这里只是不让一次意外的抛出
+      // 变成未处理的拒绝，也不因此判定终态。
+      return;
+    }
+    if (stopped) return;
+    // 终态 → 停掉定时器，不再发下一次请求。
+    if (isTerminal()) stop();
+  };
+
+  // 先挂定时器再跑第一次：这样第一次 poll 结束时 handle 一定已经就位，
+  // stop() 才不会漏掉清理（漏了就等于停不下来）。
+  handle = scheduler.setInterval(() => void tick(), intervalMs);
+  void tick();
+  return { stop };
 }
 
 /**
