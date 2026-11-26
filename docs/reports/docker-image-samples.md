@@ -44,7 +44,7 @@ COPY examples/ examples/
 
 ### 1.2 CI 的 `docker` job：多了一步，名字也跟着改
 
-`.github/workflows/ci.yml:471-529` 的 `docker` job：
+`.github/workflows/ci.yml:518-576` 的 `docker` job：
 
 | | 改前 | 改后 |
 |---|---|---|
@@ -148,7 +148,7 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 
 ## 4. CI 怎么验
 
-`.github/workflows/ci.yml:488-529` 那一步（`Analyse the bundled sample inside the image`）
+`.github/workflows/ci.yml:535-576` 那一步（`Analyse the bundled sample inside the image`）
 按顺序做四件事：
 
 1. **第一遍：什么卷都不挂**。
@@ -212,7 +212,7 @@ docker run --rm -v dexatlas-workspace:/workspace dexatlas \
 4. **仓库没有 `.dockerignore`**：构建上下文是整个工作树（含 `.git`）。本轮没有加
    ——加它会改变构建行为（`.git` 变小、上下文变小），需要主会话决定是否单独做。
 5. **本轮让两处行号跟着走**：`docs/reports/post-release-rehearsal.md` 里引用
-   `measurement` job 的两处行号（`.github/workflows/ci.yml:752` 与 `:799`）因为本轮
+   `measurement` job 的两处行号（`.github/workflows/ci.yml:799` 与 `:846`）因为本轮
    往 `ci.yml` 里加了步骤而漂移，已用 `scripts/remap-citations.py` 重新推导。
    另有一处漂移是 **main 自己的**（提交 `7593574` 改了测量脚本，一处裸行号落到了
    空行上），顺手把它改成显式的文件引用——那一处本来指的就是 `tests/test_docs.py`

@@ -82,8 +82,8 @@ python scripts/make-social-preview.py --repo-root <仓库根>
 4. **卡片不依赖 PATH 上恰好是哪个 python**——用的是跑测量的同一个解释器。
 
 代价是：画卡片需要 Pillow 和字体。这不是新的要求——完整测量本来就需要 Pillow
-（`docs/status.md:433`「完整测量需要 Pillow」），CI 上跑测量时也带了 `--extra demo`
-（`.github/workflows/ci.yml:782`）。CI 上测量只跑 `--check`（`:799`），不写盘，
+（`docs/status.md:434`「完整测量需要 Pillow」），CI 上跑测量时也带了 `--extra demo`
+（`.github/workflows/ci.yml:829`）。CI 上测量只跑 `--check`（`:846`），不写盘，
 所以那一步在 CI 上根本不会走到（Linux runner 也没有 Windows 字体）。
 
 ### 2.3 边界：卡片属于仓库，不属于任何一份报告的副本
