@@ -109,8 +109,10 @@ def test_run_status_badge_no_longer_claims_simulation() -> None:
     badge = _probe([{"fn": "deriveStageBadge", "args": ["run-status", False]}])[0]
     assert isinstance(badge, dict)
     assert "模拟" not in badge["text"]
-    assert badge["text"] == "阶段推进：后端 run 状态"  # noqa: RUF001
+    # 角标同时点明两件事: 状态来自后端, 格子是前端的映射 (2026-11-26 修).
+    assert badge["text"] == "阶段推进：后端 run 状态 + 前端映射"  # noqa: RUF001
     assert "不随时间推进" in badge["title"]
+    assert "前端" in badge["title"]
 
 
 def test_run_status_badge_still_discloses_an_unavailable_stages_endpoint() -> None:
