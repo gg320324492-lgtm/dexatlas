@@ -182,7 +182,7 @@ HTTP 202
 
 ![时间线 C：取消请求已受理（202），分析还在跑，日志区记下了这一条](../assets/phase5/timeline-04-cancel-requested.png)
 
-**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1049` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:490-491`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
+**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1099` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:492-493`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
 
 ```
 inspect           11:59:35.44 -> 11:59:35.44
