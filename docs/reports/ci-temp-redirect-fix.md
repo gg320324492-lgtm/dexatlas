@@ -216,13 +216,13 @@ CLAUDE.md 规则 4 说得很清楚：指着「地方」而不是「符号」的�
 
 | 文件 | 原 | 新 | 它指着的东西 | 现在在哪 |
 |---|---|---|---|---|
-| `post-release-rehearsal.md` | `ci.yml` 第 708 行 | `ci.yml:724` | `measurement` job | `ci.yml:799` |
-| `post-release-rehearsal.md` | `ci.yml:705` | `ci.yml:771` | `refresh-report-figures.py --check` 那行 | `ci.yml:846` |
-| `post-release-rehearsal.md` | `ci.yml:630` | `ci.yml:696` | `social-preview` job | `ci.yml:771` |
-| `post-release-rehearsal.md` | `ci.yml:651` | `ci.yml:717` | `make-social-preview.py --check` 那行 | `ci.yml:792` |
-| `docker-image-samples.md` | `ci.yml` 第 708 行 | `ci.yml:724` | `measurement` job | `ci.yml:799` |
-| `docker-image-samples.md` | `:755` | `:771` | `refresh-report-figures.py --check` 那行 | `ci.yml:846` |
-| `gate-self-checks.md` | `ci.yml:786` | `ci.yml:802` | `fetch-depth: 0` 那行 | `ci.yml:877` |
+| `post-release-rehearsal.md` | `ci.yml` 第 708 行 | `ci.yml:724` | `measurement` job | `ci.yml:798` |
+| `post-release-rehearsal.md` | `ci.yml:705` | `ci.yml:770` | `refresh-report-figures.py --check` 那行 | `ci.yml:845` |
+| `post-release-rehearsal.md` | `ci.yml:630` | `ci.yml:696` | `social-preview` job | `ci.yml:770` |
+| `post-release-rehearsal.md` | `ci.yml:651` | `ci.yml:717` | `make-social-preview.py --check` 那行 | `ci.yml:791` |
+| `docker-image-samples.md` | `ci.yml` 第 708 行 | `ci.yml:724` | `measurement` job | `ci.yml:798` |
+| `docker-image-samples.md` | `:755` | `:771` | `refresh-report-figures.py --check` 那行 | `ci.yml:845` |
+| `gate-self-checks.md` | `ci.yml:786` | `ci.yml:802` | `fetch-depth: 0` 那行 | `ci.yml:876` |
 
 最后一列是**会走的**：它记的是「它现在指着的东西在哪」，所以 `ci.yml` 之后每长一行，
 这一列就得跟着走一次（2026-11-26 加了 `desktop` job，`ci.yml` 第 300 行之后整体 +35，

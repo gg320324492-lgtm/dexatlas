@@ -83,7 +83,7 @@ python scripts/make-social-preview.py --repo-root <仓库根>
 
 代价是：画卡片需要 Pillow 和字体。这不是新的要求——完整测量本来就需要 Pillow
 （`docs/status.md:434`「完整测量需要 Pillow」），CI 上跑测量时也带了 `--extra demo`
-（`.github/workflows/ci.yml:829`）。CI 上测量只跑 `--check`（`:846`），不写盘，
+（`.github/workflows/ci.yml:828`）。CI 上测量只跑 `--check`（`:845`），不写盘，
 所以那一步在 CI 上根本不会走到（Linux runner 也没有 Windows 字体）。
 
 ### 2.3 边界：卡片属于仓库，不属于任何一份报告的副本

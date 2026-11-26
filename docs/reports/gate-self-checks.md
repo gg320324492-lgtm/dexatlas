@@ -190,7 +190,7 @@ FAILED tests/test_release_numbers.py::test_a_tag_that_is_not_in_the_checkout_is_
 | `test_the_docker_job_analyses_the_bundled_sample_by_a_relative_path` | CI 的 docker job 里那条命令用的是**相对路径**——相对路径在**容器里**解析，不受宿主把 Windows 路径改写成什么的影响（`tests/test_docker_image_samples.py:163`） |
 | `test_the_docker_job_checks_the_counts_the_run_produced` | 那个 job **核了计数**：读回 JSON 报告，对着 floors 断言 classes / methods / call_sites / call_edges——没有这条，一个什么都没分析出来的镜像也能让 job 变绿（`tests/test_docker_image_samples.py:182`） |
 
-那条相对路径的命令在 `.github/workflows/ci.yml:542`。
+那条相对路径的命令在 `.github/workflows/ci.yml:541`。
 
 （第三条是顺带加的：任务里点名的是两条，但它和第二条是同一件事的两半——**用相对路径**跑，
 **并且**核了跑出来的数。）
@@ -438,7 +438,7 @@ v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的
 
 | 文件 | 改了什么 | 为什么 |
 |---|---|---|
-| `.github/workflows/ci.yml` | `release-numbers` job 的 checkout 加了 `fetch-depth: 0`（`.github/workflows/ci.yml:877`） | 第二段要读 **tag 树**里的报告，而那个 job 原来的 checkout 是**浅克隆**，里面没有 `v1.0.0` 这个 tag。同一份文件里另外四个需要 tag 的 job 早就是 `fetch-depth: 0` 了，这里是照着它们的样子加的 |
+| `.github/workflows/ci.yml` | `release-numbers` job 的 checkout 加了 `fetch-depth: 0`（`.github/workflows/ci.yml:876`） | 第二段要读 **tag 树**里的报告，而那个 job 原来的 checkout 是**浅克隆**，里面没有 `v1.0.0` 这个 tag。同一份文件里另外四个需要 tag 的 job 早就是 `fetch-depth: 0` 了，这里是照着它们的样子加的 |
 
 如果这一行不加，CI 上那个 job 会以退出码 2 结束，并报
 `the v1.0.0 tree could not be read: the v1.0.0 tag is not in this checkout`——

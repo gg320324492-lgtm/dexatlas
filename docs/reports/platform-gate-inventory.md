@@ -22,7 +22,7 @@
      知道它是合法的。
 - **本文建的是方法，不是又修一个个案。** 三件东西：
   1. **清单**：[`scripts/platform-gates.json`](../../scripts/platform-gates.json)——
-     14 个 CI job、4 条平台相关的测试、3 处平台敏感的脚本行、两组「只在一处跑」的门禁，
+     15 个 CI job、4 条平台相关的测试、3 处平台敏感的脚本行、两组「只在一处跑」的门禁，
      每一条写明**为什么会有差异**、**这个差异是合法还是缺陷**；
   2. **机制**：[`scripts/check-platform-gates.py`](../../scripts/check-platform-gates.py)——
      从树上把事实**推出来**（读 workflow 文本、用 `ast` 读测试套件），与清单逐条对账，
@@ -158,9 +158,9 @@ assert sync_steps == 12, f"{sync_steps} steps install dependencies"
 | `scripts/verify-public-contracts.py::<module>` | `tempfile.gettempdir()` | 活检的工作区落在**平台的临时目录**里——所以跑它的 CI job 必须重定向 `TMPDIR`（§3.1 就出在这里） | 合法 |
 | `scripts/render-demo.py::_posix` | `sys.platform` | Git for Windows 附带的 MSYS bash 认的是 `/g/x` 而不是 `G:\x`，路径只为那个 shell 改写 | 合法（不是门禁，是录 demo 的脚本；列在这里是因为它是 `scripts/` 下唯一**故意**长成 Windows 形状的一个） |
 
-### 2.3 CI 的 job 矩阵（14 个）
+### 2.3 CI 的 job 矩阵（15 个）
 
-`.github/workflows/ci.yml` 里的 job，一共 14 个（`on:` 下面那两个不是 job）：
+`.github/workflows/ci.yml` 里的 job，一共 15 个（`on:` 下面那两个不是 job）：
 
 | job | 装依赖 | 重定向临时目录 | 跑什么 |
 |---|---|---|---|
@@ -168,6 +168,7 @@ assert sync_steps == 12, f"{sync_steps} steps install dependencies"
 | `test` | 是 | 是 | 全套 pytest + fixture + 后端 |
 | `test-partial-backends` | 是 | 是 | 同一套，`DEXATLAS_JADX_PATH` 清空（**少跑的那些是 JADX 依赖的，不是失败**） |
 | `desktop` | 否（npm，不是 uv） | 不适用 | 桌面前端的 vitest 单测 + `tsc --noEmit`（`npm run test` / `npm run build`） |
+| `desktop-rust` | 否（cargo，不是 uv） | 是 | 桌面端 Rust 侧的单元测试（`cargo test --lib`）。**只跑在 Windows 上**：被测代码是 Windows 的作业对象，别处编译不出来——在别的平台上跑等于什么都没测 |
 | `m3-comparison` | 是 | 是 | 基准比对 |
 | `docker` | 否 | 不适用 | 镜像构建与实跑 |
 | `security` | 是 | 是 | `uv export` + `pip-audit` |
@@ -411,7 +412,7 @@ FAILED tests/test_platform_gate_inventory.py::test_a_claim_about_a_script_that_n
 
 | 文件 | 是什么 | 新增/改动 |
 |---|---|---|
-| `scripts/platform-gates.json` | 清单：14 个 CI job、4 条平台相关的测试、3 处平台敏感的行、两组覆盖差、8 条本地门禁 | **新增** |
+| `scripts/platform-gates.json` | 清单：15 个 CI job、4 条平台相关的测试、3 处平台敏感的行、两组覆盖差、11 条本地门禁 | **新增** |
 | `scripts/check-platform-gates.py` | 机制：从树上把事实推出来，与清单对账 | **新增** |
 | `tests/test_platform_gate_inventory.py` | 回归测试：10 条，含红→绿的那条 | **新增** |
 | `tests/test_platform_independent_gates.py` | 那条写死个数的规则改成守性质 | **改**（只改那一条测试 + 三个常量） |
