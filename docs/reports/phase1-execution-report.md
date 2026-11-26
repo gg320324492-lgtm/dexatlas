@@ -192,6 +192,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_upload_isolation.py` | 两个同名上传不会写到同一个路径去；分析读到的字节必须和它的元数据对得上 |
 | `test_jadx_relative_paths.py` | 默认配置（相对工作区）下 JADX 的输出路径只有一个意思，Java 反编译真的生效 |
 | `test_analysis_failure.py` | 分析崩了必须说得清：项目不留在 `running`，错误被记下，异常照样传出去 |
+| `test_empty_result.py` | 分析跑完却什么也没读到时，失败同样要落库：项目行与 run 行都记 `failed` 并带一条说得清原因的错误，界面才不会永远停在「分析中」；空的结果**不**发布，已发布的快照保持原样，取消与异常路径不变（Phase 5 收尾新增） |
 | `test_analysis_duration.py` | 这次分析花了多久：CLI 和 API 导出的是同一个数，而且不是 0 |
 | `test_report_cross_reference_units.py` | 「有证据的交叉引用」和「索引的交叉引用」必须同一个单位 |
 | `test_evidence_table_window.py` | 证据表只有 200 行时，结论级的记录不能被挤掉，截断必须在表前说清楚 |
