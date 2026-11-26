@@ -389,16 +389,18 @@ class Analyzer:
                 # re-analysis that reported that stamp disagreed with the
                 # stored row -- and with the report the first run had
                 # written. The row is the authority.
-                #
-                # A run that found nothing is not published, and the model it
-                # built is the only record of what it saw, so the result
-                # keeps that model: reading back the row a `begin_run` wrote
-                # would report a failed analysis as one still running, with
-                # none of the errors it recorded.
                 stored = self._store.get_project(project.id)
                 if stored is not None:
                     project = stored
                     project.duration_seconds = elapsed
+            else:
+                # A run that found nothing is not published, and the model it
+                # built is the only record of what it saw, so the result
+                # keeps that model. But the failure is a fact about the
+                # project, and it is written down like one: a row that says
+                # "running" is a run that is still going, and this one ended
+                # minutes ago.
+                self._record_empty_result(project, run)
             # A run that found nothing has nothing to publish, and publishing
             # it would replace a snapshot that was complete with one that is
             # empty.
@@ -512,6 +514,54 @@ class Analyzer:
         except Exception:
             logger.exception("could not record the cancellation on %s", project.id)
         _remove_database(run.workspace / RUN_DATABASE_NAME if run.workspace else None)
+        return error
+
+    def _record_empty_result(self, project: Project, run: AnalysisRun) -> ToolError:
+        """Leave the project failed, and say that the analysis read nothing.
+
+        The analysis reached its end and read nothing out of the APK: not one
+        class declaration and not one manifest. That is a failure of the
+        analysis, and it is recorded as one -- with its reason -- because a
+        project left ``running`` is a project that is never coming back: the
+        API finds it by the APK's hash and hands it back as it is, so an
+        analysis that finished without reading anything would be reported as
+        an analysis that is still going.
+
+        The failure is recorded as a :class:`ToolError` of DexAtlas itself,
+        not of a backend. The backends may have said why they read nothing --
+        each of them records its own failure, under its own name -- but it is
+        the analysis that read nothing, and that is what the record says.
+
+        Only the status and the errors are written. The published snapshot --
+        the symbols, the evidence, the counts, the manifest and the workspace
+        pointer -- belongs to the run that published it, and this run
+        published nothing: writing the project's whole record here would
+        replace a complete snapshot with zeroes.
+
+        The run is left failed as well. The run's own record is what a reader
+        of the run list reads, and a run that still says ``running`` is a run
+        that never ended.
+        """
+        error = ToolError(
+            tool=ANALYSIS_TOOL,
+            code=ToolErrorCode.ANALYSIS_FAILED,
+            message=(
+                "the analysis finished but read nothing: no classes and no manifest "
+                "could be read out of the APK"
+            ),
+        )
+        project.status = ProjectStatus.FAILED
+        project.errors.append(error)
+        run.status = RunStatus.FAILED
+        run.completeness = RunCompleteness.PARTIAL
+        run.errors = list(project.errors)
+        try:
+            self._store.set_project_state(project.id, ProjectStatus.FAILED, project.errors)
+            self._store.update_run(self._finish_run(run, RunStatus.FAILED))
+        except Exception:
+            # The workspace is what failed, most likely. The failure still has
+            # to reach the reader, and the log is where it can be read.
+            logger.exception("could not record the empty result on %s", project.id)
         return error
 
     @staticmethod

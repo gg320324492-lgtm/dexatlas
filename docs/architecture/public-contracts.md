@@ -528,7 +528,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
 `source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
-自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1031-1046` 的
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1081-1096` 的
 `_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
 - 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺
@@ -604,3 +604,15 @@ stages 端点进活检后升为 55 = 31 REST + 6 MCP + 18 CLI，见本节开头�
   回归测试：`tests/test_public_contracts.py` 的
   `test_cli_an_analysis_with_no_index_is_six`（先红 `assert 0 == 6`，后绿）及
   partial-index / resource-only / no-index-over-truncation 三项护栏。
+- **「什么都没读到」的失败也要落库（2026-11-26 修复）**：上面「何时会发生」里说的
+  「若 manifest 也没有，项目记为 `failed`」，过去只有内存里的模型记着：管线算出了
+  `failed`，却没有把它写进数据库，项目行与 run 行仍停在 `running`。桌面端读的是
+  持久化的状态，于是分析早就结束、界面却一直停在「分析中」；只有后端重启时那次
+  孤儿轮次对账会把它改成 `failed`，而它给的理由是「服务端进程在分析结束前就结束
+  了」——对这次「分析其实跑完了、只是失败状态没写」的情形恰好说反。现在这条路径把
+  失败写进数据库：项目行记 `failed`、run 行记 `failed`，并带一条说得清原因的错误
+  （`dexatlas: the analysis finished but read nothing: ...`）。空的结果**不**发布，
+  已发布的快照保持原样；取消路径与异常路径不变
+  （`src/dexatlas/core/pipeline.py:519-565` `anchor: _record_empty_result`）。
+  回归测试：`tests/test_empty_result.py`（拿掉修复即红：项目行与 run 行都停在
+  `running`）。
