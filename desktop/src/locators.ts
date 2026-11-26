@@ -152,3 +152,73 @@ export function openSourceState(
   }
   return { openable: true };
 }
+
+// ---------------------------------------------------------------------------
+// 「打开来源」的内联源码视图
+// ---------------------------------------------------------------------------
+
+/** 后端 UntrustedText（schemas.py:43）—— resolve 响应里源码所在的那层。 */
+export interface UntrustedTextLike {
+  text: string;
+  truncated?: boolean;
+  bytes?: number;
+  notice?: string;
+}
+
+/** {@link inlineSourceOf} 的输入：`/locators/resolve` 的完整响应。 */
+export interface LocatorResolutionFull extends LocatorResolutionLike {
+  text?: UntrustedTextLike | null;
+  provenance?: string[];
+}
+
+/** 抽屉内联展示的一份源码，以及它自带的可核对信息。 */
+export interface InlineSourceView {
+  /** 后端解析出的真实文件路径（成功时 reason 就是它） */
+  path: string;
+  /** 文件的表示：java 或 smali */
+  kind: string;
+  /** 源码本身（后端已截到 ≤200 行 / 64 KB） */
+  code: string;
+  /** 展示的行数 */
+  lines: number;
+  /** 字节数的人类可读形式（截断前的大小） */
+  bytesLabel: string;
+  /** 后端是否截断了这段源码 */
+  truncated: boolean;
+  /** 后端随文本一起给的数据声明（UntrustedText.notice） */
+  notice?: string;
+}
+
+/**
+ * 从 `/locators/resolve` 的响应里取「能内联展示的源码」。
+ *
+ * 后端（`src/dexatlas/mcp/tools/evidence.py` 的 `resolve_locator`）在 locator
+ * 解析到输出树里的一个文件时，`reason` 就是解析出的真实路径，`text` 携带
+ * 源码、字节数与截断标记——不需要新端点。解析失败、解析到的不是单文件
+ * （DEX 内符号、包级事实）时返回 null：那几种情况抽屉照旧展示状态面板。
+ */
+export function inlineSourceOf(resolution: LocatorResolutionFull | null): InlineSourceView | null {
+  if (!resolution?.resolved || !resolution.kind || !resolution.text) return null;
+  const code = resolution.text.text;
+  const lines = code === "" ? 0 : (code.endsWith("\n") ? code.slice(0, -1) : code).split("\n").length;
+  return {
+    path: resolution.reason,
+    kind: resolution.kind,
+    code,
+    lines,
+    bytesLabel: formatBytes(resolution.text.bytes ?? 0),
+    truncated: resolution.text.truncated ?? false,
+    notice: resolution.text.notice,
+  };
+}
+
+/** 字节数的人类可读形式：999 B → 1.0 KB → 64.0 KB → 1.0 MB。 */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  let value = bytes;
+  for (const unit of ["KB", "MB", "GB"]) {
+    value /= 1024;
+    if (value < 1024) return `${value.toFixed(1)} ${unit}`;
+  }
+  return `${(bytes / 1024 ** 4).toFixed(1)} TB`;
+}
