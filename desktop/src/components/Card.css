@@ -40,6 +40,11 @@
 }
 .da-card__heading {
   min-width: 0;
+  /* The heading takes the room the actions do not need. Without this the
+     actions (which do not shrink) squeeze the title until its characters
+     stack one per line -- a 280px column with a long badge in it does
+     exactly that. */
+  flex: 1 1 auto;
 }
 .da-card__title {
   font-size: var(--text-lg);
@@ -56,7 +61,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  flex-shrink: 0;
+  /* The actions may be given a bound of their own: a long one wraps inside
+     itself instead of taking the heading's width away from it. */
+  flex-shrink: 1;
+  min-width: 0;
 }
 .da-card__body {
   padding: var(--space-4) var(--space-5);

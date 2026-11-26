@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1878<!--/fig-->（<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1880<!--/fig-->（<!--fig:tests.fast-->1731<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->93.4%<!--/fig-->**（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1729<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1731<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1878<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1880<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -200,6 +200,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_method_resolution.py` | 方法按描述符解析：同名重载必须报歧义并列出候选，不许挑一个（v0.1.3 之后新增） |
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
 | `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
+| `test_desktop_card_header_layout.py` | 窄栏里卡片的标题不被角标挤成竖排：标题块占满角标让出的空间、actions 允许收缩、阶段角标允许换行（读 CSS 钉住那几条规则，布局没有单元测试能测）（Phase 5 收尾新增） |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
 | `test_desktop_locator_vocabulary.py` | 前端镜像后端的 locator 词汇（跨语言，JS 单测读不了 Python 源码）：工具前缀、落点类别与后端常量不许漂移 |
 | `test_desktop_stale_copy.py` | 界面上的三句陈旧文案：错误提示不再写死回退端口而取自实际的 baseUrl（端口不可知时说「后端地址未知」）；分析页脚注与 workbench 实际提供的 `/api/backends` 一致；报告页的时间戳按本地时区显示并附 UTC 标注（打包 exe 二次验收新增） |
@@ -891,10 +892,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1878<!--/fig--> 个：<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1880<!--/fig--> 个：<!--fig:tests.fast-->1731<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1877<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1879<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1115,10 +1116,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:76462097bb2023f56545875cf7746420d60106a18c8ae2bbf5c7154fe04f4f46",
+  "source_fingerprint": "sha256:3399368292cf5dd92a40d31423b26b2d4b541ab7beb6d18abdde116144d544b3",
   "suite": {
     "failed": 0,
-    "passed": 1877,
+    "passed": 1879,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1132,8 +1133,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1729,
+    "fast": 1731,
     "slow": 149,
-    "total": 1878
+    "total": 1880
   }
 }-->

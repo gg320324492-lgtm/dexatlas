@@ -255,7 +255,13 @@
   color: var(--color-text-secondary);
   background: var(--color-surface-muted);
   border: 1px dashed var(--color-border);
-  white-space: nowrap;
+  /* The badge may wrap: it says which source the stage grid is drawn from,
+     and in a narrow column a single line of it is wider than the column.
+     Wrapping is honest; squeezing the title into a column of single
+     characters is not. */
+  white-space: normal;
+  text-align: left;
+  min-width: 0;
 }
 
 /* 顶部分组内的横幅纵向排列 */
