@@ -14,6 +14,7 @@
 import { describe, expect, it } from "vitest";
 import * as stagesModule from "./stages";
 import {
+  deriveBackends,
   deriveStageBadge,
   deriveStagesFromRun,
   isTerminalStatus,
@@ -404,5 +405,63 @@ describe("模块的形状", () => {
   it("模块里没有时间模拟函数（拿不到事实时不推进）", () => {
     // Phase 5 收尾删除了前端时间模拟；这条断言在旧实现上会红。
     expect("deriveStageStates" in stagesModule).toBe(false);
+  });
+});
+
+/**
+ * 后端状态区的映射 —— Phase 5 收尾在打包 exe 上实测到的缺陷的拦截网。
+ *
+ * 实测现象：打包 exe 里分析进行中，右侧「后端状态」区把三个后端全说成
+ * 「✕ 失败 未安装或未配置，未参与本次分析」，而那台机器上三个后端都装着
+ * （侧车自己的 /api/backends 说得清清楚楚）。原因是那一轮 run 的
+ * tool_versions 还没写进库，键不存在，前端把「键不存在」与「值是 null」
+ * 当成了同一件事。
+ *
+ * 这里钉住的是**三态**：键不存在 = 没参与；键在、值为 null = 参与了但
+ * 版本还没探测出来；键在、值是版本号 = 参与了，版本已知。
+ */
+describe("deriveBackends", () => {
+  it("says a backend that is not in the run's record did not take part", () => {
+    const backends = deriveBackends({
+      runs: [{ tool_versions: { androguard: "4.1.4" } }],
+    });
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("未安装或未配置");
+  });
+
+  it("does not call a backend uninstalled while its version is still being probed", () => {
+    // The run has started: the backends are named, the versions are not
+    // known yet. Saying "not installed" here would be a lie.
+    const backends = deriveBackends({
+      runs: [{ tool_versions: { jadx: null, apktool: null, androguard: null } }],
+    });
+    expect(backends.every((b) => b.state === "running")).toBe(true);
+    const first = backends[0];
+    expect(first).toBeDefined();
+    expect(first?.detail).toContain("版本探测中");
+    expect(first?.detail).not.toContain("未安装");
+  });
+
+  it("states the version once it is known", () => {
+    const backends = deriveBackends({
+      runs: [
+        {
+          tool_versions: {
+            jadx: "1.5.2",
+            apktool: "2.11.1",
+            androguard: "4.1.4",
+          },
+        },
+      ],
+    });
+    expect(backends.every((b) => b.state === "done")).toBe(true);
+    expect(backends[0]?.detail).toBe("v1.5.2 · 参与本次分析");
+  });
+
+  it("waits for the run when there is none yet", () => {
+    const backends = deriveBackends({ runs: [] });
+    expect(backends.every((b) => b.state === "queued")).toBe(true);
+    expect(backends[0]?.detail).toContain("等待分析轮次数据");
   });
 });

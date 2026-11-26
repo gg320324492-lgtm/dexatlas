@@ -106,7 +106,7 @@
 
 | 位置 | 改前 | 改后 |
 |---|---|---|
-| §2.3 散文里的三数 | 「应当是 **N**（**M** 快 + **K** 集成)」（人抄的 ✅） | 「应当是 <!--fig:tests.trio-->**1874**（**1725** 快 + **149** 集成）<!--/fig-->」 ✅ |
+| §2.3 散文里的三数 | 「应当是 **N**（**M** 快 + **K** 集成)」（人抄的 ✅） | 「应当是 <!--fig:tests.trio-->**1878**（**1729** 快 + **149** 集成）<!--/fig-->」 ✅ |
 | §2.3 紧跟着的一句 | 指报告里那几个标记 ✅ | 「这三个数是上面那个标记的值 ✅，由 `scripts/refresh-report-figures.py` 写出来（§4） ✅」 |
 | §2.3 skip 对照表「取了样本」行 | 「`… passed`、**… skipped**、**… xfailed**」（三个手抄的数 ✅） | 三个标记 ✅：`<!--fig:suite.passed-->` / `<!--fig:suite.skipped-->` / `<!--fig:suite.xfailed-->` ✅ |
 | §2.3 skip 对照表「没取样本」行 | 「`… passed, … skipped`（退出码 0） ✅。N 个 skip……（M 条）……（K 条） ✅」 | 「`<N> passed, <M> skipped`（退出码 0） ✅。skip **全部**出自缺样本 ✅，理由只有两种 ✅：……」——**具体条数删掉** ✅：那一行量的是**另一种跑法** ✅，脚本量不到它 ✅，写死就一定过期 ✅ |
@@ -119,7 +119,7 @@
 ### 2.2 `docs/portfolio.md`
 
 「Quality gates」那一行 ✅：「N tests at M% coverage on the first-party code」 ✅ →
-「<!--fig:tests.total-->1874<!--/fig--> tests at <!--fig:coverage.pct-->93.3%<!--/fig--> coverage on the first-party code」 ✅
+「<!--fig:tests.total-->1878<!--/fig--> tests at <!--fig:coverage.pct-->93.4%<!--/fig--> coverage on the first-party code」 ✅
 
 ### 2.3 `docs/status.md`
 
