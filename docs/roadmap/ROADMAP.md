@@ -27,7 +27,10 @@ what comes next.
   [Phase 5 acceptance report](../reports/phase5-acceptance.md). What comes
   after it is **not decided yet**: the remaining open items need either another
   platform or a recorded decision, and the next phase is scoped by such a
-  decision, not by this document.
+  decision, not by this document. Per the author's instruction of 2026-11-26,
+  **every task from here on counts as Phase 5 work** — Phase 5 stays open, and
+  the inventory of what is left is in
+  [phase5-remaining-goals.md](../reports/phase5-remaining-goals.md).
 - **Plan version:** 2026-11-26 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4/5 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
   new work front inside this repository — Tauri + React, light "studio" visual
