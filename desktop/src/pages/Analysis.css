@@ -122,6 +122,15 @@
 .da-stage-meta__tools {
   font-family: var(--font-mono, monospace);
 }
+/* 没有 run 数据时：说明五格是「状态未知」，不是正在推进的进度 */
+.da-stage-unknown {
+  margin: var(--space-3) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-border);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
 
 /* ---- 中：实时日志 ---- */
 .da-log {

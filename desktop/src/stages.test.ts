@@ -12,12 +12,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-  deriveStageBadge,
-  deriveStageStates,
-  deriveStagesFromRun,
-  STAGES,
-} from "./stages";
+import * as stagesModule from "./stages";
+import { deriveStageBadge, deriveStagesFromRun, STAGES } from "./stages";
 import type { RunStageEvent } from "./api/types";
 
 /** 页面上的五个格子，顺序即页面上的顺序。 */
@@ -233,37 +229,17 @@ describe("deriveStagesFromRun —— 没有 run", () => {
   });
 });
 
-describe("deriveStageStates —— 前端时间模拟（最后的兜底）", () => {
-  it("完成的 run 五格全完成", () => {
-    expect(deriveStageStates(5, "completed")).toEqual({
-      collect: "done",
-      parse: "done",
-      index: "done",
-      evidence: "done",
-      report: "done",
-    });
-  });
-
-  it("运行中按已完成的格数推进", () => {
-    expect(deriveStageStates(2, "running")).toEqual({
-      collect: "done",
-      parse: "done",
-      index: "running",
-      evidence: "pending",
-      report: "pending",
-    });
-  });
-});
-
 describe("deriveStageBadge —— 角标如实说明数据来源", () => {
   it("有 stages 时说数据来自后端真实阶段事件", () => {
     const badge = deriveStageBadge("stages");
     expect(badge.text).toBe("阶段推进：后端真实阶段事件");
   });
 
-  it("旧 run 说清楚是 run 状态 + 前端粒度模拟", () => {
+  it("旧 run 说清楚是后端 run 状态，不再声称前端模拟", () => {
     const badge = deriveStageBadge("run-status", false);
-    expect(badge.text).toBe("阶段推进：后端 run 状态 + 前端粒度模拟");
+    expect(badge.text).toBe("阶段推进：后端 run 状态");
+    expect(badge.text).not.toContain("模拟");
+    expect(badge.title).toContain("不随时间推进");
   });
 
   it("stages 端点不可用时不能藏起来", () => {
@@ -271,13 +247,8 @@ describe("deriveStageBadge —— 角标如实说明数据来源", () => {
     expect(badge.text).toContain("stages 端点不可用");
   });
 
-  it("什么都没有时说清楚是前端模拟", () => {
-    const badge = deriveStageBadge("simulation");
-    expect(badge.text).toBe("阶段推进为前端模拟");
-  });
-
   it("每一种角标都要说明「证据」格是推断值、解析格合并了两个阶段", () => {
-    for (const source of ["stages", "run-status", "simulation"] as const) {
+    for (const source of ["stages", "run-status"] as const) {
       const { title } = deriveStageBadge(source);
       expect(title).toContain("证据");
       expect(title).toContain("推断");
@@ -289,5 +260,10 @@ describe("deriveStageBadge —— 角标如实说明数据来源", () => {
 describe("模块的形状", () => {
   it("页面上的五格就是这个顺序", () => {
     expect(STAGES.map((s) => s.id)).toEqual([...SLOTS]);
+  });
+
+  it("模块里没有时间模拟函数（拿不到事实时不推进）", () => {
+    // Phase 5 收尾删除了前端时间模拟；这条断言在旧实现上会红。
+    expect("deriveStageStates" in stagesModule).toBe(false);
   });
 });
