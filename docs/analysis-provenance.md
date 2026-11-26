@@ -25,7 +25,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | manifest 的版本号（部分解码 manifest 被 Apktool 挪走了，从 `apktool.yml` 补；其 `versionInfo` 与五个自建 APK 的二进制 manifest 一致，由 `test_version_fields.py` 钉住） | **Apktool** | `ManifestInfo` | `tools/apktool/adapter.py:675-711` |
 | manifest 的 SDK 级别（Apktool 写进 `apktool.yml` 的值不是 APK 的字节说的；从 binary manifest 读回，只补解码 manifest 缺的字段） | **Androguard**（唯一） | `read_sdk_levels` | `tools/androguard/adapter.py:280-331`、`core/pipeline.py:702-752` |
 | 类的身份、种类、父类、接口、访问标志 | **Androguard** 与 **JADX** 各产出一条，合并规则见第 2 节 | `ClassRef` | `tools/androguard/adapter.py:526-542` |
-| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:720-881` 的 `class_source_document` / `method_source_document` |
+| 类的**源码表示**（Java 或 Smali） | **JADX** 优先，**Apktool** 回退 | 工作区文件，按需读取；出处跟着源码一起走（见 3.3） | `core/pipeline.py:838-999` 的 `class_source_document` / `method_source_document` |
 | 方法（签名、描述符、访问标志） | **Androguard**（唯一） | `MethodRef` | `tools/androguard/adapter.py:621-637` |
 | 方法**是否被反编译成 Java** | **JADX**（唯一） | `MethodRef.decompiled` | `tools/jadx/adapter.py:403-456` |
 | 字段 | **Androguard**（唯一） | `FieldRef` | `tools/androguard/adapter.py:544-561` |
@@ -70,7 +70,7 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 | `provenance` | 拼接 | **两条都留**，谁也不覆盖谁 |
 
 合并的**顺序**就是执行顺序：Apktool → Androguard → JADX
-（`core/pipeline.py:246` 的 `include_apktool`、`core/pipeline.py:265` 的 `include_androguard`、`core/pipeline.py:282` 的 `include_jadx`）。Apktool 不产出 `ClassRef`，
+（`core/pipeline.py:260` 的 `include_apktool`、`core/pipeline.py:279` 的 `include_androguard`、`core/pipeline.py:296` 的 `include_jadx`）。Apktool 不产出 `ClassRef`，
 所以真正参与合并的只有 Androguard（先）和 JADX（后）。
 
 Androguard 先跑不是因为它更重要，是因为它是**结构**的正确来源（`docs/architecture/README.md`
@@ -125,7 +125,7 @@ Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所
 还有一个项目级的版本表 `Project.tool_versions: dict[str, str | None]`
 （`models.py:764`），记录这次分析实际用到的三个后端版本，存进 `projects.tool_versions`
 （`core/storage.py:234`）。它和 `provenance.tool_version` 是**两份独立的数据**——
-管道把同一份版本表交给证据构造器（`core/pipeline.py:214-218` 的 `tool_versions`），
+管道把同一份版本表交给证据构造器（`core/pipeline.py:221-227` 的 `tool_versions`），
 所以两份数据现在说的是同一件事。
 
 ### 3.1.1 交叉引用自己带的信息：调用方式
@@ -383,7 +383,7 @@ JSON report → C:\Users\admin\AppData\Local\Temp\dexatlas-prov-multidex.json
 Androguard 把两个 DEX 里的 `SharedConfig` 各索引一遍，会得到 14 个方法；
 `methods` 表的主键是 `(project_id, class_name, name, descriptor)`（`core/storage.py:285-295`），
 重复的被 `INSERT OR REPLACE` 折叠掉了，而计数一度取的是**折叠前**的列表长度。
-现在计数由表自己量（`core/pipeline.py:352` 的 `class_count`），折叠掉的那三个方法没有丢——
+现在计数由表自己量（`core/pipeline.py:366` 的 `class_count`），折叠掉的那三个方法没有丢——
 它们合并成了一条带两份 provenance 的方法。详见 6.2。
 
 ### 4.4 五个自建样本的实际结果
@@ -546,7 +546,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 这一行整个不出现——不是 0，是「没有这一说」。
 同理，方法表里的 `decompiled` 全部是 `false`：没有反编译器，就没有反编译出来的 Java。
 
-这时候 `class_source` 会落到 Smali（`core/pipeline.py:799-807`）：
+这时候 `class_source` 会落到 Smali（`core/pipeline.py:808-816`）：
 
 ```smali
 .class public final Lcom/example/demo/Crypto;
@@ -1032,7 +1032,7 @@ ring;
 
 **当时的现象：** multidex-app 报 14，`methods` 表 11 行。
 `project.method_count` 数的是折叠前的列表——那版写法已经不在了，
-现在是表自己量的（`core/pipeline.py:352` 的 `class_count`）——
+现在是表自己量的（`core/pipeline.py:366` 的 `class_count`）——
 而 `methods` 表的主键会折叠重复（`core/storage.py:285-295`）。
 **类在多个 DEX 里重复定义时就会不一致。**
 
@@ -1088,7 +1088,7 @@ androguard:classes2.dex#com.example.multidex.SharedConfig
 报告里看不到「谁调用了什么」这一层，只能在索引里查。
 
 **现在的行为：** 管道会为**这个 APK 自己的、被调用过的方法**各记一条证据
-（`core/pipeline.py:768` 调用 `core/evidence.py:452-481` 的
+（`core/pipeline.py:782` 调用 `core/evidence.py:452-481` 的
 `add_cross_references`）。粒度是**被调用的方法**，不是「调用」：
 一个被五十处调用的方法是**一条**结论。调用库代码（`java.lang.StringBuilder.append`）
 **不产生记录**——那是关于 JDK 的事实，不是关于这个应用的结论；
@@ -1125,7 +1125,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk -o report.md
 才赋值的，于是 builder 手里永远是一份空字典。
 
 **现在的行为：** 管道先探测版本，再把**同一份**版本表交给证据构造器
-（`core/pipeline.py:214-218` 的 `tool_versions`），`EvidenceBuilder` 把它当成构造参数
+（`core/pipeline.py:221-227` 的 `tool_versions`），`EvidenceBuilder` 把它当成构造参数
 （`core/evidence.py:71-125`）——不是「记得填」，是「不给就写不出证据」。
 `tool_version` 为 `None` 现在只有一种含义：**这个工具这次没跑**
 （比如它压根没装，见 4.6）。

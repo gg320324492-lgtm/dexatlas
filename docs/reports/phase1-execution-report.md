@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1874<!--/fig-->（<!--fig:tests.fast-->1725<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7482<!--/fig-->/<!--fig:coverage.total-->8015<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1878<!--/fig-->（<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.4%<!--/fig-->**（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -131,7 +131,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.3%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.4%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1725<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1729<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1874<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1878<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -257,6 +257,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_agent_round3_budget.py` | 返回体裁剪回归：长文本字段截断保形状、整页 scaffold 超限时按 offset 裁行，total/offset 不失真（M6 第三轮修复新增） |
 | `test_agent_round3_transcript_budget.py` | 真实工具 + 计量 provider 的整链路预算回归：字符串常量页任务在门限内作答而非预算耗尽（M6 第三轮修复新增） |
 | `test_review_fixes.py` | 审查遗留修复回归：证据记录承载被裁源码文本（分块 + 截断声明）、source/reference 四工具 offset 分页、call_sites/callees 纳入行裁剪、裁剪提示如实指向分页续读（M-1/L-1 修复新增） |
+| `test_running_run_backend_versions.py` | 分析进行中读者看到的后端版本：run 的 `tool_versions` 在分析还在跑的时候就落库（不等到第一次阶段转换）、与后端报的版本一致、被取消的 run 也带着它们（Phase 5 收尾新增） |
 | `test_social_preview.py` | 首页 social preview 卡：图上的数与报告里的数必须一致；报告变了而图没重画（旁证的数对不上、图被手改过、徽章与卡片分家）都要判红 |
 | `test_platform_independent_gates.py` | 门禁的平台无关性：链接检查、指纹归一化、子进程输出解码等规则在脚本自身上钉死 |
 | `test_failure_wording.py` | 后端失败那条证据记录的文案：「这一步没跑完」与「它已经交出来的产物」必须分开说，否则同一份报告里的两条 `verified` 记录会被读成互相否定；等级与统计不得被顺手改掉 |
@@ -890,10 +891,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1874<!--/fig--> 个：<!--fig:tests.fast-->1725<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1878<!--/fig--> 个：<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7482<!--/fig-->/<!--fig:coverage.total-->8015<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1873<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1877<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1021,7 +1022,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 24,
     "cli_commands": 15,
-    "documents": 160,
+    "documents": 161,
     "sample_apks": 5
   },
   "coverage": {
@@ -1057,7 +1058,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/methods.py": [218, 10],
       "core/models.py": [343, 5],
       "core/paths.py": [36, 2],
-      "core/pipeline.py": [557, 34],
+      "core/pipeline.py": [560, 34],
       "core/runs.py": [106, 0],
       "core/storage.py": [403, 13],
       "mcp/__init__.py": [2, 0],
@@ -1097,7 +1098,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 533,
-    "statements": 8015
+    "statements": 8018
   },
   "history": {
     "v0.1.0": {
@@ -1114,10 +1115,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:2d6e71ac51061bb0c51d6e21ccea4b40f6eada3767089c0a3b9bd7eb516b0bc9",
+  "source_fingerprint": "sha256:76462097bb2023f56545875cf7746420d60106a18c8ae2bbf5c7154fe04f4f46",
   "suite": {
     "failed": 0,
-    "passed": 1873,
+    "passed": 1877,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1131,8 +1132,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1725,
+    "fast": 1729,
     "slow": 149,
-    "total": 1874
+    "total": 1878
   }
 }-->

@@ -363,3 +363,50 @@ export function readCompletenessErrors(run) {
     typeof e === "string" ? e : `${e && typeof e === "object" && "tool" in e ? e.tool : ""}: ${e && typeof e === "object" && "message" in e ? e.message : ""}`,
   );
 }
+
+/**
+ * 后端状态区的映射 —— 纯函数，无 React 依赖。
+ *
+ * 【三种状态，不是两种】
+ * `tool_versions` 的**键**说明这一轮有没有带上这个后端，值说明它的版本。
+ * 值可能是 `null`，那有两种意思：版本还没探测出来（分析刚开始，探测还在
+ * 跑），或者它压根没装上。这两者必须分开说——把「还没探测」说成「未安装」
+ * 是在对用户说假话，而那正是 Phase 5 收尾时在打包 exe 上实测到的现象。
+ *
+ * @typedef {import("./types").BackendState} BackendState
+ * @typedef {import("./types").BackendStatus} BackendStatus
+ */
+
+/** 页面右栏的三个后端，顺序即页面上的顺序。 @type {Array<{name: string, key: string}>} */
+export const BACKEND_KEYS = [
+  { name: "JADX", key: "jadx" },
+  { name: "Apktool", key: "apktool" },
+  { name: "Androguard", key: "androguard" },
+];
+
+/**
+ * 从最近一轮 run 的 tool_versions 推断三个后端的状态。
+ *
+ * @param {{runs?: Array<{tool_versions?: Record<string, string | null>}>} | null} project
+ * @returns {BackendStatus[]}
+ */
+export function deriveBackends(project) {
+  const latest = project && project.runs ? project.runs[0] : undefined;
+  const versions = (latest && latest.tool_versions) || {};
+  const hasRun = Boolean(latest);
+  return BACKEND_KEYS.map(({ name, key }) => {
+    if (!hasRun) {
+      return { name, state: "queued", detail: "等待分析轮次数据…" };
+    }
+    if (!(key in versions)) {
+      // 这一轮的记录里没有它：它没有参与这次分析。
+      return { name, state: "error", detail: "未安装或未配置，未参与本次分析" };
+    }
+    const version = versions[key];
+    if (version) {
+      return { name, state: "done", detail: `v${version} · 参与本次分析` };
+    }
+    // 键在、值为空：后端参与了这一轮，版本还没探测出来。
+    return { name, state: "running", detail: "参与本次分析 · 版本探测中" };
+  });
+}

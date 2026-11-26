@@ -52,7 +52,7 @@ methods_total: 8 / methods_jadx_failed: []`，`errors[]` 里只有一条 `timeou
 locator 指向 `jadx:error/timeout`（失败即事实，见
 `src/dexatlas/core/locators.py:56`）。文案原来只有一句：后端没有完成。
 
-**统计那一侧**：`src/dexatlas/core/pipeline.py:1418` 的 `_record_decompilation` 从
+**统计那一侧**：`src/dexatlas/core/pipeline.py:1432` 的 `_record_decompilation` 从
 jadx **自己的输出树**里读出覆盖度，写成 `summary.decompilation` 的三个字段和那条
 「jadx produced real Java for N of M methods in K of K classes」的记录。
 
@@ -200,7 +200,7 @@ FAILED tests/test_failure_wording.py::test_the_report_and_the_json_report_carry_
 | 文件 | 改了什么 |
 |---|---|
 | `src/dexatlas/core/evidence.py` | 新增 `_failure_summary`（`src/dexatlas/core/evidence.py:63`）与 `NEVER_RAN_CODES`（`:60`）；`add_error`（`:317`）改用它。**等级、kind、locator、detail 一个没动** |
-| `src/dexatlas/core/pipeline.py` | `_record_decompilation` 的 docstring（`src/dexatlas/core/pipeline.py:1418`）补一句：失败记录说的是**这一步**，不是它的产出 |
+| `src/dexatlas/core/pipeline.py` | `_record_decompilation` 的 docstring（`src/dexatlas/core/pipeline.py:1432`）补一句：失败记录说的是**这一步**，不是它的产出 |
 | `tests/test_failure_wording.py` | **新文件，9 条**。复现 M-2 的完整场景（替身后端：jadx 写出部分 Java 后被终止 + 8 个方法 5 个类的索引），断言两条记录并存时不再打架、等级仍是 `verified`、统计数字没动、Markdown 与 JSON 报告都带着新文案 |
 | `tests/test_first_party_samples.py` | 一条精确相等断言跟随新文案（`not_installed` 那一支） |
 | `docs/analysis-provenance.md` | 文档里的 JSON 样例的 `summary` 换成新文案；**5 处** `core/evidence.py` 引用行号因插行而漂移（2 处由 `scripts/remap-citations.py` 重映射，3 处手改到新行号） |

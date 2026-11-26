@@ -211,8 +211,22 @@ class Analyzer:
             # evidence names the version of the tool that produced it. Probing
             # them once, here, keeps one answer for the project record and for
             # every evidence record.
+            #
+            # The names are written down *before* the probing starts. Probing
+            # runs each backend to ask its version, and that takes long enough
+            # to be a window a reader can land in -- and a reader who lands
+            # there is told the machine has no backends at all, when it has
+            # every one of them. The names are known before the versions are;
+            # the versions follow.
+            run.tool_versions = {backend.name: None for backend in self._backends.all()}
+            self._store.update_run(run)
             project.tool_versions = self._backends.versions()
             run.tool_versions = dict(project.tool_versions)
+            # Write the versions down too, not when the run's row is next
+            # saved. The next save is at the first stage transition after this
+            # point, so without this write the answer stays "version unknown"
+            # for as long as the analysis takes.
+            self._store.update_run(run)
             builder = EvidenceBuilder(
                 project_id=project.id,
                 tool_versions=project.tool_versions,

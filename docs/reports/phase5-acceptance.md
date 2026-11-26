@@ -28,7 +28,7 @@
 - **代码基线：** `origin/main` @ `33e4ba9`（`Merge pull request #22`）。本报告在 `docs/phase5-closure` 分支上写，该分支相对 `origin/main` **只改文档与截图**，不改 `src/`、`tests/`、`desktop/src`、`scripts/`。
 - **打包形态（二次验收）：** Windows 11 10.0.26300；MSVC 2022 Build Tools；`npm run tauri build` 退出码 0，产出 NSIS 与 MSI 两个 bundle；NSIS 安装器静默安装到用户目录，退出码 0。**验收全程 8618 端口无任何监听**——因此前端只要能取到数据，就必然是打到了侧车自己的端口。
 - **开发形态（复测与走查）：** 后端 `uv run dexatlas-workbench`（`127.0.0.1:8618`），前端 Vite dev（`5173`，HashRouter）；JADX 1.5.2 / Apktool 2.11.1 / Androguard 4.1.4。
-- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1874<!--/fig--> 个（<!--fig:tests.fast-->1725<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1873<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7482<!--/fig-->/<!--fig:coverage.total-->8015<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
+- **最后一次完整测量（本分支重跑，发布树，带 JADX 1.5.2 + Apktool 2.11.1）：** 测试 <!--fig:tests.total-->1878<!--/fig--> 个（<!--fig:tests.fast-->1729<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成），`suite.passed` <!--fig:suite.passed-->1877<!--/fig-->、`skipped` <!--fig:suite.skipped-->1<!--/fig-->、`failed` 0，一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行，见 `docs/reports/phase1-execution-report.md`）。**本分支新增了 Markdown 文件，文档篇数随之变化，已在本分支重跑完整测量刷新**（`scripts/refresh-report-figures.py`），本报告的所有生成数字均由该脚本写入，没有手写。
 
 ## 2. W1 — 侧车进程真接入
 
@@ -266,6 +266,37 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 
 **阶段格与后端阶段不是一一对应 —— 未拆格。** 前端五格是「采集/解析/索引/证据/报告」，后端五阶段是 `inspect / parse-apktool / index-androguard / decompile-jadx / publish`：「解析」格**合并了两个后端阶段**，「证据」格**在后端没有对应阶段**、状态是推断的。这两点写在角标的 `title` 提示里（`desktop/src/stages.js` 的 `EVIDENCE_SLOT_NOTE` 与 `PARSE_SLOT_NOTE`），角标正文现在也点明了「前端映射」这一层——**说法不再夸大，但格子没有拆**。
 
+### 7.5 A1 复验（2026-11-26 收尾）带出并已修的一个界面缺陷
+
+**现象：** 在**打包 exe** 里跑一次分析，右栏「后端状态」区把三个后端全说成
+「✕ 失败 未安装或未配置，未参与本次分析」——而那台机器上三个后端都装着：
+侧车自己的 `GET /api/backends` 同一时刻回的是
+`{"available":["jadx","apktool","androguard"],"missing":[],"versions":{...1.5.2/2.11.1/4.1.4}}`。
+
+**根因：** 那一轮 run 的 `tool_versions` 在库里还是**空的**。版本是在管线
+开头探测的，但落库要等 run 的行下一次被保存——而下一次保存是**第一次阶段
+转换**。于是从 run 建立到第一次阶段转换之间的这段窗口里，读者读到的是
+run 创建时那份空 map。前端把「键不存在」与「值为 null」当成同一件事，
+一律说成「未安装」。
+
+**修法（两处）：**
+
+1. **后端**：探测**之前**先把三个后端的**名字**写进 run 并落库，探测完成
+   后再把**版本**写进去并落库。名字在探测之前就知道，版本在探测之后才
+   知道——读者落在窗口里时读到的是「这个后端参与了，版本还没探测出来」。
+2. **前端**：把后端状态区从两态改成**三态**——键不存在 = 没参与这一轮；
+   键在、值为 null = 参与了但版本还在探测；键在、值是版本号 = 参与了，
+   版本已知。「版本探测中」不再被说成「未安装」。
+
+**回归测试：** 后端 4 例（`tests/test_running_run_backend_versions.py`，
+两个窗口各一例，红→绿已证），前端 4 例（`desktop/src/stages.test.ts`）。
+
+**顺带关闭的走查未覆盖项**（[走查报告](phase5-failure-timeline.md) §7）：
+第 1 条（打包 exe 里的失败/取消路径）与第 2 条（`window.confirm` 在
+WebView2 里的样子）——本轮在打包 exe 里复验了取消路径，并捕获到确认框的
+原文「确认取消本次分析？已生成的中间结果将被丢弃。」；取消后项目记 failed、
+错误为 `the analysis was cancelled before it completed`、**未发布任何结果**。
+
 ## 8. 判定与下一步
 
 **可以宣布的：**
@@ -277,6 +308,7 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 - **失败与取消两条时间线真机走通**，「取消」这条路径确实存在（§7.1 第 7 项）。
 - **界面不再有夸大与多余**：角标说明「后端阶段事件 + 前端映射」，run 进终态即停止轮询（§7.1 第 10、11 项）。
 - **「前端时间模拟兜底」已删除**（2026-11-26 收尾）：模拟路径已删除，无 run 数据时五格如实显示状态未知，runs 请求失败时显示可读错误与重试入口。
+- **后端状态区不再把「版本还在探测」说成「未安装」**（2026-11-26 收尾，§7.5）：打包 exe 里实测到的界面假话，后端补落库、前端改三态，两边都有回归测试。
 
 **不能宣布的：**
 

@@ -65,10 +65,11 @@ import type {
   RunsEnvelope,
   WorkbenchHealth as WsHealth,
 } from "../api";
-import type { BackendState, BackendStatus, LogLevel, LogEntry, StageState } from "../types";
+import type { BackendState, LogLevel, LogEntry, StageState } from "../types";
 import {
   EVIDENCE_SLOT_NOTE,
   STAGES,
+  deriveBackends,
   deriveStageBadge,
   deriveStagesFromRun,
   isTerminalStatus,
@@ -115,13 +116,6 @@ const STATUS_LABEL: Record<string, string> = {
   completed: "已完成",
   failed: "失败",
 };
-
-/** workbench /api/health 不含后端清单；各后端版本从最近分析轮次的 tool_versions 读取。 */
-const BACKEND_KEYS: Array<{ name: string; key: string }> = [
-  { name: "JADX", key: "jadx" },
-  { name: "Apktool", key: "apktool" },
-  { name: "Androguard", key: "androguard" },
-];
 
 function nowLabel(): string {
   const d = new Date();
@@ -354,26 +348,6 @@ function durationLabel(seconds: number | null | undefined): string | null {
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return `${m}m${String(s).padStart(2, "0")}s`;
-}
-
-/**
- * 后端状态：workbench 的 /api/backends 只说明"装没装"，这里用最近轮次的
- * tool_versions 如实推断"这次参与了没有"。
- */
-function deriveBackends(project: WsProjectStatus | null): BackendStatus[] {
-  const latest = project?.runs[0];
-  const versions = latest?.tool_versions ?? {};
-  const hasRun = Boolean(latest);
-  return BACKEND_KEYS.map(({ name, key }) => {
-    const version = versions[key] ?? null;
-    if (!hasRun) {
-      return { name, state: "queued" as BackendState, detail: "等待分析轮次数据…" };
-    }
-    if (version) {
-      return { name, state: "done" as BackendState, detail: `v${version} · 参与本次分析` };
-    }
-    return { name, state: "error" as BackendState, detail: "未安装或未配置，未参与本次分析" };
-  });
 }
 
 /**

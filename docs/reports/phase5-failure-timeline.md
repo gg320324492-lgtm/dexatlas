@@ -97,8 +97,8 @@ notanapk.apk is not a ZIP archive; APKs are ZIP archives
    !  jadx exited with code 1: … JadxException: Error decode: resources.arsc …
    ```
    （走查的浏览器界面**看不到**这三句：它们在项目上，但项目状态没被写进去，见下一条。）
-3. 管线的结论是「没有 classes 也没有 manifest」→ 项目状态判为 `FAILED`（`src/dexatlas/core/pipeline.py:358`）。
-4. **但是这个 `FAILED` 从来没被写进工作区数据库**：管线只对 `COMPLETED` 的项目调用 `publish_run`（`src/dexatlas/core/pipeline.py:382-384`），失败的那一支不发布（`src/dexatlas/core/pipeline.py:405` 只删掉暂存库）。管线自己注释里写明了这个取舍："A run that found nothing is not published… reading back the row a `begin_run` wrote would report a failed analysis as one still running"。
+3. 管线的结论是「没有 classes 也没有 manifest」→ 项目状态判为 `FAILED`（`src/dexatlas/core/pipeline.py:372`）。
+4. **但是这个 `FAILED` 从来没被写进工作区数据库**：管线只对 `COMPLETED` 的项目调用 `publish_run`（`src/dexatlas/core/pipeline.py:398-400`），失败的那一支不发布（`src/dexatlas/core/pipeline.py:405` 只删掉暂存库）。管线自己注释里写明了这个取舍："A run that found nothing is not published… reading back the row a `begin_run` wrote would report a failed analysis as one still running"。
 5. 后端日志如实记了一句：`background analysis of E:\...\uploads\bdb138...\corrupt.apk completed but produced no symbols`。
 6. 数据库里这个项目**仍然是** `status: 'running'`，它的 run 也是 `status: 'running'`、`finished_at: NULL`。
 
@@ -182,7 +182,7 @@ HTTP 202
 
 ![时间线 C：取消请求已受理（202），分析还在跑，日志区记下了这一条](../assets/phase5/timeline-04-cancel-requested.png)
 
-**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1099` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:492-493`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
+**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1113` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:506-507`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
 
 ```
 inspect           11:59:35.44 -> 11:59:35.44
@@ -258,8 +258,8 @@ androguard: androguard could not parse classes.dex
 
 这些是真的没验，不能算已验证：
 
-1. **打包后的 Tauri exe 里的同一条路径。** 本次全程是 vite 开发模式 + 浏览器。exe 里的 `tauri://localhost` 生产源、`@tauri-apps/plugin-http` 走侧车端口、以及 exe 自带的侧车进程管理，都**没有**在失败/取消场景下复验过。
-2. **原生 `window.confirm` 在 exe 里的样子。** 开发模式用的是浏览器原生弹窗；Tauri 的 WebView2 里它由 WebView2 渲染，外观与行为未验证。更要紧的是：自动化浏览器里原生弹窗会阻塞页面，所以本次是把 `window.confirm` 接管成「记录文案并返回 true」才点得下去——**文案是真实调用点传进去的字符串，但没人看见过它弹出时的样子**。
+1. ~~**打包后的 Tauri exe 里的同一条路径。**~~ **已关闭（2026-11-26 收尾）**：在打包 exe 里复验了取消路径——侧车自动拉起并用系统分配的端口、前端请求打在侧车自己的端口上、`POST /cancel` 返回 202、取消后项目记 failed 且**未发布任何结果**。见[验收报告 §7.5](phase5-acceptance.md)。
+2. ~~**原生 `window.confirm` 在 exe 里的样子。**~~ **已关闭（2026-11-26 收尾）**：确认框的原文在打包 exe 里被捕获——「确认取消本次分析？已生成的中间结果将被丢弃。」见[验收报告 §7.5](phase5-acceptance.md)。
 3. **「取消」按钮在真机上被手指点到的路径。** 本次是脚本在按钮出现后立即派发真实 DOM `click`（走的是 React 的 `onClick`，与用户点击同一条代码路径），确认框由上面说的接管放行。人手点击、焦点、键盘可达性未验。
 4. **取消发生在别的阶段。** 本次取消落在 `parse-apktool` 结束之后。若在 `index-androguard` 或 `decompile-jadx` 期间取消，界面表现应当相同（状态与错误一样），但**没有实测**。
 5. **JADX/Apktool 缺失的失败形态。** 本次三个后端都在、都装了。"后端根本没装"（`/api/backends` 的 `missing` 非空）在界面上是什么表现，**没有走**。
@@ -379,12 +379,12 @@ curl -s -X POST http://127.0.0.1:8618/api/projects/<project_id>/cancel
 
 验收报告里那条开放项可以这样收口（**建议**，最终措辞由主会话定）：
 
-> **失败 / 取消时间线：已实走（开发模式），未在打包 exe 中复验。**
+> **失败 / 取消时间线：已实走（开发模式），并已于 2026-11-26 收尾在打包 exe 中复验。**
 > 「取消」路径存在且走通：分析页「取消」按钮 → 原生确认 → `POST /api/projects/{id}/cancel` 202 →
 > 管线在下一个检查点停下（run 记为 `cancelled`，项目记为 `failed`）→ 界面显示「分析失败」，
 > 原因逐字为 `dexatlas: the analysis was cancelled before it completed`。
 > 「失败」有三种界面结果，取决于后端发生了什么：上传被拒停在首页（422 原文）、
 > 分析无产出则**界面一直停在「分析中」**（后端不写失败状态，只有重启后的孤儿对账才改成 `failed`）、
 > 后端失败但分析完成则显示「结果不完整」并列出各后端的错误。
-> **遗留缺口：**①「分析无产出 → 界面卡在分析中」是后端不写失败状态造成的，不是前端问题；
-> ②失败/取消在打包 exe 里未复验。
+> **遗留缺口（2026-11-26 收尾后）：**①「分析无产出 → 界面卡在分析中」是后端不写失败状态造成的，不是前端问题——**该缺陷已由 Phase 5 收尾批次修好**（失败状态现在落库，见[验收报告 §7.2](phase5-acceptance.md)）；
+> ②失败/取消在打包 exe 里未复验——**已于 2026-11-26 收尾复验**（见[验收报告 §7.5](phase5-acceptance.md)）。
