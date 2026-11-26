@@ -303,6 +303,10 @@ mod job {
     /// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`：作业的最后一个句柄关闭时，
     /// 终止作业里的全部进程。
     const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x0000_2000;
+    /// `SYNCHRONIZE`：只等着看目标还在不在。
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    /// `WAIT_TIMEOUT`：没等到（对进程来说 = 它还活着）。
+    const WAIT_TIMEOUT: u32 = 0x0000_0102;
 
     type Handle = *mut c_void;
 
@@ -400,6 +404,8 @@ mod job {
         fn Thread32Next(snapshot: Handle, entry: *mut ThreadEntry32) -> i32;
         fn OpenThread(access: u32, inherit_handle: i32, thread_id: u32) -> Handle;
         fn ResumeThread(thread: Handle) -> u32;
+        fn OpenProcess(access: u32, inherit_handle: i32, process_id: u32) -> Handle;
+        fn WaitForSingleObject(object: Handle, milliseconds: u32) -> u32;
     }
 
     /// 一个作业对象句柄：句柄一关，作业里的进程就被终止。
@@ -426,6 +432,9 @@ mod job {
                     per_process_user_time_limit: 0,
                     per_job_user_time_limit: 0,
                     // 这个标志就是"关闭即终止"的那一位：不设它，作业对象只是一个
+                    // 分组，句柄关掉时作业里的进程一个也不会被杀——而这一层兜底
+                    // 在宿主被 `taskkill /F` 强杀时是**唯一**还能执行的东西。
+                    // 这个标志就是「关闭即终止」的那一位：不设它，作业对象只是一个
                     // 分组，句柄关掉时作业里的进程一个也不会被杀——而这一层兜底
                     // 在宿主被 `taskkill /F` 强杀时是**唯一**还能执行的东西。
                     limit_flags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
@@ -570,6 +579,20 @@ mod job {
     pub fn spawn_suspended(command: &mut Command) -> io::Result<Child> {
         command.creation_flags(CREATE_SUSPENDED);
         command.spawn()
+    }
+
+    /// 这个 pid 上还有进程吗（测试用）。
+    ///
+    /// 用来回答"强杀宿主之后，后端还在不在"。打不开句柄就当作不在了：这台
+    /// 机器上被问的进程都是我们自己的后代，权限不会是原因。
+    pub fn process_is_alive(pid: u32) -> bool {
+        let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
+        if handle.is_null() {
+            return false;
+        }
+        let waited = unsafe { WaitForSingleObject(handle, 0) };
+        unsafe { CloseHandle(handle) };
+        waited == WAIT_TIMEOUT
     }
 
     /// 恢复刚创建（挂起）的子进程主线程。
@@ -1417,5 +1440,82 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(50));
         }
+    }
+
+    /// 「假宿主」：只被 `killing_the_host_leaves_no_orphan_backend` 显式重新执行。
+    ///
+    /// 它做的事和应用一样——把后端拉进作业对象——然后一直活着，直到父测试
+    /// 用 TerminateProcess 把它强杀。它不跑任何收尾代码，所以「后端被收走」
+    /// 这件事只可能由作业对象完成。
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "由 killing_the_host_leaves_no_orphan_backend 重新执行"]
+    fn the_host_role() {
+        let Ok(marker) = std::env::var("DEXATLAS_TEST_HOST_MARKER") else {
+            return;
+        };
+        let managed = ManagedChild::spawn("cmd", &long_running_command(), None).expect("启动后端");
+        let pid = managed.child.lock().expect("child mutex poisoned").id();
+        std::fs::write(&marker, pid.to_string()).expect("记下后端的 pid");
+        // 一直活着，直到父测试把它强杀。父测试先动手，所以这个 sleep 只会
+        // 在父测试失败时兜底。
+        std::thread::sleep(Duration::from_secs(300));
+        drop(managed);
+    }
+
+    /// 回归：宿主被 `taskkill /F` 强杀后，后端必须随之消失。
+    ///
+    /// 这是验收报告里那条开放项（「强杀宿主是否留下孤儿后端」）的可执行版本：
+    /// 一个假宿主把后端拉进作业对象，然后被 TerminateProcess 强杀——它的
+    /// `Drop`、`RunEvent::Exit`、一切收尾代码都没机会跑。宿主一死，系统关闭
+    /// 它的作业句柄，作业里的进程随之终止。
+    ///
+    /// 作业对象没带 `KILL_ON_JOB_CLOSE` 时，这一条是红的：宿主没了，后端还在。
+    #[cfg(windows)]
+    #[test]
+    fn killing_the_host_leaves_no_orphan_backend() {
+        let marker = std::env::temp_dir().join(format!("dexatlas-host-{}.pid", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let exe = std::env::current_exe().expect("测试二进制");
+
+        let mut host = std::process::Command::new(exe)
+            .args([
+                "--ignored",
+                "--exact",
+                "sidecar::tests::the_host_role",
+                "--nocapture",
+            ])
+            .env("DEXATLAS_TEST_HOST_MARKER", &marker)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("拉起假宿主");
+
+        // 等假宿主把后端拉起来并记下它的 pid。
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let pid: u32 = loop {
+            if let Ok(text) = std::fs::read_to_string(&marker) {
+                if let Ok(parsed) = text.trim().parse::<u32>() {
+                    break parsed;
+                }
+            }
+            assert!(Instant::now() < deadline, "假宿主没有把后端拉起来");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+
+        // 强杀：不给它任何收尾的机会。
+        let _ = host.kill();
+        let _ = host.wait();
+
+        // 后端必须随之消失——不留孤儿。
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while job::process_is_alive(pid) {
+            assert!(
+                Instant::now() < deadline,
+                "宿主被强杀后，后端进程必须随之终止（作业对象没有 KILL_ON_JOB_CLOSE？）"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = std::fs::remove_file(&marker);
     }
 }
