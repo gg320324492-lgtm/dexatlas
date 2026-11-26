@@ -425,7 +425,10 @@ mod job {
                 basic_limit_information: BasicLimitInformation {
                     per_process_user_time_limit: 0,
                     per_job_user_time_limit: 0,
-                    limit_flags: 0,
+                    // 这个标志就是"关闭即终止"的那一位：不设它，作业对象只是一个
+                    // 分组，句柄关掉时作业里的进程一个也不会被杀——而这一层兜底
+                    // 在宿主被 `taskkill /F` 强杀时是**唯一**还能执行的东西。
+                    limit_flags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
                     minimum_working_set_size: 0,
                     maximum_working_set_size: 0,
                     active_process_limit: 0,
@@ -506,6 +509,51 @@ mod job {
             } else {
                 info.active_processes
             }
+        }
+
+        /// 把作业的限制标志读回来（测试用）。
+        ///
+        /// 行为测试（关闭句柄后进程必须被终止）覆盖了"关闭即终止"这件事，
+        /// 但它要花几秒才判得出结果。这一条直接把标志读回来：标志没设，
+        /// 错在哪儿一目了然。
+        #[cfg(test)]
+        pub fn kill_on_close_is_set(&self) -> bool {
+            let mut info = ExtendedLimitInformation {
+                basic_limit_information: BasicLimitInformation {
+                    per_process_user_time_limit: 0,
+                    per_job_user_time_limit: 0,
+                    limit_flags: 0,
+                    minimum_working_set_size: 0,
+                    maximum_working_set_size: 0,
+                    active_process_limit: 0,
+                    affinity: 0,
+                    priority_class: 0,
+                    scheduling_class: 0,
+                },
+                io_info: IoCounters {
+                    read_operation_count: 0,
+                    write_operation_count: 0,
+                    other_operation_count: 0,
+                    read_transfer_count: 0,
+                    write_transfer_count: 0,
+                    other_transfer_count: 0,
+                },
+                process_memory_limit: 0,
+                job_memory_limit: 0,
+                peak_process_memory_used: 0,
+                peak_job_memory_used: 0,
+            };
+            let ok = unsafe {
+                QueryInformationJobObject(
+                    self.handle,
+                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                    ptr::from_mut(&mut info).cast::<c_void>(),
+                    size_of::<ExtendedLimitInformation>() as u32,
+                    ptr::null_mut(),
+                )
+            };
+            ok != 0
+                && info.basic_limit_information.limit_flags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE != 0
         }
     }
 
@@ -1263,15 +1311,14 @@ mod tests {
         // 转发器，它会再拉起真正的解释器）。
         let marker = std::env::temp_dir().join(format!("dexatlas-suspend-{}.txt", std::process::id()));
         let _ = std::fs::remove_file(&marker);
-        let mut child = job::spawn_suspended(&mut backend_command(
+        let child = job::spawn_suspended(&mut backend_command(
             "cmd",
             &["/C".into(), format!("echo hi > {}", marker.display())],
             None,
         ))
         .expect("挂起创建");
 
-        std::thread::sleep(Duration::from_millis(300));
-        assert!(
+        std::thread::sleep(Duration::from_millis(300));        assert!(
             !marker.exists(),
             "挂起创建的进程在恢复之前不该执行任何指令"
         );
@@ -1283,6 +1330,19 @@ mod tests {
         }
         assert!(marker.exists(), "恢复之后进程应当照常执行");
         let _ = std::fs::remove_file(&marker);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_job_object_carries_the_kill_on_close_flag() {
+        // 回归：作业对象**建好了却没设** `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+        // 时，句柄关闭不会终止作业里的任何进程——整条强杀兜底静默失效。
+        // 行为测试（下面那条）要花几秒才判得出结果，这条直接把标志读回来。
+        let job = job::Job::new().expect("作业对象");
+        assert!(
+            job.kill_on_close_is_set(),
+            "作业对象必须带 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，否则关闭句柄杀不掉任何进程"
+        );
     }
 
     #[cfg(windows)]

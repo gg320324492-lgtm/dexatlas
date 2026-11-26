@@ -332,6 +332,53 @@ jobs:
       - name: Run the desktop unit tests
         run: npm run test
 
+  # The desktop application's Rust side (desktop/src-tauri) had no CI job at
+  # all: its unit tests -- including the ones that decide whether the sidecar
+  # leaves an orphan backend behind when the host is killed -- ran nowhere but
+  # on the machine that wrote them. A regression test nobody runs is a
+  # document, not a test.
+  #
+  # This job runs on Windows on purpose. The code under test is the Windows
+  # Job Object FFI: the backend is created suspended, put into a job, and
+  # resumed, so that the whole process tree it spawns inherits the job and is
+  # terminated when the host dies. That module is compiled out on other
+  # platforms, so a Linux job would compile the tests and assert nothing.
+  desktop-rust:
+    name: Desktop Rust unit tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      # tauri-build embeds ../dist; without a built front end there is
+      # nothing to embed and the build script complains about it.
+      - name: Build the front end
+        run: npm run build
+      # The runner image ships rustup and a stable toolchain; the crate
+      # declares rust-version = 1.77, so the toolchain has to be one that is
+      # not older than that.
+      - name: Use the stable Rust toolchain
+        run: rustup default stable
+      - name: Keep generated files in .scratch
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.scratch/tmp"
+          {
+            echo "TMPDIR=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TEMP=$GITHUB_WORKSPACE/.scratch/tmp"
+            echo "TMP=$GITHUB_WORKSPACE/.scratch/tmp"
+          } >> "$GITHUB_ENV"
+      - name: Run the Rust unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+
   m3-comparison:
     name: M3 comparison stays reproducible
     runs-on: ubuntu-latest
