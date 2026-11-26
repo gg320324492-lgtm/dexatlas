@@ -9,7 +9,9 @@
 //! - 启动：应用启动时（`setup`）按配置 spawn 后端，端口由系统分配（`--port 0`）。
 //! - 观测：转发子进程 stdout/stderr 到应用日志（透传，不解析、不造数据）。
 //! - 通知：子进程退出/被杀时向前端发 `sidecar://exited` 事件，UI 如实呈现。
-//! - 收尾：应用退出时结束子进程（Drop + RunEvent::ExitRequested 双保险）。
+//! - 收尾：应用退出时结束子进程——`RunEvent::Exit` 主动清理、`SidecarState::drop`
+//!   兜底；Windows 上再加一道作业对象（Job Object）：宿主进程被 `taskkill /F`
+//!   强杀时 Rust 一行也跑不了，由系统替我们收掉整棵后端进程树。
 //! - 放行：拿到实际端口后给 http 插件补一条动态 capability，前端 fetch 才
 //!   能通过 ACL（`Manager::add_capability` 的 global scope 是增量合并的）。
 
@@ -93,8 +95,9 @@ impl SidecarStatus {
 pub struct SidecarState {
     /// 最近一次状态（供命令查询与事件载荷）。
     status: Mutex<Option<SidecarStatus>>,
-    /// 子进程句柄；`None` 表示尚未启动或已由 Drop 收走。
-    child: Mutex<Option<Arc<Mutex<Child>>>>,
+    /// 被托管的后端子进程；`None` 表示尚未启动或已被清理
+    /// （主动清理，或本结构体的 `Drop` 收走）。
+    child: Mutex<Option<ManagedChild>>,
     /// 已向 http 插件放行的端口，避免重复注入 capability。
     allowed_port: AtomicU16,
     /// 侧车实例序号：每次 spawn 自增。
@@ -133,6 +136,515 @@ impl SidecarState {
     /// 这个线程是否仍在负责当前那一个侧车实例。
     fn is_current_instance(&self, instance: u64) -> bool {
         self.instance.load(Ordering::SeqCst) == instance
+    }
+}
+
+impl Drop for SidecarState {
+    /// 兜底：状态被丢弃时（应用退出、`run()` 返回）确保后端不留活口。
+    ///
+    /// `RunEvent::Exit` 里的主动清理是第一道，这里是第二道。旧版本**根本没有**
+    /// 这个 `Drop`，而字段注释却写着"已由 Drop 收走"——注释声称的必须是代码
+    /// 做的，所以要么补上实现，要么改注释；这里选了补实现，因为应用崩溃、
+    /// 事件循环异常返回等路径上，主动清理那一条未必跑得到。
+    ///
+    /// 强杀（`taskkill /F`）时这个 `Drop` 同样跑不到——那一道由 Windows 的
+    /// 作业对象兜：宿主进程一死，系统关闭它的句柄，作业里的后端进程随之终止。
+    fn drop(&mut self) {
+        // `get_mut` 不会上锁，也就不会和正拿着锁的日志线程互等。
+        let Ok(slot) = self.child.get_mut() else {
+            return;
+        };
+        if let Some(mut managed) = slot.take() {
+            managed.terminate();
+        }
+    }
+}
+
+/// 被托管的后端子进程：进程本身 + "宿主一死它也得死"的托管句柄。
+struct ManagedChild {
+    /// 直接子进程；读日志线程与等待线程共用同一把锁。
+    child: Arc<Mutex<Child>>,
+    /// Windows：作业对象句柄。其他平台没有等价机制，恒为 `None`。
+    ///
+    /// 它与子进程同生共死：句柄一关（显式关闭，或宿主被强杀时由系统关闭），
+    /// 作业里的整棵后端进程树随即被终止。
+    job: Option<TreeGuard>,
+}
+
+/// 平台相关的"宿主一死，后端跟着死"的托管句柄。
+#[cfg(windows)]
+type TreeGuard = job::Job;
+#[cfg(not(windows))]
+type TreeGuard = ();
+
+impl ManagedChild {
+    /// 启动后端，但**不**纳入作业对象。
+    ///
+    /// 这是作业对象那条路走不通时的退路（作业建不起来、或主线程恢复失败）。
+    /// 此时"宿主被强杀"就没有系统兜底，只剩应用自己收尾。
+    fn spawn_unmanaged(
+        program: &str,
+        args: &[String],
+        cwd: Option<&std::path::Path>,
+    ) -> std::io::Result<Self> {
+        let child = spawn_backend(program, args, cwd)?;
+        Ok(Self {
+            child: Arc::new(Mutex::new(child)),
+            job: None,
+        })
+    }
+
+    /// 启动后端，并把它纳入托管。
+    ///
+    /// Windows 上是"挂起创建 → 放进作业对象 → 放行"：子进程在进作业之前
+    /// 一条指令也没执行，它自己拉起的后代（venv 的 `python.exe` 是个转发器，
+    /// 会再拉起真正的解释器）必然继承作业身份。作业建不起来或恢复失败时
+    /// 退回普通启动——功能不受影响，只是强杀宿主时少了系统兜底。
+    fn spawn(
+        program: &str,
+        args: &[String],
+        cwd: Option<&std::path::Path>,
+    ) -> std::io::Result<Self> {
+        #[cfg(windows)]
+        {
+            match job::Job::new() {
+                Some(job) => {
+                    let mut child = job::spawn_suspended(&mut backend_command(program, args, cwd))?;
+                    let in_job = job.assign(&child) && job.contains(&child);
+                    if !in_job {
+                        // 进不了作业（或进去了却查不到）：照样把挂起的子进程放行，
+                        // 别让它永远挂着；只是"宿主被强杀"时少了系统兜底。
+                        eprintln!("[sidecar] 后端进程未进入作业对象，宿主被强杀时将失去系统兜底");
+                        let _ = job::resume_primary_thread(&child);
+                        return Ok(Self {
+                            child: Arc::new(Mutex::new(child)),
+                            job: None,
+                        });
+                    }
+                    if let Err(err) = job::resume_primary_thread(&child) {
+                        // 恢复失败 = 进程永远挂着 = 比孤儿更糟。杀掉重来，
+                        // 这一回不带作业对象。
+                        let _ = child.kill();
+                        let _ = child.wait();
+                        eprintln!(
+                            "[sidecar] 恢复后端主线程失败（{err}），改用不带作业对象的启动方式"
+                        );
+                        return Self::spawn_unmanaged(program, args, cwd);
+                    }
+                    Ok(Self {
+                        child: Arc::new(Mutex::new(child)),
+                        job: Some(job),
+                    })
+                }
+                None => Self::spawn_unmanaged(program, args, cwd),
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            Self::spawn_unmanaged(program, args, cwd)
+        }
+    }
+
+    /// 结束这个后端：先按进程树杀，再等它收尸，最后关掉托管句柄兜底。
+    fn terminate(&mut self) {
+        let pid = self.child.lock().ok().map(|guard| guard.id());
+        if let Some(pid) = pid {
+            kill_process_tree(pid);
+        }
+        if let Ok(mut guard) = self.child.lock() {
+            let _ = guard.kill();
+            let _ = guard.wait();
+        }
+        // 关掉作业对象：Windows 上作业里剩下的进程随之被系统终止——
+        // 直接子进程已经退出、只剩孙子进程时，`taskkill /T` 够不着它们，
+        // 作业对象够得着。
+        self.job = None;
+    }
+}
+
+/// Windows 作业对象（Job Object）：把"宿主一死，后端跟着死"从 Rust 的善意
+/// 变成操作系统的保证。
+///
+/// **为什么需要它。** 侧车后端是应用 spawn 出来的子进程。应用正常退出时
+/// Rust 代码还能跑，可以主动结束它；被 `taskkill /F` 强杀时 Rust 一行也跑不了，
+/// 剩下的只有操作系统。Windows 的作业对象正是为此准备的：把子进程放进一个
+/// 带 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的作业，宿主进程一死（正常退出、
+/// 崩溃、被强杀都一样——系统会关闭它的全部句柄），作业里的进程随即被终止。
+///
+/// **为什么是"挂起创建"。** 子进程必须在**执行第一条指令之前**就进作业，
+/// 否则它自己拉起的后代可能落在作业之外：venv 里的 `python.exe` 是个转发器，
+/// 它会再拉起真正的解释器（实测进程树是 exe → venv python → 真解释器）。
+/// 所以这里用 `CREATE_SUSPENDED` 创建子进程 → 放进作业 → 再恢复它的主线程。
+/// 之后它 fork 出来的后代一律继承作业身份（作业没有开 breakaway）。
+///
+/// 其余平台没有等价机制，那里只剩"能主动收尾就主动收尾"（见 `ManagedChild`）。
+#[cfg(windows)]
+mod job {
+    use std::ffi::c_void;
+    use std::io;
+    use std::mem::size_of;
+    use std::os::windows::io::{AsRawHandle, RawHandle};
+    use std::os::windows::process::CommandExt;
+    use std::process::{Child, Command};
+    use std::ptr;
+
+    /// `CREATE_SUSPENDED`：进程创建后主线程挂起，不执行任何指令。
+    const CREATE_SUSPENDED: u32 = 0x0000_0004;
+    /// `THREAD_SUSPEND_RESUME`：打开线程只要"挂起/恢复"的权限。
+    const THREAD_SUSPEND_RESUME: u32 = 0x0000_0002;
+    /// `TH32CS_SNAPTHREAD`：线程快照。
+    const TH32CS_SNAPTHREAD: u32 = 0x0000_0004;
+    /// `INVALID_HANDLE_VALUE`
+    const INVALID_HANDLE_VALUE: RawHandle = usize::MAX as RawHandle;
+    /// `JobObjectExtendedLimitInformation`
+    const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION: i32 = 9;
+    /// `JobObjectBasicAccountingInformation`
+    const JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION: i32 = 1;
+    /// `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`：作业的最后一个句柄关闭时，
+    /// 终止作业里的全部进程。
+    const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: u32 = 0x0000_2000;
+    /// `SYNCHRONIZE`：只等着看目标还在不在。
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    /// `WAIT_TIMEOUT`：没等到（对进程来说 = 它还活着）。
+    const WAIT_TIMEOUT: u32 = 0x0000_0102;
+
+    type Handle = *mut c_void;
+
+    /// `JOBOBJECT_BASIC_LIMIT_INFORMATION`
+    #[repr(C)]
+    struct BasicLimitInformation {
+        per_process_user_time_limit: i64,
+        per_job_user_time_limit: i64,
+        limit_flags: u32,
+        minimum_working_set_size: usize,
+        maximum_working_set_size: usize,
+        active_process_limit: u32,
+        affinity: usize,
+        priority_class: u32,
+        scheduling_class: u32,
+    }
+
+    /// `IO_COUNTERS`
+    #[repr(C)]
+    struct IoCounters {
+        read_operation_count: u64,
+        write_operation_count: u64,
+        other_operation_count: u64,
+        read_transfer_count: u64,
+        write_transfer_count: u64,
+        other_transfer_count: u64,
+    }
+
+    /// `JOBOBJECT_EXTENDED_LIMIT_INFORMATION`
+    #[repr(C)]
+    struct ExtendedLimitInformation {
+        basic_limit_information: BasicLimitInformation,
+        io_info: IoCounters,
+        process_memory_limit: usize,
+        job_memory_limit: usize,
+        peak_process_memory_used: usize,
+        peak_job_memory_used: usize,
+    }
+
+    /// `JOBOBJECT_BASIC_ACCOUNTING_INFORMATION`
+    #[cfg(test)]
+    #[repr(C)]
+    struct BasicAccountingInformation {
+        total_user_time: i64,
+        total_kernel_time: i64,
+        this_period_total_user_time: i64,
+        this_period_total_kernel_time: i64,
+        total_page_fault_count: u32,
+        total_processes: u32,
+        active_processes: u32,
+        total_terminated_processes: u32,
+    }
+
+    /// `THREADENTRY32`
+    #[repr(C)]
+    struct ThreadEntry32 {
+        dw_size: u32,
+        cnt_usage: u32,
+        thread_id: u32,
+        owner_process_id: u32,
+        base_priority: i32,
+        delta_priority: i32,
+        flags: u32,
+    }
+
+    // 结构体布局写歪时 `SetInformationJobObject` 会失败，但失败原因看不直观；
+    // 与 Windows SDK 的文档尺寸对齐，能在编译期就发现写歪。
+    #[cfg(target_pointer_width = "64")]
+    const _: () = assert!(size_of::<ExtendedLimitInformation>() == 144);
+    #[cfg(target_pointer_width = "32")]
+    const _: () = assert!(size_of::<ExtendedLimitInformation>() == 112);
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn CreateJobObjectW(attributes: *const c_void, name: *const u16) -> Handle;
+        fn SetInformationJobObject(
+            job: Handle,
+            info_class: i32,
+            info: *const c_void,
+            info_length: u32,
+        ) -> i32;
+        fn AssignProcessToJobObject(job: Handle, process: RawHandle) -> i32;
+        #[cfg(test)]
+        fn QueryInformationJobObject(
+            job: Handle,
+            info_class: i32,
+            info: *mut c_void,
+            info_length: u32,
+            return_length: *mut u32,
+        ) -> i32;
+        fn IsProcessInJob(process: RawHandle, job: Handle, result: *mut i32) -> i32;
+        fn CloseHandle(object: Handle) -> i32;
+        fn CreateToolhelp32Snapshot(flags: u32, process_id: u32) -> Handle;
+        fn Thread32First(snapshot: Handle, entry: *mut ThreadEntry32) -> i32;
+        fn Thread32Next(snapshot: Handle, entry: *mut ThreadEntry32) -> i32;
+        fn OpenThread(access: u32, inherit_handle: i32, thread_id: u32) -> Handle;
+        fn ResumeThread(thread: Handle) -> u32;
+        fn OpenProcess(access: u32, inherit_handle: i32, process_id: u32) -> Handle;
+        fn WaitForSingleObject(object: Handle, milliseconds: u32) -> u32;
+    }
+
+    /// 一个作业对象句柄：句柄一关，作业里的进程就被终止。
+    pub struct Job {
+        handle: Handle,
+    }
+
+    // 作业句柄是内核对象，交给多个线程用与交给一个线程用没有区别；但裸指针
+    // 不带 `Send`/`Sync`，得自己说明这一点。本模块只在持锁的情况下用它。
+    unsafe impl Send for Job {}
+    unsafe impl Sync for Job {}
+
+    impl Job {
+        /// 建一个"关闭即终止"的作业。
+        pub fn new() -> Option<Self> {
+            let handle = unsafe { CreateJobObjectW(ptr::null(), ptr::null()) };
+            if handle.is_null() {
+                eprintln!("[sidecar] 创建作业对象失败：{:?}", io::Error::last_os_error());
+                return None;
+            }
+            let job = Self { handle };
+            let info = ExtendedLimitInformation {
+                basic_limit_information: BasicLimitInformation {
+                    per_process_user_time_limit: 0,
+                    per_job_user_time_limit: 0,
+                    // 这个标志就是"关闭即终止"的那一位：不设它，作业对象只是一个
+                    // 分组，句柄关掉时作业里的进程一个也不会被杀——而这一层兜底
+                    // 在宿主被 `taskkill /F` 强杀时是**唯一**还能执行的东西。
+                    // 这个标志就是「关闭即终止」的那一位：不设它，作业对象只是一个
+                    // 分组，句柄关掉时作业里的进程一个也不会被杀——而这一层兜底
+                    // 在宿主被 `taskkill /F` 强杀时是**唯一**还能执行的东西。
+                    limit_flags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                    minimum_working_set_size: 0,
+                    maximum_working_set_size: 0,
+                    active_process_limit: 0,
+                    affinity: 0,
+                    priority_class: 0,
+                    scheduling_class: 0,
+                },
+                io_info: IoCounters {
+                    read_operation_count: 0,
+                    write_operation_count: 0,
+                    other_operation_count: 0,
+                    read_transfer_count: 0,
+                    write_transfer_count: 0,
+                    other_transfer_count: 0,
+                },
+                process_memory_limit: 0,
+                job_memory_limit: 0,
+                peak_process_memory_used: 0,
+                peak_job_memory_used: 0,
+            };
+            let ok = unsafe {
+                SetInformationJobObject(
+                    job.handle,
+                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                    ptr::from_ref(&info).cast::<c_void>(),
+                    size_of::<ExtendedLimitInformation>() as u32,
+                )
+            };
+            if ok == 0 {
+                eprintln!("[sidecar] 设置作业对象属性失败：{:?}", io::Error::last_os_error());
+                // job 在这里被 drop ⇒ CloseHandle；此刻作业里没有成员，没有副作用。
+                return None;
+            }
+            Some(job)
+        }
+
+        /// 把一个（此刻还挂着的）子进程收进作业。
+        pub fn assign(&self, child: &Child) -> bool {
+            let ok = unsafe { AssignProcessToJobObject(self.handle, child.as_raw_handle()) };
+            if ok == 0 {
+                eprintln!("[sidecar] 后端进程加入作业对象失败：{:?}", io::Error::last_os_error());
+                return false;
+            }
+            true
+        }
+
+        /// 这个进程是不是在作业里。
+        pub fn contains(&self, child: &Child) -> bool {
+            let mut inside = 0i32;
+            let ok = unsafe { IsProcessInJob(child.as_raw_handle(), self.handle, &mut inside) };
+            ok != 0 && inside != 0
+        }
+
+        /// 作业里活着的进程数（含它们自己 fork 出来的后代）。
+        #[cfg(test)]
+        pub fn active_process_count(&self) -> u32 {
+            let mut info = BasicAccountingInformation {
+                total_user_time: 0,
+                total_kernel_time: 0,
+                this_period_total_user_time: 0,
+                this_period_total_kernel_time: 0,
+                total_page_fault_count: 0,
+                total_processes: 0,
+                active_processes: 0,
+                total_terminated_processes: 0,
+            };
+            let ok = unsafe {
+                QueryInformationJobObject(
+                    self.handle,
+                    JOB_OBJECT_BASIC_ACCOUNTING_INFORMATION,
+                    ptr::from_mut(&mut info).cast::<c_void>(),
+                    size_of::<BasicAccountingInformation>() as u32,
+                    ptr::null_mut(),
+                )
+            };
+            if ok == 0 {
+                0
+            } else {
+                info.active_processes
+            }
+        }
+
+        /// 把作业的限制标志读回来（测试用）。
+        ///
+        /// 行为测试（关闭句柄后进程必须被终止）覆盖了"关闭即终止"这件事，
+        /// 但它要花几秒才判得出结果。这一条直接把标志读回来：标志没设，
+        /// 错在哪儿一目了然。
+        #[cfg(test)]
+        pub fn kill_on_close_is_set(&self) -> bool {
+            let mut info = ExtendedLimitInformation {
+                basic_limit_information: BasicLimitInformation {
+                    per_process_user_time_limit: 0,
+                    per_job_user_time_limit: 0,
+                    limit_flags: 0,
+                    minimum_working_set_size: 0,
+                    maximum_working_set_size: 0,
+                    active_process_limit: 0,
+                    affinity: 0,
+                    priority_class: 0,
+                    scheduling_class: 0,
+                },
+                io_info: IoCounters {
+                    read_operation_count: 0,
+                    write_operation_count: 0,
+                    other_operation_count: 0,
+                    read_transfer_count: 0,
+                    write_transfer_count: 0,
+                    other_transfer_count: 0,
+                },
+                process_memory_limit: 0,
+                job_memory_limit: 0,
+                peak_process_memory_used: 0,
+                peak_job_memory_used: 0,
+            };
+            let ok = unsafe {
+                QueryInformationJobObject(
+                    self.handle,
+                    JOB_OBJECT_EXTENDED_LIMIT_INFORMATION,
+                    ptr::from_mut(&mut info).cast::<c_void>(),
+                    size_of::<ExtendedLimitInformation>() as u32,
+                    ptr::null_mut(),
+                )
+            };
+            ok != 0
+                && info.basic_limit_information.limit_flags & JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE != 0
+        }
+    }
+
+    impl Drop for Job {
+        fn drop(&mut self) {
+            unsafe { CloseHandle(self.handle) };
+        }
+    }
+
+    /// 以"挂起"方式创建进程：主线程不执行任何指令，直到我们显式恢复它。
+    ///
+    /// 挂起创建的意义只有一个：让调用方能在子进程跑第一条指令之前，先把它
+    /// 安置进作业对象。否则它 fork 出来的后代可能落在作业之外。
+    pub fn spawn_suspended(command: &mut Command) -> io::Result<Child> {
+        command.creation_flags(CREATE_SUSPENDED);
+        command.spawn()
+    }
+
+    /// 这个 pid 上还有进程吗（测试用）。
+    ///
+    /// 用来回答"强杀宿主之后，后端还在不在"。打不开句柄就当作不在了：这台
+    /// 机器上被问的进程都是我们自己的后代，权限不会是原因。
+    pub fn process_is_alive(pid: u32) -> bool {
+        let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
+        if handle.is_null() {
+            return false;
+        }
+        let waited = unsafe { WaitForSingleObject(handle, 0) };
+        unsafe { CloseHandle(handle) };
+        waited == WAIT_TIMEOUT
+    }
+
+    /// 恢复刚创建（挂起）的子进程主线程。
+    ///
+    /// 挂起创建的进程只有一个线程（主线程），所以按属主 PID 找到它并恢复即可。
+    /// 找不到或恢复失败时返回错误：调用方必须杀掉这个挂起的进程——让它一直
+    /// 挂着比留下一个孤儿更糟（占着内存却什么都不做）。
+    pub fn resume_primary_thread(child: &Child) -> io::Result<()> {
+        let pid = child.id();
+        let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) };
+        if snapshot == INVALID_HANDLE_VALUE {
+            return Err(io::Error::last_os_error());
+        }
+        let mut entry = ThreadEntry32 {
+            dw_size: size_of::<ThreadEntry32>() as u32,
+            cnt_usage: 0,
+            thread_id: 0,
+            owner_process_id: 0,
+            base_priority: 0,
+            delta_priority: 0,
+            flags: 0,
+        };
+        let mut outcome = Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "找不到挂起进程的主线程",
+        ));
+        unsafe {
+            if Thread32First(snapshot, &mut entry) != 0 {
+                loop {
+                    if entry.owner_process_id == pid {
+                        let thread = OpenThread(THREAD_SUSPEND_RESUME, 0, entry.thread_id);
+                        if thread.is_null() {
+                            outcome = Err(io::Error::last_os_error());
+                        } else {
+                            let previous = ResumeThread(thread);
+                            CloseHandle(thread);
+                            outcome = if previous == u32::MAX {
+                                Err(io::Error::last_os_error())
+                            } else {
+                                Ok(())
+                            };
+                        }
+                        break;
+                    }
+                    if Thread32Next(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            CloseHandle(snapshot);
+        }
+        outcome
     }
 }
 
@@ -252,26 +764,32 @@ fn allow_backend_port(app: &AppHandle<impl Runtime>, port: u16) {
     }
 }
 
+/// 拼好后端命令（启动与测试共用）。
+fn backend_command(program: &str, args: &[String], cwd: Option<&std::path::Path>) -> Command {
+    let mut command = Command::new(program);
+    command.args(args);
+    if let Some(dir) = cwd {
+        command.current_dir(dir);
+    }
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    command
+}
+
 /// 启动后端命令。
 ///
 /// `cwd` 是**可选**的工作目录：`None` 表示"推断不到仓库根"（安装形态）。
 /// 推断不到**不是**拒绝启动的理由——那样绝对路径的后端命令永远不会被执行。
 /// 旧实现把两件事用 `and_then` 串死：cwd 推断失败 ⇒ 短路 ⇒ `Command::new`
 /// 从未被调用 ⇒ 安装形态下侧车从未被拉起。
+///
+/// 这条路径**不做**进程托管：托管在 [`ManagedChild::spawn`] 里（Windows 上
+/// 还要"挂起创建 → 进作业对象 → 放行"）。
 fn spawn_backend(
     program: &str,
     args: &[String],
     cwd: Option<&std::path::Path>,
 ) -> std::io::Result<Child> {
-    let mut command = Command::new(program);
-    command.args(args);
-    if let Some(dir) = cwd {
-        command.current_dir(dir);
-    }
-    command
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+    backend_command(program, args, cwd).spawn()
 }
 
 /// 命令里是否带了目录部分（`python` 与 `E:\venv\Scripts\python.exe` 的区别）。
@@ -307,8 +825,8 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
     app.state::<SidecarState>().set_status(status);
 
     let cwd = backend_cwd(&app);
-    let child = match spawn_backend(&program, &args, cwd.as_deref()) {
-        Ok(child) => child,
+    let managed = match ManagedChild::spawn(&program, &args, cwd.as_deref()) {
+        Ok(managed) => managed,
         Err(err) => {
             let reason = spawn_failure_reason(&program, &err);
             let failure = SidecarStatus::spawn_failed(&program, &reason);
@@ -319,11 +837,11 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
         }
     };
 
-    let child = Arc::new(Mutex::new(child));
+    let child = managed.child.clone();
     *app.state::<SidecarState>()
         .child
         .lock()
-        .expect("sidecar child mutex poisoned") = Some(child.clone());
+        .expect("sidecar child mutex poisoned") = Some(managed);
 
     // stdout 线程：透传日志 + 从启动行抓实际端口
     let stdout_app = app.clone();
@@ -538,19 +1056,18 @@ pub fn restart_sidecar(app: AppHandle<impl Runtime>) -> SidecarStatus {
 }
 
 /// 应用退出时结束子进程（kill 整棵进程树再 wait，避免留下孤儿后端）。
+///
+/// 这是**主动**清理；`SidecarState::drop` 是兜底；宿主被强杀时两者都跑不到，
+/// 由 Windows 的作业对象接手（见 `job` 模块）。
 pub fn shutdown_sidecar(app: &AppHandle<impl Runtime>) {
-    let child = app
+    let managed = app
         .state::<SidecarState>()
         .child
         .lock()
         .expect("sidecar child mutex poisoned")
         .take();
-    if let Some(child) = child {
-        let pid = child.lock().expect("child mutex poisoned").id();
-        kill_process_tree(pid);
-        let mut guard = child.lock().expect("child mutex poisoned");
-        let _ = guard.kill();
-        let _ = guard.wait();
+    if let Some(mut managed) = managed {
+        managed.terminate();
     }
 }
 
@@ -738,5 +1255,267 @@ mod tests {
         }
         assert!(!state.status().failed);
         assert!(state.status().message.contains("正在启动"), "状态仍是新实例的：{}", state.status().message);
+    }
+
+    // ---------------------------------------------------------------- 收尾
+
+    use std::time::{Duration, Instant};
+
+    /// 一个必定会一直跑着的后端命令（用来观察"谁还活着"）。
+    fn long_running_command() -> Vec<String> {
+        if cfg!(windows) {
+            // ping -t 一直跑；输出丢进 nul，免得测试的管道被填满。
+            vec!["/C".into(), "ping -t 127.0.0.1 > nul".into()]
+        } else {
+            vec!["-c".into(), "sleep 300".into()]
+        }
+    }
+
+    /// 等一个进程收工；超时返回 false。
+    fn wait_until_exited(child: &Arc<Mutex<Child>>, timeout: Duration) -> bool {
+        let deadline = Instant::now() + timeout;
+        loop {
+            if child
+                .lock()
+                .expect("child mutex poisoned")
+                .try_wait()
+                .expect("try_wait")
+                .is_some()
+            {
+                return true;
+            }
+            if Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    #[test]
+    fn dropping_the_sidecar_state_stops_the_backend() {
+        // 回归：旧实现里**根本没有** Drop，字段注释却写着"已由 Drop 收走"——
+        // 注释声称的必须是代码做的。状态被丢弃（应用退出）时后端必须跟着走。
+        //
+        // 这里刻意用**没有作业对象**的后端：否则作业对象会替 Drop 把进程收走，
+        // 测到的就不是 Drop 了。
+        let managed = ManagedChild::spawn_unmanaged("cmd", &long_running_command(), None)
+            .or_else(|_| ManagedChild::spawn_unmanaged("sh", &long_running_command(), None))
+            .expect("启动后端");
+        let child = managed.child.clone();
+        {
+            let state = SidecarState::default();
+            *state.child.lock().expect("sidecar child mutex poisoned") = Some(managed);
+        } // state 在这里被 drop
+        assert!(
+            wait_until_exited(&child, Duration::from_secs(15)),
+            "状态被丢弃后，后端进程必须一起走"
+        );
+    }
+
+    #[test]
+    fn terminate_stops_the_backend() {
+        let managed = ManagedChild::spawn_unmanaged("cmd", &long_running_command(), None)
+            .or_else(|_| ManagedChild::spawn_unmanaged("sh", &long_running_command(), None))
+            .expect("启动后端");
+        let child = managed.child.clone();
+        let mut managed = managed;
+        managed.terminate();
+        assert!(
+            wait_until_exited(&child, Duration::from_secs(15)),
+            "主动清理后，后端进程必须收工"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_suspended_process_has_not_run_yet() {
+        // 挂起创建的意义：子进程在进作业对象之前**一条指令也没执行**。
+        // 否则它 fork 出来的后代可能落在作业之外（venv 的 python.exe 就是
+        // 转发器，它会再拉起真正的解释器）。
+        let marker = std::env::temp_dir().join(format!("dexatlas-suspend-{}.txt", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let child = job::spawn_suspended(&mut backend_command(
+            "cmd",
+            &["/C".into(), format!("echo hi > {}", marker.display())],
+            None,
+        ))
+        .expect("挂起创建");
+
+        std::thread::sleep(Duration::from_millis(300));        assert!(
+            !marker.exists(),
+            "挂起创建的进程在恢复之前不该执行任何指令"
+        );
+
+        job::resume_primary_thread(&child).expect("恢复主线程");
+        let deadline = Instant::now() + Duration::from_secs(15);
+        while !marker.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(marker.exists(), "恢复之后进程应当照常执行");
+        let _ = std::fs::remove_file(&marker);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_job_object_carries_the_kill_on_close_flag() {
+        // 回归：作业对象**建好了却没设** `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`
+        // 时，句柄关闭不会终止作业里的任何进程——整条强杀兜底静默失效。
+        // 行为测试（下面那条）要花几秒才判得出结果，这条直接把标志读回来。
+        let job = job::Job::new().expect("作业对象");
+        assert!(
+            job.kill_on_close_is_set(),
+            "作业对象必须带 JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE，否则关闭句柄杀不掉任何进程"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn closing_the_job_object_terminates_the_process_inside_it() {
+        // 回归：宿主被 `taskkill /F` 强杀时 Rust 代码一行也跑不了，收尾只能
+        // 靠作业对象——句柄被系统关闭，作业里的进程随之终止。
+        let mut child = job::spawn_suspended(&mut backend_command(
+            "cmd",
+            &long_running_command(),
+            None,
+        ))
+        .expect("挂起创建");
+        let job = job::Job::new().expect("作业对象");
+        assert!(job.assign(&child), "子进程应当能进作业对象");
+        job::resume_primary_thread(&child).expect("恢复主线程");
+        assert!(
+            child.try_wait().expect("try_wait").is_none(),
+            "恢复之后进程应当还活着"
+        );
+
+        drop(job);
+
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if child.try_wait().expect("try_wait").is_some() {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "作业对象的句柄关闭后，作业里的进程必须被终止"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_spawned_backend_runs_inside_the_job_object() {
+        let managed = ManagedChild::spawn("cmd", &long_running_command(), None).expect("启动后端");
+        let guard = managed.child.lock().expect("child mutex poisoned");
+        let job = managed.job.as_ref().expect("作业对象");
+        assert!(job.contains(&guard), "后端进程必须在作业对象里");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_grandchild_inherits_the_job_object() {
+        // 回归：venv 里的 `python.exe` 是个转发器，它会再拉起真正的解释器。
+        // 后端的后代必须继承作业身份——否则强杀宿主时留下的是"孙进程"，
+        // 而它才是真正在监听端口的那个。
+        let managed = ManagedChild::spawn(
+            "cmd",
+            &[
+                "/C".into(),
+                "ping -t 127.0.0.1 > nul & start /B ping -t 127.0.0.1 > nul".into(),
+            ],
+            None,
+        )
+        .expect("启动后端");
+        let job = managed.job.as_ref().expect("作业对象");
+
+        let deadline = Instant::now() + Duration::from_secs(15);
+        loop {
+            if job.active_process_count() >= 2 {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "后端自己拉出来的后代也应当继承作业身份（作业里活着的进程数：{}）",
+                job.active_process_count()
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    /// 「假宿主」：只被 `killing_the_host_leaves_no_orphan_backend` 显式重新执行。
+    ///
+    /// 它做的事和应用一样——把后端拉进作业对象——然后一直活着，直到父测试
+    /// 用 TerminateProcess 把它强杀。它不跑任何收尾代码，所以「后端被收走」
+    /// 这件事只可能由作业对象完成。
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "由 killing_the_host_leaves_no_orphan_backend 重新执行"]
+    fn the_host_role() {
+        let Ok(marker) = std::env::var("DEXATLAS_TEST_HOST_MARKER") else {
+            return;
+        };
+        let managed = ManagedChild::spawn("cmd", &long_running_command(), None).expect("启动后端");
+        let pid = managed.child.lock().expect("child mutex poisoned").id();
+        std::fs::write(&marker, pid.to_string()).expect("记下后端的 pid");
+        // 一直活着，直到父测试把它强杀。父测试先动手，所以这个 sleep 只会
+        // 在父测试失败时兜底。
+        std::thread::sleep(Duration::from_secs(300));
+        drop(managed);
+    }
+
+    /// 回归：宿主被 `taskkill /F` 强杀后，后端必须随之消失。
+    ///
+    /// 这是验收报告里那条开放项（「强杀宿主是否留下孤儿后端」）的可执行版本：
+    /// 一个假宿主把后端拉进作业对象，然后被 TerminateProcess 强杀——它的
+    /// `Drop`、`RunEvent::Exit`、一切收尾代码都没机会跑。宿主一死，系统关闭
+    /// 它的作业句柄，作业里的进程随之终止。
+    ///
+    /// 作业对象没带 `KILL_ON_JOB_CLOSE` 时，这一条是红的：宿主没了，后端还在。
+    #[cfg(windows)]
+    #[test]
+    fn killing_the_host_leaves_no_orphan_backend() {
+        let marker = std::env::temp_dir().join(format!("dexatlas-host-{}.pid", std::process::id()));
+        let _ = std::fs::remove_file(&marker);
+        let exe = std::env::current_exe().expect("测试二进制");
+
+        let mut host = std::process::Command::new(exe)
+            .args([
+                "--ignored",
+                "--exact",
+                "sidecar::tests::the_host_role",
+                "--nocapture",
+            ])
+            .env("DEXATLAS_TEST_HOST_MARKER", &marker)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .expect("拉起假宿主");
+
+        // 等假宿主把后端拉起来并记下它的 pid。
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let pid: u32 = loop {
+            if let Ok(text) = std::fs::read_to_string(&marker) {
+                if let Ok(parsed) = text.trim().parse::<u32>() {
+                    break parsed;
+                }
+            }
+            assert!(Instant::now() < deadline, "假宿主没有把后端拉起来");
+            std::thread::sleep(Duration::from_millis(50));
+        };
+
+        // 强杀：不给它任何收尾的机会。
+        let _ = host.kill();
+        let _ = host.wait();
+
+        // 后端必须随之消失——不留孤儿。
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while job::process_is_alive(pid) {
+            assert!(
+                Instant::now() < deadline,
+                "宿主被强杀后，后端进程必须随之终止（作业对象没有 KILL_ON_JOB_CLOSE？）"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = std::fs::remove_file(&marker);
     }
 }
