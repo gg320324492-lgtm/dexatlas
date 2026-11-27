@@ -1,8 +1,8 @@
 # Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装，非 MSIX 容器启动
 
-**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）
+**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）；2026年11月28日（NSIS 首装/卸载补测，§5.8）
 **机器：** Windows 11 Pro 10.0.26300（x64）
-**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`
+**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`；NSIS 首装/卸载轮（§5.8）基线 `273536b`，worktree `zen-sammet-4b7f5e`
 **本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」；§5 补的是 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。
 
 > **本文的地位。** 验收报告是判定书；本文是那两条空白项的**原始记录**：配了什么、跑了什么命令、看到了什么、以及**哪些没看到**。本文只做记录与取证，不改判定——两条空白项的结论由验收报告的作者在看过本文后写。
@@ -17,6 +17,9 @@
 | 打包 exe + 完整后端（JADX + Apktool + Androguard） | **通过** | 打包 exe 走完「上传 → 分析 → 项目详情 → 证据」，5 个阶段全部「已完成」，**12 条证据**、`missing_backends: []`、`complete: true`；设置页三个后端都显示「已安装 · 参与本次分析」（§2） |
 | MSI 安装 | **通过（有一个前提要说清）** | `msiexec /i … /passive` 退出码 **0**，装到 `C:\Program Files\DexAtlas Studio\`；装完启动应用，侧车起来、连上后端、跑出同样的 **12 条证据**（§3） |
 | 非 MSIX 容器下的启动（2026-11-27 第三轮） | **通过** | 无包身份的进程（`GetCurrentPackageFullName` rc=15700）启动 exe：判别实验证明读的是**真实路径**的 `backend.json`（§5.3）；同样跑出 **12 条证据**、五阶段全完成、三后端参与（§5.4）；NSIS per-user 静默升级 0.1.0→1.2.0 成功、用户数据保留（§5.5） |
+| NSIS 首次安装（2026-11-28 第四轮） | **通过** | 机器清到首装形态后静默 `/S` 退出码 **0**，装到 `C:\Users\pc\AppData\Local\DexAtlas Studio\`；装完的应用起来、侧车起来、一次真实分析跑出同样的 **12 条证据**、五阶段全完成、三后端参与（§5.8.1） |
+| NSIS 卸载（2026-11-28 第四轮） | **通过，但查出一个缺陷** | 静默卸载退出码 **0**，安装目录整个没了、注册表卸载项没了、两份快捷方式都没了，**`%APPDATA%` 的 `backend.json` 逐字节保留**；但 `HKCU\Software\github\DexAtlas Studio`（记住安装位置的键）**没删**，判别实验证明它决定下一次装到哪（§5.8.3）。**缺陷：用户用过一次之后，卸载就卸不干净**——工作区建在安装目录里，而 NSIS 的 `RMDir` 只删空目录，卸完还剩 `.dexatlas\`（§5.8.4） |
+| NSIS 的 `ProductVersion` 跟着发版号走（2026-11-28 第四轮） | **通过** | 另建一棵树把发版号抬到 1.2.1，由**项目自己的** `sync-desktop-version.py` 推到四个文件，打出的包 `ProductVersion` **1.2.1**——不是巧合，是跟着走（§5.8.2） |
 
 **两条空白项都能填上，但 MSI 那一项带一个前提：`msiexec /i … /qn`（静默）装不上，退出码 1603；换成 `/passive` 才装得上。** 原因与边界写在 §3.5——不是包的毛病，是「静默模式下 Windows Installer 不做凭据提升」这条机制。
 
@@ -28,6 +31,13 @@
 > 无包身份的进程启动 exe，判别实验证明配置读的是**真实路径**，分析同样跑出完整一档
 > （12 条证据、`complete: true`），NSIS per-user 升级路径也验过。**结论（是否关闭该验收项）
 > 仍由验收报告的作者写**，本文只交证据。
+>
+> **2026-11-28 NSIS 首装/卸载补测（§5.8）：** §5.6 当时明写「没验到」的两条——
+> **NSIS 的首次安装**与 **NSIS 的卸载**——在本轮补上，并顺带实测了 NSIS 的
+> `ProductVersion` 是否跟着发版号走（跟着走：另建一棵树抬到 1.2.1，打出的包就是 1.2.1）。
+> **这一轮只做验证与记录，没有改产品代码、没有加测试**（主会话在并行发版，改源码会让
+> 源码指纹变、测量要重跑）。机器状态**已恢复到本轮开始之前**，逐项核对过（§5.8.6）。
+> **结论（是否关闭相应验收项）仍由验收报告的作者写。**
 
 ---
 
@@ -622,14 +632,315 @@ GET http://127.0.0.1:65207/api/backends   → 三个后端齐全（同 §5.4）
 
 ### 5.6 这一轮没验到的
 
-- **卸载路径**：NSIS 卸载会把安装目录连同里面的 `.dexatlas` 用户数据一起删掉；那份 0.1.0
-  时代的项目数据不是本轮创建的，删它要作者拍板，本轮没有执行卸载。MSI 的卸载路径 §4.2.4 已验过。
+> **2026-11-28 更新：** 本节的前两条（NSIS 卸载、NSIS 首次安装）**已在 §5.8 补上**——
+> 2026-11-28 那一轮把机器清到首装形态，跑了完整首装与卸载，并实测了 NSIS 的
+> `ProductVersion` 是否跟着发版号走。剩下的两条仍然开放。
+
+- ~~**卸载路径**：NSIS 卸载会把安装目录连同里面的 `.dexatlas` 用户数据一起删掉；那份 0.1.0
+  时代的项目数据不是本轮创建的，删它要作者拍板，本轮没有执行卸载。MSI 的卸载路径 §4.2.4 已验过。~~
+  **已验（§5.8.3）：** NSIS 静默卸载退出码 0，安装目录整个没了，注册表卸载项没了，
+  两份快捷方式都没了，**`%APPDATA%` 的 `backend.json` 逐字节保留**（sha256 `c1387ed5…` 不变）。
+  §5.6 当时担心的「`.dexatlas` 用户数据会被一起删掉」**只在安装目录里那份**成立，
+  而那份不在 `%APPDATA%` 里。
 - **修复（repair）路径**：NSIS 安装器没有 repair 模式（MSI 的 §4.2.3 已验）。
-- **首次安装（空机器 → 装上）**：本轮只验了「在已有 0.1.0 的机器上升 1.2.0」；
-  全新机器的首次 NSIS 安装没验（主会话 2026-11-27 的打包复验轮已覆盖 MSI 首装）。
+- ~~**首次安装（空机器 → 装上）**：本轮只验了「在已有 0.1.0 的机器上升 1.2.0」；
+  全新机器的首次 NSIS 安装没验（主会话 2026-11-27 的打包复验轮已覆盖 MSI 首装）。~~
+  **已验（§5.8.1）：** 机器清到首装形态后静默首装退出码 0，装到
+  `C:\Users\pc\AppData\Local\DexAtlas Studio\`，装完的应用能起来、侧车起来、
+  一次真实分析跑完（12 条证据、五阶段全完成、三后端参与）。
 - **MSI 在非容器下的重装**：MSI 装卸都验过，但都是在（可能的）容器上下文里跑的命令行；
   本轮没有再走一遍 MSI。判断上 msiexec 的容器敏感性远低于 GUI 应用（它本来就是系统服务），
   但没有单独取证。
+
+### 5.8 NSIS 的首次安装与卸载（2026-11-28 第四轮）
+
+> **这一轮补的是 §5.6 当时明写「没验到」的两条**：NSIS 的**首次安装**与 NSIS 的**卸载**，
+> 外加一件顺带核的事——**NSIS 的 `ProductVersion` 是否跟着发版号走**。
+> **只做验证与记录，不改产品代码、不加测试。**
+
+#### 5.8.0 被测对象与这一轮的做法
+
+| | |
+|---|---|
+| 仓库基线 | worktree `zen-sammet-4b7f5e`，HEAD `273536b`；`src/`、`desktop/src/`、`desktop/src-tauri/src/` 与上一轮被测的那棵树 `diff -rq` **无输出** |
+| NSIS 安装包 | **本 worktree 自建**（`npm run tauri build`，Rust 编译 3m01s），`desktop/src-tauri/target/release/bundle/nsis/DexAtlas Studio_1.2.0_x64-setup.exe`，3,785,587 B，sha256 `99f920b6…` |
+| exe 的版本资源 | `FileVersion 1.2.0` / `ProductVersion 1.2.0` / `ProductName DexAtlas Studio` |
+| 驱动进程 | **无包身份**：`GetCurrentPackageFullName` rc=**15700**（`APPMODEL_ERROR_NO_PACKAGE`）——与 §5.1 同一套量法，三种调用形状（`(len,buf,len)`、sizing 版、`(len,buf)`）都回 15700 |
+| 机器形态 | **首装形态**：本轮开始前先把机器上原有的 NSIS 安装**卸掉**，再把残留（两棵安装目录、两个注册表键、两份快捷方式、`%APPDATA%` 配置目录）**移到一边**（不是删），并确认全部不在位 |
+
+**这一轮为什么必须先把机器清干净：** 上一轮（§5.5）验的升级是「在已有 0.1.0 的机器上升 1.2.0」，
+机器上留着 `HKCU\Software\github\DexAtlas Studio`（NSIS 用来**记住上次装到哪**的键）。
+那个键还在，下一次静默安装就会被它带到旧目录去——那不是首装。
+把键、目录、快捷方式都清掉之后，首装才真的是首装。
+
+#### 5.8.1 首次安装：退出码 0，装到 `%LOCALAPPDATA%`，应用起来、侧车起来、一次真实分析跑完
+
+```
+'DexAtlas Studio_1.2.0_x64-setup.exe' '/S'      # 退出码 0，0.9 秒
+```
+
+| | 装完的样子 |
+|---|---|
+| 安装目录 | **`C:\Users\pc\AppData\Local\DexAtlas Studio\`**（NSIS `INSTALLMODE "currentUser"` ⇒ `$LOCALAPPDATA`） |
+| 目录里有什么 | `dexatlas-desktop.exe`（14,823,424 B，sha256 `01bd3db5…`，`FileVersion 1.2.0`）与 `uninstall.exe`（79,493 B） |
+| 注册表卸载项 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\DexAtlas Studio`：`DisplayVersion` **1.2.0**、`Publisher` github、`InstallLocation`/`UninstallString`/`DisplayIcon` 都指向 `C:\…`、`NoModify 1`、`NoRepair 1` |
+| 记住位置的键 | `HKCU\Software\github\DexAtlas Studio`（默认值）= `C:\Users\pc\AppData\Local\DexAtlas Studio` |
+| 快捷方式 | 桌面 `DexAtlas Studio.lnk` 与开始菜单 `DexAtlas Studio.lnk` **都建了**（静默安装器也建桌面快捷方式——`installer.nsi:741`） |
+| **提权 / 重启** | **都没有**：per-user 安装不提权；**全程未遇 3010，未触发任何重启提示** |
+
+**首装的第一次启动：侧车起不来——这是如实记下来的一条。**
+新装的机器上 `%APPDATA%\io.github.dexatlas.desktop\backend.json` **不存在**，
+应用于是用默认命令 `python -m dexatlas.workbench`（`sidecar.rs:658`）。本机 PATH 上的
+`python` 是 `C:\Users\pc\AppData\Local\Programs\Python\Python310\python.exe`，它没有装 dexatlas：
+
+```
+[backend-stderr] C:\Users\pc\AppData\Local\Programs\Python\Python310\python.exe:
+  Error while finding module specification for 'dexatlas.workbench'
+  (ModuleNotFoundError: No module named 'dexatlas')
+```
+
+**这不是缺陷，是「首次安装后要配置一次」的真实形态**，而且设置页把这件事写了出来
+（截图 `machine-11-11`：侧车「未运行 · 正在启动 DexAtlas 后端…」，后端命令那格里是默认的
+`python`，「分析后端」那张卡还在加载）。本轮**按用户会做的做**：在设置页把后端命令填成
+`E:\Dexatlas\.venv\Scripts\python.exe` 并点「保存并重启后端」——
+**这一步是点 UI 做的**（`#backend-command-input` 里填值 + 点 `button.backend-command-save`，
+事件是真实 DOM 事件，不是走后端 API 冒充）。保存后：
+
+```
+%APPDATA%\io.github.dexatlas.desktop\backend.json  ← 应用自己写的（§5.8.3 卸载后仍在）
+  {"args": ["-m", "dexatlas.workbench"], "command": "E:\\Dexatlas\\.venv\\Scripts\\python.exe"}
+```
+
+侧车随即起来（`Uvicorn running on http://127.0.0.1:63621`），设置页显示
+**「侧车：运行中 · 127.0.0.1:63621 · DexAtlas 后端已就绪」**。
+
+**然后是一次真实分析**（上传 `examples/demo-app/demo.apk`，走 `<input type=file>` +
+`DataTransfer` + `change` 事件，与用户操作同构）：
+
+```
+分析完成：5 类 · 8 方法 · 23 调用点 · 12 条证据。
+采集 ✓ · 解析 ✓ · 索引 ✓ · 反编译 ✓ · 报告 ✓        （五阶段全「已完成」）
+jadx v1.5.2 · apktool v2.11.1 · androguard v4.1.4   （三个后端全「参与本次分析」）
+轮询记录：状态变化 running → completed，用时 3.3s
+```
+
+**工作区数据库里的数字**（直查 `.scratch/nsis-verify/ws-install/dexatlas.db`）：
+
+```
+project apk_80a8fe0e81204c9f  status = completed
+  class_count = 5   method_count = 8   evidence_count = 12   call_edge_count = 21
+  tool_versions = {"jadx": "1.5.2", "apktool": "2.11.1", "androguard": "4.1.4"}
+  errors = []
+run run_33202d5b3aca4bc7  status = completed  completeness = complete  errors = []
+evidence 表 12 行
+```
+
+> **截图里有一处要读准：** 阶段进度下面那行在截图上写的是
+> `run run_3320 · running`——**那一行是「最近一轮 run 的状态」，与横幅不是同一份读数**：
+> 横幅来自项目状态轮询（它先看到 completed，于是画出「分析完成」），
+> 而这一行来自**另一个**、每 2s 一次的 `GET /api/projects/{id}/runs` 轮询。
+> 截图是在横幅一出现就拍的，**那次 runs 轮询还没回来**，所以它还停在上一轮读到的
+> `running`。同一张截图里紧挨着的轮询记录写着「状态变化：running → completed，用时 3.3s」，
+> 后端日志里 runs 端点被问了 **3 次**（第 16、20、23 行——**最后一次在转换之后**），
+> 而**数据库里那一轮确实是 `completed` / `complete`**（上面那段是直查出来的）。
+> **所以这不是「分析没跑完」，是一次转瞬即逝的显示滞后（最多一个轮询周期）。**
+> 本轮没有去追那处滞后的成因——它属于界面状态的范畴，不在这次补测的两条里；
+> 记在这里是因为**截图会被后来的人当证据读**，不写清楚会读成「分析没跑完」。
+
+![首装的分析完成页](../assets/phase5/machine-11-06-analysis-done.png)
+![首装的设置页：三后端可用、侧车运行中](../assets/phase5/machine-11-09-settings-after-analysis.png)
+![全新安装还没配后端时的设置页：侧车起不来](../assets/phase5/machine-11-11-first-launch-settings-unconfigured.png)
+
+> **工作区落在哪：** 这一轮用 `DEXATLAS_WORKSPACE` 把工作区钉在
+> `<worktree>/.scratch/nsis-verify/ws-install`（设置页那句「workspace ws-install」就是它）。
+> **不钉会落在哪**：安装形态下 exe 在 `C:\Users\pc\AppData\Local\DexAtlas Studio\`
+> —— 那里**反推不出仓库根**（`sidecar.rs:1003` 的 `repo_root_from_exe` 找的是
+> 祖先链第 4 级下有没有 `src/dexatlas`），所以 `backend_cwd()` 返回 `None`，
+> 侧车没有 cwd，`.dexatlas` 就落在**启动时的工作目录**。本轮第一遍没钉，
+> 它就落在了驱动的 cwd（本 worktree 根）——那不是安装目录的错，是
+> 「相对路径的工作区跟着 cwd 走」这条机制（`settings.py:43` 的 `_expand_workspace`
+> 把它锚在进程启动的那一刻）。
+>
+> **「用户从开始菜单图标启动时它落在哪」——本轮也验了，答案是：落在安装目录里。**
+> 开始菜单那份快捷方式的 `WorkingDirectory` **就是安装目录**
+> （`D:\Users\pc\AppData\Local\DexAtlas Studio`——实测快捷方式属性），
+> 于是侧车继承它的工作目录，`.dexatlas` 就被建在**安装目录里面**：
+>
+> ```
+> 把已有的 .dexatlas 移开 → 从开始菜单图标启动（不设 DEXATLAS_WORKSPACE）
+>   → 新建的 .dexatlas 出现在 D:\Users\pc\AppData\Local\DexAtlas Studio\.dexatlas
+> ```
+>
+> **这条有后果，见 §5.8.4 那一节——它让卸载卸不干净。**
+
+#### 5.8.2 NSIS 的 `ProductVersion` 跟着发版号走（实测，不是推断）
+
+**只测一次 1.2.0 说明不了什么**：1.2.0 既是当下的发版号，也是打包时写进模板的那个数，
+两者相同不能证明「跟着走」，只能证明「此刻对得上」。所以本轮**另建了一棵树**，
+把发版号抬到 **1.2.1**，让**项目自己的** `scripts/sync-desktop-version.py` 把它推到
+那四个带版本号的文件里，再打一个 NSIS 包：
+
+```
+src/dexatlas/__init__.py      __version__ = "1.2.1"     ← 发版号的唯一来源
+desktop/package.json          "version": "1.2.1"
+desktop/src-tauri/tauri.conf.json  "version": "1.2.1"  ← NSIS 的 !define VERSION 从这里来
+desktop/src-tauri/Cargo.toml  version = "1.2.1"
+desktop/src-tauri/Cargo.lock  version = "1.2.1"
+```
+
+打出来的包：**`DexAtlas Studio_1.2.1_x64-setup.exe`，`FileVersion 1.2.1` / `ProductVersion 1.2.1`**。
+
+**结论：NSIS 这一侧的 `ProductVersion` 跟着发版号走。**
+机制在 NSIS 模板里（`installer.nsi:37` `!define VERSION` 来自 `tauri.conf.json` 的 `version`，
+`:89` `VIAddVersionKey "ProductVersion" "${VERSION}"`），
+**从 MSI 那一侧一路到 NSIS 这一侧，中间没有第二个号。**
+
+> **同一棵树顺带核到的两件事（同一台机器、同一棵树，只是版本号不同）：**
+> - NSIS 安装包**文件名**里的版本号也跟着走（`DexAtlas Studio_1.2.1_x64-setup.exe`）；
+> - 装进 `HKCU\…\Uninstall\DexAtlas Studio` 的 `DisplayVersion` 是打包时的号，
+>   所以**卸载时它显示的是你装的那个号**。
+
+#### 5.8.3 卸载：退出码 0，安装目录整个没了，配置保留；但有一个键没删
+
+```
+'C:\Users\pc\AppData\Local\DexAtlas Studio\uninstall.exe' '/S'    # 退出码 0，0.4 秒
+```
+
+| | 卸载后 |
+|---|---|
+| 退出码 | **0** |
+| 安装目录 | **整个没了**（`C:\Users\pc\AppData\Local\DexAtlas Studio\` 不再存在）——**这一条只对「装完没用过」成立**，用过之后会留下 `.dexatlas\`，见 §5.8.4 |
+| 注册表卸载项 | **没了**（`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\DexAtlas Studio` 整个键不存在） |
+| 桌面 / 开始菜单快捷方式 | **两份都没了** |
+| `%APPDATA%\io.github.dexatlas.desktop\` | **还在**，`backend.json` sha256 `c1387ed5…` **逐字节相同**（与卸载前、与本轮开始时都相同） |
+| **提权 / 重启** | **都没有**：per-user 卸载不提权；**未遇 3010，无重启提示** |
+
+**`backend.json` 保留是对的**，和 MSI 那条路一致（§4.2.4）：那是用户自己的数据
+（后端命令是哪条路径），不是安装产物。NSIS 的卸载确认页上有个
+**「删除应用数据」复选框**（`installer.nsi:449`），默认不勾；**静默模式下那一页被跳过
+（`un.SkipIfPassive`），复选框保持未勾**，所以 `%APPDATA%` 与 `%LOCALAPPDATA%` 下
+以 bundle id 命名的目录都没被删（`installer.nsi:865`）。
+
+**但有一个键没删——而且它有后果。**
+卸载后 `HKCU\Software\github\DexAtlas Studio` **还在**（默认值仍是
+`C:\Users\pc\AppData\Local\DexAtlas Studio`）。
+它就是 NSIS 用来**记住上次装到哪**的键（`installer.nsi:697`
+`WriteRegStr SHCTX "${MANUPRODUCTKEY}" "" $INSTDIR`），
+卸载时**只有在「删除应用数据」被勾上的情况下**才删（`installer.nsi:868`）。
+静默卸载不勾 ⇒ 键留着。
+
+**这不是推测——本轮做了一个判别实验把它钉死。**
+把那个键的默认值改成**不是默认目录**的 `D:\Users\pc\AppData\Local\DexAtlas Studio`，
+再静默装一次：
+
+```
+记住的键：D:\Users\pc\AppData\Local\DexAtlas Studio
+默认目录：C:\Users\pc\AppData\Local\DexAtlas Studio
+安装器退出码 0 之后：
+  C:\Users\pc\AppData\Local\DexAtlas Studio  → 不存在
+  D:\Users\pc\AppData\Local\DexAtlas Studio  → 存在，dexatlas-desktop.exe 在
+判别结论：记住的键决定安装位置。
+```
+
+**所以「装在哪」不是固定的：** 第一次静默装到 `%LOCALAPPDATA%`；
+**卸载之后再装，还是装到同一个地方**（因为键还记得）；
+但**如果那个键被改过（或者从别的机器带来的），装到哪就跟着它走**——
+§5.5 那个 D 盘的安装就是这么来的（本轮的机器上，D 盘那份是 2026-11-25 装的，
+那个键从那时起就记着 D 盘）。
+
+> **给使用者的一句话：** 卸载之后**再装一次不会装回默认目录**，而是装回上次那个地方。
+> 想装到别处，先把 `HKCU\Software\github\DexAtlas Studio` 删掉，或者用图形安装器
+> 手动选目录（图形模式会问）。
+
+#### 5.8.4 顺带查出来的一个缺陷：**用过一次之后，NSIS 卸载卸不干净**
+
+这一条是**在把上面的事做完之后**顺手查出来的，**不是推出来的**——是实跑出来的。
+
+**先说机制（两个事实，各自单独看都没问题，合起来就有问题）：**
+
+1. **工作区会落在安装目录里。** 开始菜单与桌面那份快捷方式的 `WorkingDirectory`
+   **就是安装目录**（实测快捷方式属性：`TargetPath` 与 `WorkingDirectory` 都是
+   `D:\Users\pc\AppData\Local\DexAtlas Studio`）。安装形态下侧车没有自己的 cwd
+   （`sidecar.rs:994` 的 `backend_cwd()` 反推不出仓库根 ⇒ `None`），
+   所以它继承启动器的 cwd；而工作区是**相对路径** `.dexatlas`，锚定在进程启动的那一刻
+   （`settings.py:43`）。**三者一合 ⇒ `.dexatlas` 被建在安装目录里面。**
+2. **NSIS 的卸载器最后一句是 `RMDir "$INSTDIR"`（`installer.nsi:815`），
+   而 NSIS 的 `RMDir` 只在目录为空时才删掉它。**
+
+**实跑（干净首装 → 正常启动一次 → 静默卸载）：**
+
+```
+0. 清到首装形态
+1. 静默安装                                    → 退出码 0
+     安装目录：dexatlas-desktop.exe, uninstall.exe
+2. 配好后端命令（设置页写 backend.json 那一步）
+3. 从开始菜单图标启动（不设 DEXATLAS_WORKSPACE）→ 侧车起来
+     安装目录：.dexatlas\dexatlas.db, dexatlas-desktop.exe, uninstall.exe
+     ⇒ 工作区确实建在安装目录里
+4. 静默卸载                                    → 退出码 0
+     安装目录还在：True
+     剩下的文件：.dexatlas\dexatlas.db
+     剩下的目录：.dexatlas, .dexatlas\projects
+     注册表卸载项：没了
+     %APPDATA% 配置目录：还在
+     桌面快捷方式：没了
+```
+
+**结论：只要用户用过一次，NSIS 卸载就卸不干净——安装目录连同用户数据留在磁盘上，
+而控制面板（注册表卸载项）里已经没有它了。** 用户看到的是「已从列表中删除」，
+磁盘上却还留着 `DexAtlas Studio\` 目录。
+
+**这与 §5.8.3 的「卸载干净」不矛盾——两条是不同条件下的两条路径：**
+
+| 条件 | 卸载后安装目录 |
+|---|---|
+| **装完没用过**（§5.8.3 验的那条） | **整个没了**（目录本来就是空的，`RMDir` 删得掉） |
+| **用过一次**（本节） | **留着**，里面有 `.dexatlas\dexatlas.db` 与 `.dexatlas\projects\` |
+
+> **给修的人的提示（本轮不改代码）：** 三条路都能解——
+> (a) NSIS 模板里把 `RMDir "$INSTDIR"` 换成 `RMDir /r "$INSTDIR"`；
+> (b) 卸载时先删 `$INSTDIR\.dexatlas`；
+> (c) **更根本的**：让工作区不再落在安装目录里——把 `backend_cwd()` 在安装形态下
+> 指到一个稳定的用户目录（`%APPDATA%` 或 `%LOCALAPPDATA%`），
+> 而不是让它继承快捷方式的 `WorkingDirectory`。
+> **(c) 顺带解决另一个问题：** 安装目录里的用户数据在**升级**时也会跟着搬来搬去
+> （§5.5 验过 `.dexatlas` 逐字节保留，代价是它住在安装目录里）。
+> **回归测试建议：** 装好 → 从快捷方式启动 → 让它建出 `.dexatlas` → 卸载 →
+> 断言安装目录不存在。（纯 NSIS 行为的话，NSIS 层面加一个断言即可。）
+
+#### 5.8.5 这一轮仍然没验到的
+
+- **图形安装器（不静默）的路径**：本轮全程 `/S`。首装的「选目录」页、
+  升级的「如何安装」页都没有走——后者在 NSIS 模板里挂在
+  `MULTIUSER_PAGE_INSTALLMODE` 上（`installer.nsi:174`），而那个页**只在
+  `INSTALLMODE "both"` 时存在**（`installer.nsi:40` 是 `"currentUser"`），**所以本项目根本没有那一页**。
+- **`/UPDATE` 模式**：NSIS 的 `/UPDATE` 与 `/R`（装完自动启动）没验。
+- **「删除应用数据」勾上之后的卸载**：会连带删掉 `%APPDATA%\io.github.dexatlas.desktop\`
+  与 `%LOCALAPPDATA%\io.github.dexatlas.desktop\`，本轮**没勾**，所以没验。
+- **MSI 那条路有没有同样的「用过之后卸不干净」**：没查——本轮只查 NSIS。
+- **NSIS 的 repair**：NSIS 安装器**没有** repair 模式（MSI 的 §4.2.3 已验）。
+
+#### 5.8.6 机器状态（本轮结束时）
+
+**机器已恢复到本轮开始之前的状态**，并且**逐项核对过**（不是「大概恢复」）：
+
+| | 本轮开始时 | 本轮结束时 |
+|---|---|---|
+| `D:\Users\pc\AppData\Local\DexAtlas Studio\` | 4 个文件（含 `.dexatlas\dexatlas.db`） | **同 4 个文件，哈希逐一相同** |
+| `C:\Users\pc\AppData\Local\DexAtlas Studio\` | 7 个文件（0.1.0 的孤儿） | **同 7 个文件，哈希逐一相同** |
+| `HKCU\…\Uninstall\DexAtlas Studio` | 10 个值 | **同 10 个值，逐一相同** |
+| `HKCU\Software\github\DexAtlas Studio` | 2 个值 | **同 2 个值，逐一相同** |
+| 桌面 / 开始菜单快捷方式 | 在 | **在，哈希相同** |
+| `%APPDATA%\io.github.dexatlas.desktop\backend.json` | sha256 `c1387ed5…` | **sha256 `c1387ed5…`，mtime 也相同** |
+
+- 恢复的办法是**从备份拷回**（备份在 `.scratch/nsis-verify/backup/`，不入库），
+  不是「把移走的东西搬回来」——因为卸载器已经把安装目录里的 exe 与 uninstaller 删了，
+  搬回来搬不回原样；备份里才是原样。
+- **无遗留 dexatlas / 侧车 / 安装器进程；全程没有一次重启。**
+- 本 worktree 的产物留在 `desktop/src-tauri/target/release/`；
+  抬到 1.2.1 的那棵**副本**在 `.scratch/nsis-verify/bumptree/`（`.scratch/` 不入库，
+  **仓库里的文件一个都没改**）。
+
 
 ### 5.7 机器状态（本轮结束时）
 
@@ -703,6 +1014,33 @@ $sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
 > **msiexec 的两个坑（本轮踩过）：** 包路径含空格要用引号包起来，否则 **1639**（命令行无效）；
 > 包路径用正斜杠会得到 **1619**（打不开安装包）——用原生反斜杠。
 
+**2026-11-28 NSIS 首装/卸载补测用的命令**（§5.8）：
+
+```powershell
+# 12) 备份机器现状（安装目录 / 两个注册表键 / 快捷方式 / %APPDATA% 配置）
+#     脚本：<worktree>\.scratch\nsis-verify\backup_state.py
+
+# 13) 把机器清到首装形态（移动，不是删除）
+#     脚本：<worktree>\.scratch\nsis-verify\clean_to_first_install.py
+
+# 14) NSIS per-user 静默首装（不提权，无重启环节）
+& '<worktree>\desktop\src-tauri\target\release\bundle\nsis\DexAtlas Studio_1.2.0_x64-setup.exe' '/S'
+#     → 退出码 0；装到 $env:LOCALAPPDATA\DexAtlas Studio\
+
+# 15) 从安装目录启动应用，走 CDP 驱动 UI（填后端命令 → 上传 → 等分析 → 截图）
+#     脚本：<worktree>\.scratch\nsis-verify\drive_installed.py
+
+# 16) NSIS per-user 静默卸载（不提权，无重启环节）
+& "$env:LOCALAPPDATA\DexAtlas Studio\uninstall.exe" '/S'
+#     → 退出码 0；安装目录整个没了，%APPDATA%\io.github.dexatlas.desktop\ 保留
+
+# 17) 判别实验：记住安装位置的键（HKCU\Software\github\DexAtlas Studio）决定装到哪
+#     脚本：<worktree>\.scratch\nsis-verify\probe_remembered_location.py
+
+# 18) 把机器恢复回轮前状态（从备份拷回）
+#     脚本：<worktree>\.scratch\nsis-verify\restore_state.py
+```
+
 **取证脚本**（本轮用的，不入库，放在 worktree 的 `.scratch/`）：
 
 | 脚本 | 作用 |
@@ -727,8 +1065,14 @@ $sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
 | `docs/assets/phase5/machine-09-upgraded-home.png` | 2026-11-27 补测：升级之后的应用首页 |
 | `docs/assets/phase5/machine-10-01-home.png` … `machine-10-05-evidence.png`、`machine-10-07-settings.png` | 2026-11-27 非容器补测（§5）：无包身份进程启动 exe 的全链路截图 |
 | `docs/assets/phase5/machine-10-08-installed-home.png`、`machine-10-09-installed-settings.png` | 2026-11-27 非容器补测（§5.5）：NSIS 静默升级到 1.2.0 后从安装目录启动的截图 |
+| `docs/assets/phase5/machine-11-02-settings-saved.png` … `machine-11-09-settings-after-analysis.png` | 2026-11-28 NSIS 首装补测（§5.8.1）：首装后应用从「配好后端」到「跑出 12 条证据」的截图 |
+| `docs/assets/phase5/machine-11-10-first-launch-home.png`、`machine-11-11-first-launch-settings-unconfigured.png` | 2026-11-28 NSIS 首装补测（§5.8.1）：**全新安装、还没有 `backend.json`** 时的首页与设置页——侧车起不来的真实形态 |
 
 **没有改任何生产代码**：`src/**`、`tests/**`、`desktop/src/**`、`desktop/src-tauri/src/**` 一个字没动；`desktop/src-tauri/tauri.conf.json` 也没动（MSI 打包不需要改 bundle 配置）。第三方 APK / DEX / `so` / 密钥没有进仓库（只用了仓库自带的一方样例）。
+
+> **2026-11-28 那一轮（§5.8）同样没改任何生产代码，也没有加测试。** 那一轮把发版号抬到 1.2.1 的
+> 做法是**复制一份树到 `.scratch/`** 再改那份，**仓库里的文件一个都没动**——
+> 主会话在并行发版，改源码会让源码指纹变、测量要重跑。
 
 **机器上留下的状态（2026-11-27 补测结束时）：** DexAtlas Studio **已经卸干净了**——安装目录 `C:\Program Files\DexAtlas Studio\` 不存在、注册表没有卸载项、开始菜单与公共桌面快捷方式不存在。**用户配置目录 `%APPDATA%\io.github.dexatlas.desktop\backend.json` 保留**（卸载不该删用户数据），内容与本轮开始时的备份逐字节相同（sha256 `d358dbc4…`）。没有遗留 dexatlas 进程或侧车进程，也没有遗留计划任务（本轮用来提权的任务始终**注册失败**，机器上从未存在过）。
 
@@ -737,3 +1081,7 @@ $sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
 >
 > 2026-11-27 非容器补测结束时的状态见 §5.7：D 盘的 NSIS per-user 安装从 0.1.0 升到了
 > 本 worktree 构建的 1.2.0 并保留；两份 `backend.json` 都与轮前逐字节相同。
+>
+> **2026-11-28 那一轮（§5.8）结束时，机器回到了那一轮开始之前的状态**——逐项核对过，
+> 不是「大概恢复」：两棵安装目录、两个注册表键、两份快捷方式、`backend.json`
+> **哈希与 mtime 都与轮前相同**（§5.8.6 的表）。**没有重启。**
