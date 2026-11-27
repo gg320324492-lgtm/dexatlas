@@ -260,9 +260,262 @@ androguard: androguard could not parse classes.dex
 
 1. ~~**打包后的 Tauri exe 里的同一条路径。**~~ **已关闭（2026-11-26 收尾）**：在打包 exe 里复验了取消路径——侧车自动拉起并用系统分配的端口、前端请求打在侧车自己的端口上、`POST /cancel` 返回 202、取消后项目记 failed 且**未发布任何结果**。见[验收报告 §7.5](phase5-acceptance.md)。
 2. ~~**原生 `window.confirm` 在 exe 里的样子。**~~ **已关闭（2026-11-26 收尾）**：确认框的原文在打包 exe 里被捕获——「确认取消本次分析？已生成的中间结果将被丢弃。」见[验收报告 §7.5](phase5-acceptance.md)。
-3. **「取消」按钮在真机上被手指点到的路径。** 本次是脚本在按钮出现后立即派发真实 DOM `click`（走的是 React 的 `onClick`，与用户点击同一条代码路径），确认框由上面说的接管放行。人手点击、焦点、键盘可达性未验。
-4. **取消发生在别的阶段。** 本次取消落在 `parse-apktool` 结束之后。若在 `index-androguard` 或 `decompile-jadx` 期间取消，界面表现应当相同（状态与错误一样），但**没有实测**。
-5. **JADX/Apktool 缺失的失败形态。** 本次三个后端都在、都装了。"后端根本没装"（`/api/backends` 的 `missing` 非空）在界面上是什么表现，**没有走**。
+3. ~~**「取消」按钮在真机上被手指点到的路径。**~~ **已覆盖（2026-11-27 收尾）**：在打包 exe 里用**键盘**把这条路径走了一遍。
+   **基线：** 本轮实测的 exe 由 `8140661` 这棵树构建（`desktop/src-tauri/target/release/dexatlas-desktop.exe`），侧车按 `backend.json` 拉起 `E:\Dexatlas\.venv\Scripts\python.exe -m dexatlas.workbench`；WebView2 开远程调试口，键盘事件用 CDP 的 `Input.dispatchKeyEvent` 派发——**不是** `Runtime.evaluate` 造一个 `KeyboardEvent`：合成事件的 `isTrusted` 为 false，浏览器不会对它跑默认处理，也就不会移动焦点环。为了让分析窗口足够长，上传的是 `scripts/generate-large-apk.py` 现生成的合成 APK（300 个类 / 12,000 个方法 / 300 个 dex 文件；一次分析约 18 秒，其中 `parse-apktool` 4.3 秒、`index-androguard` 4.4 秒、`decompile-jadx` 6.7 秒）。
+
+   **Tab 的落点。** 从页面顶部开始按 Tab，`document.activeElement` 实测依次是：
+
+   | 第几次 Tab | 元素 | 文字 |
+   |---|---|---|
+   | 1 | `A.skip-link` | 跳到主内容 |
+   | 2 | `A.sidebar-link` | ▦ 项目 |
+   | 3 | `A.sidebar-link is-active` | ◈ 分析 |
+   | 4 | `A.sidebar-link` | ◆ 证据 |
+   | 5 | `A.sidebar-link` | ▤ 报告 |
+   | 6 | `A.sidebar-link` | ⚙ 设置 |
+   | 7 | `BUTTON.da-btn.da-btn--danger.da-btn--sm` | 取消 |
+
+   **焦点环看得见。** 焦点落在「取消」上时，它的计算样式是 `outline: rgb(184, 167, 245) solid 1.71429px`——就是 `desktop/src/components/Button.css:29` 的 `outline: 2px solid var(--color-lavender)`；截图里那圈淡紫色的框肉眼可见。
+
+   **Shift+Tab 退得回去。** 从「取消」按 Shift+Tab，落回侧栏的「⚙ 设置」。
+
+   **Enter 与 Space 都触发。** 两者都把**浏览器自己的** `window.confirm` 拉起来（`desktop/src/components/Button.tsx:70`）。CDP 侧收到的原文：
+
+   ```
+   Page.javascriptDialogOpening
+   {"message": "确认取消本次分析？已生成的中间结果将被丢弃。", "type": "confirm", "hasBrowserHandler": true}
+   ```
+
+   确认框在的时候**页面是冻住的**：任何发往页面的 CDP 命令都超时，`Page.captureScreenshot` 也超时。
+
+   **确认框出现时焦点落在哪。** 确认框是**浏览器自己的**对话框（上面那个事件就是它），**不是**应用自己的 `Dialog` 组件——所以 `desktop/src/components/useDismissable.ts` 里那套焦点陷阱与 Esc 处理**在这条路径上根本没有运行**。应用这一侧能观察到的只有一件事：确认框关掉之后，**焦点回到了「取消」按钮上**（实测 `document.activeElement` 仍是那个 `BUTTON`，焦点环还在）。
+
+   **Esc 能不能取消确认——这一问没验到，说清楚为什么。**
+   在打包 exe 里，这个确认框**不是一扇独立的窗口**：确认框弹起前后枚举全部顶层窗口，没有多出任何一扇（没有 `#32770`，也没有别的）。它是 WebView2 在自己的窗口里画的。因此：
+   - 没有窗口可以递键盘：往页面上派发 Esc 键事件**到不了它**（渲染进程正卡在 `confirm()` 里，事件排在队列里出不去）。实测按 Esc 之后页面仍然冻着。
+   - CDP 只有「替用户回答」的接口，没有「递一个物理按键」的接口。
+
+   所以「人手按 Esc 取消确认框」这一问**没验到**。能验的是**浏览器自己的两个回答**：
+   - 回答「取消」（Chromium 里 Esc 的含义）：**分析继续跑**，日志区没有取消那一行，焦点仍在「取消」按钮上。
+   - 回答「确定」（Chromium 里 Enter 的含义）：日志区出现
+
+     ```
+     11:05:46
+     [取消]
+     已向后端发送取消请求（202），等待状态确认
+     ```
+
+     随后项目记 `failed`、run 记 `cancelled`、**未发布任何结果**，界面显示「分析失败」。
+
+   **最终界面（逐字）：**
+
+   ```
+   分析进行中
+
+   项目 large.apk · apk_5b8b5f363ea5c75a · 失败
+
+   分析失败：本轮未产出可发布的结果。
+   dexatlas: the analysis was cancelled before it completed
+   ```
+
+   ```
+   分析失败
+   后端在本轮分析中遇到错误，未发布任何结果。可返回首页重新上传该 APK 再试。
+   dexatlas: the analysis was cancelled before it completed
+   返回首页
+   ```
+
+   ![键盘走到「取消」按钮上，焦点环可见](../assets/phase5/timeline-14-keyboard-cancel-focused.png)
+
+   ![确认框被「取消」回答后：分析继续跑，焦点仍在「取消」按钮上，日志区没有取消那一行](../assets/phase5/timeline-15-keyboard-confirm-dismissed.png)
+
+   ![键盘确认取消后的最终界面：分析失败、未发布任何结果](../assets/phase5/timeline-16-keyboard-cancelled.png)
+
+   **顺带查到的一条界面缺陷（已由主会话修复，PR #33）：** 确认框被「确定」回答后，「取消」按钮立刻进入 `loading`（`desktop/src/pages/Analysis.tsx:568`），按钮随即被**原生 `disabled`** 禁用——按钮一被禁用，浏览器就把焦点收走，**键盘焦点因此掉到 `<body>` 上**（实测 `document.activeElement` 从 `BUTTON` 变成 `BODY`），没有落回任何可操作元素。主会话已改用 `aria-disabled` 代替原生 `disabled`（`desktop/src/components/Button.tsx:60`；分支 `fix/backend-status-truth-and-focus`，提交 `ec5de0a`）。
+
+   **建议的回归测试（留给主会话，本轮不加）：** 仓库里已有的 `tests/test_desktop_keyboard_accessibility.py` 断言的是**应用自己的** `Dialog` / `Drawer` 覆盖层的键盘契约（源码级断言），它**不覆盖**这条路径——「取消」走的是浏览器原生 `window.confirm`，应用那份焦点陷阱与 Esc 处理在这里根本不运行。能钉住的只有两条可观察的事实：① Tab 七次能走到「取消」，焦点环可见；② 确认框关闭后焦点回到「取消」按钮。
+4. ~~**取消发生在别的阶段。**~~ **已覆盖（2026-11-27 收尾）**：在打包 exe 里造出了「取消发生在索引期」与「取消发生在反编译期」两个场景，各跑一遍。
+   **基线：** 本条**测了两棵树**，两次都是当轮 `npm run tauri build` 出来的 exe：① `8140661`（PR #32 之前）；② `b6c0438`（`main` 合了 PR #32 `4ddf469`「阶段格与后端推进点一一对应」，再合 PR #33 `ec5de0a`、复测量 `0a231d0`、外发材料 `b6c0438`）。上传的是与第 3 条同一个合成 APK（300 个类 / 12,000 个方法 / 300 个 dex 文件）。取消用**真实鼠标点击**（CDP `Input.dispatchMouseEvent`）按下，不是键盘。
+
+   **怎么造的场景：** 取消不是立刻掐断的——请求只是把取消令牌置位，管线在**下一个检查点**才停（`src/dexatlas/core/pipeline.py:1113`）。所以「在哪个阶段取消」不是靠盯着界面猜的：脚本轮询后端自己的阶段事件端点 `GET /api/projects/{id}/runs/{run_id}/stages`，**等到目标阶段的 `finished_at` 还是 `null`（也就是它正在跑）的那一刻**，再用真实鼠标点击按下「取消」。
+
+   前端每 2 秒轮询一次，所以界面会比后端的阶段事实**最多晚一个轮询周期**。第二轮（`b6c0438`）在点了取消之前**额外等页面自己把这一格点着**（等到那格的徽标变成「◌ 进行中」再截屏、再点），这样截到的是「读者读得到的那句话」，而不是页面还停在上一格时的样子。
+
+   - 场景 A：**`index-androguard` 正在跑**时点取消。
+   - 场景 B：**`decompile-jadx` 正在跑**时点取消。
+
+   **终态：两边的表现完全一样——这一条的预期得到了证实。**（运行途中那一行「当前阶段：」在两棵树上不一样，见本条最后一段。）
+
+   取消请求受理后，日志区新增一行（`b6c0438` 场景 B 的实测原文）：
+
+   ```
+   11:42:30
+   [取消]
+   已向后端发送取消请求（202），等待状态确认
+   ```
+
+   最终界面（两个场景**逐字相同**）：
+
+   ```
+   分析进行中
+
+   项目 large.apk · apk_5b8b5f363ea5c75a · 失败
+
+   分析失败：本轮未产出可发布的结果。
+   dexatlas: the analysis was cancelled before it completed
+   ```
+
+   ```
+   分析失败
+   后端在本轮分析中遇到错误，未发布任何结果。可返回首页重新上传该 APK 再试。
+   dexatlas: the analysis was cancelled before it completed
+   返回首页
+   ```
+
+   后端侧两个场景也一致：`projects.status = failed`、`analysis_runs.status = cancelled`、`published_run = null`（**未发布任何结果**）、`completeness.errors` 只有一条 `dexatlas: the analysis was cancelled before it completed`。
+
+   **终态一样，差的是停在哪一步——而这一步在后端的阶段事件里看得见。** 取消令牌在哪一个检查点被读到，管线就在那之后停下（时间为本地时间，`b6c0438` 那一次；`8140661` 那一次落库的阶段事件与这张表逐项相同）：
+
+   | 场景 | 取消后落库的阶段事件 |
+   |---|---|
+   | A：取消落在 `index-androguard` 期间 | `inspect` 11:37:04 → `parse-apktool` 11:37:05–11:37:08 → `index-androguard` 11:37:08–11:37:12（**没有 `decompile-jadx`，没有 `publish`**） |
+   | B：取消落在 `decompile-jadx` 期间 | `inspect` 11:42:21 → `parse-apktool` 11:42:21–11:42:24 → `index-androguard` 11:42:24–11:42:27 → `decompile-jadx` 11:42:27–11:42:34（**没有 `publish`**） |
+
+   场景 A 停在那处取消检查（`src/dexatlas/core/pipeline.py:297` `anchor: _check_cancelled(cancellation)`）——**JADX 根本没跑**；场景 B 停在另一处取消检查（`src/dexatlas/core/pipeline.py:342` `anchor: _check_cancelled(cancellation)`）——**JADX 跑完了，但结果一步也没进暂存库**。
+
+   **界面上分不分得开？`8140661` 分不开，`b6c0438` 分得开了。**
+
+   - **`8140661`（PR #32 之前）：分不开。** 两个场景在按下取消的那一刻，界面副标题**一字不差**：
+
+     ```
+     项目 large.apk · apk_5b8b5f363ea5c75a · 分析中 · 当前阶段：解析
+     ```
+
+     阶段五格也都是「解析 ◌ 进行中」。原因是那棵树的五格把 `parse-apktool` 与 `decompile-jadx` **合并成了一格「解析」**——读者在界面上既分不出当时跑的是 Apktool 还是 JADX，也分不出这次取消落在索引期还是反编译期。
+
+   - **`b6c0438`（PR #32 之后）：分得开了。** 两个场景的副标题**不再一样**：
+
+     ```
+     项目 large.apk · apk_5b8b5f363ea5c75a · 分析中 · 当前阶段：索引
+     ```
+
+     ```
+     项目 large.apk · apk_5b8b5f363ea5c75a · 分析中 · 当前阶段：反编译
+     ```
+
+     阶段五格也一一对上了——场景 A 是「采集 ✓已完成 · 解析 ✓已完成 · **索引 ◌ 进行中** · 反编译 •待处理 · 报告 •待处理」，场景 B 是「采集 ✓已完成 · 解析 ✓已完成 · 索引 ✓已完成 · **反编译 ◌ 进行中** · 报告 •待处理」。五格与后端的五个推进点一一对应（`desktop/src/stages.js:84` 的 `STAGE_TO_SLOT`），每格的状态就是后端那条阶段事件说的事实。
+
+     **PR #32 的效果因此被实测确认**：读者在界面上能分出这次取消落在索引期还是反编译期，不必再去翻后端的阶段事件。
+
+   ![`8140661`：取消落在索引期——副标题是「当前阶段：解析」，分不出](../assets/phase5/timeline-17-cancel-during-index.png)
+
+   ![`8140661`：取消落在索引期之后的最终界面](../assets/phase5/timeline-18-cancel-during-index-final.png)
+
+   ![`8140661`：取消落在反编译期——副标题也是「当前阶段：解析」，同样分不出](../assets/phase5/timeline-19-cancel-during-jadx.png)
+
+   ![`8140661`：取消落在反编译期之后的最终界面：与索引期逐字相同](../assets/phase5/timeline-20-cancel-during-jadx-final.png)
+
+   ![`b6c0438`：取消落在索引期——副标题写「当前阶段：索引」，「索引」格是「◌ 进行中」](../assets/phase5/timeline-21-cancel-during-index-newtree.png)
+
+   ![`b6c0438`：取消落在反编译期——副标题写「当前阶段：反编译」，「反编译」格是「◌ 进行中」](../assets/phase5/timeline-22-cancel-during-jadx-newtree.png)
+
+   ![`b6c0438`：取消落在索引期之后的最终界面——与反编译期逐字相同](../assets/phase5/timeline-23-cancel-during-index-final-newtree.png)
+
+   ![`b6c0438`：取消落在反编译期之后的最终界面](../assets/phase5/timeline-24-cancel-during-jadx-final-newtree.png)
+
+   **终态在两棵树上都一样**：横幅、错误卡片、错误原文 `dexatlas: the analysis was cancelled before it completed`、`projects.status = failed`、`analysis_runs.status = cancelled`、`published_run = null` 全部逐字相同——「界面表现应当相同（状态与错误一样）」这个预期在两棵树上都成立。**变的只是运行途中那一行「当前阶段：」**：PR #32 之前它分不出阶段，之后它分得出了。
+
+   （一处如实记下：前端每 2 秒轮询一次，所以界面上的那一格会比后端的阶段事实**最多晚一个轮询周期**。`8140661` 那次截图里「索引」格显示「待处理」就是这个原因——截图是界面当时的样子，不是后端当时的样子。`b6c0438` 那次在点取消之前先等页面自己把那一格点着，截到的才是读者读得到的那句话。）
+5. ~~**JADX/Apktool 缺失的失败形态。**~~ **已覆盖（2026-11-27 收尾）**：在打包 exe 里把 JADX 与 Apktool 两个后端都做成不可用，走了一遍完整的分析。
+   **基线：** `8140661` 构建的 exe；上传的是 `examples/demo-app/demo.apk`。
+
+   **怎么造的场景：** 启动 exe 时把两个环境变量置空——`DEXATLAS_JADX_PATH=` 与 `DEXATLAS_APKTOOL_JAR=`。`Settings` 的 `jadx_path` / `apktool_jar` 读的就是这两个变量（`src/dexatlas/config/settings.py:33`）。空字符串不是「没配」，而是**明确禁用**：`which_or_none` 见到空串就直接返回 `None`，不再做 PATH 查找（`src/dexatlas/tools/base.py:509`）。这一步是确定的——JADX 与 Apktool 在本机 PATH 上本来也没有，禁用之后侧车的 `GET /api/backends` 回到：
+
+   ```json
+   {"available": ["androguard"], "missing": ["jadx", "apktool"], "versions": {"jadx": null, "apktool": null, "androguard": "4.1.4"}}
+   ```
+
+   **首页：一个字都不提后端。** 上传卡、拖拽区、最近项目表全部照常。这个页面上没有任何地方说「少装了两个后端」。
+
+   ![首页不显示任何后端状态](../assets/phase5/timeline-10-missing-backends-home.png)
+
+   **设置页：唯一一处如实说「装没装」的地方**（`GET /api/backends` 就是给它用的，`desktop/src/pages/SettingsPage.tsx:113`）。逐字：
+
+   ```
+   分析后端
+   jadx
+   未安装或未配置
+   缺失
+   apktool
+   未安装或未配置
+   缺失
+   androguard
+   已安装 · v4.1.4
+   可用
+   缺失后端：jadx、apktool
+   ```
+
+   ![设置页：jadx 与 apktool 缺失，androguard 可用](../assets/phase5/timeline-11-missing-backends-settings.png)
+
+   **分析页：分析是「完成但结果不完整」，不是失败。** 分析跑完了：run 的 `status` 是 `completed`、`completeness` 是 `partial`、**发布了结果**（10 条证据）。横幅如实说了缺什么：
+
+   ```
+   分析完成：4 类 · 8 方法 · 23 调用点 · 10 条证据。
+   ```
+
+   ```
+   本轮分析存在未完成的步骤，结果不完整：
+   apktool: apktool is not installed or not on PATH
+   jadx: jadx is not installed or not on PATH
+   ```
+
+   **但同一屏的「后端状态」卡说的是另一回事——这里有一处界面假话（已由主会话修复，PR #33）。** 它把两个**根本没装**的后端写成：
+
+   ```
+   JADX
+   ◌ 进行中
+   参与本次分析 · 版本探测中
+   ```
+
+   ```
+   Apktool
+   ◌ 进行中
+   参与本次分析 · 版本探测中
+   ```
+
+   两句话都是假的：JADX 与 Apktool **没有参与**这一轮（run 的完整性错误原文是「jadx is not installed or not on PATH. It never ran, so it produced nothing.」），而这一轮**早就结束了**，版本不会再被探测。徽标还是「进行中」加一个跳动的圆点，停在一个已经完成的分析上。
+
+   ![分析页：横幅说「未安装」，右栏后端状态却说「参与本次分析 · 版本探测中」](../assets/phase5/timeline-12-missing-backends-analysis-page.png)
+
+   **项目详情页是对的。** 同一轮分析的项目详情页把话说准了：
+
+   ```
+   部分状态：缺失后端：apktool、jadx；apktool: apktool is not installed or not on PATH；jadx: jadx is not installed or not on PATH
+   ```
+
+   证据表里也有对应两条（E-0002、E-0006）：
+
+   ```
+   apktool did not complete in this run: apktool is not installed or not on PATH. It never ran, so it produced nothing.
+   ```
+
+   ![项目详情页如实写出缺失后端](../assets/phase5/timeline-13-missing-backends-project-detail.png)
+
+   **根因（写清楚，交给主会话定修法）：** 后端在探测版本**之前**就把**全部三个后端的名字**写进这一轮的 `tool_versions`（`src/dexatlas/core/pipeline.py:221`）：
+
+   ```python
+   run.tool_versions = {backend.name: None for backend in self._backends.all()}
+   ```
+
+   所以 `tool_versions[name] == null` 有**两种**含义，而前端只认一种。`8140661` 那棵树的 `desktop/src/stages.js` 上是三态映射：键不存在 = 这一轮没带上它；键在、值为 `null` = 参与了但版本还在探测；键在、值是版本号 = 参与了、版本已知。**「键在」证明的是「这一轮计划里带着它」，不是「它参与了」**——后端根本没装时，键也在、值也是 `null`。于是 `deriveBackends` 把「没装」误判成「版本还在探测」，说了两句关于机器的假话。
+
+   后端自己知道真相：`missing_backends()`（`src/dexatlas/mcp/tools/projects.py:26`）就是按「版本为 null」把没装的后端挑出来，项目详情页用的正是它；分析页的后端状态卡没有用它。
+
+   **主会话已修（PR #33，提交 `ec5de0a`）：** `deriveBackends` 改为同时看机器那份名单（`GET /api/backends`）与 run 的记录（`desktop/src/stages.js:386`），别再靠 `null` 猜——「机器说没装」那一支现在读出来就是「未安装或未配置，未参与本次分析」（`desktop/src/stages.js:398`）。
+
+   **建议的回归测试（留给主会话，本轮不加）：**
+   - 前端 `desktop/src/stages.test.ts`：`deriveBackends` 收到一个**已结束**的轮次（`status: "completed"`）、`tool_versions: {jadx: null, androguard: "4.1.4"}` 时，JADX 应当是「未安装或未配置，未参与本次分析」而不是「参与本次分析 · 版本探测中」。今天这条会红。
+   - 后端：`GET /api/projects/{id}/runs` 的 run 行若带上 `missing_backends`（或 `errors`），前端就不必靠猜。
 6. **管线自身抛异常（`AnalysisFailed`）的失败形态。** 本次能触发 `failed` 的后端动作是「取消」和「孤儿对账」；`src/dexatlas/core/pipeline.py:420` 那条 `except Exception` 分支（管线自己崩了）**没有触发过**——三个后端的失败都被各自的适配器接住了，不会走到那里。
 7. **并发与竞态。** 取消与收尾同时发生、`RUNNING` 表的边界，没有压测。
 8. **本次走查的树不是最新的树。** 走查基线是 `bb04ac5`。另一条并行分支（`claude/adoring-wilbur-bb6688`）已经把阶段角标文案从「阶段推进：后端真实阶段事件」改成「阶段推进：后端阶段事件 + 前端映射」，并把三处轮询改成终态即停。**本文截图里的角标文案与轮询行为，反映的是 `bb04ac5`；合并后角标会变，轮询停止后「卡在分析中」的表象也会变——但 §4 那条「后端不写失败状态」的病不受影响，因为那是后端的事。**
