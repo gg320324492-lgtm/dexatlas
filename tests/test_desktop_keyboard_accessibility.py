@@ -12,7 +12,10 @@ found to be broken or unproven:
   ``:focus-visible`` ring, so the landing point was invisible;
 * the focus trap wraps at both ends of the overlay;
 * Escape closes the overlay and the focus goes back to the element that
-  opened it.
+  opened it;
+* a button that becomes unavailable keeps the focus -- a native
+  ``disabled`` hands it to ``<body>`` and drops the keyboard user at the
+  top of the page.
 
 The desktop front-end has no test framework, so this checks the sources under
 ``desktop/src`` directly, the same way ``tests/test_desktop_version_badge.py``
@@ -27,6 +30,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP_LAYOUT_TSX = ROOT / "desktop" / "src" / "components" / "AppLayout.tsx"
 APP_LAYOUT_CSS = ROOT / "desktop" / "src" / "components" / "AppLayout.css"
+BUTTON = ROOT / "desktop" / "src" / "components" / "Button.tsx"
+BUTTON_CSS = ROOT / "desktop" / "src" / "components" / "Button.css"
 DISMISSABLE = ROOT / "desktop" / "src" / "components" / "useDismissable.ts"
 DRAWER = ROOT / "desktop" / "src" / "components" / "Drawer.tsx"
 DIALOG = ROOT / "desktop" / "src" / "components" / "Dialog.tsx"
@@ -117,3 +122,59 @@ def test_the_focus_goes_back_to_the_element_that_opened_the_overlay() -> None:
         assert re.search(r"opener\??\.focus\??\.?\(\)", source), (
             f"{path.name} does not give the focus back"
         )
+
+
+def test_a_button_that_becomes_unavailable_keeps_the_focus() -> None:
+    """The keyboard user must not be dropped at the top of the page.
+
+    A native ``disabled`` takes the focus away: the browser moves it to
+    ``<body>``, and the user is back at the top of the document.  This was
+    measured on the packaged executable on 2026-11-27 -- pressing "取消"
+    moved the focus to ``<body>`` the moment the cancellation started, so
+    the keyboard path to the button was lost exactly when the user had
+    just used it.
+
+    The button therefore stays focusable and says it is unavailable with
+    ``aria-disabled``; the click is stopped in the handler instead.
+    """
+    source = _source(BUTTON)
+
+    # A bare ``disabled={...}`` attribute: the browser takes the focus away.
+    # ``aria-disabled=`` must not be caught by this -- hence the lookbehind
+    # for the hyphen that belongs to the aria- prefix.  The pattern wants a
+    # JSX expression after the "=", so ``disabled === true`` in the
+    # component's own code does not match.
+    assert not re.search(r"(?<![\w-])disabled\s*=\s*\{", source), (
+        "the button is disabled natively, so the browser drops the focus to "
+        "<body> the moment it becomes unavailable"
+    )
+    assert "aria-disabled" in source, (
+        "the button must say it is unavailable with aria-disabled, which keeps it focusable"
+    )
+
+
+def test_an_unavailable_button_still_refuses_to_act() -> None:
+    """Focusable is not the same as clickable.
+
+    With ``aria-disabled`` the browser still delivers the click, so the
+    component has to stop it -- otherwise an unavailable button would fire
+    its action (and a submit button would submit).
+    """
+    source = _source(BUTTON)
+
+    assert "event.preventDefault()" in source, (
+        "an unavailable button must swallow the click, including its default action"
+    )
+    assert re.search(r"onClick=\{\s*blocked", source), (
+        "the unavailable branch must be the one that runs while the button is blocked"
+    )
+
+
+def test_an_unavailable_button_still_looks_unavailable() -> None:
+    """``aria-disabled`` does not match ``:disabled``, so the style moves too."""
+    css = _source(BUTTON_CSS)
+
+    assert 'aria-disabled="true"' in css, (
+        "the button styles no longer cover the aria-disabled state, so an "
+        "unavailable button would look available"
+    )

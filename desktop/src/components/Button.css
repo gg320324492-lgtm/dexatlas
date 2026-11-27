@@ -16,10 +16,13 @@
     transform var(--transition-fast);
   white-space: nowrap;
 }
-.da-btn:active:not(:disabled) {
+.da-btn:active:not(:disabled):not([aria-disabled="true"]) {
   transform: translateY(1px);
 }
-.da-btn:disabled {
+/* 不可用：用 aria-disabled 而不是原生 disabled，所以按钮留在原地、焦点不
+   被浏览器收走。样式与原生 :disabled 保持一致。 */
+.da-btn:disabled,
+.da-btn[aria-disabled="true"] {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -52,7 +55,7 @@
   color: var(--color-text-invert);
   box-shadow: var(--shadow-1);
 }
-.da-btn--primary:hover:not(:disabled) {
+.da-btn--primary:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-navy-700);
   box-shadow: var(--shadow-2);
 }
@@ -63,7 +66,7 @@
   border-color: var(--color-border-strong);
   color: var(--color-navy-800);
 }
-.da-btn--secondary:hover:not(:disabled) {
+.da-btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--color-navy-800);
   background: rgba(184, 167, 245, 0.12);
 }
@@ -73,7 +76,7 @@
   background: var(--color-danger);
   color: var(--color-text-invert);
 }
-.da-btn--danger:hover:not(:disabled) {
+.da-btn--danger:hover:not(:disabled):not([aria-disabled="true"]) {
   background: #b93843;
 }
 
@@ -82,7 +85,7 @@
   background: transparent;
   color: var(--color-text-secondary);
 }
-.da-btn--ghost:hover:not(:disabled) {
+.da-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--color-surface-muted);
   color: var(--color-text);
 }

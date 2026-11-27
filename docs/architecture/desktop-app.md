@@ -130,7 +130,7 @@
 
 | 组件 | 职责 | 关键约定 |
 |---|---|---|
-| `Button` | 主/次/危险/ghost 四变体，三尺寸 | `loading`/`disabled` 禁点；`confirm` 非空时点击先弹确认（危险操作必带） |
+| `Button` | 主/次/危险/ghost 四变体，三尺寸 | `loading`/`disabled` 禁点（用 `aria-disabled` + 拦住处理函数，焦点不丢，见 §7）；`confirm` 非空时点击先弹确认（危险操作必带） |
 | `Card` | 基础卡片（Header/Body/Footer） | 圆角 `--radius-lg` + `--shadow-1` |
 | `Panel` | 可折叠内容分区 | 标题点击切换，箭头旋转 |
 | `MetricCard` | 计数指标卡 | 数字等宽字体；数值由页面传入，组件不计算 |
@@ -169,6 +169,7 @@
 
 - **全链路键盘可达：** 拖拽上传（Enter/Space 打开文件选择）、导航、筛选、证据跳转、locator 解析、报告导出、返回，全部 Tab/Enter 完成。
 - **焦点可见：** 统一焦点环（§4.3）；浮层用 `useFocusTrap` 限制 Tab 循环，关闭后焦点还原到触发元素。
+- **不可用的按钮不夺走焦点：** 按钮在 `loading` / `disabled` 时改用 `aria-disabled`（不是原生 `disabled`）——原生 `disabled` 会让浏览器把焦点收走，键盘用户被扔回页面开头（实测：打包 exe 里按下「取消」，取消一开始焦点就掉到了 `<body>`）。`aria-disabled` 让按钮留在原地、也留在 Tab 序列里，屏幕阅读器仍念「不可用」；点击由处理函数拦下（连同这次点击的默认动作，如表单提交）。样式从 `:disabled` 补上 `[aria-disabled="true"]`——`aria-disabled` 不匹配 `:disabled` 选择器，不补就看不出不可用。规则在 `desktop/src/components/Button.tsx`，回归测试在 `tests/test_desktop_keyboard_accessibility.py`。
 - **键盘走查（Q2 走查 P4，浏览器面板实测）：** 六个页面（首页/详情/分析/证据/报告/设置）的 Tab 顺序逐页盘点过，每个可聚焦元素都有焦点环（全局 `:focus-visible` 规则）；skip-link 是每一页的第一跳，聚焦时由 `clip-path` 解除显形并画出焦点环，跳转落点 `main` 在键盘聚焦时画出内侧焦点环（`desktop/src/components/AppLayout.css` 的 `.app-main:focus-visible`——`.app-main:focus` 的轮廓抑制不再盖住它）；证据抽屉的焦点陷阱在首尾两端环绕，Esc 关闭后焦点回到触发元素。走查环境（浏览器面板）拿不到窗口焦点，`:focus` 相关渲染以静态层叠核实，未取像素证据；`Dialog` 组件目前没有任何页面在用。
 - **触控目标：** 交互元素最小 44px 命中区域。
 - **语义化与标注：** 浮层 `role="dialog"` + `aria-modal`；Tab 组用 `tablist/tab/tabpanel`；图标按钮带 `aria-label`；状态不只靠颜色（徽章带图标与文字）。
@@ -245,9 +246,16 @@
    `desktop/src/backendAddress.js`。
 2. **端点清单要看实现，不能沿用旧笔记。** workbench 自 PR #18 起提供
    `GET /api/backends`（`src/dexatlas/workbench/app.py:557`
-   `anchor: def list_backends(`），返回本机已安装/缺失的分析后端；分析页的
-   后端状态区仍取自最近分析轮次的 `tool_versions`，因为那个端点只回答「装没
-   装」，不回答「这次参与了没有」。
+   `anchor: def list_backends(`），返回本机已安装/缺失的分析后端。分析页的
+   后端状态区把**两份事实合起来判**：机器那份名单回答「装没装」，最近分析
+   轮次的 `tool_versions` 回答「这次记下了哪个版本」。**必须合起来**——
+   `tool_versions` 的值可能是 `null`，而 `null` 有两种完全不同的意思
+   （「版本还没探测出来」与「压根没装」），run 的记录分不开这两种
+   （它只记了键，键在而值为空）。分不开就要说错：两头都实测说错过——
+   分析进行中把装着的后端说成「未安装」，分析结束后又把没装的后端说成
+   「版本探测中」。映射规则在 `desktop/src/stages.js` 的 `deriveBackends`，
+   回归测试在 `desktop/src/stages.test.ts` 与
+   `tests/test_desktop_backend_status_truth.py`。
 3. **时间戳要显示在读者的时区里，并留一个 UTC 标注。** 后端给的是 UTC 时刻
    （`created_at` = `datetime.now(UTC).isoformat()`，
    `src/dexatlas/core/models.py:762` `anchor: created_at`），直接切前 19 个
