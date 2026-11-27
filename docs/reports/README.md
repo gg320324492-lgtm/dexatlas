@@ -68,11 +68,11 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [phase1-findings-ledger.md](phase1-findings-ledger.md) | Phase 1 复现台账（基准 `8df894b`）：每一条评审发现是怎么验出来的、现状指针在哪里。 | 要重跑或核对某条发现的复现步骤时看它。 |
 | [phase2-issue-list.md](phase2-issue-list.md) | Phase 2 开工清单（基准 `8df894b`）：评审之后按发现整理的待办 issue，编号、范围与处置状态。 | 想核对「Phase 2 当时打算修什么」时看它。 |
 | [phase3-baseline.md](phase3-baseline.md) | Phase 3 M5 基线校准：对外声明有什么证据、三份 benchmark 能否从原始 trace 重算、还剩哪些问题。 | 想确认「对外说的每个数都能重算」时看它。 |
-| [phase5-acceptance.md](phase5-acceptance.md) | Phase 5 验收报告（基线 `origin/main` @ `33e4ba9`）：W1 侧车（安装形态二次验收 a–d 全通过）、W2 阶段契约（复测 ①–⑤，⑤ 的文档过时与完成态缺陷已由 PR #18/#19 修好）、W3/W4 备料的逐项判据与证据，含 16 张截图。**明确写出仍然开放的项**（见 §7：macOS/Linux 不纳入、打包 exe 未跑装了 jadx/apktool 的配置、MSI 未验证等；「前端模拟代码删除」已于 2026-11-26 收尾完成）。 | 要引用「Phase 5 做到哪一步」时看它；判据与证据都在里面，未覆盖的项也都在里面。 |
-| [phase5-failure-timeline.md](phase5-failure-timeline.md) | Phase 5 失败/取消时间线走查（开发模式 + 浏览器 + 真后端，2026-11-26）：「取消」这条路径确实存在（`POST /cancel` → 管线在下一个检查点停 → run 记 cancelled、项目记 failed），「失败」分叉成三种界面结果（上传被拒 / 分析跑完却读到空 / 后端失败但分析完成）。**走查带出一个后端缺陷**：失败状态此前从不落库，界面会永远停在「分析中」（实测 4 分 44 秒）。含 9 张截图。**边界**：全程开发模式，未在打包 exe 里复验（未覆盖项逐条列在 §7）。 | 要引用「失败与取消在界面上是什么样」时看它；也解释了为什么 Phase 5 会修后端的失败落库。 |
-| [phase5-machine-verification.md](phase5-machine-verification.md) | Phase 5 真机补测（2026-11-26）：打包 exe 在 JADX 1.5.2 + Apktool 2.11.1 + Androguard 4.1.4 齐全时跑出 **12 条证据**、`missing_backends: []`、`complete: true`（缺后端那档实测 10 条）；MSI 用 `msiexec /i … /passive` 退出码 **0** 装到 `C:\Program Files\DexAtlas Studio\`，装完能启动能分析。**`/qn` 在未提升的会话里装不上（退出码 1603）——机制限制是静默模式不做凭据提升，不是包的毛病；在已提升的会话里 `/qn` 装得上（2026-11-27 复验）**。升级 / 卸载 / repair 三条路径也各跑通。含 26 张截图。 | 要引用「打包产物在完整后端配置下真的能用」时看它；测量看不到的东西逐条列在 §4。 |
-| [phase5-crash-and-race-paths.md](phase5-crash-and-race-paths.md) | Phase 5 管线崩溃形态与并发竞态（2026-11-27，打包 exe 上真实触发）：管线自己抛异常那条 `except Exception` 分支**第一次被真的走到**（故障注入：把一个普通文件放在本该是目录的地方），实测项目行 failed、未发布、**轮次自己的 errors 是空的**、HTTP 层没有错误码；并发下**「同一 APK 重复上传不会重复分析」是假的**（4 个同时上传每轮都跑起来，被发布那一轮的 `tool_versions.jadx` 被并发读成 null，界面于是说「JADX 没装」），`RUNNING` 表按项目号建键导致**正在跑的分析变得不可取消**。含 4 张截图。 | 要引用「管线崩了会是什么样、并发下哪里会打架」时看它；6 个待修缺陷逐条列在报告里。 |
-| [phase5-remaining-goals.md](phase5-remaining-goals.md) | Phase 5 尚未完成的目标清单（2026-11-26）：把散在验收报告、走查报告、机器补测报告、状态页与运营清单里的未完成项收成一处，分四类——A 解冻范围内可直接做（4 件）、B 等作者提供账号/渠道/决策（4 件）、C 明确不在范围内不追（3 件）、D 需外部样本或别的机器（4 件）。**只做盘点与归类，不承诺执行**；并指出 Q2 报告里那条「三个端点不存在」的限制已过期。 | 要回答「Phase 5 说自己做完了，还剩什么」时看它。 |
+| [phase5-acceptance.md](phase5-acceptance.md) | Phase 5 验收报告（基线 `origin/main` @ `33e4ba9`）：W1 侧车（安装形态二次验收 a–d 全通过）、W2 阶段契约（复测 ①–⑤，⑤ 的文档过时与完成态缺陷已由 PR #18/#19 修好）、W3/W4 备料的逐项判据与证据，含 16 张截图。**明确写出仍然开放的项**（见 §7：macOS/Linux 不纳入、MCP 是否暴露阶段工具未决、W4 账号口径 1 处、取消框 Esc 机制上验不到等；打包 exe 完整后端、MSI 与非 MSIX 容器启动三项已于 2026-11-26/27 关闭；「前端模拟代码删除」已收尾完成）。 | 要引用「Phase 5 做到哪一步」时看它；判据与证据都在里面，未覆盖的项也都在里面。 |
+| [phase5-failure-timeline.md](phase5-failure-timeline.md) | Phase 5 失败/取消时间线走查（开发模式 + 浏览器 + 真后端，2026-11-26）：「取消」这条路径确实存在（`POST /cancel` → 管线在下一个检查点停 → run 记 cancelled、项目记 failed），「失败」分叉成三种界面结果（上传被拒 / 分析跑完却读到空 / 后端失败但分析完成）。**走查带出一个后端缺陷**：失败状态此前从不落库，界面会永远停在「分析中」（实测 4 分 44 秒）。含 24 张截图。**边界**：主体在开发模式（vite + 浏览器）走查，§7 的第 1–5 条已在打包 exe 里补验（2026-11-26/27，含键盘取消、取消发生在索引/反编译期与缺后端三档；第 3/4/5 条还补了新树复验）。 | 要引用「失败与取消在界面上是什么样」时看它；也解释了为什么 Phase 5 会修后端的失败落库。 |
+| [phase5-machine-verification.md](phase5-machine-verification.md) | Phase 5 真机补测（2026-11-26/27）：打包 exe 在 JADX 1.5.2 + Apktool 2.11.1 + Androguard 4.1.4 齐全时跑出 **12 条证据**、`missing_backends: []`、`complete: true`（缺后端那档实测 10 条）；MSI 用 `msiexec /i … /passive` 退出码 **0** 装到 `C:\Program Files\DexAtlas Studio\`，装完能启动能分析。**`/qn` 在未提升的会话里装不上（退出码 1603）——机制限制是静默模式不做凭据提升，不是包的毛病；在已提升的会话里 `/qn` 装得上（2026-11-27 复验）**。升级 / 卸载 / repair 三条路径也各跑通；非 MSIX 容器下的启动与 NSIS per-user 静默升级（0.1.0→1.2.0，用户数据保留）也实测过。含 34 张截图。 | 要引用「打包产物在完整后端配置下真的能用」时看它；测量看不到的东西逐条列在 §4。 |
+| [phase5-crash-and-race-paths.md](phase5-crash-and-race-paths.md) | Phase 5 管线崩溃形态与并发竞态（2026-11-27，打包 exe 上真实触发）：管线自己抛异常那条 `except Exception` 分支**第一次被真的走到**（故障注入：把一个普通文件放在本该是目录的地方），实测项目行 failed、未发布、**轮次自己的 errors 是空的**、HTTP 层没有错误码；并发下**「同一 APK 重复上传不会重复分析」是假的**（4 个同时上传每轮都跑起来，被发布那一轮的 `tool_versions.jadx` 被并发读成 null，界面于是说「JADX 没装」），`RUNNING` 表按项目号建键导致**正在跑的分析变得不可取消**。含 4 张截图。 | 要引用「管线崩了会是什么样、并发下哪里会打架」时看它；三个并发缺陷与一个 Windows 专属竞态已在 §10 修掉（三例真并发回归测试）。 |
+| [phase5-remaining-goals.md](phase5-remaining-goals.md) | Phase 5 尚未完成的目标清单（2026-11-26）：把散在验收报告、走查报告、机器补测报告、状态页与运营清单里的未完成项收成一处，分四类——A 解冻范围内可直接做（0 件：A1–A11 全部已关闭）、B 等作者提供账号/渠道/决策（2 件：B2、B3）、C 明确不在范围内不追（3 件）、D 需外部样本或别的机器（4 件）。**只做盘点与归类，不承诺执行**；并指出 Q2 报告里那条「三个端点不存在」的限制已过期。 | 要回答「Phase 5 说自己做完了，还剩什么」时看它。 |
 
 ## 2. M4 / M8 验收与模型可禁用性
 
@@ -138,7 +138,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [c16-manifest-fourth-key.md](c16-manifest-fourth-key.md) | C16 的**落地记录**：第四个 `not_included` 键（`outside_analysis`）+ `schema_version = 2`，九处钉死与验收材料同步，四个已入库包**重新分析并导出**（新 run id 与 sha256 全表），红→绿已证（2 条新测试先红后绿）。 | 要看当前四个包的 run id / sha256、清单 v2 的形状，或「哪些留给主会话重测」时看它。 |
 | [evidence-incomplete-backend-wording.md](evidence-incomplete-backend-wording.md) | 「后端未完成」那条 `verified` 证据的**文案**：读者预演 M-2 记的那两条互斥陈述（E-0007 说 jadx 没完成、E-0008 说 jadx 为 5 个类产出了 7 个方法的真实 Java）读起来像「证据链断了」。结论：问题在**措辞** —— 旧文案只说了「没跑完」，读起来却像「没产出」。 | 改的是文案、不是等级：「did not complete」改成「did not complete **in this run**」，并补一句「已经交出来的产物仍在证据里」；统计字段与公共契约一个字没动，9 条新回归测试守着文案与等级。 |
 | [c6-build-time-from-ci.md](c6-build-time-from-ci.md) | C6 判据 (a) 要求的**新口径**：镜像构建时间的**唯一落点** —— 取自 CI 那个 `docker` job 的实测（46 秒），别处只引用它、不另抄一份数。 | 只出记录，引用它的地方已按新口径改过。 |
-| [gate-self-checks.md](gate-self-checks.md) | 门禁自己站得住：同源门禁**拆成两段比较**（工作副本对工作副本的数；**GitHub 上那份已发布的正文对 v1.0.0 tag 树里的报告** —— 否则下一轮一重测，它就拿新数去比旧正文而变红），配 6 条回归测试并证过红→绿；Docker 那条门禁补了 4 条**只读文件、不跑 Docker**的快测试；另写了一份 `.dockerignore`（镜像的构建上下文此前带着整个 `.git`）。 | 门禁与测试已合入；`tests/` 在指纹覆盖范围内，**合入后要重测一轮**。 |
+| [gate-self-checks.md](gate-self-checks.md) | 门禁自己站得住：同源门禁**拆成两段比较**（工作副本对工作副本的数；**GitHub 上那份已发布的正文对 v1.0.0 tag 树里的报告** —— 否则下一轮一重测，它就拿新数去比旧正文而变红），配 8 条回归测试并证过红→绿；Docker 那条门禁补了 4 条**只读文件、不跑 Docker**的快测试；另写了一份 `.dockerignore`（镜像的构建上下文此前带着整个 `.git`）。 | 门禁与测试已合入；`tests/` 在指纹覆盖范围内，**合入后要重测一轮**。 |
 | [figures-auto-write-landing.md](figures-auto-write-landing.md) | 「**测量数字自动覆盖**」的机制落地：脚本按标记发现所有带生成数字的文档统一写，不再靠人记得同步；另加一条硬保险 —— pytest 的汇总行**读不出来就中止并说清量到了什么、没量到什么**（上一轮 tag 的测量 job 就是把一轮 13 项的自检读成 0 项而红的）。 | 9 条新测试（旧实现下 8 红、新实现 9 绿）；**合入后要重测一轮**并同步各文档里的手写数字。 |
 | [m8-4-note-and-c17.md](m8-4-note-and-c17.md) | 两件小事：M8 演练 §6 的 **M8-4** 加一句「此后已如何解决」（退出码 6 早已落地，那一节写的是 v1.0.0 之前的实况 —— 读者核对 G3 会看到相反结论并在 ★ 阻断项上记假卡点 ✓；早年的对账报告就指出该加 ✓，一直没落地 ✓）；以及把「**散文里的手写数也改成标记**」登记成 v1.1.0 候选 **C17** ✓（这一轮撞出的三个闭环里最根治的那个 ✓）。 | 只加前向指针、正文未改 ✓（那一节是历史记录 ✓）；候选清单的计数从 16 改齐到 17 ✓。 |
 | [c5-c6-status-alignment.md](c5-c6-status-alignment.md) | 候选 **C5 与 C6 的状态与现实对齐**：C6 走的判据 (a) 已落地（镜像自带样本 ✓、CI 在镜像内实跑并核计数 ✓、构建时间的新口径单点存放 ✓），C5 的 multi-DEX 证据包早已入库 ✓；**「镜像内未本地实跑、由 CI 验证」这一点如实留在状态里** ✓（不写成「已验证跑通」✓）。 | 候选清单里**写着一个数的 13 处口径全部改齐** ✓（已完成 5→7 ✓、仓库内可做 5→3 ✓、总数仍 17 ✓）。 |
@@ -193,3 +193,11 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 这份索引本身也是一份手写文档：它记录的是某一刻的目录状态。**新增报告时，请把它加进来**——
 放进对应分组，并检查它属于哪一档（现状、审计结论、还是历史记录）。同一次改动里，如果
 某份报告被取代了，也顺手把上一节「历史记录」那一行的指向改掉。
+
+**2026-11-28 逐行复核：6 行描述过期，已改**——phase5-acceptance 的开放项示例、
+phase5-failure-timeline 的截图数（9→24）与边界、phase5-machine-verification 的截图数
+（26→34）与补测轮次、phase5-crash-and-race-paths 的缺陷状态、phase5-remaining-goals 的
+四类件数、gate-self-checks 的回归测试条数（6→8）。截图数按
+`ls docs/assets/phase5/timeline-*.png | wc -l`（24）与
+`ls docs/assets/phase5/machine-*.png | wc -l`（34）实测。份数与分组计数未变：目录
+`ls docs/reports/*.md | wc -l` 实测 70（减本页为 69 份），分组表 71 行、行内点名 79 次。
