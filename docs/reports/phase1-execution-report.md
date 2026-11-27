@@ -274,6 +274,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
 | `test_workspace_redaction.py` | 错误消息里的工作区路径不能漏出机器：脱敏要认 `OSError` 用 `repr()` 引路径的那种形状（反斜杠加倍的那种——CI 的 Linux 上不会复现，规则写成平台无关的形状，每个平台都守着它），路径里分析自身的那一段要留着（2026-11-27 新增） |
 | `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
+| `test_concurrent_uploads.py` | 并发下的三件事：同一 APK 的并发上传只起**一次**分析（后来的上传回 `already_analysed=true`、不产生第二个轮次行）、一次分析的结束**不注销**还在跑的那一次（它仍可取消、令牌真被取消）、参与了的后端不会因为并发读成**没有版本**（2026-11-27 新增） |
 
 ### 2.2 几类值得注意的测试
 
