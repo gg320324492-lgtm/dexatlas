@@ -130,7 +130,7 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 |---|---|---|
 | **P1**（中） | 侧栏版本徽标硬编码 `v1.0.2`，与真实版本 v1.1.0 不一致——违反「数字是生成的」纪律 | **PR #15**：删掉侧栏那块硬编码的版本徽标（`git diff cd846cf^1 cd846cf -- desktop/src/components/AppLayout.tsx` 显示整块 `sidebar-footer` 被移除），版本号只留在设置页「关于」区，读的是 `GET /api/health` 的真值（`desktop/src/pages/SettingsPage.tsx:12`、`:232`） |
 | **P2**（中） | W2 契约未合入 main（`stages` 端点 404） | 随 PR #14 合入；见 §3 |
-| **P3**（低） | 证据抽屉「打开来源」对非文件内 locator（`zip-entries` 等）点了没反应 | **PR #17**：新增 `desktop/src/locators.ts`（`classifyLocator()` `:53`、`openSourceState()` `:133`）镜像后端 `core/locators.py` 的工具词汇判定落点；没有单文件落点时按钮禁用并给出可见说明（`desktop/src/pages/ProjectDetail.tsx:414`），文件内 locator 行为不变 |
+| **P3**（低） | 证据抽屉「打开来源」对非文件内 locator（`zip-entries` 等）点了没反应 | **PR #17**：新增 `desktop/src/locators.ts`（`classifyLocator()` `:53`、`openSourceState()` `:133`）镜像后端 `core/locators.py` 的工具词汇判定落点；没有单文件落点时按钮禁用并给出可见说明（`desktop/src/pages/ProjectDetail.tsx:422`），文件内 locator 行为不变 |
 | **P4**（低） | 键盘全量遍历未做；且 skip-link 落点没有焦点指示 | **PR #17**：补 `.app-main:focus-visible` 规则（`desktop/src/components/AppLayout.css:130`，同特异度下排在 `:focus` 之后才赢），并按逐页 Tab 遍历复核六页的焦点环、抽屉焦点陷阱与 Esc 归还 |
 
 ### 4.3 走查截图
@@ -255,13 +255,22 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 
 现在失败状态与失败原因都写进数据库；「读到空的 run 不发布、已发布快照保持原样」这条不变量**不变**（取消路径与异常路径的行为也不变）。
 
-### 7.3 仍然开放的五项
+### 7.3 仍然开放的六项
 
 1. **macOS / Linux —— 明确不纳入。** 执行单 §2.2 的范围只写了 Windows；本轮所有真机验收都在 Windows 11 上完成。Linux 侧只有 CI 的单元测试跑过，**没有打包产物的真机验证**。
 2. **非 MSIX 容器下的启动 —— 未单独验证。** 二次验收的 exe 由 Claude 桌面应用的 MSIX 容器启动，配置目录落在虚拟化路径下（真实路径与虚拟化路径的 `backend.json` 逐字节相同，结论不依赖读的是哪一份）。
 3. **MCP 面是否该暴露阶段工具 —— 未决。** `run_stages` 未注册为 MCP 工具（工具清单仍是 11 个），阶段事实只走 REST 与 workbench。这是设计取舍，不是缺陷，但**没有记录谁做的取舍**。取舍已在[公共契约文档](../architecture/public-contracts.md)里记下「不暴露」。
 4. **W4 运营清单的账号口径 —— 1 处不一致。** §6.2 已写明位置，不影响「只备料不执行」的结论。
-5. **取消对话框上的 Esc 键 —— 机制上验不到。** 那个确认框**不是独立窗口**：弹起前后枚举全部顶层窗口没有多出任何一扇，它是 WebView2 在自己窗口里画的，没有窗口可递键盘；往页面派发 Esc 事件到不了它（渲染进程卡在 `confirm()` 里），调试协议也只有「替用户回答」的接口。能验的是浏览器自己的两个回答：「取消」→ 分析继续跑、「确定」→ 发出取消请求。逐字证据见[失败/取消走查报告](phase5-failure-timeline.md) §7 第 3 条。
+5. **引文核对器不查桌面端的行号 —— 一个盲区。** `scripts/check-doc-citations.py`
+   的引用正则只认 `py` / `sh` / `toml` / `yml` / `md`，`.tsx` / `.js` / `.css`
+   的 `file:line` 它一个都不查。PR #33 改过 `Button.tsx` / `Button.css` /
+   `stages.js` 之后，走查报告里那 8 处桌面端引用**全漂了而核对器照样绿**。
+   本轮逐处手工核对并改正（`Button.css:26→29`、`Button.tsx:61→70`、
+   `Analysis.tsx:548→568`、`stages.js:73→84`；两处旧代码在新树没了，改成写明
+   「`8140661` 那棵树的 …」并引用新树对应处）；另核出本报告里两处漂移
+   （`Analysis.tsx:471→472`、`ProjectDetail.tsx:414→422`），一并改正。
+   **机制上的缺口还没补**——补它要改核对器的正则，那是工具改动，等重新评审。
+6. **取消对话框上的 Esc 键 —— 机制上验不到。** 那个确认框**不是独立窗口**：弹起前后枚举全部顶层窗口没有多出任何一扇，它是 WebView2 在自己窗口里画的，没有窗口可递键盘；往页面派发 Esc 事件到不了它（渲染进程卡在 `confirm()` 里），调试协议也只有「替用户回答」的接口。能验的是浏览器自己的两个回答：「取消」→ 分析继续跑、「确定」→ 发出取消请求。逐字证据见[失败/取消走查报告](phase5-failure-timeline.md) §7 第 3 条。
 
 ### 7.4 一项已知且如实标注的低危残留（2026-11-27 已关闭）
 
@@ -347,7 +356,7 @@ apktool 时，右栏仍然说「◌ 进行中 · 参与本次分析 · 版本探
 
 **修法：** 机器那份名单（`GET /api/backends` 的 `missing`）是唯一能分开的证据，
 于是把它读进来一起判（`desktop/src/stages.js:386` 的 `deriveBackends`，
-页面侧在 `desktop/src/pages/Analysis.tsx:471` 把名单交给它）：
+页面侧在 `desktop/src/pages/Analysis.tsx:472` 把名单交给它）：
 
 | 事实 | 说法 |
 |---|---|
