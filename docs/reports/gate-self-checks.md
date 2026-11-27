@@ -50,7 +50,7 @@
 
 ### 1.2 现在的两段
 
-改成两段，各比各的（段的数据结构是 `Segment`，见 `scripts/check-release-numbers.py:254`）：
+改成两段，各比各的（段的数据结构是 `Segment`，见 `scripts/check-release-numbers.py:292`）：
 
 | 段 | 比什么 | 权威来源 |
 |---|---|---|
@@ -79,8 +79,8 @@ tag 树里的报告是用 `git show v1.0.0:docs/reports/phase1-execution-report.
 文件**」和「**文件是空的**」分得清清楚楚。
 
 门禁直接**引用**它，跟 `scripts/remap-citations.py` 引用引文检查器是同一个做法
-（`scripts/check-release-numbers.py:443`）。读树的那一段在
-`scripts/check-release-numbers.py:463`。
+（`scripts/check-release-numbers.py:515` 的 `citation_checker()`）。读树的那一段在
+`scripts/check-release-numbers.py:572` 的 `tagged_report()`。
 
 ### 1.4 退出码
 
@@ -332,7 +332,7 @@ v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的
 见 `scripts/refresh-report-figures.py:1505` `anchor: live_figures`），所以门禁跟测量脚本的尺子本来就不一致。
 
 **改法**：用**同一把尺子**——`scripts/refresh-report-figures.py` 的 `CODE_BLOCK` 与
-`INLINE_CODE` 两个正则，**直接引用**它（`scripts/check-release-numbers.py:470` 的
+`INLINE_CODE` 两个正则，**直接引用**它（`scripts/check-release-numbers.py:536` 的
 `measurement_script()`，读法与 `scripts/remap-citations.py` 引用引文检查器同一个做法），
 不另写一套。围栏里的标记从此是示意，不是声明。
 
@@ -410,8 +410,8 @@ v1.0.0 合入之后，主会话用**真实的树**跑这个门禁（那棵树的
 
 | 测试 | 钉住什么 |
 |---|---|
-| `test_a_number_illustrated_in_a_code_block_is_not_a_claim`（`tests/test_release_numbers.py:346`） | 代码块里与行内代码里的**示意**不是声明 |
-| `test_the_release_documents_are_compared_against_the_tag_tree`（`tests/test_release_numbers.py:376`） | 发布说明与 Release 正文跟 **tag 树**的报告比，不跟工作副本的比 |
+| `test_a_number_illustrated_in_a_code_block_is_not_a_claim`（`tests/test_release_numbers.py:465`） | 代码块里与行内代码里的**示意**不是声明 |
+| `test_the_release_documents_are_compared_against_the_tag_tree`（`tests/test_release_numbers.py:495`） | 发布说明与 Release 正文跟 **tag 树**的报告比，不跟工作副本的比 |
 
 **红→绿**：换回改之前的实现 → **3 红 5 绿**，红的是**行为上的红**：
 

@@ -405,6 +405,19 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
     （`src/dexatlas/api/app.py:202-211` `anchor: call_site_count`、`src/dexatlas/reports/json_report.py:105-113` `anchor: call_sites`）。
 - 文档中的版本陈述由 `scripts/check-version-claims.py` 对照 tag、`__version__`
   与 CHANGELOG 校验；报告数字由 `scripts/refresh-report-figures.py` 生成，禁止手改。
+- **对外文本里的发布数字由 `scripts/check-release-numbers.py` 校验，它核的是哪个
+  发布，取决于它是怎么被调用的**：
+  - CI 的 `release-numbers` job 按**被推的 ref** 决定：推 tag 就核那个 tag（正在发
+    布的那个版本）；推分支就核仓库里最新的发布 tag；**PR 上核不了任何发布体**，
+    门禁只核工作副本，并在输出里写明「这次没有核发布体、因为 PR 不发布发布体」。
+  - 手工运行时不给 `--tag`，默认核**这个 checkout 里最新的发布 tag**；给
+    `--tag <tag>` 则核那一个发布。脚本里**没有写死的发布号**——写死一个发布号，
+    门禁就会在每个新版本发布之后继续核那个旧版本，并把它的绿灯当成对刚发布的
+    那个版本的结论（2026年11月27日实测：v1.2.0 的 tag CI 打印的就是 `tag: v1.0.0`）。
+  - 核不了的时候要说清**没核什么、为什么**，而不是去核别的发布体：发布体读不到
+    → 退出码 2（不等于「数字一致」）；发布还没发布（tag 的 CI 跑在发布之前，
+    v1.2.0 的 job 04:18:18Z 结束、发布体 04:26:58Z 才上线）→ 打印「尚未发布」，
+    并按调用方的声明决定退出码。
 
 ## 7. 验证记录
 

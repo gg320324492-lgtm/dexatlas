@@ -4,6 +4,8 @@
     uv run --no-sync python scripts/check-release-numbers.py
     uv run --no-sync python scripts/check-release-numbers.py --strict
     uv run --no-sync python scripts/check-release-numbers.py --offline
+    uv run --no-sync python scripts/check-release-numbers.py --tag v1.2.0
+    uv run --no-sync python scripts/check-release-numbers.py --no-release "a pull request publishes no release"
 
 The execution report is the authority for the numbers of a release:
 ``scripts/refresh-report-figures.py`` writes them into
@@ -55,6 +57,27 @@ that sits inside a code block -- and this script draws it with the same two
 patterns, so that a number illustrated in a document is never read as a
 number asserted by it.
 
+Which release is checked
+-------------------------
+Which release this gate is about is a fact about the release, and it is
+resolved rather than assumed:
+
+* ``--tag <tag>`` -- the release the caller named. An explicit tag always
+  wins.
+* otherwise -- the newest release tag in this checkout. A tag names a
+  release only when it is shaped like one (``v1.2.0``); the repository also
+  carries tags that mark a milestone or a handover, and those have no
+  published release body.
+* ``--no-release <reason>`` -- no release at all. A pull request cuts no tag
+  and publishes no release body, so there is nothing to check, and the gate
+  says so rather than checking some other release's body.
+
+A release that has not been published *yet* is not a failure to read: a
+tag's CI runs before the release is out. The gate says which release was
+not checked and why, and the other comparisons still run.
+``--expect-unpublished`` says that the missing body is the expected state
+of this run rather than an incomplete check.
+
 What it prints
 --------------
 For every segment, for every source and every number: what the report of
@@ -74,6 +97,11 @@ The exit codes
   ``--offline`` skips it on purpose, and says so.
 
 ``--strict`` also fails when a text does not state a number at all.
+
+``--no-release <reason>`` is for a run that has no release to check -- a
+pull request, which cuts no tag and publishes no release body. It checks the
+working copy only, and it says in its output that the published release was
+not checked and why. It is not a failure: there was nothing to fail.
 """
 
 from __future__ import annotations
@@ -121,6 +149,16 @@ VERIFY_DOCUMENTS = (
 #: is the authority for the working copy's texts; in the tagged tree it is the
 #: authority for the published release body.
 REPORT_DOCUMENT = "docs/reports/phase1-execution-report.md"
+
+#: The tag names that are releases of this project, and nothing else.
+#:
+#: The repository also carries tags that mark a milestone or a handover
+#: (``phase1-acceptance-2026-10-21``, ``handover-2026-11-10``). Those name
+#: a commit, not a release: there is no release body published for them and
+#: no release notes under ``docs/releases/``. A gate that picked one of them
+#: would look for a release that was never published, and would report the
+#: absence as if the release had drifted.
+_RELEASE_TAG = re.compile(r"^v\d+\.\d+\.\d+$")
 
 #: Markdown noise around a number: emphasis, code spans, spaces.
 _MARKDOWN = r"[*`_\t ]*"
@@ -264,6 +302,34 @@ class Segment:
     authority_label: str
     authority: dict[str, str]
     sources: tuple[Source, ...]
+
+
+#: How a published release body came to be read.
+PUBLISHED = "published"
+NOT_PUBLISHED = "not published"
+UNREADABLE = "unreadable"
+
+
+@dataclass(frozen=True)
+class Published:
+    """The release body published on GitHub, and what its absence means.
+
+    The three states are kept apart because they mean different things. A
+    release that is not out yet is the ordinary state of a tag push -- the
+    CI runs before the release is published -- and it is not a fault. A
+    body that could not be read is a fault: gh is missing, the token is
+    wrong, the network is down. Reading one as the other either goes red
+    on every release, or goes green on a fault nobody looked at.
+    """
+
+    body: str | None
+    reason: str
+    state: str
+
+    @property
+    def is_read(self) -> bool:
+        """Whether the body was read."""
+        return self.body is not None
 
 
 def normalize(raw: str) -> str:
@@ -520,11 +586,98 @@ def tagged_report(tag: str) -> tuple[str | None, str]:
     return text, ""
 
 
-def published_body(tag: str, repo: str = "") -> tuple[str | None, str]:
-    """The release body published on GitHub, or the reason it is not readable."""
+@functools.cache
+def version_claims():
+    """The version-claims checker, loaded as a module.
+
+    What a version *is* is one rule: a tag that is not three numbers is not
+    a version, and it sorts below every version that is. The version-claims
+    checker already draws that line -- it is the script that answers "which
+    versions does this repository have" -- so the rule is read from there
+    rather than written a second time. Two copies of it would be two
+    answers to the same question, and the two answers would drift.
+    """
+    script = Path(__file__).resolve().parent / "check-version-claims.py"
+    spec = importlib.util.spec_from_file_location("dexatlas_version_claims", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    # The module has to be in ``sys.modules`` before it runs: its annotations
+    # resolve through it.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def version_key(tag: str) -> tuple[int, int, int]:
+    """A comparable form of "v1.2.0".
+
+    A tag that is not three numbers is not a release tag, and sorts below
+    every release tag that is -- it must never win a comparison by accident.
+    """
+    return version_claims().version_key(tag)
+
+
+def release_tags() -> tuple[str, ...]:
+    """The release tags this checkout has, newest last.
+
+    A tag names a release only when it is shaped like one. The repository
+    also carries tags that mark a milestone or a handover, and those have
+    no release body published for them.
+
+    The order is the order of the versions themselves, not the order git
+    happens to list the tags in: ``v1.10.0`` is newer than ``v1.9.0`` even
+    though it sorts before it as a string.
+    """
+    listed = citation_checker().git_output("tag", "--list") or ""
+    tags = [line.strip() for line in listed.splitlines() if _RELEASE_TAG.match(line.strip())]
+    return tuple(sorted(tags, key=version_key))
+
+
+def resolve_tag(requested: str) -> tuple[str | None, str]:
+    """The release to check, or the reason there is none.
+
+    Which release this gate is about is a fact about the *release*, not a
+    fact about the script. A hardcoded default names one release forever:
+    the gate then goes on checking that release after every later release
+    has shipped, and it reports on it while saying nothing about the one
+    that was just published. A gate that reads a constant instead of the
+    release is a gate that checks the past.
+
+    So the tag is resolved, in this order:
+
+    * the tag the caller named -- an explicit ``--tag`` always wins;
+    * otherwise the newest release tag in this checkout.
+
+    A tag that cannot be resolved is not a reason to check some other
+    release: it is a reason to say that the release was not checked. The
+    caller turns that into the exit code that says "incomplete".
+    """
+    if requested:
+        return requested, ""
+    tags = release_tags()
+    if not tags:
+        return None, "this checkout has no release tag"
+    return tags[-1], ""
+
+
+def published_body(tag: str, repo: str = "") -> Published:
+    """The release body published on GitHub, and how it came.
+
+    Three outcomes are told apart, because they mean different things:
+
+    * the body was read -- the release is published and its text is here;
+    * the release is not published *yet* -- a tag's CI runs before the
+      release is out, so this is the ordinary state of a tag push, and it
+      is not a fault;
+    * it could not be read -- gh is missing, the token is wrong, the network
+      is down. This one is a fault, not a stage.
+
+    A gate that cannot tell the second from the third either goes red on
+    every release, or goes green on a fault it never looked at.
+    """
     gh = shutil.which("gh")
     if gh is None:
-        return None, "gh is not installed"
+        return Published(None, "gh is not installed", UNREADABLE)
     command = [gh, "release", "view", tag, "--json", "body"]
     if repo:
         command += ["--repo", repo]
@@ -538,17 +691,31 @@ def published_body(tag: str, repo: str = "") -> tuple[str | None, str]:
             check=False,
         )
     except OSError as exc:
-        return None, f"gh could not be run: {exc}"
+        return Published(None, f"gh could not be run: {exc}", UNREADABLE)
     if done.returncode != 0:
-        return None, f"gh release view {tag} exited {done.returncode}: {done.stderr.strip()}"
+        detail = done.stderr.strip()
+        if "release not found" in detail:
+            # gh says this when there is no *published* release for the tag.
+            # A release that is still a draft is not published yet either,
+            # and a tag's CI runs before the release is out.
+            return Published(
+                None,
+                f"there is no published release for {tag} yet",
+                NOT_PUBLISHED,
+            )
+        return Published(
+            None,
+            f"gh release view {tag} exited {done.returncode}: {detail}",
+            UNREADABLE,
+        )
     try:
         payload = json.loads(done.stdout)
     except json.JSONDecodeError as exc:
-        return None, f"gh did not return JSON: {exc}"
+        return Published(None, f"gh did not return JSON: {exc}", UNREADABLE)
     body = payload.get("body")
     if not isinstance(body, str) or not body.strip():
-        return None, "the published release has no body"
-    return body.replace("\r\n", "\n"), ""
+        return Published(None, "the published release has no body", UNREADABLE)
+    return Published(body.replace("\r\n", "\n"), "", PUBLISHED)
 
 
 def release_body_portion(text: str) -> str:
@@ -681,7 +848,33 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Compare the release numbers across the outward texts."
     )
-    parser.add_argument("--tag", default="v1.0.0", help="the release to compare (default: v1.0.0)")
+    parser.add_argument(
+        "--tag",
+        default="",
+        help=(
+            "the release to compare "
+            "(default: the newest release tag in this checkout; "
+            "pass the tag explicitly to check one release)"
+        ),
+    )
+    parser.add_argument(
+        "--no-release",
+        default="",
+        metavar="REASON",
+        help=(
+            "check the working copy only, and say that no release was checked; "
+            "the reason says why there is no release to check"
+        ),
+    )
+    parser.add_argument(
+        "--expect-unpublished",
+        action="store_true",
+        help=(
+            "the release named by --tag is not published yet, and that is the "
+            "expected state of this run: a missing published body is reported "
+            "as not checked, not as an incomplete check"
+        ),
+    )
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -700,7 +893,39 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     print("dexatlas outward-number parity")
-    print(f"tag: {args.tag}")
+
+    # Which release this gate is about is a fact about the release. A
+    # hardcoded default names one release forever, so the gate goes on
+    # checking a release from long ago after every later release has
+    # shipped -- and the report it prints is about that old release while
+    # the reader assumes it is about the new one.
+    #
+    # The tag is therefore resolved rather than assumed, and when it cannot
+    # be resolved the gate says that the release was not checked. It does
+    # not fall back to some other release: checking a release nobody asked
+    # about, and reporting it as if it were the one, is the worst answer
+    # this gate could give.
+    if args.no_release:
+        # A run that has no release to check: a pull request cuts no tag
+        # and publishes no release body. The working copy is still checked,
+        # and the output says plainly that no release was checked.
+        tag: str | None = None
+        tag_reason = args.no_release
+        print(f"release: NONE -- {tag_reason}")
+        print("the published release was NOT checked: " + tag_reason)
+    else:
+        tag, tag_reason = resolve_tag(args.tag)
+        if tag is None:
+            print(f"release: NOT RESOLVED -- {tag_reason}")
+            print()
+            print(
+                f"the published release was NOT checked: {tag_reason}. "
+                "Name the release to check with --tag <tag>."
+            )
+            return 2
+        print(
+            f"release: {tag}" + ("" if args.tag else " (the newest release tag in this checkout)")
+        )
 
     findings: list[Finding] = []
     incomplete = ""
@@ -735,51 +960,78 @@ def main(argv: list[str] | None = None) -> int:
     # against the working copy's report.
     published: Source | None = None
     body_source: Source | None = None
-    tagged_text, tagged_reason = tagged_report(args.tag)
-    if tagged_text is None:
-        incomplete = f"the {args.tag} tree could not be read: {tagged_reason}"
-        print(f"the {args.tag} tree: NOT READ -- {tagged_reason}")
+    if tag is None:
+        # There is no release to check, and the reason was printed above.
+        # The working copy is still checked; the published segment is not
+        # built at all, so nothing in the output can be read as a check of
+        # a release.
+        pass
     else:
-        print(f"the {args.tag} tree: read")
-        published_sources: list[Source] = []
-
-        notes_relative = f"docs/releases/{args.tag}.md"
-        notes_path = REPO_ROOT / notes_relative
-        if notes_path.is_file():
-            published_sources.append(Source(notes_relative, notes_path.read_text(encoding="utf-8")))
+        tagged_text, tagged_reason = tagged_report(tag)
+        if tagged_text is None:
+            incomplete = f"the {tag} tree could not be read: {tagged_reason}"
+            print(f"the {tag} tree: NOT READ -- {tagged_reason}")
         else:
-            print(f"missing document: {notes_relative}", file=sys.stderr)
+            print(f"the {tag} tree: read")
+            published_sources: list[Source] = []
 
-        body_relative = f"docs/reports/{args.tag}-github-release-body.md"
-        body_path = REPO_ROOT / body_relative
-        if body_path.is_file():
-            body_source = Source(
-                body_relative, release_body_portion(body_path.read_text(encoding="utf-8"))
-            )
-            published_sources.append(body_source)
-        else:
-            print(f"missing document: {body_relative}", file=sys.stderr)
-
-        if args.offline:
-            print("published release body: not checked (--offline)")
-        else:
-            body, reason = published_body(args.tag, args.repo)
-            if body is None:
-                incomplete = f"the published release body could not be read: {reason}"
-                print(f"published release body: NOT READ -- {reason}")
+            notes_relative = f"docs/releases/{tag}.md"
+            notes_path = REPO_ROOT / notes_relative
+            if notes_path.is_file():
+                published_sources.append(
+                    Source(notes_relative, notes_path.read_text(encoding="utf-8"))
+                )
             else:
-                published = Source(f"GitHub release {args.tag} (published body)", body)
-                published_sources.append(published)
-                print("published release body: read")
+                print(f"missing document: {notes_relative}", file=sys.stderr)
 
-        segments.append(
-            Segment(
-                name=f"the published release {args.tag}",
-                authority_label=f"{REPORT_DOCUMENT} (the {args.tag} tree)",
-                authority=figures_in(tagged_text),
-                sources=tuple(published_sources),
+            body_relative = f"docs/reports/{tag}-github-release-body.md"
+            body_path = REPO_ROOT / body_relative
+            if body_path.is_file():
+                body_source = Source(
+                    body_relative, release_body_portion(body_path.read_text(encoding="utf-8"))
+                )
+                published_sources.append(body_source)
+            else:
+                print(f"missing document: {body_relative}", file=sys.stderr)
+
+            if args.offline:
+                print("published release body: not checked (--offline)")
+            else:
+                outcome = published_body(tag, args.repo)
+                if outcome.state == NOT_PUBLISHED:
+                    # The release is not out yet. A tag's CI runs before the
+                    # release is published, so this is the ordinary state of
+                    # a tag push -- not a fault, and not a licence to check
+                    # some other release's body. The gate says which
+                    # release it did not check.
+                    print(f"published release body: NOT PUBLISHED YET -- {outcome.reason}")
+                    if not args.expect_unpublished:
+                        incomplete = (
+                            f"the published release body of {tag} was not published "
+                            f"yet: {outcome.reason}"
+                        )
+                elif not outcome.is_read:
+                    # The body of *this* release could not be read. The gate
+                    # says which release it did not check, so that a reader
+                    # cannot read the green exit of the working-copy
+                    # comparison as "the release was checked too".
+                    incomplete = (
+                        f"the published release body of {tag} could not be read: {outcome.reason}"
+                    )
+                    print(f"published release body: NOT READ -- {outcome.reason}")
+                else:
+                    published = Source(f"GitHub release {tag} (published body)", outcome.body or "")
+                    published_sources.append(published)
+                    print("published release body: read")
+
+            segments.append(
+                Segment(
+                    name=f"the published release {tag}",
+                    authority_label=f"{REPORT_DOCUMENT} (the {tag} tree)",
+                    authority=figures_in(tagged_text),
+                    sources=tuple(published_sources),
+                )
             )
-        )
 
     for segment in segments:
         print()
