@@ -406,8 +406,12 @@ SPAN = re.compile(r"`([^`\n]+)`")
 #:
 #: Markdown is a target like any other: a document that says "the number is
 #: at ``docs/status.md:37``" has made a claim about a line of a file, and
-#: the claim is exactly as checkable as one about a line of Python.
-CITATION = re.compile(r"^([\w./-]+\.(?:py|sh|toml|yml|md)):(\d+)(?:-(\d+))?$")
+#: the claim is exactly as checkable as one about a line of Python. So is a
+#: line of the desktop front end: the ``.tsx`` / ``.ts`` / ``.js`` / ``.css``
+#: suffixes are citations into ``desktop/src`` just as ``.py`` is one into
+#: ``src``. A desktop citation that drifts when a component moves is the same
+#: small lie a Python one is, and it used to be one the checker could not see.
+CITATION = re.compile(r"^([\w./-]+\.(?:py|sh|toml|yml|md|tsx|ts|js|css)):(\d+)(?:-(\d+))?$")
 
 #: A bare line number: ``:143``. The file it belongs to is the one the same
 #: block of the text named before it — "``core/pipeline.py:296``, ``:143``"
@@ -961,8 +965,36 @@ def is_symbolic(name: str) -> bool:
     return any(character.isupper() for character in name) or "_" in name
 
 
+#: Suffixes whose symbol definitions the checker reads by pattern. Python is
+#: read with ``ast`` when the file parses; everything else here — the desktop
+#: front end's ``.tsx`` / ``.ts`` / ``.js`` — is read by the shapes a
+#: definition takes in those languages. A pattern-read definition is a
+#: heuristic, but it is the same heuristic the remapper uses to move a
+#: citation, and a symbol the pattern cannot see simply falls back to
+#: "mentioned in the range", which is what a citation naming it claims.
+PATTERN_SYMBOL_SUFFIXES = frozenset({".ts", ".tsx", ".js", ".jsx"})
+
+
+#: The shapes a function or a class takes in the desktop front end's sources.
+#: ``export`` and ``default`` are optional; ``function`` / ``const`` / ``class``
+#: carry the name. A component and a hook are both a ``const`` with an arrow
+#: function, so one shape covers them.
+SCRIPT_DEFINITION = re.compile(
+    r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?"
+    r"(?:function\s+|const\s+|let\s+|var\s+|class\s+)"
+    r"([A-Za-z_$][\w$]*)"
+)
+
+
 def definition_line(lines: tuple[str, ...], symbol: str, is_python: bool) -> int | None:
-    """The line where a class or a function is defined."""
+    """The line where a class, a function, or a constant is defined.
+
+    A constant is a module-level assignment to a single name —
+    ``DECLARATION = re.compile(...)`` — which names one line as exactly as a
+    function does. A documentation citation that names such a constant points
+    at the line it is written on, and the constant moves with the code around
+    it, so it is a definition the way a ``def`` is.
+    """
     if is_python:
         try:
             tree = ast.parse("\n".join(lines))
@@ -977,8 +1009,25 @@ def definition_line(lines: tuple[str, ...], symbol: str, is_python: bool) -> int
             ]
             if definitions:
                 return min(definitions)
+            # A module-level constant: one name, one assignment. Only counts
+            # when it is a single target, so ``a = b = 1`` and tuple unpacking
+            # do not answer for a name they do not alone define.
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                    continue
+                targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+                for target in targets:
+                    if (
+                        isinstance(target, ast.Name)
+                        and target.id == symbol
+                        and getattr(node, "col_offset", 0) == 0
+                    ):
+                        return node.lineno
     for number, line in enumerate(lines, 1):
         if re.match(rf"^\s*(?:async\s+)?(?:def|class)\s+{re.escape(symbol)}\b", line):
+            return number
+        match = SCRIPT_DEFINITION.match(line)
+        if match and match.group(1) == symbol:
             return number
     return None
 
@@ -1004,19 +1053,54 @@ def definition_span(lines: tuple[str, ...], symbol: str, is_python: bool) -> tup
             if spans:
                 return min(spans)
     pattern = re.compile(rf"^\s*(?:async\s+)?def\s+{re.escape(symbol)}\b")
+    if not is_python:
+        # The desktop front end defines with function/const/class and opens a
+        # body with a brace, not with an indent. The body runs to the line
+        # whose brace depth returns to the level the definition line opened
+        # at; a one-line arrow body closes on the line it opens.
+        pattern = re.compile(
+            rf"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?"
+            rf"(?:function\s+|const\s+|let\s+|var\s+|class\s+)"
+            rf"{re.escape(symbol)}\b"
+        )
     for number, line in enumerate(lines, 1):
         if not pattern.match(line):
             continue
-        indent = len(line) - len(line.lstrip())
-        end = len(lines)
-        for later, text in enumerate(lines[number:], number + 1):
-            if not text.strip():
-                continue
-            if len(text) - len(text.lstrip()) <= indent:
-                end = later - 1
-                break
-        return number, end
+        if is_python:
+            indent = len(line) - len(line.lstrip())
+            end = len(lines)
+            for later, text in enumerate(lines[number:], number + 1):
+                if not text.strip():
+                    continue
+                if len(text) - len(text.lstrip()) <= indent:
+                    end = later - 1
+                    break
+            return number, end
+        return number, _brace_body_end(lines, number)
     return None
+
+
+def _brace_body_end(lines: tuple[str, ...], start: int) -> int:
+    """The line a brace-opened body closes on, given its opening line.
+
+    Counts the net braces from the definition line on: an opening ``{`` takes
+    the depth up, a closing ``}`` brings it back. The body ends on the line
+    the depth returns to what it was before the definition opened its body —
+    which for a one-line ``() => ({ ... })`` is the line it opens on.
+    """
+    depth = 0
+    opened = False
+    for number in range(start, len(lines) + 1):
+        text = lines[number - 1]
+        for character in text:
+            if character == "{":
+                depth += 1
+                opened = True
+            elif character == "}":
+                depth -= 1
+        if opened and depth <= 0:
+            return number
+    return len(lines)
 
 
 def symbol_is_in_range(
@@ -2096,6 +2180,17 @@ def check_clause(clause: Clause) -> list[Finding]:
     for name, citation in missing.items():
         if name in located:
             continue
+        if not is_symbolic(name):
+            # A word the sentence uses but that is not a symbol — a status
+            # string like ``done``, a config key like ``sidecar`` — is prose,
+            # not code the citation points at. The file may name it in many
+            # places, and a place other than the cited range does not say the
+            # citation has moved: it says the word is a common one. This is
+            # the same line the value check draws with :func:`is_compared`,
+            # and the ``is at line`` branch has to draw it too, or a desktop
+            # citation whose line is right gets reported for the sake of a
+            # word that happens to be in the file elsewhere.
+            continue
         lines = citation.lines()
         if lines is None:
             continue
@@ -2106,7 +2201,7 @@ def check_clause(clause: Clause) -> list[Finding]:
             findings.append(
                 Finding(citation.where, "drifted", f"`{name}` is at line {nearest}", citation.text)
             )
-        elif is_symbolic(name):
+        else:
             findings.append(
                 Finding(
                     citation.where,

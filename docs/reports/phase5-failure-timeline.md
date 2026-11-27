@@ -79,7 +79,7 @@ notanapk.apk is not a ZIP archive; APKs are ZIP archives
 
 ![时间线 A：上传被拒，首页红字逐字显示后端的英文原文](../assets/phase5/timeline-01-upload-rejected.png)
 
-**这句话从哪来：** `validate_apk`（`src/dexatlas/core/ingest.py:139`）抛出 `ApkValidationError`（`src/dexatlas/core/ingest.py:82`），`stage_upload`（`src/dexatlas/api/uploads.py:336`）把它转成 `HTTPException`（`src/dexatlas/api/uploads.py:361`）并定下 422（`src/dexatlas/api/uploads.py:342`）；前端 `messageFromBody`（`desktop/src/api/client.ts:117`）把错误体里的 `detail` 原样取出，首页红字显示的就是它。**界面没有中文、没有"这个文件不是 APK"之类的解释，只有一句后端原文。**
+**这句话从哪来：** `validate_apk`（`src/dexatlas/core/ingest.py:139`）抛出 `ApkValidationError`（`src/dexatlas/core/ingest.py:82`），`stage_upload`（`src/dexatlas/api/uploads.py:336`）把它转成 `HTTPException`（`src/dexatlas/api/uploads.py:361`）并定下 422（`src/dexatlas/api/uploads.py:342`）；前端 `messageFromBody`（`desktop/src/api/client.ts:118`）把错误体里的 `detail` 原样取出，首页红字显示的就是它。**界面没有中文、没有"这个文件不是 APK"之类的解释，只有一句后端原文。**
 
 ---
 
@@ -156,9 +156,9 @@ workbench: the server process running this analysis ended before the analysis fi
 
 ## 5. 时间线 C：取消（这条路径是通的）
 
-**触发方式：** 分析页右上角的红色「取消」按钮。只在项目状态是 `pending`/`running` 时出现（`desktop/src/pages/Analysis.tsx:522`）。
+**触发方式：** 分析页右上角的红色「取消」按钮。只在项目状态是 `pending`/`running` 时出现（`desktop/src/pages/Analysis.tsx:564`）。
 
-**确认框：** 点击后先弹**浏览器原生 `window.confirm`**（`desktop/src/components/Button.tsx:61`），文案逐字：
+**确认框：** 点击后先弹**浏览器原生 `window.confirm`**（`desktop/src/components/Button.tsx:70`），文案逐字：
 
 ```
 确认取消本次分析？已生成的中间结果将被丢弃。
