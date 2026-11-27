@@ -16,7 +16,7 @@
 ## 2. 技术基座与边界
 
 - **栈（补充单 1-4）：** Tauri 2 + React 19 + TypeScript + Vite，工程在 `desktop/`（结构见[桌面应用 README](../../desktop/README.md)）。Rust 壳只做窗口、侧车进程与本地存储；分析能力全部来自现有 Python 核心。
-- **与 DexAtlas 的关系（补充单 1-5）：** 同一仓库、同一分析核心。桌面应用是第四个传输层，与 CLI、REST、MCP 并列；分析逻辑零复制。核心编排器是 `Analyzer`，分析入口是它的 `analyze` 方法（`src/dexatlas/core/pipeline.py:152` `anchor: def analyze(`），三后端经 `Backend` 接口（`src/dexatlas/tools/base.py:96` `anchor: Backend`）以子进程方式运行。
+- **与 DexAtlas 的关系（补充单 1-5）：** 同一仓库、同一分析核心。桌面应用是第四个传输层，与 CLI、REST、MCP 并列；分析逻辑零复制。核心编排器是 `Analyzer`，分析入口是它的 `analyze` 方法（`src/dexatlas/core/pipeline.py:181` `anchor: def analyze(`），三后端经 `Backend` 接口（`src/dexatlas/tools/base.py:96` `anchor: Backend`）以子进程方式运行。
 - **公共契约不变（补充单 §4.2、§7）：** REST 端点、MCP 工具、CLI 退出码、报告 schema、证据 locator、状态码一律不新增不改形；桌面端是这些契约的**消费方**。契约清单见 [public-contracts.md](public-contracts.md)。
 - **后端失败是值，不是异常。** `Backend.run` 返回 `ToolOutcome`，失败以 `ToolError` 附在结果上（结果模型 `ToolOutcome` 定义在 `src/dexatlas/tools/base.py:69` `anchor: ToolOutcome`，其 `error` 字段类型在 `src/dexatlas/tools/base.py:80`；错误码表在 `src/dexatlas/core/models.py:34` `anchor: ToolErrorCode`）。UI 必须如实呈现「哪一步没跑成、其余结论仍然成立」，不把 partial 包装成 success。
 - **不可信文本是数据。** 来自 APK 的字符串与源码经 `UntrustedText` 单独承载（`src/dexatlas/mcp/schemas.py:43` `anchor: UntrustedText`）；桌面端展示这些文本时不得把它当指令执行，也不做富文本解释。
@@ -183,14 +183,14 @@
 | 页面/能力 | 调用的现有能力 | 说明 |
 |---|---|---|
 | 首页·项目列表 | MCP 工具 `list_projects`（`src/dexatlas/mcp/tools/projects.py:91` `anchor: list_projects`）或 REST `GET /projects`（`src/dexatlas/api/app.py:422-423` `anchor: def list_projects(`） | 同一函数，两种既有暴露 |
-| 首页·上传分析 | REST `POST /analyze`（202，`src/dexatlas/api/app.py:384-390` `anchor: def analyze(`）或 workbench `POST /api/analyze`（`src/dexatlas/workbench/app.py:262-263`） | 复用共享上传策略与后台分析（`src/dexatlas/api/uploads.py:361` `anchor: run_background_analysis`）；同哈希已分析直接返回既有项目 |
+| 首页·上传分析 | REST `POST /analyze`（202，`src/dexatlas/api/app.py:384-390` `anchor: def analyze(`）或 workbench `POST /api/analyze`（`src/dexatlas/workbench/app.py:262-263`） | 复用共享上传策略与后台分析（`src/dexatlas/api/uploads.py:407` `anchor: run_background_analysis`）；同哈希已分析直接返回既有项目 |
 | 分析页·进度 | REST `GET /projects/{id}/runs` 与 `GET /projects/{id}/runs/{run_id}`（`src/dexatlas/api/app.py:417-440`） | run 的 status/completeness/errors 驱动三区 |
 | 分析页·后端状态 | REST `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`） | available/missing/versions |
 | 详情页·检索 | MCP `search_symbols`（`src/dexatlas/mcp/tools/symbols.py:86` `anchor: search_symbols`） | 关键字 → 符号 |
 | 详情页·源码 | MCP `class_source` / `method_source`（`src/dexatlas/mcp/tools/symbols.py:227`、`src/dexatlas/mcp/tools/symbols.py:227`） | Java 优先，Smali 回退 |
 | 详情页·调用关系 | MCP `find_callers` / `find_callees`（`src/dexatlas/mcp/tools/references.py:56`、`src/dexatlas/mcp/tools/references.py:56`） | callers/callees 图 |
 | 证据与抽屉 | MCP `get_evidence`（`src/dexatlas/mcp/tools/evidence.py:14` `anchor: get_evidence`）、`resolve_locator`（`src/dexatlas/mcp/tools/evidence.py:38` `anchor: resolve_locator`） | 证据记录与 locator 解析 |
-| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:362-363` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:856`） | json/markdown 两种既有格式 |
+| 报告导出 | workbench `GET /api/projects/{id}/report`（`src/dexatlas/workbench/app.py:379-380` `anchor: def export_report(`）或 REST `GET /projects/{id}/report`（`src/dexatlas/api/app.py:856`） | json/markdown 两种既有格式 |
 | Agent 问答 | workbench `GET /api/agent/config`、`POST /api/projects/{id}/agent/tasks`、`GET /api/agent/tasks/{id}[/report]`（`src/dexatlas/workbench/app.py:361-456`） | 未配置模型时 `configured=false`，界面拒答 |
 
 **边界红线：**
@@ -245,7 +245,7 @@
    代理转发）如实显示「后端地址未知」，不编一个。提取规则在
    `desktop/src/backendAddress.js`。
 2. **端点清单要看实现，不能沿用旧笔记。** workbench 自 PR #18 起提供
-   `GET /api/backends`（`src/dexatlas/workbench/app.py:557`
+   `GET /api/backends`（`src/dexatlas/workbench/app.py:574`
    `anchor: def list_backends(`），返回本机已安装/缺失的分析后端。分析页的
    后端状态区把**两份事实合起来判**：机器那份名单回答「装没装」，最近分析
    轮次的 `tool_versions` 回答「这次记下了哪个版本」。**必须合起来**——

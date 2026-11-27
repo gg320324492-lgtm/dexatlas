@@ -79,7 +79,7 @@ notanapk.apk is not a ZIP archive; APKs are ZIP archives
 
 ![时间线 A：上传被拒，首页红字逐字显示后端的英文原文](../assets/phase5/timeline-01-upload-rejected.png)
 
-**这句话从哪来：** `validate_apk`（`src/dexatlas/core/ingest.py:139`）抛出 `ApkValidationError`（`src/dexatlas/core/ingest.py:82`），`stage_upload`（`src/dexatlas/api/uploads.py:336`）把它转成 `HTTPException`（`src/dexatlas/api/uploads.py:341`）并定下 422（`src/dexatlas/api/uploads.py:342`）；前端 `messageFromBody`（`desktop/src/api/client.ts:117`）把错误体里的 `detail` 原样取出，首页红字显示的就是它。**界面没有中文、没有"这个文件不是 APK"之类的解释，只有一句后端原文。**
+**这句话从哪来：** `validate_apk`（`src/dexatlas/core/ingest.py:139`）抛出 `ApkValidationError`（`src/dexatlas/core/ingest.py:82`），`stage_upload`（`src/dexatlas/api/uploads.py:336`）把它转成 `HTTPException`（`src/dexatlas/api/uploads.py:361`）并定下 422（`src/dexatlas/api/uploads.py:342`）；前端 `messageFromBody`（`desktop/src/api/client.ts:117`）把错误体里的 `detail` 原样取出，首页红字显示的就是它。**界面没有中文、没有"这个文件不是 APK"之类的解释，只有一句后端原文。**
 
 ---
 
@@ -97,8 +97,8 @@ notanapk.apk is not a ZIP archive; APKs are ZIP archives
    !  jadx exited with code 1: … JadxException: Error decode: resources.arsc …
    ```
    （走查的浏览器界面**看不到**这三句：它们在项目上，但项目状态没被写进去，见下一条。）
-3. 管线的结论是「没有 classes 也没有 manifest」→ 项目状态判为 `FAILED`（`src/dexatlas/core/pipeline.py:372`）。
-4. **但是这个 `FAILED` 从来没被写进工作区数据库**：管线只对 `COMPLETED` 的项目调用 `publish_run`（`src/dexatlas/core/pipeline.py:398-400`），失败的那一支不发布（`src/dexatlas/core/pipeline.py:405` 只删掉暂存库）。管线自己注释里写明了这个取舍："A run that found nothing is not published… reading back the row a `begin_run` wrote would report a failed analysis as one still running"。
+3. 管线的结论是「没有 classes 也没有 manifest」→ 项目状态判为 `FAILED`（`src/dexatlas/core/pipeline.py:401`）。
+4. **但是这个 `FAILED` 从来没被写进工作区数据库**：管线只对 `COMPLETED` 的项目调用 `publish_run`（`src/dexatlas/core/pipeline.py:427-429`），失败的那一支不发布（`src/dexatlas/core/pipeline.py:405` 只删掉暂存库）。管线自己注释里写明了这个取舍："A run that found nothing is not published… reading back the row a `begin_run` wrote would report a failed analysis as one still running"。
 5. 后端日志如实记了一句：`background analysis of E:\...\uploads\bdb138...\corrupt.apk completed but produced no symbols`。
 6. 数据库里这个项目**仍然是** `status: 'running'`，它的 run 也是 `status: 'running'`、`finished_at: NULL`。
 
@@ -182,7 +182,7 @@ HTTP 202
 
 ![时间线 C：取消请求已受理（202），分析还在跑，日志区记下了这一条](../assets/phase5/timeline-04-cancel-requested.png)
 
-**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1121` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:514-515`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
+**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1150` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:543-544`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
 
 ```
 inspect           11:59:35.44 -> 11:59:35.44
@@ -337,7 +337,7 @@ androguard: androguard could not parse classes.dex
 4. ~~**取消发生在别的阶段。**~~ **已覆盖（2026-11-27 收尾）**：在打包 exe 里造出了「取消发生在索引期」与「取消发生在反编译期」两个场景，各跑一遍。
    **基线：** 本条**测了两棵树**，两次都是当轮 `npm run tauri build` 出来的 exe：① `8140661`（PR #32 之前）；② `b6c0438`（`main` 合了 PR #32 `4ddf469`「阶段格与后端推进点一一对应」，再合 PR #33 `ec5de0a`、复测量 `0a231d0`、外发材料 `b6c0438`）。上传的是与第 3 条同一个合成 APK（300 个类 / 12,000 个方法 / 300 个 dex 文件）。取消用**真实鼠标点击**（CDP `Input.dispatchMouseEvent`）按下，不是键盘。
 
-   **怎么造的场景：** 取消不是立刻掐断的——请求只是把取消令牌置位，管线在**下一个检查点**才停（`src/dexatlas/core/pipeline.py:1121`）。所以「在哪个阶段取消」不是靠盯着界面猜的：脚本轮询后端自己的阶段事件端点 `GET /api/projects/{id}/runs/{run_id}/stages`，**等到目标阶段的 `finished_at` 还是 `null`（也就是它正在跑）的那一刻**，再用真实鼠标点击按下「取消」。
+   **怎么造的场景：** 取消不是立刻掐断的——请求只是把取消令牌置位，管线在**下一个检查点**才停（`src/dexatlas/core/pipeline.py:1150`）。所以「在哪个阶段取消」不是靠盯着界面猜的：脚本轮询后端自己的阶段事件端点 `GET /api/projects/{id}/runs/{run_id}/stages`，**等到目标阶段的 `finished_at` 还是 `null`（也就是它正在跑）的那一刻**，再用真实鼠标点击按下「取消」。
 
    前端每 2 秒轮询一次，所以界面会比后端的阶段事实**最多晚一个轮询周期**。第二轮（`b6c0438`）在点了取消之前**额外等页面自己把这一格点着**（等到那格的徽标变成「◌ 进行中」再截屏、再点），这样截到的是「读者读得到的那句话」，而不是页面还停在上一格时的样子。
 
@@ -381,7 +381,7 @@ androguard: androguard could not parse classes.dex
    | A：取消落在 `index-androguard` 期间 | `inspect` 11:37:04 → `parse-apktool` 11:37:05–11:37:08 → `index-androguard` 11:37:08–11:37:12（**没有 `decompile-jadx`，没有 `publish`**） |
    | B：取消落在 `decompile-jadx` 期间 | `inspect` 11:42:21 → `parse-apktool` 11:42:21–11:42:24 → `index-androguard` 11:42:24–11:42:27 → `decompile-jadx` 11:42:27–11:42:34（**没有 `publish`**） |
 
-   场景 A 停在那处取消检查（`src/dexatlas/core/pipeline.py:297` `anchor: _check_cancelled(cancellation)`）——**JADX 根本没跑**；场景 B 停在另一处取消检查（`src/dexatlas/core/pipeline.py:342` `anchor: _check_cancelled(cancellation)`）——**JADX 跑完了，但结果一步也没进暂存库**。
+   场景 A 停在那处取消检查（`src/dexatlas/core/pipeline.py:326` `anchor: _check_cancelled(cancellation)`）——**JADX 根本没跑**；场景 B 停在另一处取消检查（`src/dexatlas/core/pipeline.py:371` `anchor: _check_cancelled(cancellation)`）——**JADX 跑完了，但结果一步也没进暂存库**。
 
    **界面上分不分得开？`8140661` 分不开，`b6c0438` 分得开了。**
 
@@ -501,7 +501,7 @@ androguard: androguard could not parse classes.dex
 
    ![项目详情页如实写出缺失后端](../assets/phase5/timeline-13-missing-backends-project-detail.png)
 
-   **根因（写清楚，交给主会话定修法）：** 后端在探测版本**之前**就把**全部三个后端的名字**写进这一轮的 `tool_versions`（`src/dexatlas/core/pipeline.py:221`）：
+   **根因（写清楚，交给主会话定修法）：** 后端在探测版本**之前**就把**全部三个后端的名字**写进这一轮的 `tool_versions`（`src/dexatlas/core/pipeline.py:161`）：
 
    ```python
    run.tool_versions = {backend.name: None for backend in self._backends.all()}

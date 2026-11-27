@@ -136,7 +136,7 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 （模型见 `RunStageEventResponse`，`src/dexatlas/api/app.py:229-245`
 `anchor: RunStageEventResponse`）。stage 取值 inspect、parse-apktool、
 index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际推进点一致，
-`src/dexatlas/core/pipeline.py:152`；阶段枚举见 `src/dexatlas/core/runs.py:75`
+`src/dexatlas/core/pipeline.py:181`；阶段枚举见 `src/dexatlas/core/runs.py:75`
 `anchor: RunStage`）。`started_at` 与 `finished_at` 是 ISO 8601 时间戳，
 `finished_at` 为 null 表示该阶段尚未结束——包括 run 在阶段中途失败或被取消的情况。
 同一阶段至多出现一次；旧版本写入的 run 或在首个阶段前就结束的 run，阶段列表是
@@ -145,7 +145,7 @@ index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际�
 **run 对象本身不带 stages**：`RunResponse` 仍是上表的 11 个字段，阶段事实另取
 stages 端点——这样既有 run 对象的字段集一个也不变。workbench 的
 `GET /api/projects/{pid}/runs/{rid}/stages` 与 REST 同形状
-（`src/dexatlas/workbench/app.py:603-616` `anchor: get_run_stages`）；MCP 面的形状经
+（`src/dexatlas/workbench/app.py:621-634` `anchor: get_run_stages`）；MCP 面的形状经
 `src/dexatlas/mcp/tools/projects.py:74-92` `anchor: def run_stages` 与
 `src/dexatlas/mcp/schemas.py:155-170` 的 `RunStages` 定义。端点与字段
 只增不改：既有端点的响应形状、状态码与退出码零变化。
@@ -542,7 +542,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
 `source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
-自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1089-1104` 的
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1132-1147` 的
 `_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
 - 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺
@@ -627,6 +627,6 @@ stages 端点进活检后升为 55 = 31 REST + 6 MCP + 18 CLI，见本节开头�
   失败写进数据库：项目行记 `failed`、run 行记 `failed`，并带一条说得清原因的错误
   （`dexatlas: the analysis finished but read nothing: ...`）。空的结果**不**发布，
   已发布的快照保持原样；取消路径与异常路径不变
-  （`src/dexatlas/core/pipeline.py:519-565` `anchor: _record_empty_result`）。
+  （`src/dexatlas/core/pipeline.py:570-616` `anchor: _record_empty_result`）。
   回归测试：`tests/test_empty_result.py`（拿掉修复即红：项目行与 run 行都停在
   `running`）。
