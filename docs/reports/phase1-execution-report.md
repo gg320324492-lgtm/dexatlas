@@ -73,7 +73,7 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1880<!--/fig-->（<!--fig:tests.fast-->1731<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 测试数 | <!--fig:tests.total-->1887<!--/fig-->（<!--fig:tests.fast-->1738<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
 | 一方代码覆盖率 | **<!--fig:coverage.pct-->93.4%<!--/fig-->**（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1731<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1738<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1880<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1887<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -200,6 +200,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_method_resolution.py` | 方法按描述符解析：同名重载必须报歧义并列出候选，不许挑一个（v0.1.3 之后新增） |
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
 | `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
+| `test_desktop_backend_status_truth.py` | 后端状态卡分得开「版本还没探测出来」与「压根没装」：页面确实读机器那份名单（`GET /api/backends`）、确实把它交给映射（跨语言接线）（Phase 5 收尾新增） |
 | `test_desktop_card_header_layout.py` | 窄栏里卡片的标题不被角标挤成竖排：标题块占满角标让出的空间、actions 允许收缩、阶段角标允许换行（读 CSS 钉住那几条规则，布局没有单元测试能测）（Phase 5 收尾新增） |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
 | `test_desktop_locator_vocabulary.py` | 前端镜像后端的 locator 词汇（跨语言，JS 单测读不了 Python 源码）：工具前缀、落点类别与后端常量不许漂移 |
@@ -268,7 +269,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_platform_gate_inventory.py` | 本地门禁与 CI 门禁的差异核对：每个 CI job、每个平台相关的测试、每处平台敏感的行都要在清单里写明差异是否合法；新增一个正确的 CI job 不需要改任何数字（C15 新增） |
 | `test_unguarded_numbers.py` | 没人守的手写测量数：门禁把真值从树上算出来，与文档里那句话里的数比；红→绿可复现，清单烂了会被说出来 |
 | `test_run_render.py` | C8「渲染某一次运行」：`dexatlas runs` 列出/回看运行记录、`dexatlas render` 把已发布运行的报告、证据包与 run 记录落成目录；输出结构、退出码（未知 run/项目→2、无运行→1）、未发布或已被替换的 run 拒绝渲染、渲染只读工作区（C8 新增） |
-| `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素（Q2 走查 P4 新增） |
+| `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素、**不可用的按钮不夺走焦点**（`aria-disabled` 而不是原生 `disabled`）（Q2 走查 P4 新增，Phase 5 收尾补焦点一条） |
 | `test_desktop_no_stage_simulation.py` | 分析页的阶段时间线不再有前端时间模拟：模块不再导出按时间推进的函数、无 run 数据五格如实「待处理」、runs 请求失败显示「后端不可用，阶段进度无法取得」与重试入口（Phase 5 收尾新增） |
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
 | `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
@@ -892,10 +893,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1880<!--/fig--> 个：<!--fig:tests.fast-->1731<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1887<!--/fig--> 个：<!--fig:tests.fast-->1738<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
                       # 一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1879<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 完整环境下的结果：<!--fig:suite.passed-->1886<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1116,10 +1117,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:ef84f6968f96c72b69fa73fa86aed417af46240d7c23a8d718f04362a95836ce",
+  "source_fingerprint": "sha256:b2f4244ad1d32193ed7ab60050ad266147044e7b99add553d14854c52e75452a",
   "suite": {
     "failed": 0,
-    "passed": 1879,
+    "passed": 1886,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1133,8 +1134,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1731,
+    "fast": 1738,
     "slow": 149,
-    "total": 1880
+    "total": 1887
   }
 }-->

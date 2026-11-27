@@ -436,14 +436,21 @@ describe("模块的形状", () => {
  * tool_versions 还没写进库，键不存在，前端把「键不存在」与「值是 null」
  * 当成了同一件事。
  *
+ * 修完那一处，另一处还在：分析**结束**、而机器上确实没装 jadx/apktool 时，
+ * 卡片仍然说「◌ 进行中 · 参与本次分析 · 版本探测中」——探测早就结束了，
+ * 值还是 null。run 的记录分不开「版本还没探测出来」与「压根没装」，分不开
+ * 就要说错，所以这里拿机器那份名单（GET /api/backends）一起判。
+ *
  * 这里钉住的是**三态**：键不存在 = 没参与；键在、值为 null = 参与了但
- * 版本还没探测出来；键在、值是版本号 = 参与了，版本已知。
+ * 版本还没记下来（机器上说它没装时另说）；键在、值是版本号 = 参与了，
+ * 版本已知。
  */
 describe("deriveBackends", () => {
   it("says a backend that is not in the run's record did not take part", () => {
-    const backends = deriveBackends({
-      runs: [{ tool_versions: { androguard: "4.1.4" } }],
-    });
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { androguard: "4.1.4" } },
+      { missing: ["jadx", "apktool"] },
+    );
     const jadx = backends.find((b) => b.name === "JADX");
     expect(jadx?.state).toBe("error");
     expect(jadx?.detail).toContain("未安装或未配置");
@@ -452,35 +459,86 @@ describe("deriveBackends", () => {
   it("does not call a backend uninstalled while its version is still being probed", () => {
     // The run has started: the backends are named, the versions are not
     // known yet. Saying "not installed" here would be a lie.
-    const backends = deriveBackends({
-      runs: [{ tool_versions: { jadx: null, apktool: null, androguard: null } }],
-    });
+    const backends = deriveBackends(
+      { status: "running", tool_versions: { jadx: null, apktool: null, androguard: null } },
+      { missing: [] },
+    );
     expect(backends.every((b) => b.state === "running")).toBe(true);
     const first = backends[0];
     expect(first).toBeDefined();
-    expect(first?.detail).toContain("版本探测中");
+    expect(first?.detail).toContain("版本尚未记录");
     expect(first?.detail).not.toContain("未安装");
   });
 
   it("states the version once it is known", () => {
     const backends = deriveBackends({
-      runs: [
-        {
-          tool_versions: {
-            jadx: "1.5.2",
-            apktool: "2.11.1",
-            androguard: "4.1.4",
-          },
-        },
-      ],
+      status: "completed",
+      tool_versions: {
+        jadx: "1.5.2",
+        apktool: "2.11.1",
+        androguard: "4.1.4",
+      },
     });
     expect(backends.every((b) => b.state === "done")).toBe(true);
     expect(backends[0]?.detail).toBe("v1.5.2 · 参与本次分析");
   });
 
   it("waits for the run when there is none yet", () => {
-    const backends = deriveBackends({ runs: [] });
+    const backends = deriveBackends(null, { missing: [] });
     expect(backends.every((b) => b.state === "queued")).toBe(true);
     expect(backends[0]?.detail).toContain("等待分析轮次数据");
+  });
+
+  it("calls a backend that is missing on this machine not installed, even mid-run", () => {
+    // 这台机器上没装 jadx：它压根不会参与本次分析，版本也永远不会有。
+    // 探测只在分析的头几秒发生，说「版本探测中」是说谎——机器那份名单才
+    // 分得开「还没探测出来」与「压根没装」。
+    const backends = deriveBackends(
+      { status: "running", tool_versions: { jadx: null, apktool: null, androguard: null } },
+      { missing: ["jadx", "apktool"] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("未安装或未配置");
+    expect(jadx?.detail).not.toContain("版本探测中");
+  });
+
+  it("does not keep probing for a version after the run is over", () => {
+    // 分析已经结束、机器上确实没装：卡片不能说「进行中 · 版本探测中」。
+    // 这条在旧实现上会红——旧实现不看 run 的状态，也不看机器的名单。
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { jadx: null, apktool: null, androguard: "4.1.4" } },
+      { missing: ["jadx", "apktool"] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("未安装或未配置");
+    expect(jadx?.detail).not.toContain("探测中");
+
+    const androguard = backends.find((b) => b.name === "Androguard");
+    expect(androguard?.state).toBe("done");
+  });
+
+  it("says the version is unknown when the run is over and the tool is there", () => {
+    // 机器上装着，run 结束，版本却没记下来：这时既不能说「未安装」，也不
+    // 能说「还在探测」——探测早结束了。
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { jadx: null, apktool: null, androguard: "4.1.4" } },
+      { missing: [] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("版本未知");
+    expect(jadx?.detail).not.toContain("未安装");
+  });
+
+  it("says the run did not record the backend when the record has no entry for it", () => {
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { androguard: "4.1.4" } },
+      { missing: [] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("未记录");
   });
 });

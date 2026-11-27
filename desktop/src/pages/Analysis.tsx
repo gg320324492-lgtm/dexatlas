@@ -40,10 +40,11 @@
  *
  * - 后端没有实时日志流：中间日志区展示轮询得到的状态变化时间线（时间戳 + 事件），
  *   标题注明"后端未提供实时日志流，以下为状态轮询记录"，保留日志控制台样式。
- * - workbench 提供 GET /api/backends（列出本机已安装/缺失的分析后端），但它只
- *   说明"装没装"；本页的后端状态区仍以最近分析轮次的 tool_versions 推断各后端
- *   参与情况（"这次参与了没有"）；取消按钮调用
- *   POST /api/projects/{id}/cancel，对 404/失败如实提示。
+ * - workbench 提供 GET /api/backends（列出本机已安装/缺失的分析后端），它说明
+ *   "装没装"；最近分析轮次的 tool_versions 说明"这次分析记下了哪个版本"。本页的
+ *   后端状态区把两份事实合起来判——run 的记录分不开「版本还没探测出来」与「压根
+ *   没装」，机器那份名单才分得开（映射在 ../stages 的 deriveBackends）；取消按钮
+ *   调用 POST /api/projects/{id}/cancel，对 404/失败如实提示。
  * - API 基址用相对 /api：依赖 vite dev 代理转发到 8618（M2-A 的 vite.config.ts
  *   代理合并后即生效；合并前可用临时代理配置验证）。后端未返回 CORS 头，
  *   浏览器直连绝对地址会被跨域拦截。
@@ -60,6 +61,7 @@ import { ErrorState } from "../components/states/ErrorState";
 import { LoadingState } from "../components/states/LoadingState";
 import { ApiError, dexatlas } from "../api";
 import type {
+  BackendInfo,
   ProjectDetailEnvelope as WsProjectStatus,
   RunInfo,
   RunStageEvent,
@@ -448,7 +450,26 @@ export function Analysis() {
   // 页面如实说明「状态未知」，不按时间推进（模拟路径已删除）。
   const stageStates = runDerived.states;
   const partialLabels = runDerived.partialLabels;
-  const backends = useMemo(() => deriveBackends(project), [project]);
+  // 机器那份「装没装」的名单：run 的记录分不开「版本还没探测出来」与「压根
+  // 没装」，得靠它。没有它，后端状态卡就只能在这两种说法里挑一个，挑错
+  // 就是对用户说假话（实测两头都发生过）。拿不到就 null——卡片退回只看 run
+  // 的记录，并在说明里如实写出来。
+  const [machineBackends, setMachineBackends] = useState<BackendInfo | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void dexatlas
+      .getBackends()
+      .then((info) => {
+        if (alive) setMachineBackends(info);
+      })
+      .catch(() => {
+        // 后端没提供该端点（或网络不通）：机器那份名单读不到，如实当作没有。
+      });
+    return () => {
+      alive = false;
+    };
+  }, [projectId]);
+  const backends = useMemo(() => deriveBackends(latestRun, machineBackends), [latestRun, machineBackends]);
   const [cancelNotice, setCancelNotice] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const logBodyRef = useRef<HTMLDivElement>(null);
@@ -731,7 +752,7 @@ export function Analysis() {
             </CardBody>
           </Card>
 
-          {/* 右：后端状态（版本来自最近分析轮次的 tool_versions） */}
+          {/* 右：后端状态（机器的「装没装」+ 最近分析轮次的 tool_versions） */}
           <Card className="analysis__backends" aria-label="后端状态">
             <CardHeader
               title="后端状态"
@@ -750,7 +771,10 @@ export function Analysis() {
                 ))}
               </ul>
               <p className="da-backend__note">
-                workbench 提供 GET /api/backends（本机已安装/缺失的分析后端），它只说明"装没装"；以上状态取自最近分析轮次的 tool_versions，说明"这次分析实际用了哪个版本"。
+                两份后端事实分开说：GET /api/backends 回答本机「装没装」
+                （{machineBackends ? `本机缺失：${machineBackends.missing.join("、") || "无"}` : "这份名单读不到"}）；
+                最近一轮 run 的 tool_versions 回答「这次分析记下了哪个版本」。
+                两件事必须合起来看——run 的记录分不开「版本还没探测出来」与「压根没装」，机器那份名单才分得开。
               </p>
             </CardBody>
           </Card>

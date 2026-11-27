@@ -346,14 +346,27 @@ export function readCompletenessErrors(run) {
 /**
  * 后端状态区的映射 —— 纯函数，无 React 依赖。
  *
- * 【三种状态，不是两种】
- * `tool_versions` 的**键**说明这一轮有没有带上这个后端，值说明它的版本。
- * 值可能是 `null`，那有两种意思：版本还没探测出来（分析刚开始，探测还在
- * 跑），或者它压根没装上。这两者必须分开说——把「还没探测」说成「未安装」
- * 是在对用户说假话，而那正是 Phase 5 收尾时在打包 exe 上实测到的现象。
+ * 【三份事实，各管一件事】
+ * - `run.tool_versions`：这一轮**记下了哪些版本**（后端事实，run 的记录）；
+ * - `machine.missing`：本机**装没装**（后端事实，GET /api/backends）；
+ * - `run.status`：这一轮**还在不在跑**（后端事实，run 的状态字段）。
+ *
+ * 【为什么要机器那份名单】`tool_versions` 的值可能是 null，而这有两种完全
+ * 不同的意思：还没探测出来，或者压根没装。run 的记录分不开这两件事——它只
+ * 记了键，键在而值为空。分不开就要说错，而两头都实测说错过：
+ * - 分析进行中、键还没写进去时，三个后端全被说成「未安装」（装着的后端被
+ *   说没装）——那是上一轮修复前的现象，管道现在会在探测前先把名字写下去；
+ * - 分析结束、后端确实没装时，仍被说成「版本探测中」（没装的后端被说成正
+ *   在探测）——探测早就结束了，值还是 null。
+ * 机器那份名单是唯一能分开的证据：它回答的就是「装没装」。
+ *
+ * 【为什么不说「版本探测中」】探测只发生在分析的头几秒；分析还在跑的时候
+ * 探测多半早就结束了，这时候再说「探测中」是说谎。所以活着的 run 一律说
+ * 「版本尚未记录」——探测中与探测失败，这句话都对。
  *
  * @typedef {import("./types").BackendState} BackendState
  * @typedef {import("./types").BackendStatus} BackendStatus
+ * @typedef {{missing?: string[], available?: string[], versions?: Record<string, string | null>}} MachineBackends
  */
 
 /** 页面右栏的三个后端，顺序即页面上的顺序。 @type {Array<{name: string, key: string}>} */
@@ -364,28 +377,43 @@ export const BACKEND_KEYS = [
 ];
 
 /**
- * 从最近一轮 run 的 tool_versions 推断三个后端的状态。
+ * 从最近一轮 run 的 tool_versions 与机器的后端名单推断三个后端的状态。
  *
- * @param {{runs?: Array<{tool_versions?: Record<string, string | null>}>} | null} project
+ * @param {{status?: string, tool_versions?: Record<string, string | null>} | null} run 最近一轮分析（没有就 null）
+ * @param {MachineBackends | null} [machine] GET /api/backends 的回答；拿不到就 null
  * @returns {BackendStatus[]}
  */
-export function deriveBackends(project) {
-  const latest = project && project.runs ? project.runs[0] : undefined;
-  const versions = (latest && latest.tool_versions) || {};
-  const hasRun = Boolean(latest);
+export function deriveBackends(run, machine) {
+  const missing = new Set((machine && machine.missing) || []);
+  const versions = (run && run.tool_versions) || {};
+  const status = run ? run.status : undefined;
+  const live = Boolean(run) && !isTerminalStatus(status);
   return BACKEND_KEYS.map(({ name, key }) => {
-    if (!hasRun) {
+    if (!run) {
       return { name, state: "queued", detail: "等待分析轮次数据…" };
     }
     if (!(key in versions)) {
-      // 这一轮的记录里没有它：它没有参与这次分析。
-      return { name, state: "error", detail: "未安装或未配置，未参与本次分析" };
+      // 这一轮没有记下这个后端。
+      if (missing.has(key)) {
+        return { name, state: "error", detail: "未安装或未配置，未参与本次分析" };
+      }
+      if (live) {
+        return { name, state: "running", detail: "参与本次分析 · 版本尚未记录" };
+      }
+      return { name, state: "error", detail: "本次分析未记录该后端的参与情况" };
     }
     const version = versions[key];
     if (version) {
       return { name, state: "done", detail: `v${version} · 参与本次分析` };
     }
-    // 键在、值为空：后端参与了这一轮，版本还没探测出来。
-    return { name, state: "running", detail: "参与本次分析 · 版本探测中" };
+    // 键在、值为空：这一轮带着这个后端，但版本还没记下来。
+    if (missing.has(key)) {
+      // 机器上说它没装：它压根不会参与，版本也永远不会有。
+      return { name, state: "error", detail: "未安装或未配置，未参与本次分析" };
+    }
+    if (live) {
+      return { name, state: "running", detail: "参与本次分析 · 版本尚未记录" };
+    }
+    return { name, state: "error", detail: "版本未知：本次分析没有记下该后端的版本" };
   });
 }

@@ -25,7 +25,8 @@ const sizeClass: Record<ButtonSize, string> = {
 
 /**
  * 通用按钮。只做展示与受控行为，不发请求。
- * disabled/loading 均阻止点击；confirm 走 window.confirm（桌面原型阶段）。
+ * disabled/loading 均阻止点击（用 aria-disabled + 拦住处理函数，焦点不丢）；
+ * confirm 走 window.confirm（桌面原型阶段）。
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   {
@@ -52,11 +53,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={["da-btn", `da-btn--${variant}`, sizeClass[size], loading ? "da-btn--loading" : "", className ?? ""]
         .filter(Boolean)
         .join(" ")}
-      disabled={blocked}
+      // 不用原生 disabled：按钮一被禁用，浏览器就把焦点收走，键盘用户被扔回
+      // 页面开头（实测：打包 exe 里按下「取消」，取消一开始，焦点就掉到了
+      // <body>）。aria-disabled 让按钮留在原地、也留在 Tab 序列里，屏幕阅
+      // 读器仍会念出「不可用」。
+      aria-disabled={blocked || undefined}
       aria-busy={loading || undefined}
       onClick={
         blocked
-          ? undefined
+          ? (event) => {
+              // 不可用时按下去就当没按：不触发 onClick，也不让这次点击的
+              // 默认动作（例如表单提交）发生。
+              event.preventDefault();
+            }
           : (event) => {
               if (confirm && !window.confirm(confirm)) return;
               onClick?.(event);
