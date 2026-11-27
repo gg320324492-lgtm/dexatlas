@@ -318,8 +318,8 @@ def create_app(analyzer: Analyzer) -> FastAPI:
         apk_sha256: str
         already_analysed: bool = Field(
             description=(
-                "The workspace already held this APK's analysis; nothing new runs, "
-                "and the browser can open the project at once."
+                "The workspace already held this APK's analysis, or is holding it now; "
+                "nothing new runs, and the browser can open the project at once."
             )
         )
 
@@ -331,9 +331,27 @@ def create_app(analyzer: Analyzer) -> FastAPI:
         """Store an APK with the shared upload policy, and analyse it in the background."""
         settings = analyzer.settings
         apk, target, _name = stage_upload(file, settings)
+        project_id = Project.new_id(apk.sha256)
+
+        # The APK is claimed before the answer is sent, and the claim is
+        # taken and checked in one operation. Two uploads of the same APK
+        # that arrive at the same time must not both find that nobody is
+        # analysing it: the second one is told that the analysis is already
+        # running, and no second analysis is started.
+        token = RUNNING.claim(project_id, target, apk.sha256)
+        if token is None:
+            return UploadAccepted(
+                project_id=project_id,
+                status=ProjectState.RUNNING.value,
+                apk_sha256=apk.sha256,
+                already_analysed=True,
+            )
 
         existing = analyzer.store.find_project_by_hash(apk.sha256)
         if existing is not None and existing.status is not ProjectState.FAILED:
+            # The workspace already holds this APK's analysis. Nothing is
+            # going to run, so the claim is given back.
+            RUNNING.finish(token)
             return UploadAccepted(
                 project_id=existing.id,
                 status=existing.status.value,
@@ -341,8 +359,7 @@ def create_app(analyzer: Analyzer) -> FastAPI:
                 already_analysed=True,
             )
 
-        background.add_task(run_background_analysis, analyzer, target, apk)
-        project_id = Project.new_id(apk.sha256)
+        background.add_task(run_background_analysis, analyzer, target, apk, token)
         return UploadAccepted(
             project_id=project_id,
             status="pending",

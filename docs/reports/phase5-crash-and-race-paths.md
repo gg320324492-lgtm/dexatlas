@@ -71,13 +71,14 @@ diff -rq --exclude=__pycache__ --exclude=node_modules --exclude=dist \
 ## 2. 怎么打并发：两个已知的事实
 
 **事实一：`RUNNING` 是进程内的字典，不是数据库表。**
-`RunningAnalyses`（`src/dexatlas/api/uploads.py:133`）是一个带 `threading.Lock` 的
+`RunningAnalyses`（`src/dexatlas/api/uploads.py:135`）是一个带 `threading.Lock` 的
 内存字典，键是**项目号**。项目号由 APK 的 sha256 决定（`apk_<前 16 位>`），
 所以**同一个 APK 的两次分析共用一个键**。
 
 **事实二：上传的「查—改」不是原子的。**
-`POST /api/analyze`（`src/dexatlas/workbench/app.py:326-335` `anchor: @app.post("/api/analyze"`）先
-`find_project_by_hash`（:335），再 `background.add_task`（:344）——两步之间没有锁。
+`POST /api/analyze`（`src/dexatlas/workbench/app.py:326-362` `anchor: @app.post("/api/analyze"`）先
+`find_project_by_hash`（:350），再 `background.add_task`（:362）——两步之间没有锁。
+（**§10 已改**：现在端点在返回 202 之前同步认领这份 APK，认领与检查在同一把锁里。）
 
 **事实三：每个上传都存到同一个路径。**
 `stage_upload`（`src/dexatlas/api/uploads.py:353`）把文件放在
@@ -90,7 +91,7 @@ diff -rq --exclude=__pycache__ --exclude=node_modules --exclude=dist \
 
 ### 3.1 故障怎么注入的
 
-管线把每一轮分析写进自己的目录（`src/dexatlas/core/pipeline.py:192` `anchor: workspace = self._settings.projects_dir`）：
+管线把每一轮分析写进自己的目录（`src/dexatlas/core/pipeline.py:221` `anchor: workspace = self._settings.projects_dir`）：
 
 ```python
 workspace = self._settings.projects_dir / project.id / "runs" / run.id
@@ -150,7 +151,7 @@ dexatlas: the analysis did not complete: FileExistsError: [WinError 183] 当文�
 | `GET /api/projects/{id}` | **200** | `{"project": {…,"status": "failed"}, "completeness": {"complete": false, "errors": ["dexatlas: the analysis did not complete: FileExistsError: …"]}}` |
 | `GET /api/projects/{id}/runs` | **200** | `{"total": 1, "published_run_id": null, "runs": [{"id": "run_c691957a14d540ef", "status": "failed", …}]}` |
 
-原因在代码里：后台任务 `run_background_analysis`（`src/dexatlas/api/uploads.py:361`）
+原因在代码里：后台任务 `run_background_analysis`（`src/dexatlas/api/uploads.py:407`）
 把 `AnalysisFailed` **吞掉**了——
 
 ```python
@@ -159,7 +160,7 @@ except Exception:
     return
 ```
 
-管线在抛之前已经把这个失败记在项目上了（`src/dexatlas/core/pipeline.py:449`
+管线在抛之前已经把这个失败记在项目上了（`src/dexatlas/core/pipeline.py:478`
 → `_record_failure`），所以界面拿得到失败，但 HTTP 从来不知道有过失败。
 
 **exe 的日志里能看到后端自己也知道**：
@@ -184,7 +185,7 @@ except Exception:
 
 ### 3.4 顺手查到的缺陷：脱敏在 Windows 上对 `OSError` 无效
 
-`_record_failure`（`src/dexatlas/core/pipeline.py:449`）在把失败写下去之前要脱敏：
+`_record_failure`（`src/dexatlas/core/pipeline.py:478`）在把失败写下去之前要脱敏：
 
 ```python
 message = f"the analysis did not complete: {type(exc).__name__}"
@@ -286,7 +287,7 @@ doubled root survives : True
 
 **读法：** 202 的意思是「请求已受理」，不是「已停止」。第 2 个到第 12 个取消
 拿到的 202 **不构成任何新信息**——`RunningAnalyses.cancel`
-（`src/dexatlas/api/uploads.py:161`）拿到 token 就 `token.cancel()`，
+（`src/dexatlas/api/uploads.py:195`）拿到 token 就 `token.cancel()`，
 而 `CancellationToken` 是 `threading.Event`，**幂等**。
 取消端点（`src/dexatlas/workbench/app.py:618`）不检查「这一轮是不是已经停过了」。
 所以**界面上的「已向后端发送取消请求（202），等待状态确认」（走查报告 §8 的逐字文案）
@@ -457,7 +458,7 @@ void navigate(`/analysis/${accepted.project_id}`);
 
 ### 5.5 `RUNNING` 表的边界：一次分析会变得不可取消
 
-`RunningAnalyses` 的键是**项目号**（`src/dexatlas/api/uploads.py:133`），
+`RunningAnalyses` 的键是**项目号**（`src/dexatlas/api/uploads.py:135`），
 而同一个 APK 的两次分析**共用一个项目号**。于是：
 
 - `start()`（:149）是**覆盖**：`self._analyses[project_id] = RunningAnalysis(...)`，
@@ -611,27 +612,31 @@ void navigate(`/analysis/${accepted.project_id}`);
 
 ## 9. 附录：本文引用的源码位置
 
+> **行号是对着当前工作区重新推导的**（`scripts/remap-citations.py` 的活儿）。
+> §0–§9 讲的是**走查那一轮**当时的行为；§10 记的是**分析核心那一轮**把其中
+> 三条改掉的过程——表里带「§10 已改」字样的几行，说的就是改动前后的对照。
+
 | 位置 | 内容 |
 |---|---|
-| `src/dexatlas/core/pipeline.py:192` | 每一轮分析自己的目录 |
-| `src/dexatlas/core/pipeline.py:131` | `Analyzer` 只有一套后端适配器（并发共用） |
-| `src/dexatlas/core/pipeline.py:436` | `except Exception` —— 走查报告说没触发过的那条分支 |
-| `src/dexatlas/core/pipeline.py:440` | `raise AnalysisFailed(self._record_failure(...))` |
-| `src/dexatlas/core/pipeline.py:449` | `_record_failure`：记失败并脱敏 |
+| `src/dexatlas/core/pipeline.py:221` | 每一轮分析自己的目录 |
+| `src/dexatlas/core/pipeline.py:132` | `Analyzer` 只有一套后端适配器（并发共用） |
+| `src/dexatlas/core/pipeline.py:465` | `except Exception` —— 走查报告说没触发过的那条分支 |
+| `src/dexatlas/core/pipeline.py:469` | `raise AnalysisFailed(self._record_failure(...))` |
+| `src/dexatlas/core/pipeline.py:478` | `_record_failure`：记失败并脱敏 |
 | `src/dexatlas/core/paths.py:121` | `redact_workspace`：普通字符串替换 |
 | `src/dexatlas/tools/apktool/adapter.py:160` | Apktool 建自己的输出目录（故障落点） |
 | `src/dexatlas/tools/jadx/adapter.py:221` | `version()` 的并发不安全 |
-| `src/dexatlas/api/uploads.py:133` | `RunningAnalyses`：进程内、带锁的字典 |
-| `src/dexatlas/api/uploads.py:149` | `start()` 覆盖同一键 |
-| `src/dexatlas/api/uploads.py:156` | `finish()` 摘除同一键 |
-| `src/dexatlas/api/uploads.py:161` | `cancel()`：幂等地取消 token |
-| `src/dexatlas/api/uploads.py:353` | 每个上传都存到 `uploads/<sha256>/<名字>` |
-| `src/dexatlas/api/uploads.py:361` | `run_background_analysis`：吞掉 `AnalysisFailed` |
+| `src/dexatlas/api/uploads.py:135` | `RunningAnalyses`：进程内、带锁的字典 |
+| `src/dexatlas/api/uploads.py:156` | `claim()`：认领与检查在同一把锁里（§10 之前这里是 `start()`，它覆盖同一个键） |
+| `src/dexatlas/api/uploads.py:185` | `finish(token)`：只注销它自己（§10 之前是 `finish(project_id)`，摘的是同一个键） |
+| `src/dexatlas/api/uploads.py:195` | `cancel()`：把这个项目号下的每一轮都取消 |
+| `src/dexatlas/api/uploads.py:390` | 每个上传都存到 `uploads/<sha256>/<名字>` |
+| `src/dexatlas/api/uploads.py:407` | `run_background_analysis`：吞掉 `AnalysisFailed` |
 | `src/dexatlas/workbench/app.py:87` | `_reconcile_orphaned_runs`：启动对账 |
 | `src/dexatlas/workbench/app.py:326` | `POST /api/analyze` |
-| `src/dexatlas/workbench/app.py:335` | `find_project_by_hash`（查—改不原子） |
-| `src/dexatlas/workbench/app.py:344` | `background.add_task`：调度后台分析 |
-| `src/dexatlas/workbench/app.py:618` | `POST /api/projects/{id}/cancel` |
+| `src/dexatlas/workbench/app.py:350` | `find_project_by_hash`（查—改不原子；§10 已改成先认领） |
+| `src/dexatlas/workbench/app.py:362` | `background.add_task`：调度后台分析 |
+| `src/dexatlas/workbench/app.py:635` | `POST /api/projects/{id}/cancel` |
 | `desktop/src/pages/HomePage.tsx:94` | 重复上传的提示（渲染了，看不见） |
 | `desktop/src/pages/HomePage.tsx:149` | 首页那句「不会重复分析」 |
 | `desktop/src/pages/Analysis.tsx:612` | 失败横幅 |
@@ -639,3 +644,80 @@ void navigate(`/analysis/${accepted.project_id}`);
 | `desktop/src/api/client.ts:61` | 打包形态为什么用 `plugin-http`（没有 CORS 头） |
 | `desktop/src/api/client.ts:206` | 侧车端口变化时重解析 baseUrl |
 | `desktop/src-tauri/src/sidecar.rs:878` | 侧车 stderr 的转发线程（遇非 UTF-8 就停） |
+
+---
+
+## 10. 修复：并发那三条（2026-11-27，分析核心那一轮）
+
+**这一节是后来补写的。** §0–§9 是走查那一轮的实测证据，那一轮**没有改任何
+产品代码、没有加测试、没有 commit**（§8 末尾原话）。下面记的是**分析核心**
+那一轮把 §5.3、§5.5 与 §6.1 第 2 条修掉的过程。
+
+### 10.1 三条缺陷，三处根因，三处改法
+
+| 缺陷（本文出处） | 根因 | 改法 |
+|---|---|---|
+| §5.3 同一 APK 并发上传会重复分析 | 去重检查与后台启动之间**没有原子性**：`find_project_by_hash` 先跑，项目行要到后台任务里才写，四个请求都在任何一行项目记录存在之前通过了检查 | `RunningAnalyses.claim()`（`src/dexatlas/api/uploads.py:156`）：检查与登记**在同一把锁里**，在 workbench 端点**返回 202 之前**同步占位；后来的上传看见占位，回 `already_analysed=true`，**不再起第二次分析** |
+| §5.5 `RUNNING` 表按项目号建键 | 注册表用 `self._analyses[project_id]`，而 `Project.new_id(sha256)` 是内容寻址的 → 同一个 APK 的并发分析共用一个键，先结束的那次 `finish()` 把还在跑的那次摘掉 | 注册表按**一次分析**建键（键是它自己的取消令牌）：`finish(token)`（`src/dexatlas/api/uploads.py:185`）只注销它自己；`cancel(project_id)`（`src/dexatlas/api/uploads.py:195`）把该项目号下的**每一轮**都取消 |
+| §6.1 第 2 条 `tool_versions.jadx` 被并发读成 `null` | `JadxBackend.version()`（`src/dexatlas/tools/jadx/adapter.py:221`）在探测**开始前**就置 `_version_probed`，并发读者拿到还是 `None` 的 `self._version` | `Analyzer.tool_versions()`（`src/dexatlas/core/pipeline.py:161`）：探测在一把锁里做**一次**、答案留着 everybody 读；管线的项目记录改从它取（`src/dexatlas/core/pipeline.py:252`） |
+
+### 10.2 顺带修掉的一个 Windows 专属竞态
+
+四个并发上传把各自的临时文件搬到**同一个**目标路径（`uploads/<sha256>/<名字>`）。
+Windows 上 `os.replace` 撞上另一场搬运会抛 `WinError 5`（拒绝访问）——**修复前
+实测到的第一个后果就是它**：四个上传里有的直接 500（§10.3 的红字证据）。`stage_upload`
+现在把这种失败读作「同一份字节已经在那儿了」：目标在，就丢掉自己那份
+（`src/dexatlas/api/uploads.py:394`）。
+
+### 10.3 回归测试：真并发，去掉修复必红
+
+`tests/test_concurrent_uploads.py`，三例，**全部用真线程**（没有改代码加测试钩子，
+竞态是线程自己撞出来的）。
+
+| 测试 | 断言 | 去掉修复后 |
+|---|---|---|
+| `test_four_concurrent_uploads_of_one_apk_start_one_analysis` | 4 个同时上传 → 恰好 **1** 次分析、另外 3 个 `already_analysed=true`、**1** 个轮次行 | 红：`only 0 of the four uploads answered while the analysis was running`——每个上传都在等自己那一次分析（旧的注册表让它们全都通过了检查） |
+| `test_an_analysis_that_ends_does_not_unregister_the_one_that_is_still_running` | 一个分析结束后，另一个**仍可取消**（202）且令牌**真被取消** | 红：**409** `no analysis is running for 'apk_abababababababab'`——正是 §5.5 记的那句 |
+| `test_a_backend_that_took_part_is_never_recorded_without_a_version` | 参与了的后端不会被记成没有版本 | 红：`None == 'jadx 1.5.2'`——正是 §6.1 第 2 条记的那个 `null` |
+
+第二例用的是**两个哈希前 16 位相同**的 APK：项目号就是哈希的前 16 位，所以
+「同一个项目号下的两次分析」就是这么来的（同一份字节，或者两份哈希前缀撞了的
+不同字节）。注册表必须把两者分清。
+
+### 10.4 动了 `core/pipeline.py`——按本轮的规矩说明
+
+版本探测那一条的改法落在 `src/dexatlas/core/pipeline.py`（`Analyzer.tool_versions()`）
+而不在适配器上。原因是**适配器那一层不在本轮的边界内**；Analyzer 一层已经把
+窗口关上了：**分析核心读版本的路径只有这一条**，而 REST `/backends` 与 workbench
+`/api/backends` 各自**新建**一套注册表（`src/dexatlas/api/app.py:123`、
+`src/dexatlas/workbench/app.py:582`），与 Analyzer 那套**不共享适配器**，
+因此不共享那个「探测前置位」的窗口。
+
+**残留（低危，如实记录）**：适配器自己的 `_version_probed` 仍然是「探测前置位」。
+今天没有别的读法能撞上它，但这是**同一个形状的隐患留在原地**；要彻底关掉，得改
+`src/dexatlas/tools/jadx/adapter.py:221` 等三个适配器（**不在本轮边界内**）。
+后端版本探测还多了一条读法：`Analyzer.tool_versions()` 的答案**在进程内缓存**，
+与适配器自己缓存探测结果的时长一致。
+
+### 10.5 边界：这一轮**没有**动的东西
+
+- **REST 传输的响应形状没变**（`src/dexatlas/api/app.py` 没改）：它的 `AnalyzeJobResponse`
+  里**没有** `already_analysed` 字段，所以它对「已经在分析」这件事**不说话**。
+  但它的后台任务（`run_background_analysis`）现在会**认领**这份 APK：并发上传时
+  第二次分析**不会跑**，客户端轮询项目时看到的是第一次分析的结果。
+- **界面那句「该 APK 已分析过」在并发时其实是「该 APK 正在分析」**
+  （`desktop/src/api/types.ts` 的 `already_analysed` 注释写的是前者）。
+  端点的响应形状按规矩没改，前端那一句措辞属于界面侧，不在本轮范围。
+- **§7 的「没有验到」那九条仍然成立**：本轮没有真机验证并发上传（没有打包 exe 复测），
+  也没有验多进程写同一个工作区。
+- **认领有一个已知的窄口子：客户端在「请求收完、响应发出」之间断开。** 认领是在端点
+  里做的（在返回 202 之前），而分析是**后台任务**——Starlette 是先把响应发出去、再跑
+  后台任务，所以客户端恰好在这中间断开时，那个后台任务**不会跑**，认领也就**没人归还**：
+  这一份 APK 在这个进程里会被当成「正在被分析」，直到进程重启。窗口是**毫秒级**
+  （客户端要么在上传途中断开——那时端点根本不会被调用，认领也不会发生——要么在响应
+  那一刻断开）。桌面端那条路上它**几乎不可能发生**：客户端没有超时设置（客户端不主动
+  放弃），而客户端死了的时候侧车也一起死了（作业对象），注册表跟着进程一起没了。
+  **没有为它加代码**：加「认领过期」会带来另一种更常见的错（一次分析还没被后台任务
+  取走就被下一次上传接管，同一份字节又分析两遍）；加中间件则要动传输的结构。
+  这里**如实记下**，由作者决定要不要处理。
+

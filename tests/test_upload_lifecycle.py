@@ -170,12 +170,12 @@ def test_the_upload_of_a_running_analysis_is_not_removed(workspace: Path, monkey
     stored = _store_upload(workspace)
     _age(stored, 7200)
 
-    api_module._RUNNING.start("apk_in_use", stored)
+    token = api_module._RUNNING.claim("apk_in_use", stored, "cd" * 32)
     try:
         assert api_module._expire_uploads(Settings(workspace=workspace)) == []
         assert stored.exists()
     finally:
-        api_module._RUNNING.finish("apk_in_use")
+        api_module._RUNNING.finish(token)
 
 
 def test_the_stored_uploads_are_listed_with_their_age(workspace: Path, monkeypatch) -> None:
@@ -301,7 +301,7 @@ def test_the_cancel_endpoint_asks_the_running_analysis_to_stop(workspace: Path) 
     stopped: a backend that is half way through reading the APK finishes
     reading it first.
     """
-    token = api_module._RUNNING.start("apk_running", workspace / "uploads" / "app.apk")
+    token = api_module._RUNNING.claim("apk_running", workspace / "uploads" / "app.apk", "cd" * 32)
     try:
         response = _client().post("/projects/apk_running/cancel")
 
@@ -309,7 +309,7 @@ def test_the_cancel_endpoint_asks_the_running_analysis_to_stop(workspace: Path) 
         assert response.json()["status"] == "cancelling"
         assert token.cancelled
     finally:
-        api_module._RUNNING.finish("apk_running")
+        api_module._RUNNING.finish(token)
 
 
 def test_cancelling_an_analysis_that_is_not_running_is_a_not_found(
