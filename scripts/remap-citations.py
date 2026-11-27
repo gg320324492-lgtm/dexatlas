@@ -69,7 +69,7 @@ def _document_list() -> tuple[Path, ...]:
     return tuple(checker.DOCS)
 
 
-CITATION = re.compile(r"`([\w./-]+\.(?:py|sh|toml|yml)):(\d+)(?:-(\d+))?`")
+CITATION = re.compile(r"`([\w./-]+\.(?:py|sh|toml|yml|md|tsx|ts|js|css)):(\d+)(?:-(\d+))?`")
 
 
 def _checker():

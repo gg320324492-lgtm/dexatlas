@@ -112,7 +112,7 @@ workspace = self._settings.projects_dir / project.id / "runs" / run.id
 
 ### 3.2 界面看到什么（逐字）
 
-项目详情 / 分析页（`desktop/src/pages/Analysis.tsx:612` 的失败横幅 + :622 的 `ErrorState`）：
+项目详情 / 分析页（`desktop/src/pages/Analysis.tsx:612` 的失败横幅 + `:622` 的 `ErrorState`）：
 
 ```
 分析失败：本轮未产出可发布的结果。

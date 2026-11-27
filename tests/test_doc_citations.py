@@ -1357,4 +1357,189 @@ def test_a_new_report_that_is_clean_leaves_the_check_green(
     monkeypatch.setattr(checker, "DOCS", documents)
 
     assert checker.main() == 0
-    assert "Every citation still says what it says." in capsys.readouterr().out
+
+
+# --- desktop line-number citations -------------------------------------------------
+#
+# The checker used to read only ``py`` / ``sh`` / ``toml`` / ``yml`` / ``md``
+# as citation targets. The desktop front end's ``.tsx`` / ``.ts`` / ``.js`` /
+# ``.css`` were invisible, so a report could cite ``Button.tsx:42`` and drift
+# the moment the component moved, with the check staying green. These tests
+# keep the desktop blind spot closed.
+
+
+def _repository_with_a_desktop_source(tmp_path: Path) -> Path:
+    """A repository whose desktop front end defines a component and a hook.
+
+    The component is written the way the project's React sources are:
+    ``export function`` for the component, ``export function`` for the hook,
+    a lowercase status string scattered through the file as prose. The
+    component is two lines past where the document says it is, so a citation
+    that names it drifts and one that only points at a location does not.
+    """
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    source = repository / "desktop" / "src" / "components"
+    source.mkdir(parents=True)
+    (source / "Button.tsx").write_text(
+        "\n".join(f"// filler line {number}" for number in range(1, 40))
+        + "\n"
+        + "export function Button({ label }: { label: string }) {\n"
+        + "  return <button>{label}</button>;\n"
+        + "}\n",
+        encoding="utf-8",
+    )
+    (repository / "doc.md").write_text(
+        "The `Button` component is built at `desktop/src/components/Button.tsx:2`.\n",
+        encoding="utf-8",
+    )
+    return repository
+
+
+def test_a_desktop_citation_is_recognised_as_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``.tsx`` citation is a citation, not prose the check ignores.
+
+    The whole point of the blind spot: before the desktop suffixes were read,
+    this citation was not checked at all, so a component that moved left the
+    report pointing at the wrong line with the check green. The citation
+    points past the end of the file, and the location check — the one every
+    citation gets — has to say so.
+    """
+    repository = _repository_with_a_desktop_source(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The component lives at `desktop/src/components/Button.tsx:999`.\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    # A citation the check does not read is a citation that passes in
+    # silence; reading it is what makes the out-of-range line a finding.
+    assert report.unresolved == (), report.unresolved
+    kinds = [finding.kind for finding in report.findings]
+    assert "out of range" in kinds, f"the .tsx citation was not read as one: {kinds}"
+
+
+def test_a_drifted_desktop_citation_fails_the_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A desktop citation whose line no longer holds turns the check red.
+
+    The desktop blind spot let a moved component leave a green check behind.
+    A drifted ``.tsx`` citation has to fail the run the way a drifted
+    ``.py`` one does.
+    """
+    repository = _repository_with_a_desktop_source(tmp_path)
+    document = repository / "doc.md"
+    checker = _checker_for(repository, monkeypatch, None)
+    monkeypatch.setattr(checker, "DOCS", [document])
+
+    assert checker.main() == 1, "a drifted desktop citation passed the check"
+    written = capsys.readouterr().out
+    assert "Button.tsx" in written
+
+
+def test_a_desktop_citation_whose_line_holds_is_green(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A desktop citation that points where the component is stays green.
+
+    The failure above has to come from the citation being wrong, not from it
+    being a desktop one: a ``.tsx`` citation that holds must not turn the run
+    red, or the suffix would be useless for the reports that cite it rightly.
+    """
+    repository = _repository_with_a_desktop_source(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The component lives at `desktop/src/components/Button.tsx:41`.\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+
+def test_a_lowercase_prose_word_is_not_reported_as_a_desktop_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A word the sentence uses is prose, not a symbol the citation locates.
+
+    ``done``, ``sidecar`` and ``running`` are status strings a desktop report
+    names as words. The file names them too, in many places, and a place
+    other than the cited range does not say the citation moved — it says the
+    word is a common one. Reporting it is a false friend, and it hid real
+    drift behind noise. This is the same line the value check draws with
+    ``is_compared``.
+    """
+    repository = _repository_with_a_desktop_source(tmp_path)
+    source = repository / "desktop" / "src" / "components" / "Button.tsx"
+    # ``done`` appears on many lines, none of them the cited one.
+    text = source.read_text(encoding="utf-8")
+    source.write_text(text.replace("// filler", "// done filler"), encoding="utf-8")
+    document = repository / "doc.md"
+    document.write_text(
+        "The step enters `done` at `desktop/src/components/Button.tsx:2`.\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    drifts = [finding for finding in report.findings if finding.kind == "drifted"]
+    assert not drifts, [finding.render() for finding in drifts]
+
+
+def test_a_desktop_component_cited_by_name_is_checked_for_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A component a desktop citation names has to be inside the range it cites.
+
+    Symbol anchoring is what lets the remapper move a desktop citation when
+    the component moves: the citation names ``Button``, and ``Button`` has to
+    be defined in the lines it points at. A pattern-read definition is what
+    makes that checkable for ``.tsx``.
+    """
+    repository = _repository_with_a_desktop_source(tmp_path)
+    document = repository / "doc.md"
+    document.write_text(
+        "The `Button` component is built at `desktop/src/components/Button.tsx:41`.\n",
+        encoding="utf-8",
+    )
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not report.findings, [finding.render() for finding in report.findings]
+
+
+def test_a_module_level_constant_is_a_definition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A constant a citation names is defined on the line it is written on.
+
+    ``DECLARATION = re.compile(...)`` names one line as exactly as a function
+    does, and it moves with the code around it. Without reading it as a
+    definition the remapper cannot place a citation that names it, which is
+    how the checker's own rules drifted and stayed unmoved.
+    """
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    (repository / "rule.py").write_text(
+        "\n".join(f"# filler {number}" for number in range(1, 30))
+        + "\nRULE = re.compile(r'^anchor:')\n"
+        + "OTHER = 2\n",
+        encoding="utf-8",
+    )
+    document = repository / "doc.md"
+    document.write_text("The rule lives at `rule.py:31`.\n", encoding="utf-8")
+    checker = _checker_for(repository, monkeypatch, None)
+
+    report = checker.check_documents([document])
+
+    assert not report.findings, [finding.render() for finding in report.findings]

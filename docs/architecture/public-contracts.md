@@ -67,7 +67,7 @@ run 未发布/已取消/失败（无可渲染快照）、run 的快照已被新�
 失败或分析失败——与报告 `summary.index_complete == false` 同源）。无 DEX 的资源型
 APK（索引为空但无缺口）不触发 6，仍为 0；部分后端失败（索引仍在）不触发 6，仍为 0。
 no-index 判定先于截断：空索引是更强的信号。三个"空"彼此不同：请求错（2）、答案空
-（1）、运行失败（3），调用方只读退出码也能区分（`src/dexatlas/cli/main.py:7-30` `anchor: EXIT_AMBIGUOUS`）。
+（1）、运行失败（3），调用方只读退出码也能区分（`src/dexatlas/cli/main.py:122-145` `anchor: EXIT_AMBIGUOUS`）。
 
 退出码 6 由提案 [docs/proposals/exit-code-partial-read.md](../proposals/exit-code-partial-read.md)
 批准实施（方案 A），按 §6 作为兼容变更显式版本化：0–5 语义不变，0 的外延收窄——

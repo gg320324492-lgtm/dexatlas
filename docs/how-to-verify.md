@@ -198,6 +198,18 @@ Every citation still says what it says.
 **退出码 0。** 意思是：文档里 `file:line` 形式的引用，指的还是它说的那个符号。
 `drifted: 0` 是关键那一行——非零就说明有引用漂了。
 
+**这条门禁认的引用目标**是 `.py` / `.sh` / `.toml` / `.yml` / `.md` 与桌面端的
+`.tsx` / `.ts` / `.js` / `.css`。桌面端后缀是 2026-11-27 补上的：此前 PR 改过
+`Button.tsx` / `stages.js`，报告里那几处桌面端引用全漂了而核对器照样绿——它根本
+不认 `.tsx` 是引用目标。现在桌面端引用与 Python 引用同一套待遇：符号锚定的
+（句子点名了组件，如 `` `Button` ``）能被 `scripts/remap-citations.py` 自动重推；
+只指位置的（句子没点名）留给人和检查器报。桌面端的定义形状（`export function` /
+`export const` / `export default function` / `class`）由 `definition_line` 按模式
+识别，Python 仍走 `ast`；一个模式认不出的名字会退回「引用区间内是否提及」这一档，
+那正是点名引用所声称的。注意：只认 `.tsx`/`.ts` 还不够——句子点名的若是状态字符串
+之类的小写词（`done`、`running`），那是行文用词不是符号，核对器按 `is_symbolic`
+不把它当符号（否则会为「这个词在文件别处出现过」误报一次漂移，把真漂移埋进噪音）。
+
 **这条门禁扫的是 `scripts/check-doc-citations.py` 里 `DOCS` 清单上的文档**
 （清单在变，以脚本里的为准）：`docs/analysis-provenance.md`、
 `docs/architecture/public-contracts.md`、`docs/reports/phase1-execution-report.md`、

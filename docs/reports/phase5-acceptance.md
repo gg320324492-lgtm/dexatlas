@@ -223,9 +223,9 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 
 | 位置 | 原写法 | 现写法 |
 |---|---|---|
-| `desktop/src/pages/FindingsPage.tsx:131` | 错误描述硬编码回退端口 `127.0.0.1:8618` | 取实际后端地址（`desktop/src/backendAddress.js:27` `backendAddress()`），端口不可知时显示「后端地址未知」 |
+| `desktop/src/pages/FindingsPage.tsx:123` | 错误描述硬编码回退端口 `127.0.0.1:8618` | 取实际后端地址（`desktop/src/backendAddress.js:27` `backendAddress()`），端口不可知时显示「后端地址未知」 |
 | `desktop/src/pages/Analysis.tsx`（后端状态脚注） | 「8618 为只读 workbench API，无 `/api/backends` 端点」（实测返回 **200**） | 改述 `/api/backends` 的语义：它只说明「装没装」，「这次分析实际用了哪个版本」仍取自 `tool_versions` |
-| `desktop/src/pages/ReportsPage.tsx:112` | 「生成时间」显示 UTC 原始串 | 本地时区 + 一行 UTC 标注（`desktop/src/datetime.js:118` `timestampParts()`） |
+| `desktop/src/pages/ReportsPage.tsx:123` | 「生成时间」显示 UTC 原始串 | 本地时区 + 一行 UTC 标注（`desktop/src/datetime.js:118` `timestampParts()`） |
 
 > **PR #21 的状态：** 已于 2026-11-26 合入 main（合并提交 `59bb9c9`），本报告基线 `33e4ba9` 已包含它。
 >
