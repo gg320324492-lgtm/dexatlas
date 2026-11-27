@@ -56,7 +56,7 @@
 
 | # | 子评审发现（原判级） | 复核结论 | 依据 |
 |---|---|---|---|
-| 1 | 项目页把带 errors 的分析当完整展示，无 partial 横幅（High） | **不成立** | `Completeness.complete = not absent and not truncated and not project.errors`（`src/dexatlas/mcp/tools/projects.py:103`）：errors 非空时 `complete` 必为 false，项目页走 gaps 分支把每条 error 红字列出（`src/dexatlas/workbench/web/src/App.tsx:535`），「every step of the analysis finished」仅在 `complete` 为真时渲染（`src/dexatlas/workbench/web/src/App.tsx:522`）——子评审描述的场景自相矛盾。errors 不触发顶部 PartialBanner 与 UI 规范一致（`docs/architecture/workbench-ui.md` §3 的 partial 触发条件为 missing_backends/truncated） |
+| 1 | 项目页把带 errors 的分析当完整展示，无 partial 横幅（High） | **不成立** | `Completeness.complete = not absent and not truncated and not project.errors`（`src/dexatlas/mcp/tools/projects.py:152`）：errors 非空时 `complete` 必为 false，项目页走 gaps 分支把每条 error 红字列出（`src/dexatlas/workbench/web/src/App.tsx:535`），「every step of the analysis finished」仅在 `complete` 为真时渲染（`src/dexatlas/workbench/web/src/App.tsx:522`）——子评审描述的场景自相矛盾。errors 不触发顶部 PartialBanner 与 UI 规范一致（`docs/architecture/workbench-ui.md` §3 的 partial 触发条件为 missing_backends/truncated） |
 | 2 | 上传轮询把项目 `failed` 终态并入成功分支，绿 ✓ 显示「analysis finished」（High） | **成立，但系 Phase 4 之前既有行为** | 轮询终止条件对 `completed` 与 `failed` 同样进入 `done`（`src/dexatlas/workbench/web/src/App.tsx:228`），该行为来自 `903195c`（2026-11-14，已含于 v1.0.0），非本评审范围引入；失败本身在项目页以红 ✕ 徽章与 completeness errors 明示，误导限于上传屏瞬时文案。登记为发现 R-5（见 §5），不阻断发布 |
 | 3 | Dialog/Drawer 键盘用户无法关闭（Medium） | **不成立** | 面板头部有 `aria-label="close"` 的 ✕ 按钮，Escape 关闭路径独立存在（`useEscapeCloses`）；overlay 点击是鼠标的额外通道，键盘路径并未缺失 |
 | 4 | Tabs 缺 aria-controls / tabpanel / roving tabIndex（Medium） | **成立，潜伏项** | 该组件当前未被任何页面使用；将来采用时会带入不完整的 tab 语义。登记为低危备忘，不阻断 |

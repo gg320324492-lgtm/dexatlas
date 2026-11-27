@@ -182,7 +182,7 @@
 
 | 页面/能力 | 调用的现有能力 | 说明 |
 |---|---|---|
-| 首页·项目列表 | MCP 工具 `list_projects`（`src/dexatlas/mcp/tools/projects.py:91` `anchor: list_projects`）或 REST `GET /projects`（`src/dexatlas/api/app.py:422-423` `anchor: def list_projects(`） | 同一函数，两种既有暴露 |
+| 首页·项目列表 | MCP 工具 `list_projects`（`src/dexatlas/mcp/tools/projects.py:121` `anchor: list_projects`）或 REST `GET /projects`（`src/dexatlas/api/app.py:422-423` `anchor: def list_projects(`） | 同一函数，两种既有暴露 |
 | 首页·上传分析 | REST `POST /analyze`（202，`src/dexatlas/api/app.py:384-390` `anchor: def analyze(`）或 workbench `POST /api/analyze`（`src/dexatlas/workbench/app.py:262-263`） | 复用共享上传策略与后台分析（`src/dexatlas/api/uploads.py:407` `anchor: run_background_analysis`）；同哈希已分析直接返回既有项目 |
 | 分析页·进度 | REST `GET /projects/{id}/runs` 与 `GET /projects/{id}/runs/{run_id}`（`src/dexatlas/api/app.py:417-440`） | run 的 status/completeness/errors 驱动三区 |
 | 分析页·后端状态 | REST `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`） | available/missing/versions |

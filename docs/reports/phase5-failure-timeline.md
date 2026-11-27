@@ -509,7 +509,7 @@ androguard: androguard could not parse classes.dex
 
    所以 `tool_versions[name] == null` 有**两种**含义，而前端只认一种。`8140661` 那棵树的 `desktop/src/stages.js` 上是三态映射：键不存在 = 这一轮没带上它；键在、值为 `null` = 参与了但版本还在探测；键在、值是版本号 = 参与了、版本已知。**「键在」证明的是「这一轮计划里带着它」，不是「它参与了」**——后端根本没装时，键也在、值也是 `null`。于是 `deriveBackends` 把「没装」误判成「版本还在探测」，说了两句关于机器的假话。
 
-   后端自己知道真相：`missing_backends()`（`src/dexatlas/mcp/tools/projects.py:26`）就是按「版本为 null」把没装的后端挑出来，项目详情页用的正是它；分析页的后端状态卡没有用它。
+   后端自己知道真相：`missing_backends()`（`src/dexatlas/mcp/tools/projects.py:27`）就是按「版本为 null」把没装的后端挑出来，项目详情页用的正是它；分析页的后端状态卡没有用它。
 
    **主会话已修（PR #33，提交 `ec5de0a`）：** `deriveBackends` 改为同时看机器那份名单（`GET /api/backends`）与 run 的记录（`desktop/src/stages.js:386`），别再靠 `null` 猜——「机器说没装」那一支现在读出来就是「未安装或未配置，未参与本次分析」（`desktop/src/stages.js:398`）。
 

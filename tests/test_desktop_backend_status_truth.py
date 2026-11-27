@@ -203,31 +203,27 @@ def test_a_backend_whose_probe_failed_reports_no_version_but_is_installed(
     assert "jadx" in [b.name for b in registry.available()]
 
 
-def test_the_core_treats_every_null_version_as_a_missing_backend(
+def test_the_core_tells_a_failed_probe_apart_from_a_missing_backend(
     tmp_path: Path,
 ) -> None:
-    """The core's own list cannot tell the three apart either -- and says so.
+    """The core's own list separates ③ from ② now, and this is why.
 
-    ``missing_backends()`` reads a ``null`` version as "this backend did
-    not take part".  That is true of ② and of ①, and **false** of ③: a
+    ``missing_backends()`` used to read a ``null`` version as "this backend
+    did not take part".  That is true of ① and of ②, and **false** of ③: a
     backend that is installed and whose probe failed did take part -- it is
     recorded as failing in the errors, and the analysis went on without it.
 
-    This test pins the *current* behaviour of the core, which is what the
-    desktop's "missing backends" banner reads.  It is a measurement, not
-    an endorsement: the point of a measurement is that the next change to
-    the code has to come here and say what it means.
-
-    The desktop's own card does not read this list -- it reads the run's
-    record and the machine's list, and those two *do* separate ③ from ②.
-    This is the one place where the three meanings are still collapsed, and
-    it is named here so that it is a decision rather than an accident.
+    The first version of this test pinned that collapse, and said so: it
+    was a *measurement*, not an endorsement, and the next change to the
+    code would have to come here and say what it means.  The change came
+    (2026-11-28, author's decision): the list now reads the project's own
+    errors through ``NEVER_RAN_CODES``, and a backend whose probe failed no
+    longer counts as absent.  This test is the statement it asked for.
 
     The measurement is made against a **real** analysis: a jadx that is
     installed on the machine and whose version probe fails.  The analysis
-    succeeds (the DEX reader does the work), and jadx's failure is
-    recorded under jadx's own name -- so the record says "jadx did not
-    take part" about a backend that was on the machine the whole time.
+    succeeds (the DEX reader does the work), jadx's failure is recorded
+    under jadx's own name -- and jadx no longer appears in the absent list.
     """
     from dexatlas.mcp.tools.projects import missing_backends
 
@@ -239,6 +235,7 @@ def test_the_core_treats_every_null_version_as_a_missing_backend(
     apk = ROOT / "examples" / "demo-app" / "demo.apk"
     result = analyzer.analyze(apk)
 
+    # jadx was installed and took part -- the
     # jadx was installed and took part -- the analysis only failed to ask it
     # for its version.
     assert analyzer.backends.get("jadx").available() is True, (
@@ -251,11 +248,11 @@ def test_the_core_treats_every_null_version_as_a_missing_backend(
         "jadx 的失败没有记在 jadx 名下: 记录里看不出它参与过"
     )
 
-    # And the core's list says it did not take part.
+    # And the core's list no longer says it did not take part.
     absent = missing_backends(result.project)
-    assert "jadx" in absent, (
-        "核心的 missing_backends() 不再把每个 null 版本都算成'没参与'了: "
-        "这要么是一次行为改动 (那就得说明它在三种含义之间怎么选) , 要么是笔误"
+    assert "jadx" not in absent, (
+        "核心的 missing_backends() 又把「探测失败」算成了「没参与」: "
+        "契约在 2026-11-28 收紧过。这条退回去了"
     )
 
 

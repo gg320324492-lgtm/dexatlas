@@ -699,9 +699,7 @@ def test_a_backend_whose_version_probe_failed_did_take_part(
     assert status.project.missing_backends == []
 
 
-def test_a_backend_that_is_not_installed_is_still_named(
-    analyzer: Analyzer, tmp_path: Path
-) -> None:
+def test_a_backend_that_is_not_installed_is_still_named(analyzer: Analyzer, tmp_path: Path) -> None:
     """``NOT_INSTALLED`` means "never ran", so the backend did not take part.
 
     The other side of the fix above: a backend recorded under a

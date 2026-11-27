@@ -52,9 +52,7 @@ def missing_backends(project: Project) -> list[str]:
     did not take part; a backend that ran and failed its version probe is
     recorded under a code of its own, and did take part.
     """
-    ran_and_failed = {
-        error.tool for error in project.errors if error.code not in NEVER_RAN_CODES
-    }
+    ran_and_failed = {error.tool for error in project.errors if error.code not in NEVER_RAN_CODES}
     return sorted(
         name
         for name, version in project.tool_versions.items()

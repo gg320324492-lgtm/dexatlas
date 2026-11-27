@@ -146,7 +146,7 @@ index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际�
 stages 端点——这样既有 run 对象的字段集一个也不变。workbench 的
 `GET /api/projects/{pid}/runs/{rid}/stages` 与 REST 同形状
 （`src/dexatlas/workbench/app.py:621-634` `anchor: get_run_stages`）；MCP 面的形状经
-`src/dexatlas/mcp/tools/projects.py:74-92` `anchor: def run_stages` 与
+`src/dexatlas/mcp/tools/projects.py:104-119` `anchor: def run_stages` 与
 `src/dexatlas/mcp/schemas.py:155-170` 的 `RunStages` 定义。端点与字段
 只增不改：既有端点的响应形状、状态码与退出码零变化。
 
@@ -283,7 +283,7 @@ APK 里有什么」；阶段进度是**这一次分析进行到哪了**——一
 算进「缺失」，于是项目详情与工作台网页版会对一个跑过的后端说「缺失后端：jadx」。
 现在判据是「版本为空 **且** 没有一条不是「没跑过」的错误记在它名下」——
 「没跑过」的代码沿用 `src/dexatlas/core/evidence.py:60` 的
-`NEVER_RAN_CODES`（`not_installed` 与 `unsupported`）。**这个字段只会变得更准：
+`NEVER_RAN_CODES`（`ToolErrorCode.NOT_INSTALLED` 与 `ToolErrorCode.UNSUPPORTED`）。**这个字段只会变得更准：
 原先会点名的一批后端里，只有「探测失败」那一类不再被点名**；消费方若把
 `missing_backends` 当作「`tool_versions` 里 null 的全集」，要改用 `tool_versions`
 本身。错误以 `RequestError` 抛出，形状 `{code,message,detail}`
