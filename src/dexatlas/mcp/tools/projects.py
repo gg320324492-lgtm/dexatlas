@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dexatlas.core.evidence import NEVER_RAN_CODES
 from dexatlas.core.models import Project, ToolErrorCode
 from dexatlas.core.paths import display_path
 from dexatlas.core.pipeline import Analyzer
@@ -28,8 +29,37 @@ def missing_backends(project: Project) -> list[str]:
 
     A backend that is absent is not a backend that found nothing, and the
     difference decides what the numbers mean.
+
+    A ``None`` version has three meanings, and only two of them are "did
+    not take part":
+
+    * the version had not been probed yet -- the analysis had only just
+      started when the record was read;
+    * the backend is not installed -- a missing backend is a normal state,
+      not an error, so nothing is recorded against it;
+    * **the backend took part and its version probe failed** -- an error
+      stands against it, under its own name.
+
+    The third used to be reported as absent: a successful analysis whose
+    JADX had run (and whose ``--version`` probe had failed) produced
+    ``missing_backends: ["jadx"]``, and two interfaces repeated it as
+    "missing backend: jadx" (2026-11-28).
+
+    The project's own error list tells the third apart, read through the
+    codes the rest of the codebase already uses for "never ran"
+    (:data:`dexatlas.core.evidence.NEVER_RAN_CODES`): a backend that is not
+    installed, or is unsupported, is recorded under one of those codes and
+    did not take part; a backend that ran and failed its version probe is
+    recorded under a code of its own, and did take part.
     """
-    return sorted(name for name, version in project.tool_versions.items() if version is None)
+    ran_and_failed = {
+        error.tool for error in project.errors if error.code not in NEVER_RAN_CODES
+    }
+    return sorted(
+        name
+        for name, version in project.tool_versions.items()
+        if version is None and name not in ran_and_failed
+    )
 
 
 def was_truncated(project: Project) -> bool:

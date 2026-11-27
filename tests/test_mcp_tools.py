@@ -667,3 +667,61 @@ def test_a_truncated_analysis_says_so(analyzer: Analyzer, tmp_path: Path) -> Non
     assert status.completeness.complete is False
     assert status.project.truncated is True
     assert any("method limit" in error for error in status.completeness.errors)
+
+
+def test_a_backend_whose_version_probe_failed_did_take_part(
+    analyzer: Analyzer, tmp_path: Path
+) -> None:
+    """A failed version probe is not an absent backend.
+
+    The record carries a ``None`` version for a JADX that ran: its
+    ``--version`` probe failed, and the failure is recorded under its own
+    name. Reporting it as a missing backend told two interfaces to print
+    "missing backend: jadx" about a JADX that had produced evidence
+    (measured on a real successful analysis, 2026-11-28).
+    """
+    project_id = _project(
+        analyzer,
+        tmp_path,
+        tool_versions={"jadx": None, "apktool": "2.11.1", "androguard": "4.1.4"},
+        errors=[
+            ToolError(
+                tool="jadx",
+                code=ToolErrorCode.EXIT_NONZERO,
+                message="the version probe exited 1",
+            )
+        ],
+    )
+
+    status = project_tools.project_status(analyzer, project_id)
+
+    assert status.completeness.missing_backends == []
+    assert status.project.missing_backends == []
+
+
+def test_a_backend_that_is_not_installed_is_still_named(
+    analyzer: Analyzer, tmp_path: Path
+) -> None:
+    """``NOT_INSTALLED`` means "never ran", so the backend did not take part.
+
+    The other side of the fix above: a backend recorded under a
+    "never ran" code must stay in the list. A fix that removed every
+    backend with an error against it would have included this one.
+    """
+    project_id = _project(
+        analyzer,
+        tmp_path,
+        tool_versions={"jadx": "1.5.2", "apktool": None, "androguard": "4.1.4"},
+        errors=[
+            ToolError(
+                tool="apktool",
+                code=ToolErrorCode.NOT_INSTALLED,
+                message="apktool is not installed or not on PATH",
+            )
+        ],
+    )
+
+    status = project_tools.project_status(analyzer, project_id)
+
+    assert status.completeness.missing_backends == ["apktool"]
+    assert status.project.missing_backends == ["apktool"]

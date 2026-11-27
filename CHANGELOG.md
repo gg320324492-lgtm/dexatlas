@@ -5,6 +5,22 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`missing_backends[]` 不再把「版本探测失败」的后端说成「没有参与」。**
+  一个后端的版本是 `null` 有三种含义：还没探测（刚开头）、压根没装、**装了但
+  版本探测失败**。第三种后端**参与**了分析（结果与错误都在它名下），此前被
+  算进「缺失」名单——一次真实成功的分析里，JADX 的 `--version` 探测失败，于是
+  `missing_backends()` 返回 `["jadx"]`，项目详情页写「缺失后端：jadx」、工作台
+  网页版写「no jadx」，而 JADX 明明跑过。判据改成「版本为空 **且** 没有一条
+  不是「没跑过」的错误记在它名下」（「没跑过」沿用 `NEVER_RAN_CODES`：
+  `not_installed` 与 `unsupported`）。**这是对公共契约 `Completeness.missing_backends`
+  的收紧**，已在[公共契约文档](docs/architecture/public-contracts.md)里写明；
+  字段只会更准，原先会点名的一批里只有「探测失败」那一类不再被点名。
+  回归测试 2 例（去掉修复即红）。
+
 ## [1.2.0] — 2026-11-27
 
 ### Added

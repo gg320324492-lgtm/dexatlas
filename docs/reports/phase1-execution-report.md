@@ -200,7 +200,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_method_resolution.py` | 方法按描述符解析：同名重载必须报歧义并列出候选，不许挑一个（v0.1.3 之后新增） |
 | `test_analysis_runs.py` | 分析的运行身份；符号与证据不会跨运行混合；失败或取消的运行不发布；旧工作区仍可打开 |
 | `test_run_stages.py` | run 的阶段事实（Phase 5 W2）：完成的 run 按管线顺序记录阶段、时间戳单调、经数据库与两个传输端点原样读回、埋点不改变分析结果 |
-| `test_desktop_backend_status_truth.py` | 后端状态卡分得开「版本还没探测出来」与「压根没装」：页面确实读机器那份名单（`GET /api/backends`）、确实把它交给映射（跨语言接线）（Phase 5 收尾新增） |
+| `test_desktop_backend_status_truth.py` | 后端状态卡分得开「版本还没探测出来」与「压根没装」：页面确实读机器那份名单（`GET /api/backends`）、确实把它交给映射（跨语言接线）；另钉住 `null` 版本的**第三种**含义——装着但版本探测失败的后端参与了分析，不该出现在「缺失」名单里（Phase 5 收尾新增；2026-11-28 补 §6 第 8 条） |
 | `test_desktop_card_header_layout.py` | 窄栏里卡片的标题不被角标挤成竖排：标题块占满角标让出的空间、actions 允许收缩、阶段角标允许换行（读 CSS 钉住那几条规则，布局没有单元测试能测）（Phase 5 收尾新增） |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
 | `test_msi_shortcut_repair.py` | MSI 的修复路径：repair 能不能把被删掉的快捷方式修回来（REINSTALLMODE 的 `s` 标志要赶在成本计算之前补上、控制面板的修复入口不能被 `ARPNOREPAIR` 关掉）（Phase 5 A8 新增） |
@@ -276,7 +276,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
 | `test_workspace_redaction.py` | 错误消息里的工作区路径不能漏出机器：脱敏要认 `OSError` 用 `repr()` 引路径的那种形状（反斜杠加倍的那种——CI 的 Linux 上不会复现，规则写成平台无关的形状，每个平台都守着它），路径里分析自身的那一段要留着（2026-11-27 新增） |
 | `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
-| `test_concurrent_uploads.py` | 并发下的三件事：同一 APK 的并发上传只起**一次**分析（后来的上传回 `already_analysed=true`、不产生第二个轮次行）、一次分析的结束**不注销**还在跑的那一次（它仍可取消、令牌真被取消）、参与了的后端不会因为并发读成**没有版本**（2026-11-27 新增） |
+| `test_concurrent_uploads.py` | 并发下的三件事：同一 APK 的并发上传只起**一次**分析（后来的上传回 `already_analysed=true`、不产生第二个轮次行）、一次分析的结束**不注销**还在跑的那一次（它仍可取消、令牌真被取消）、参与了的后端不会因为并发读成**没有版本**；另加「首页那句『不会重复分析』与后端实际行为一致」的接线（2026-11-27 新增；2026-11-28 补 §6 第 7 条） |
 
 ### 2.2 几类值得注意的测试
 

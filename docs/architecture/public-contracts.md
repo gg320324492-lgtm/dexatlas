@@ -275,7 +275,18 @@ APK 里有什么」；阶段进度是**这一次分析进行到哪了**——一
 的文本字段裁剪，裁剪提示指向分页（同工具 `offset=` 续读），不再宣称全文
 已录为 evidence。`Completeness`（`src/dexatlas/mcp/schemas.py:68-90`）携带
 `complete`、`missing_backends[]`、`truncated`、`errors[]`——"没找到"与"没查"
-分开。错误以 `RequestError` 抛出，形状 `{code,message,detail}`
+分开。
+
+**`missing_backends[]` 只点名「没有参与本次分析」的后端（2026-11-28 澄清，纯收紧，
+不是扩宽）**：一个后端的版本是 `null` 有三种含义——还没探测（刚开头）、压根没装、
+**装了但版本探测失败**。第三种后端**参与**了分析（它的结果与错误都在），此前被
+算进「缺失」，于是项目详情与工作台网页版会对一个跑过的后端说「缺失后端：jadx」。
+现在判据是「版本为空 **且** 没有一条不是「没跑过」的错误记在它名下」——
+「没跑过」的代码沿用 `src/dexatlas/core/evidence.py:60` 的
+`NEVER_RAN_CODES`（`not_installed` 与 `unsupported`）。**这个字段只会变得更准：
+原先会点名的一批后端里，只有「探测失败」那一类不再被点名**；消费方若把
+`missing_backends` 当作「`tool_versions` 里 null 的全集」，要改用 `tool_versions`
+本身。错误以 `RequestError` 抛出，形状 `{code,message,detail}`
 （`src/dexatlas/mcp/errors.py:14-31` `anchor: RequestError`），已知码：`unknown_project`
 （`src/dexatlas/mcp/errors.py:32-38`）、`unknown_method`
 （`src/dexatlas/mcp/errors.py:41-47`）、`no_manifest`
