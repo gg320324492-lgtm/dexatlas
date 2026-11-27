@@ -13,7 +13,9 @@ what comes next.
   showcase shipped, M10 independent acceptance passed on 2026-11-20; v1.0.2
   (2026-11-24) is the Phase 4 documentation, dependency-hardening and measurement
   follow-up; **v1.1.0 (2026-11-25) is the Q2 desktop application and the
-  post-Q2 stability batch**. Per-milestone evidence
+  post-Q2 stability batch; v1.2.0 (2026-11-27) is the Phase 5 batch — the
+  self-contained desktop application and the fixes under one rule: the
+  interface says what actually happened**. Per-milestone evidence
   is in [§3.4](#34-progress-2026-11-15); see [current status](../status.md) and the
   [Phase 3 plan](phase3-plan.md). The project was in **Phase 4** — portfolio
   closure, software design and Workbench UI — scoped by
@@ -31,7 +33,7 @@ what comes next.
   **every task from here on counts as Phase 5 work** — Phase 5 stays open, and
   the inventory of what is left is in
   [phase5-remaining-goals.md](../reports/phase5-remaining-goals.md).
-- **Plan version:** 2026-11-26 (v1.1.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4/5 history retained)
+- **Plan version:** 2026-11-27 (v1.2.0 release recorded; Phase 4 Q2 desktop-app supplement and Phase 3/4/5 history retained)
 - **Q2 supplement:** after v1.0.2 the user approved a **desktop application** as a
   new work front inside this repository — Tauri + React, light "studio" visual
   language, evidence-chain-first — scoped by
@@ -116,7 +118,7 @@ extracting unauthorized data, or reproducing proprietary application code. See
 | Phase 3  | `v1.0.0`  | Production-Ready       | ✅ Shipped 2026-11-17 — M5–M10; M10 independent acceptance passed 2026-11-20 |
 | Phase 4  | `v1.0.2`  | Portfolio Closure      | ✅ Shipped 2026-11-24 — M11–M15; documentation, dependency hardening and a fresh measurement of the tagged tree |
 | Phase 4 Q2 | `v1.1.0` | Desktop Application    | ✅ Shipped 2026-11-25 — the Tauri + React desktop app, by explicit author authorization after M15 closed |
-| Phase 5  | (no release yet) | Desktop Self-Containment & Stage Observability | ✅ Engineering delivered and accepted 2026-11-26 — the sidecar process, the stage-level progress contract, C12 outreach material and the post-release checklist; the release decision remains open |
+| Phase 5  | `v1.2.0` | Desktop Self-Containment & Stage Observability | ✅ Shipped 2026-11-27 — the sidecar process, the stage-level progress contract, C12 outreach material and the post-release checklist; engineering delivered and accepted 2026-11-26 |
 
 **Promotion rule:** a phase is complete when its exit checklist passes *and* the source
 review raises no blocking findings. Promotion is not a calendar event.

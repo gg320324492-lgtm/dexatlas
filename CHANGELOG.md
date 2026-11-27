@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] — 2026-11-27
 
 ### Added
 
@@ -95,6 +95,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `/api/backends` 端点」（实测 200）、报告页「生成时间」显示 UTC 原始串。
   三处改为取实际后端地址、改述 `/api/backends` 的语义（只说明「装没装」，
   不说明「这次用了哪个版本」）、时间改成本地时区 + UTC 双行。（PR #21，`59bb9c9`）
+- **分析结束后不再谎称「版本探测中」。** 上一条修的是它的另一半（分析**进行中**
+  把装着的后端说成「未安装」）。这一条是反过来的：分析**已经结束**、而机器上
+  确实没装 jadx 与 apktool 时，右栏仍说「◌ 进行中 · 参与本次分析 · 版本
+  探测中」——探测在分析的头几秒就结束了，值还是 `null`，那句话一直在说。
+  根因是 `run.tool_versions` 的 `null` 有两种完全不同的意思（「还没探测出来」
+  与「压根没装」），而 run 的记录分不开（它只记了键，键在而值为空）。现在
+  机器那份名单（`GET /api/backends` 的 `missing`）与 run 的记录一起判，两种
+  说法各归各的事实；活着的 run 一律说「版本尚未记录」——探测只发生在头几秒，
+  说「探测中」是说谎。（PR #33）
+- **不可用的按钮不夺走焦点。** 原生 `disabled` 让浏览器收走焦点：实测按下
+  「取消」、取消一开始，焦点掉到 `<body>`，键盘用户被扔回页面开头。改用
+  `aria-disabled`——按钮留在原地、也留在 Tab 序列里，屏幕阅读器仍念「不可用」；
+  点击由处理函数拦下（连同这次点击的默认动作）。样式从 `:disabled` 补上
+  `[aria-disabled="true"]`。（PR #33）
 
 ## [1.1.0] — 2026-11-25
 
@@ -1650,7 +1664,8 @@ every language model switched off.
   a fresh clone
 - No APK, DEX or native library is committed to the repository
 
-[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/gg320324492-lgtm/dexatlas/compare/v1.0.0...v1.0.1

@@ -68,7 +68,7 @@
 
 | # | 文件 | 修正前 | 修正后（现文件里的版本句） |
 |---|---|---|---|
-| 8 | `project-brief.md` §Honest limitations | `in early development (v0.2.x)` | `The current release is v1.1.0 (tagged 2026-11-25)` |
+| 8 | `project-brief.md` §Honest limitations | `in early development (v0.2.x)` | `The current release is v1.2.0 (tagged 2026-11-27)` |
 
 `v0.2.x` 不是一个 tag，也不是一个可核对的版本号，所以第一轮把它收紧成了当时
 真实存在的 `v0.2.0`（那一版的意思是「当前最新版本就是 v0.2.0」）。这种句子要靠
@@ -78,7 +78,7 @@
 **发版已落地，这一句已经按 §7 第 1 条改过一遍。** `v1.0.0` 于 2026-11-17 打上
 tag（`git for-each-ref refs/tags/v1.0.0`），`src/dexatlas/__init__.py` 的
 `__version__` 是 `1.0.0`，`project-brief.md` §Honest limitations 现在写
-`The current release is v1.1.0 (tagged 2026-11-25)`，后半句是
+`The current release is v1.2.0 (tagged 2026-11-27)`，后半句是
 `; the public contract covers the documented CLI/API/MCP surfaces.`。
 **下次发版仍要按 §7 第 1 条回来改这一句。**
 
@@ -309,10 +309,10 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 按重要性排序。**这一节是发出去之前的最后一关**：下面每一条要么只能在真实表单
 上看，要么要人决定，仓库里的门禁替不了。
 
-1. **版本号会过期（`v1.0.0` 已发，下一个版本还要再改）。**
+1. **版本号会过期（`v1.2.0` 已发，下一个版本还要再改）。**
    `project-brief.md` §Honest limitations 现在写
-   `The current release is v1.1.0 (tagged 2026-11-25)`——这句是真的
-   （`git for-each-ref refs/tags/v1.0.0`），但它说的是「当前最新版本」。
+   `The current release is v1.2.0 (tagged 2026-11-27)`——这句是真的
+   （`git for-each-ref refs/tags/v1.2.0`），但它说的是「当前最新版本」。
    **再发一个 tag，这句就变成假话**，`scripts/check-version-claims.py` 会直接
    报出来。发版 commit 之后要回来改这一句。
 2. **两封信的正文长度按 2,500 再核一次。** Template 1 模板态 raw 2,185 /

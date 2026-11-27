@@ -106,7 +106,7 @@ captured as values and surfaced in the report instead of aborting the run.
 - The agent is a bounded single-loop assistant over a completed analysis; it
   is not a general autonomous vulnerability finder, and its default budget
   and known open issues are documented.
-- The current release is `v1.1.0` (tagged 2026-11-25); the public contract
+- The current release is `v1.2.0` (tagged 2026-11-27); the public contract
   covers the documented CLI/API/MCP surfaces.
 
 ## Links

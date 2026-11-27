@@ -54,7 +54,7 @@ still yields a manifest, an index and a report that says which steps did not run
 > records are the [comparison report](docs/benchmarks/comparison.md) and the
 > [M4 end-to-end run record](docs/reports/m4-e2e-run.md).
 >
-> **Status: early development — v1.1.0 released; v1.0.0 was tagged 2026-11-17. Phase 3's
+> **Status: early development — v1.2.0 released; v1.0.0 was tagged 2026-11-17. Phase 3's
 > deliverables are released; M10 independent acceptance passed on 2026-11-20 and M6's
 > B1 acceptance line was closed on 2026-11-22 (M8 is delivered; macOS unverified).** The CLI,
 > analysis core and report pipeline shipped in `v0.1.0` and have been released in
@@ -196,7 +196,7 @@ DexAtlas is built around fixing that:
 | **3** | `v1.0.0` (tag 2026-11-17) | Portfolio & Delivery | Bounded agent workflows (set frozen, level-0/1 scored, level-2 real-model batch run — not passed: 40.0% first batch, post-fix three-round retest 81.7% vs the ≥90% three-round bar, post-fix narrow verification converted 2/6 then 3/6 after the budget-efficiency fixes — both below the ≥4/6 gate, moved to state-of-record disclosure), portable evidence reports (`--html`/`export` shipped), clean-install verification and the public contract table (rehearsed), client-facing examples (delivered), independent acceptance (passed 2026-11-20) |
 | **4** | `v1.0.2` | Portfolio Closure | M11–M15: documentation claims realigned with the code, the Workbench UI and accessibility work, dependencies hardened, and a fresh measurement of the tagged tree |
 | **4 Q2** | `v1.1.0` | Desktop Application | The original Tauri + React desktop app (DexAtlas Studio), authorized after M15 closed and scoped by the [Q2 supplement](docs/roadmap/phase4-q2-supplement.md) |
-| **5** | (no release yet) | Desktop Self-Containment & Stage Observability | The Tauri sidecar that spawns the real backend, the stage-level progress contract the pipeline records, C12 outreach material and the post-release checklist — engineering delivered and accepted 2026-11-26 |
+| **5** | `v1.2.0` (tag 2026-11-27) | Desktop Self-Containment & Stage Observability | The Tauri sidecar that spawns the real backend, the stage-level progress contract the pipeline records, C12 outreach material and the post-release checklist — engineering delivered and accepted 2026-11-26 |
 
 Full detail, exit checklists and the review protocol: **[docs/roadmap/ROADMAP.md](docs/roadmap/ROADMAP.md)**.
 

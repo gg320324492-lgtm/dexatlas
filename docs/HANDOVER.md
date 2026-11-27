@@ -104,7 +104,10 @@ A + D + G). v1.0.2 ships the Phase 4 documentation, dependency-hardening and
 measurement follow-up. **v1.1.0 (2026-11-25) ships the Q2 desktop application
 (Tauri + React, scoped by
 [`docs/roadmap/phase4-q2-supplement.md`](roadmap/phase4-q2-supplement.md)) and
-the post-Q2 stability batch.** The project is now in a **partial unfreeze
+the post-Q2 stability batch.** **v1.2.0 (2026-11-27) ships Phase 5 — the
+self-contained desktop application (the backend starts with the app) and the
+stage-level progress contract — plus the batch of fixes under one rule: the
+interface says what actually happened.** The project is now in a **partial unfreeze
 (option B)**: only desktop-app defects, performance and usability work is
 open; new features need re-review. Read [`docs/status.md`](status.md) for the current state
 and its open gaps.
