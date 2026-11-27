@@ -24,7 +24,13 @@ import {
 import type { RunStageEvent } from "./api/types";
 
 /** 页面上的五个格子，顺序即页面上的顺序。 */
-const SLOTS = ["collect", "parse", "index", "evidence", "report"] as const;
+const SLOTS = [
+  "collect",
+  "parse-apktool",
+  "index",
+  "decompile-jadx",
+  "report",
+] as const;
 
 /** 一个阶段事件；`finished=false` 表示这个阶段还没结束。 */
 function stage(name: string, finished = true): RunStageEvent {
@@ -94,66 +100,69 @@ const FAILED_AT_PUBLISH_EVENTS = [
 ];
 
 describe("deriveStagesFromRun —— 有阶段事件（stages 端点）", () => {
-  it("完成态五格全完成，「证据」格也在其中", () => {
+  it("完成态五格全完成，每格对应后端的一个推进点", () => {
     const { states } = deriveStagesFromRun(run("completed"), COMPLETED_EVENTS);
     expect(states).toEqual({
       collect: "done",
-      parse: "done",
+      "parse-apktool": "done",
       index: "done",
-      evidence: "done",
+      "decompile-jadx": "done",
       report: "done",
     });
   });
 
-  it("运行中「证据」格进行中（复测报告 t=5044ms 的采样）", () => {
+  it("运行中「反编译」格进行中（复测报告 t=5044ms 的采样）", () => {
     const { states } = deriveStagesFromRun(run("running"), AT_JADX_EVENTS);
     expect(states).toEqual({
       collect: "done",
-      parse: "running",
+      "parse-apktool": "done",
       index: "done",
-      evidence: "running",
+      "decompile-jadx": "running",
       report: "pending",
     });
   });
 
-  it("证据还没产出时，「证据」格保持待处理", () => {
+  it("还没走到的阶段保持待处理", () => {
     const atApktool = deriveStagesFromRun(run("running"), AT_APKTOOL_EVENTS);
-    expect(atApktool.states.evidence).toBe("pending");
-    expect(atApktool.states.parse).toBe("running");
+    expect(atApktool.states["parse-apktool"]).toBe("running");
+    expect(atApktool.states.index).toBe("pending");
+    expect(atApktool.states["decompile-jadx"]).toBe("pending");
+    expect(atApktool.states.report).toBe("pending");
 
     const atIndex = deriveStagesFromRun(run("running"), AT_INDEX_EVENTS);
-    expect(atIndex.states.evidence).toBe("pending");
     expect(atIndex.states.index).toBe("running");
+    expect(atIndex.states["decompile-jadx"]).toBe("pending");
   });
 
   it("失败的 run 不会把某个格子留在「进行中」", () => {
     const atApktool = deriveStagesFromRun(run("failed"), FAILED_AT_APKTOOL_EVENTS);
     expect(atApktool.states.collect).toBe("done");
-    expect(atApktool.states.parse).toBe("error");
-    expect(atApktool.states.evidence).toBe("pending");
+    expect(atApktool.states["parse-apktool"]).toBe("error");
+    expect(atApktool.states.index).toBe("pending");
+    expect(atApktool.states["decompile-jadx"]).toBe("pending");
     expect(atApktool.states.report).toBe("pending");
 
-    // 证据格前一个阶段：旧推断把它读成「进行中」，留在一个已经结束的 run 上。
+    // 跑 JADX 时失败：反编译格标失败，报告格还没到。
     const atJadx = deriveStagesFromRun(run("failed"), FAILED_AT_JADX_EVENTS);
     expect(atJadx.states.collect).toBe("done");
-    expect(atJadx.states.parse).toBe("error");
+    expect(atJadx.states["parse-apktool"]).toBe("done");
     expect(atJadx.states.index).toBe("done");
-    expect(atJadx.states.evidence).toBe("pending");
+    expect(atJadx.states["decompile-jadx"]).toBe("error");
     expect(atJadx.states.report).toBe("pending");
   });
 
   it("取消的 run 同样不会把某个格子留在「进行中」", () => {
     const { states } = deriveStagesFromRun(run("cancelled"), CANCELLED_AT_INDEX_EVENTS);
     expect(states.collect).toBe("done");
-    expect(states.parse).toBe("done");
+    expect(states["parse-apktool"]).toBe("done");
     expect(states.index).toBe("error");
-    expect(states.evidence).toBe("pending");
+    expect(states["decompile-jadx"]).toBe("pending");
     expect(states.report).toBe("pending");
   });
 
-  it("发布阶段失败时，证据已经产出（pipeline 先建证据再发布）", () => {
+  it("发布阶段失败时，报告格标失败", () => {
     const { states } = deriveStagesFromRun(run("failed"), FAILED_AT_PUBLISH_EVENTS);
-    expect(states.evidence).toBe("done");
+    expect(states["decompile-jadx"]).toBe("done");
     expect(states.report).toBe("error");
   });
 
@@ -180,8 +189,8 @@ describe("deriveStagesFromRun —— 有阶段事件（stages 端点）", () => 
       run("completed", "partial", ["jadx: 反编译失败"]),
       COMPLETED_EVENTS,
     );
-    expect(states.parse).toBe("skipped");
-    expect(partialLabels.parse).toBe("部分");
+    expect(states["decompile-jadx"]).toBe("skipped");
+    expect(partialLabels["decompile-jadx"]).toBe("部分");
     expect(states.report).toBe("done");
   });
 });
@@ -191,9 +200,9 @@ describe("deriveStagesFromRun —— 没有阶段事件（旧 run 走状态兜�
     const { states } = deriveStagesFromRun(run("completed"), []);
     expect(states).toEqual({
       collect: "done",
-      parse: "done",
+      "parse-apktool": "done",
       index: "done",
-      evidence: "done",
+      "decompile-jadx": "done",
       report: "done",
     });
   });
@@ -201,23 +210,23 @@ describe("deriveStagesFromRun —— 没有阶段事件（旧 run 走状态兜�
   it("运行中的 run 走粗粒度映射", () => {
     const { states } = deriveStagesFromRun(run("running"), []);
     expect(states.collect).toBe("done");
-    expect(states.parse).toBe("running");
+    expect(states["parse-apktool"]).toBe("running");
     expect(states.index).toBe("pending");
   });
 
   it("失败的 run 把解析格标失败", () => {
     const { states } = deriveStagesFromRun(run("failed"), []);
     expect(states.collect).toBe("done");
-    expect(states.parse).toBe("error");
+    expect(states["parse-apktool"]).toBe("error");
   });
 
   it("还没开始的 run 不许声称某个阶段失败了", () => {
     const { states } = deriveStagesFromRun(run("pending"), []);
     expect(states).toEqual({
       collect: "pending",
-      parse: "pending",
+      "parse-apktool": "pending",
       index: "pending",
-      evidence: "pending",
+      "decompile-jadx": "pending",
       report: "pending",
     });
   });
@@ -228,9 +237,9 @@ describe("deriveStagesFromRun —— 没有 run", () => {
     const { states } = deriveStagesFromRun(null, null);
     expect(states).toEqual({
       collect: "pending",
-      parse: "pending",
+      "parse-apktool": "pending",
       index: "pending",
-      evidence: "pending",
+      "decompile-jadx": "pending",
       report: "pending",
     });
   });
@@ -261,12 +270,22 @@ describe("deriveStageBadge —— 角标如实说明数据来源", () => {
     expect(badge.text).toContain("stages 端点不可用");
   });
 
-  it("每一种角标都要说明「证据」格是推断值、解析格合并了两个阶段", () => {
+  it("每一种角标都要说明格子与后端推进点是一一对应", () => {
     for (const source of ["stages", "run-status"] as const) {
       const { title } = deriveStageBadge(source);
-      expect(title).toContain("证据");
-      expect(title).toContain("推断");
-      expect(title).toContain("parse-apktool");
+      expect(title).toContain("一一对应");
+      // 以前角标还要解释「证据」格是推断值、「解析」格合并了两个阶段——
+      // 现在每格对应后端的一个推进点，没有要解释的了。
+      expect(title).not.toContain("推断得出");
+      expect(title).not.toContain("合并了");
+    }
+  });
+
+  it("每一种角标都要说明后端阶段是后端给的", () => {
+    for (const source of ["stages", "run-status"] as const) {
+      const { title } = deriveStageBadge(source);
+      expect(title).toContain("后端");
+      expect(title).toContain("前端");
     }
   });
 });

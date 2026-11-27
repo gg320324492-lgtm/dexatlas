@@ -97,9 +97,9 @@ def test_no_run_data_maps_to_pending_not_to_invented_progress() -> None:
     assert isinstance(result, dict)
     assert result["states"] == {
         "collect": "pending",
-        "parse": "pending",
+        "parse-apktool": "pending",
         "index": "pending",
-        "evidence": "pending",
+        "decompile-jadx": "pending",
         "report": "pending",
     }
 
@@ -155,6 +155,13 @@ def test_analysis_page_says_unknown_when_there_is_no_run_data() -> None:
     assert "五个阶段的状态未知，这里不推测进度" in source, (  # noqa: RUF001
         "没有 run 数据时必须说明五个阶段状态未知, 而不是让五格看起来在推进"
     )
+    # 五个格子与后端的五个推进点一一对应: inspect / parse-apktool /
+    # index-androguard / decompile-jadx / publish 各占一格。
+    slots_source = STAGES_MODULE.read_text(encoding="utf-8")
+    assert '"parse-apktool": "parse-apktool"' in slots_source, (
+        "parse-apktool 必须独占一格, 不能与 decompile-jadx 合并"
+    )
+    assert '"decompile-jadx": "decompile-jadx"' in slots_source, "decompile-jadx 必须独占一格"
 
 
 def test_analysis_page_clears_stage_facts_when_the_run_changes() -> None:

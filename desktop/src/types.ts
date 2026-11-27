@@ -23,7 +23,7 @@ export interface ProjectSummary {
 }
 
 /** 分析阶段 id（§2-3：左侧阶段进度） */
-export type StageId = "collect" | "parse" | "index" | "evidence" | "report";
+export type StageId = "collect" | "parse-apktool" | "index" | "decompile-jadx" | "report";
 
 export type StageState = "pending" | "running" | "done" | "error" | "skipped";
 

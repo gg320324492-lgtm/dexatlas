@@ -51,7 +51,7 @@
 
 | 区 | 位置 | 内容与数据来源 |
 |---|---|---|
-| 阶段进度 | 左列 | 采集 → 解析 → 索引 → 证据 → 报告 五阶段时间线；每阶段 `StatusBadge`（pending/running/done/error/skipped）。数据来自 run 轮询：`RunStatus`（`src/dexatlas/core/runs.py:52` `anchor: RunStatus`）与 `RunCompleteness`（`src/dexatlas/core/runs.py:121` `anchor: RunCompleteness`）；阶段事件来自只读端点 `GET /api/projects/{id}/runs/{run_id}/stages`。没有阶段事件时按 run.status 粗粒度映射；没有任何 run 数据时五格如实显示「待处理」（状态未知），runs 请求失败时显示「后端不可用，阶段进度无法取得」与重试入口——**前端时间模拟已删除**（Phase 5 收尾），拿不到后端事实时不再按时间推进 |
+| 阶段进度 | 左列 | 采集 → 解析 → 索引 → 反编译 → 报告 五阶段时间线，**与后端的五个推进点一一对应**（inspect / parse-apktool / index-androguard / decompile-jadx / publish 各占一格）；每阶段 `StatusBadge`（pending/running/done/error/skipped）。数据来自 run 轮询：`RunStatus`（`src/dexatlas/core/runs.py:52` `anchor: RunStatus`）与 `RunCompleteness`（`src/dexatlas/core/runs.py:121` `anchor: RunCompleteness`）；阶段事件来自只读端点 `GET /api/projects/{id}/runs/{run_id}/stages`。没有阶段事件时按 run.status 粗粒度映射；没有任何 run 数据时五格如实显示「待处理」（状态未知），runs 请求失败时显示「后端不可用，阶段进度无法取得」与重试入口——**前端时间模拟已删除**（Phase 5 收尾），拿不到后端事实时不再按时间推进 |
 | 实时日志 | 中间 | 等宽字体滚动区，按级别着色（info/debug/warn/error/success）。日志来自 Tauri 侧车进程对分析进程 stdout/stderr 的转发——现有后端没有日志流契约，桌面端不得为此新增 REST 端点；run 级错误另见 `run.errors` |
 | 后端状态 | 右列 | Apktool / JADX / Androguard 三卡片：版本、可用性、当前阶段。数据来自 `GET /backends`（`src/dexatlas/api/app.py:369-370` `anchor: def list_backends(`）；缺失后端显示 `missing_error` 的安装提示（`src/dexatlas/tools/base.py:144` `anchor: missing_error`） |
 

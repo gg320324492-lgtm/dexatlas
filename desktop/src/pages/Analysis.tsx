@@ -14,8 +14,10 @@
  * 【后端事实 vs 前端映射——两件事，别混成一件】
  * - 后端给的**事实**：阶段事件（GET /api/projects/{id}/runs/{run_id}/stages）、
  *   run 的 status、项目的 status；
- * - 前端做的**映射**：五个格子分别对应哪个后端阶段、哪一格算「推进到位」、
- *   「证据」格怎么推断（映射规则在 ../stages 的 STAGE_TO_SLOT）。
+ * - 前端做的**映射**：哪一格算「推进到位」（映射规则在 ../stages 的
+ *   STAGE_TO_SLOT）。五个格子与后端的五个推进点**一一对应**：inspect →
+ *   采集、parse-apktool → 解析、index-androguard → 索引、decompile-jadx →
+ *   反编译、publish → 报告。所以格上的状态就是后端报的事实，没有推断。
  * 页面上的角标与注释都按这条线措辞：事件是后端给的，对应关系是前端定的。
  *
  * 阶段映射规则（优先级从高到低）写在 ../stages 里（纯函数、可被
@@ -24,8 +26,7 @@
  *   done/running；run 已终止却停在某阶段的格子标 error；completeness =
  *   "partial" 时按 errors 点名的工具在已完成格子上标注"部分"（skipped 态）；
  * - 否则按 run.status 粗粒度映射（旧后端写入的 run 无阶段事件），角标只
- *   标注数据来源（stages / run-status），并说明格子是前端的映射、「证据」
- *   格等推断值也在角标里说明；
+ *   标注数据来源（stages / run-status），并说明格子是前端的映射；
  * - 无 run 数据时五格全部"待处理"（状态未知），角标不标来源；runs 请求
  *   失败（404 / 网络）时阶段卡片显示可读错误与重试入口——不画一个看起来
  *   在推进的时间线。
@@ -67,7 +68,6 @@ import type {
 } from "../api";
 import type { BackendState, LogLevel, LogEntry, StageState } from "../types";
 import {
-  EVIDENCE_SLOT_NOTE,
   STAGES,
   deriveBackends,
   deriveStageBadge,
@@ -467,8 +467,7 @@ export function Analysis() {
   const hasStageFacts = Boolean(runStageEvents?.length);
   // 角标只标注数据来源（阶段事件 / run 状态），并写明哪一部分是后端给的
   // 事实、哪一部分是前端做的映射；没有 run 数据时不标来源，
-  // 卡片正文如实说明「状态未知」。角标标题同时说明哪些格子是推断出来的
-  //（证据格、合并了 JADX 的解析格）。
+  // 卡片正文如实说明「状态未知」。
   const stageBadge = hasStageFacts
     ? deriveStageBadge("stages")
     : hasRealRun
@@ -623,7 +622,7 @@ export function Analysis() {
           <Card className="analysis__stages" aria-label="阶段进度">
             <CardHeader
               title="阶段进度"
-              subtitle="采集 → 解析 → 索引 → 证据 → 报告"
+              subtitle="采集 → 解析 → 索引 → 反编译 → 报告"
               actions={
                 stageBadge ? (
                   <span className="da-mock-badge" title={stageBadge.title}>
@@ -650,9 +649,6 @@ export function Analysis() {
                           key={stage.id}
                           className={`da-stage da-stage--${state}`}
                           aria-current={state === "running" ? "step" : undefined}
-                          // 「证据」格在后端没有对应的阶段事件：把这一点说在格子上，
-                          // 读者悬停就知道这一格是推断值（复测报告 §P3）。
-                          title={stage.id === "evidence" ? EVIDENCE_SLOT_NOTE : undefined}
                         >
                           <span className="da-stage__dot" aria-hidden="true">
                             {state === "done" ? "✓" : state === "running" ? "◌" : state === "error" ? "✕" : "•"}

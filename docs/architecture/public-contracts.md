@@ -246,6 +246,20 @@ server instructions（`src/dexatlas/mcp/server.py:49-69` `anchor: INSTRUCTIONS`�
 | 10 | `resolve_locator` | `project_id`、`locator` | `LocatorResolution{resolved,reason,kind?,text?,provenance[]}` | `src/dexatlas/mcp/server.py:315-330` |
 | 11 | `find_resource_declarations` | `project_id`、`name?`、`value?`、`offset`、`limit` | `ResourceDeclarationList{declarations:[ResourceDeclarationView],total,offset,limit}` | `src/dexatlas/mcp/server.py:322-357` |
 
+**阶段工具为什么不在 MCP 面上（作者决定，2026-11-27）：** Phase 5 W2 加了阶段级
+进度契约——`GET /projects/{pid}/runs/{rid}/stages` 返回 run 的五个推进点与它们的
+时间戳。它**没有**被注册成 MCP 工具，工具清单仍是上面 11 个。
+
+这是**有意的取舍，不是遗漏**。理由：MCP 面是给 agent 用的，agent 要的是「这个
+APK 里有什么」；阶段进度是**这一次分析进行到哪了**——一个正在跑的 run 的阶段，
+对 agent 查证据没有帮助，而 run 一旦结束，阶段事实就是「全部完成」，agent 从
+`get_project_status` 的 `runs[]` 里已经能看到结论。阶段事实的用处在于**给人看**
+（桌面应用的分析页），那两个传输面已经给了。
+
+所以阶段事实走 REST 与 workbench 两处，MCP 面不暴露。这条取舍写在这里，
+是为了下次有人问「为什么 MCP 没有阶段工具」时有答案可查，而不是只能看到
+一个「没有」。
+
 > 注：5/6 两个工具的 `limit` 默认值（200000）大于其校验上界（20000）是**现有实现的事实**，
 > 不是文档笔误——pydantic 不校验 default，所以省略 `limit` 时按 200000 生效；显式传
 > 20001–200000 会被拒（`src/dexatlas/mcp/server.py:198-201, 236-239`，上界来自
