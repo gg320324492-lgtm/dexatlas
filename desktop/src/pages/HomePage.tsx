@@ -50,6 +50,15 @@ export default function HomePage() {
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * 「这个 APK 之前分析过了」的提示。
+   *
+   * 旧实现把这句话塞进 `error` 然后立刻 `navigate(...)`：路由一变，首页被卸载，
+   * 这句话跟着组件一起消失——**用户根本没看见**（打包 exe 实测 802 次采样 0 次抓到）。
+   * 现在它是一份留在页面上的提示：不跳转，提示留在原地，配一个「打开已有项目」
+   * 的动作由用户自己决定去不去。
+   */
+  const [duplicate, setDuplicate] = useState<{ projectId: string; sha12: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const [projects, setProjects] = useState<WorkbenchProject[] | null>(null);
   const [projectsError, setProjectsError] = useState<string | null>(null);
@@ -84,14 +93,21 @@ export default function HomePage() {
         return;
       }
       setError(null);
+      setDuplicate(null);
       setFileName(file.name);
       setUploading(true);
       dexatlas
         .analyzeUpload(file, file.name)
         .then((accepted: AnalyzeAccepted) => {
           if (accepted.already_analysed) {
-            // 同 hash 已分析过：明确提示"复用已有项目"再跳转，避免误以为重新分析
-            setError(`该 APK 已分析过（sha256 前 12 位 ${accepted.apk_sha256.slice(0, 12)}），正在打开已有项目，不会重复分析。`);
+            // 同 hash 已分析过：**留在原地**，把「没有重复分析」这句话留在页面上，
+            // 并给一个去已有项目的入口。不跳转——跳转会把这句话一起带走（旧实现
+            // 的缺陷：用户永远看不到这句提示）。
+            setDuplicate({
+              projectId: accepted.project_id,
+              sha12: accepted.apk_sha256.slice(0, 12),
+            });
+            return;
           }
           void navigate(`/analysis/${accepted.project_id}`);
         })
@@ -163,6 +179,19 @@ export default function HomePage() {
             ) : null}
           </>
         )}
+        {duplicate ? (
+          // 留在页面上的提示：role="alert" 让读屏软件立刻念出来，视觉上是一块
+          // 有底色的告示，不是悄悄溜走的一行字。
+          <div className="dropzone-notice" role="alert">
+            <strong className="dropzone-notice-title">这个 APK 已经分析过了</strong>
+            <span className="dropzone-notice-text">
+              sha256 前 12 位 {duplicate.sha12}；没有重复分析，已有的分析结果还在。
+            </span>
+            <Link className="btn btn-secondary dropzone-notice-action" to={`/analysis/${duplicate.projectId}`}>
+              打开已有项目
+            </Link>
+          </div>
+        ) : null}
       </section>
 
       <section aria-label="最近项目">
