@@ -1,7 +1,7 @@
 {
   "name": "dexatlas-desktop",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "DexAtlas 桌面应用（Tauri 2 + React 19）",
   "type": "module",
   "scripts": {
