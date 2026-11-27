@@ -1463,7 +1463,7 @@ def test_cancel_accepts_a_running_analysis_and_sets_its_token(client: TestClient
     """
     from dexatlas.api.uploads import RUNNING
 
-    token = RUNNING.start(FAKE_SHA256, Path("uploads") / "demo.apk")
+    token = RUNNING.claim(FAKE_SHA256, Path("uploads") / "demo.apk", "cd" * 32)
     try:
         response = client.post(f"/api/projects/{FAKE_SHA256}/cancel")
 
@@ -1471,7 +1471,7 @@ def test_cancel_accepts_a_running_analysis_and_sets_its_token(client: TestClient
         assert response.json() == {"project_id": FAKE_SHA256, "status": "cancelling"}
         assert token.cancelled
     finally:
-        RUNNING.finish(FAKE_SHA256)
+        RUNNING.finish(token)
 
 
 def test_cancel_without_a_running_analysis_is_a_conflict(client: TestClient) -> None:
@@ -1558,12 +1558,12 @@ def test_start_up_leaves_runs_this_process_started_alone(tmp_path: Path) -> None
     run = AnalysisRun.start(pid, FAKE_SHA256)
     run.status = RunStatus.RUNNING
     analyzer.store.create_run(run)
-    RUNNING.start(pid, Path("uploads") / "demo.apk")
+    token = RUNNING.claim(pid, Path("uploads") / "demo.apk", "cd" * 32)
     try:
         with TestClient(create_app(analyzer)):
             pass
     finally:
-        RUNNING.finish(pid)
+        RUNNING.finish(token)
 
     live = analyzer.store.get_run(run.id)
     assert live is not None and live.status is RunStatus.RUNNING

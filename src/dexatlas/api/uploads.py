@@ -122,50 +122,87 @@ class UploadSizeLimitMiddleware:
         await self.app(scope, receive, send)
 
 
-@dataclass
+@dataclass(frozen=True)
 class RunningAnalysis:
     """One analysis that is running, and the way to stop it."""
 
+    project_id: str
+    sha256: str | None
     token: CancellationToken
     apk_path: Path
 
 
 class RunningAnalyses:
-    """The analyses that are running, by the project they are running for.
+    """The analyses that are running, each one under its own key.
 
     The analysis runs in a background task, so "stop it" cannot be a call
     into it: it has to be a fact the running code can observe. The token is
     that fact -- the request sets it, and the analysis stops at the next
     point where stopping cannot leave half-written results behind.
 
-    The registry is keyed by the project id, which is the handle the API
-    already gave the caller when it accepted the upload.
+    The registry is keyed by the token, and the token belongs to one
+    analysis and to no other. It used to be keyed by the project id, which
+    is the APK's content hash: two analyses of one APK are two analyses
+    and share that key, so the analysis that ended first unregistered the
+    one that was still running -- and an analysis that is not registered
+    cannot be cancelled. The cancel endpoint then answered 409 for an
+    analysis that was running.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._analyses: dict[str, RunningAnalysis] = {}
+        self._analyses: dict[CancellationToken, RunningAnalysis] = {}
 
-    def start(self, project_id: str, apk_path: Path) -> CancellationToken:
-        """Register an analysis that is starting, and hand back its token."""
-        token = CancellationToken()
-        with self._lock:
-            self._analyses[project_id] = RunningAnalysis(token=token, apk_path=apk_path)
-        return token
+    def claim(
+        self, project_id: str, apk_path: Path, sha256: str | None = None
+    ) -> CancellationToken | None:
+        """Register an analysis of these bytes -- unless one is already running.
 
-    def finish(self, project_id: str) -> None:
-        """Forget an analysis that has ended."""
+        The check and the registration are one operation, under one lock.
+        Two uploads of the same APK that arrive at the same time must not
+        both decide that nobody is analysing it, or the APK is analysed
+        twice -- once for each upload, writing over each other's results.
+
+        The answer is the token of the analysis that was registered, or
+        ``None`` when these bytes are already being analysed. The caller
+        that gets ``None`` has to say so rather than start a second
+        analysis of the same APK.
+        """
         with self._lock:
-            self._analyses.pop(project_id, None)
+            if sha256 is not None and any(
+                entry.sha256 == sha256 for entry in self._analyses.values()
+            ):
+                return None
+            token = CancellationToken()
+            self._analyses[token] = RunningAnalysis(
+                project_id=project_id,
+                sha256=sha256,
+                token=token,
+                apk_path=apk_path,
+            )
+            return token
+
+    def finish(self, token: CancellationToken) -> None:
+        """Forget the analysis this token belongs to, and no other.
+
+        One analysis ending is not the end of the analysis beside it: two
+        analyses of one APK are two analyses, and the one that is still
+        running has to stay registered -- or it stays uncancellable.
+        """
+        with self._lock:
+            self._analyses.pop(token, None)
 
     def cancel(self, project_id: str) -> bool:
-        """Ask an analysis to stop. Whether one was running."""
+        """Ask every analysis of this project to stop. Whether one was running."""
         with self._lock:
-            running = self._analyses.get(project_id)
-        if running is None:
-            return False
-        running.token.cancel()
-        return True
+            tokens = [
+                token
+                for token, running in self._analyses.items()
+                if running.project_id == project_id
+            ]
+        for token in tokens:
+            token.cancel()
+        return bool(tokens)
 
     def apk_paths(self) -> set[Path]:
         """The uploads the running analyses are reading."""
@@ -175,7 +212,7 @@ class RunningAnalyses:
     def projects(self) -> set[str]:
         """The ids of the analyses this process is running."""
         with self._lock:
-            return set(self._analyses)
+            return {running.project_id for running in self._analyses.values()}
 
 
 #: The analyses this process is running.
@@ -353,12 +390,26 @@ def stage_upload(
     stored_dir = upload_root / apk.sha256
     stored_dir.mkdir(parents=True, exist_ok=True)
     target = stored_dir / name
-    staged.replace(target)
+    try:
+        staged.replace(target)
+    except OSError:
+        # Another upload of the same bytes moved its own copy into place at
+        # the same moment. The directory is named after the hash, so the file
+        # that is there holds these bytes and the staged copy is redundant;
+        # on Windows the move can lose that race and fail rather than wait.
+        if not target.exists():
+            raise
+        staged.unlink(missing_ok=True)
     apk.path = target
     return apk, target, name
 
 
-def run_background_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata) -> None:
+def run_background_analysis(
+    analyzer: Analyzer,
+    apk_path: Path,
+    apk: ApkMetadata,
+    token: CancellationToken | None = None,
+) -> None:
     """Analyse an APK in the background.
 
     Three things can happen, and the log has to tell them apart: the
@@ -366,12 +417,32 @@ def run_background_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata
     nothing. The first two are errors and the third is an answer, and a log
     that says "failed" for all three sends the reader looking for a fault
     that is not there.
+
+    ``token`` is the token of an analysis that has already been registered.
+    A transport that claims the APK before it answers the upload passes it
+    here, so that the analysis is registered from the moment the upload is
+    accepted -- and so that a second upload of the same bytes finds the
+    analysis that is already running instead of starting another one.
+    Without a token the analysis registers itself here, and it does not run
+    at all when the same bytes are already being analysed.
     """
     from dexatlas.core.models import Project
     from dexatlas.core.runs import AnalysisCancelled
 
     project_id = Project.new_id(apk.sha256)
-    token = RUNNING.start(project_id, apk_path)
+    if token is None:
+        claimed = RUNNING.claim(project_id, apk_path, apk.sha256)
+        if claimed is None:
+            # These bytes are already being analysed. The analysis that is
+            # running will publish the result, so this one has nothing to
+            # do -- and running it as well would have two analyses writing
+            # over the same project.
+            logger.info(
+                "background analysis of %s was skipped: the same APK is already being analysed",
+                apk_path,
+            )
+            return
+        token = claimed
     try:
         result = analyzer.analyze(apk_path, metadata=apk, cancellation=token)
     except AnalysisCancelled:
@@ -386,7 +457,9 @@ def run_background_analysis(analyzer: Analyzer, apk_path: Path, apk: ApkMetadata
         logger.exception("background analysis of %s failed", apk_path)
         return
     finally:
-        RUNNING.finish(project_id)
+        # Only this analysis is forgotten. Another analysis of the same APK
+        # may still be running, and it has to stay cancellable.
+        RUNNING.finish(token)
         # The retention window is counted from the end of the analysis that
         # used the upload, so the clock starts again now.
         touch_upload(apk_path)
