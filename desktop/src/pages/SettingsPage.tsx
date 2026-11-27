@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { LoadingState } from "../components/states/LoadingState";
 import { ApiError, dexatlas } from "../api";
 import type { BackendInfo, BackendCommandConfig, WorkbenchHealth } from "../api";
-import { loadBackendCommandConfig, saveBackendCommandConfig, getSidecarStatus } from "../api";
+import {
+  loadBackendCommandConfig,
+  saveBackendCommandConfig,
+  getSidecarStatus,
+  loadAppInfo,
+} from "../api";
+import { versionEntries } from "./settingsVersion";
 import "./SettingsPage.css";
 
 /**
@@ -12,9 +18,13 @@ import "./SettingsPage.css";
  * 版本信息来自 GET /api/health（{version, workspace}）。
  * Phase 5 W1：新增 DexAtlas 后端命令路径配置（Tauri 本地配置 backend.json），
  * 保存后按新配置重启侧车；浏览器/dev 环境保存仅本地提示，不写真实配置。
+ * Phase 5 A11：版本分成两行——「应用版本」是这个桌面应用（exe/MSI）自己的
+ * 版本号（来自 Tauri 壳的 app_info 命令），「后端版本」才是分析核心的号。
+ * 以前只有一条写着「版本」的行，填的是后端的号，读者会认错。
  */
 export default function SettingsPage() {
   const [health, setHealth] = useState<WorkbenchHealth | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [backends, setBackends] = useState<BackendInfo | null>(null);
   const [backendsUnavailable, setBackendsUnavailable] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +68,20 @@ export default function SettingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    // 桌面应用自己的版本号（Tauri 壳的 app_info 命令）。浏览器预览里没有这个
+    // 命令，拿到 null，页面如实说「仅在桌面应用内可得」，不拿后端的号顶替。
+    let cancelled = false;
+    void loadAppInfo().then((info) => {
+      if (!cancelled) {
+        setAppVersion(info?.version ?? null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     void loadBackendCommandConfig().then(setCommand);
@@ -224,19 +248,26 @@ export default function SettingsPage() {
             <dt>应用</dt>
             <dd>DexAtlas Studio</dd>
           </div>
-          <div>
-            <dt>版本</dt>
-            <dd>
-              {health ? (
-                <>
-                  v{health.version}
-                  {health.workspace ? <span className="settings-workspace"> · 工作区 {health.workspace}</span> : null}
-                </>
-              ) : (
-                <span className="settings-unavailable">{error ?? "读取中…"}</span>
-              )}
-            </dd>
-          </div>
+          {versionEntries({
+            appVersion,
+            backendVersion: health ? health.version : null,
+            backendWorkspace: health ? health.workspace : null,
+            backendError: error ?? (loading ? "读取中…" : null),
+          }).map((row) => (
+            <div key={row.subject}>
+              <dt>{row.label}</dt>
+              <dd>
+                {row.version ? (
+                  <>
+                    v{row.version}
+                    {row.note ? <span className="settings-workspace"> · {row.note}</span> : null}
+                  </>
+                ) : (
+                  <span className="settings-unavailable">{row.unavailable}</span>
+                )}
+              </dd>
+            </div>
+          ))}
           <div>
             <dt>分析核心</dt>
             <dd>与 CLI / API / MCP 共用同一分析核心</dd>

@@ -113,6 +113,24 @@ Windows 上 Rust 构建需要 MSVC 环境：在 cmd 里先
 （路径按本机 Build Tools 安装位置调整），再执行 `cargo check` /
 `npm run tauri dev`。
 
+## 版本号
+
+桌面的版本号跟着发版号走，发版号只有一处：
+`src/dexatlas/__init__.py` 的 `__version__`。桌面上带着版本号的四个文件
+（`package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml`、
+`src-tauri/Cargo.lock`）由一个脚本统一改：
+
+```bash
+uv run --no-sync python scripts/sync-desktop-version.py           # 从仓库根目录执行
+uv run --no-sync python scripts/sync-desktop-version.py --check   # 只检查
+```
+
+设置页把版本分成两行：「应用版本」是这个桌面应用（exe / MSI）的号，
+「后端版本（分析核心）」才是 Python 侧车的号。
+
+打包、版本号与修复路径（repair）的细节见
+[`docs/desktop-packaging.md`](../docs/desktop-packaging.md)。
+
 ## 测试
 
 桌面前端的单元测试用 **vitest**，测试文件在 `src/` 旁边（`src/**/*.test.ts`）：

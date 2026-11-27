@@ -14,6 +14,8 @@ export {
   isTauriRuntime,
 } from "./sidecar";
 export type { BackendCommandConfig, SidecarStatus, SaveOutcome } from "./sidecar";
+export { loadAppInfo } from "./appVersion";
+export type { AppInfo } from "./appVersion";
 
 export type {
   AnalyzeAccepted,
