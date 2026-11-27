@@ -775,6 +775,43 @@ fn backend_command(program: &str, args: &[String], cwd: Option<&std::path::Path>
     command
 }
 
+/// 把一行原始字节解成文本：非法 UTF-8 的字节换成 U+FFFD，**永不失败**。
+///
+/// 旧实现用 `read_line` 往 `String` 里读，它要求整行都是合法 UTF-8。后端只要
+/// 吐出一行非 UTF-8 的字节（Windows 控制台编码的残留、损坏的路径名、二进制
+/// 片段），`read_line` 就返回 `Err(InvalidData)`，旧代码随即 `break`——**整条流
+/// 就此停止**，那一行之后的 traceback 再也到不了运营者手里。
+///
+/// 逐行容错是这里唯一正确的做法：坏字节只坏它自己那一行，其余行照常转发。
+fn decode_line_lossy(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+/// 逐行转发子进程的一条输出流（stdout / stderr）。
+///
+/// - 每读到一行就交给 `on_line`（已去掉行尾空白）。
+/// - **非 UTF-8 的行不会停掉流**：按字节读、按行容错解码（见 [`decode_line_lossy`]）。
+/// - 只有真正的 I/O 错误才结束转发（管道已经断了，再读也没有内容）；
+///   `Interrupted` 是可重试的信号，重试而不是结束。
+fn forward_lines<R: BufRead>(mut reader: R, stream: &str, mut on_line: impl FnMut(&str)) {
+    let mut buf: Vec<u8> = Vec::new();
+    loop {
+        buf.clear();
+        match reader.read_until(b'\n', &mut buf) {
+            Ok(0) => break,
+            Ok(_) => {
+                let line = decode_line_lossy(&buf);
+                on_line(line.trim_end());
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(err) => {
+                eprintln!("[{stream}] 读取失败：{err}");
+                break;
+            }
+        }
+    }
+}
+
 /// 启动后端命令。
 ///
 /// `cwd` 是**可选**的工作目录：`None` 表示"推断不到仓库根"（安装形态）。
@@ -847,23 +884,16 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
     let stdout_app = app.clone();
     let stdout_child = child.clone();
     thread::spawn(move || {
-        let mut reader = BufReader::new(stdout_child.lock().expect("child mutex poisoned").stdout.take().expect("stdout piped"));
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match reader.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    let trimmed = line.trim_end();
-                    eprintln!("[backend-stdout] {trimmed}");
-                    note_backend_line(&stdout_app, instance, trimmed);
-                }
-                Err(err) => {
-                    eprintln!("[backend-stdout] 读取失败：{err}");
-                    break;
-                }
-            }
-        }
+        let stdout = stdout_child
+            .lock()
+            .expect("child mutex poisoned")
+            .stdout
+            .take()
+            .expect("stdout piped");
+        forward_lines(BufReader::new(stdout), "backend-stdout", |line| {
+            eprintln!("[backend-stdout] {line}");
+            note_backend_line(&stdout_app, instance, line);
+        });
     });
 
     // stderr 线程：透传日志（uvicorn 的 "Uvicorn running on" 行在 stderr，
@@ -871,23 +901,16 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
     let stderr_app = app.clone();
     let stderr_child = child.clone();
     thread::spawn(move || {
-        let mut reader = BufReader::new(stderr_child.lock().expect("child mutex poisoned").stderr.take().expect("stderr piped"));
-        let mut line = String::new();
-        loop {
-            line.clear();
-            match reader.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    let trimmed = line.trim_end();
-                    eprintln!("[backend-stderr] {trimmed}");
-                    note_backend_line(&stderr_app, instance, trimmed);
-                }
-                Err(err) => {
-                    eprintln!("[backend-stderr] 读取失败：{err}");
-                    break;
-                }
-            }
-        }
+        let stderr = stderr_child
+            .lock()
+            .expect("child mutex poisoned")
+            .stderr
+            .take()
+            .expect("stderr piped");
+        forward_lines(BufReader::new(stderr), "backend-stderr", |line| {
+            eprintln!("[backend-stderr] {line}");
+            note_backend_line(&stderr_app, instance, line);
+        });
     });
 
     // 等待线程：进程退出时更新状态并通知前端。
@@ -1090,6 +1113,123 @@ fn kill_process_tree(pid: u32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 一行非 UTF-8 的字节**不能**停掉整条流：坏行之后的行仍要转发出去。
+    ///
+    /// 这是回归测试。旧实现用 `read_line` 往 `String` 里读，坏字节让它返回
+    /// `Err(InvalidData)`，代码随即 `break`——那一行之后的 traceback 全丢，
+    /// 运营者手里只剩半截日志。
+    #[test]
+    fn non_utf8_line_does_not_stop_the_stream() {
+        let mut raw: Vec<u8> = Vec::new();
+        raw.extend_from_slice(b"INFO:     Started server process\n");
+        raw.extend_from_slice(&[b'T', b'r', 0xff, 0xfe, b'e']); // 一行非法 UTF-8
+        raw.push(b'\n');
+        raw.extend_from_slice(b"Traceback (most recent call last):\n");
+        raw.extend_from_slice(b"ValueError: boom\n");
+
+        let mut seen: Vec<String> = Vec::new();
+        forward_lines(BufReader::new(&raw[..]), "backend-stderr", |line| {
+            seen.push(line.to_string())
+        });
+
+        assert_eq!(
+            seen.len(),
+            4,
+            "坏行之后的行必须照样转发（实际收到 {seen:?}）"
+        );
+        assert_eq!(seen[0], "INFO:     Started server process");
+        assert!(
+            seen[1].contains('\u{FFFD}'),
+            "坏字节要被替换成 U+FFFD，而不是丢掉整行（实际 {:?}）",
+            seen[1]
+        );
+        assert_eq!(seen[2], "Traceback (most recent call last):");
+        assert_eq!(seen[3], "ValueError: boom");
+    }
+
+    /// 合法的一行不多、不少地转发出去（转发本身没被改坏）。
+    #[test]
+    fn valid_lines_are_forwarded_unchanged() {
+        let raw: Vec<u8> = b"first\nsecond\n".to_vec();
+        let mut seen: Vec<String> = Vec::new();
+        forward_lines(BufReader::new(&raw[..]), "backend-stdout", |line| {
+            seen.push(line.to_string())
+        });
+        assert_eq!(seen, vec!["first".to_string(), "second".to_string()]);
+    }
+
+    /// 进程在半行上死掉：没有换行符的尾巴也要转发（那多半正是崩溃现场）。
+    #[test]
+    fn trailing_line_without_newline_is_forwarded() {
+        let raw: Vec<u8> = b"ok\nKilled".to_vec();
+        let mut seen: Vec<String> = Vec::new();
+        forward_lines(BufReader::new(&raw[..]), "backend-stderr", |line| {
+            seen.push(line.to_string())
+        });
+        assert_eq!(seen, vec!["ok".to_string(), "Killed".to_string()]);
+    }
+
+    /// 解码器本身：坏字节换成 U+FFFD，好字节原样保留。
+    #[test]
+    fn decode_line_lossy_replaces_only_the_bad_bytes() {
+        assert_eq!(decode_line_lossy(b"plain ascii"), "plain ascii");
+        assert_eq!(decode_line_lossy("正常中文".as_bytes()), "正常中文");
+        let decoded = decode_line_lossy(&[0x61, 0xff, 0x62]);
+        assert_eq!(decoded, format!("a{}b", '\u{FFFD}'));
+    }
+
+    /// 真管道：子进程往 stderr 写一行非 UTF-8 的字节，再写一行正常的——
+    /// **两行都要到父进程手里**（旧实现只收到第一行，后面全丢）。
+    ///
+    /// 上面那条用的是字节切片；这条走的是真的 OS 管道（Windows 上也是），
+    /// 证明修复在真实的后端输出上成立。
+    #[test]
+    fn a_real_pipe_keeps_forwarding_after_a_non_utf8_line() {
+        let exe = std::env::current_exe().expect("测试二进制");
+        let mut child = std::process::Command::new(exe)
+            .args([
+                "--ignored",
+                "--exact",
+                "sidecar::tests::the_bad_stderr_emitter",
+                "--nocapture",
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .expect("拉起写坏字节的子进程");
+
+        let stderr = child.stderr.take().expect("stderr piped");
+        let mut seen: Vec<String> = Vec::new();
+        forward_lines(BufReader::new(stderr), "backend-stderr", |line| {
+            seen.push(line.to_string())
+        });
+        let _ = child.wait();
+
+        assert!(
+            seen.iter().any(|line| line.contains('\u{FFFD}')),
+            "坏字节那一行要替换成 U+FFFD 后照样转发（实际收到 {seen:?}）"
+        );
+        assert!(
+            seen.iter().any(|line| line == "traceback: ValueError"),
+            "坏行之后的行必须照样转发（实际收到 {seen:?}）"
+        );
+    }
+
+    /// 子进程角色：往 stderr 写一行非 UTF-8 的字节，再写一行正常的。
+    ///
+    /// 只被 `a_real_pipe_keeps_forwarding_after_a_non_utf8_line` 显式重新执行。
+    #[test]
+    #[ignore = "由 a_real_pipe_keeps_forwarding_after_a_non_utf8_line 重新执行"]
+    fn the_bad_stderr_emitter() {
+        use std::io::Write;
+        let mut err = std::io::stderr();
+        err.write_all(&[0x66, 0xff, 0xfe, 0x62, b'\n'])
+            .expect("写一行非 UTF-8 的字节");
+        err.write_all(b"traceback: ValueError\n")
+            .expect("写正常的一行");
+        err.flush().expect("flush");
+    }
 
     #[test]
     fn dynamic_port_replaces_existing_flag() {

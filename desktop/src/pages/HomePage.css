@@ -87,6 +87,33 @@
   font-size: var(--text-sm);
 }
 
+/* 「这个 APK 已经分析过了」的告示：留在首页，用户看得见、点得到。 */
+.dropzone-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-lavender);
+  border-radius: var(--radius-md);
+  background: rgba(184, 167, 245, 0.14);
+  text-align: center;
+}
+
+.dropzone-notice-title {
+  font-size: var(--text-md);
+}
+
+.dropzone-notice-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.dropzone-notice-action {
+  text-decoration: none;
+}
+
 .section-head {
   display: flex;
   align-items: baseline;

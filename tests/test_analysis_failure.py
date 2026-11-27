@@ -138,6 +138,34 @@ def test_the_failure_is_recorded_on_the_project(
     assert "the DEX reader fell over" in failure.message
 
 
+def test_the_failure_is_recorded_on_the_run_as_well(
+    settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The run's own row must say what failed, not only the project's.
+
+    The "read nothing" path has always recorded the failure on the run
+    (``run.errors = list(project.errors)``); the exception path did not. A
+    run that died of an exception was therefore stored ``failed`` with an
+    **empty** error list, while its project carried the reason.
+
+    A reader who reads the run -- which is what the workbench's run list and
+    the stages endpoint hand back -- saw the failure without its reason.
+    Measured on the packaged executable on 2026-11-27: the project row said
+    failed with one error, and the run row said failed with none.
+    """
+    analyzer = _failing_analyzer(settings, monkeypatch)
+
+    with pytest.raises(AnalysisFailed):
+        analyzer.analyze(minimal_apk, include_jadx=False, include_apktool=False)
+
+    project = analyzer.store.list_projects()[0]
+    runs = analyzer.store.list_runs(project.id)
+    assert len(runs) == 1, f"the run was not written: {runs}"
+    failures = [error for error in runs[0].errors if error.code is ToolErrorCode.ANALYSIS_FAILED]
+    assert len(failures) == 1, f"the run did not say why it failed: {runs[0].errors}"
+    assert "RuntimeError" in failures[0].message
+
+
 def test_the_failure_does_not_hide_the_errors_that_came_before_it(
     settings: Settings, minimal_apk: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

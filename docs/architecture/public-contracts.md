@@ -67,7 +67,7 @@ run 未发布/已取消/失败（无可渲染快照）、run 的快照已被新�
 失败或分析失败——与报告 `summary.index_complete == false` 同源）。无 DEX 的资源型
 APK（索引为空但无缺口）不触发 6，仍为 0；部分后端失败（索引仍在）不触发 6，仍为 0。
 no-index 判定先于截断：空索引是更强的信号。三个"空"彼此不同：请求错（2）、答案空
-（1）、运行失败（3），调用方只读退出码也能区分（`src/dexatlas/cli/main.py:7-30` `anchor: EXIT_AMBIGUOUS`）。
+（1）、运行失败（3），调用方只读退出码也能区分（`src/dexatlas/cli/main.py:122-145` `anchor: EXIT_AMBIGUOUS`）。
 
 退出码 6 由提案 [docs/proposals/exit-code-partial-read.md](../proposals/exit-code-partial-read.md)
 批准实施（方案 A），按 §6 作为兼容变更显式版本化：0–5 语义不变，0 的外延收窄——
@@ -136,7 +136,7 @@ Apache-2.0 许可信息。上传体积上限由中间件强制：`UploadSizeLimi
 （模型见 `RunStageEventResponse`，`src/dexatlas/api/app.py:229-245`
 `anchor: RunStageEventResponse`）。stage 取值 inspect、parse-apktool、
 index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际推进点一致，
-`src/dexatlas/core/pipeline.py:152`；阶段枚举见 `src/dexatlas/core/runs.py:75`
+`src/dexatlas/core/pipeline.py:181`；阶段枚举见 `src/dexatlas/core/runs.py:75`
 `anchor: RunStage`）。`started_at` 与 `finished_at` 是 ISO 8601 时间戳，
 `finished_at` 为 null 表示该阶段尚未结束——包括 run 在阶段中途失败或被取消的情况。
 同一阶段至多出现一次；旧版本写入的 run 或在首个阶段前就结束的 run，阶段列表是
@@ -145,7 +145,7 @@ index-androguard、decompile-jadx、publish（与 `Analyzer.analyze` 的实际�
 **run 对象本身不带 stages**：`RunResponse` 仍是上表的 11 个字段，阶段事实另取
 stages 端点——这样既有 run 对象的字段集一个也不变。workbench 的
 `GET /api/projects/{pid}/runs/{rid}/stages` 与 REST 同形状
-（`src/dexatlas/workbench/app.py:603-616` `anchor: get_run_stages`）；MCP 面的形状经
+（`src/dexatlas/workbench/app.py:621-634` `anchor: get_run_stages`）；MCP 面的形状经
 `src/dexatlas/mcp/tools/projects.py:74-92` `anchor: def run_stages` 与
 `src/dexatlas/mcp/schemas.py:155-170` 的 `RunStages` 定义。端点与字段
 只增不改：既有端点的响应形状、状态码与退出码零变化。
@@ -405,6 +405,19 @@ not_included: {apk, full_sources, unrelated_strings, outside_analysis}
     （`src/dexatlas/api/app.py:202-211` `anchor: call_site_count`、`src/dexatlas/reports/json_report.py:105-113` `anchor: call_sites`）。
 - 文档中的版本陈述由 `scripts/check-version-claims.py` 对照 tag、`__version__`
   与 CHANGELOG 校验；报告数字由 `scripts/refresh-report-figures.py` 生成，禁止手改。
+- **对外文本里的发布数字由 `scripts/check-release-numbers.py` 校验，它核的是哪个
+  发布，取决于它是怎么被调用的**：
+  - CI 的 `release-numbers` job 按**被推的 ref** 决定：推 tag 就核那个 tag（正在发
+    布的那个版本）；推分支就核仓库里最新的发布 tag；**PR 上核不了任何发布体**，
+    门禁只核工作副本，并在输出里写明「这次没有核发布体、因为 PR 不发布发布体」。
+  - 手工运行时不给 `--tag`，默认核**这个 checkout 里最新的发布 tag**；给
+    `--tag <tag>` 则核那一个发布。脚本里**没有写死的发布号**——写死一个发布号，
+    门禁就会在每个新版本发布之后继续核那个旧版本，并把它的绿灯当成对刚发布的
+    那个版本的结论（2026年11月27日实测：v1.2.0 的 tag CI 打印的就是 `tag: v1.0.0`）。
+  - 核不了的时候要说清**没核什么、为什么**，而不是去核别的发布体：发布体读不到
+    → 退出码 2（不等于「数字一致」）；发布还没发布（tag 的 CI 跑在发布之前，
+    v1.2.0 的 job 04:18:18Z 结束、发布体 04:26:58Z 才上线）→ 打印「尚未发布」，
+    并按调用方的声明决定退出码。
 
 ## 7. 验证记录
 
@@ -542,7 +555,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
 `source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
-自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1081-1096` 的
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1132-1147` 的
 `_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
 - 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺
@@ -627,6 +640,6 @@ stages 端点进活检后升为 55 = 31 REST + 6 MCP + 18 CLI，见本节开头�
   失败写进数据库：项目行记 `failed`、run 行记 `failed`，并带一条说得清原因的错误
   （`dexatlas: the analysis finished but read nothing: ...`）。空的结果**不**发布，
   已发布的快照保持原样；取消路径与异常路径不变
-  （`src/dexatlas/core/pipeline.py:519-565` `anchor: _record_empty_result`）。
+  （`src/dexatlas/core/pipeline.py:570-616` `anchor: _record_empty_result`）。
   回归测试：`tests/test_empty_result.py`（拿掉修复即红：项目行与 run 行都停在
   `running`）。

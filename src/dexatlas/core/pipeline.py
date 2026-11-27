@@ -12,6 +12,7 @@ when it fails, the project is left failed and the failure is raised to the calle
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -131,6 +132,14 @@ class Analyzer:
         self._backends = BackendRegistry(
             self._settings, [self._jadx, self._apktool, self._androguard]
         )
+        # The backends are shared by every analysis this process runs, and
+        # each of them remembers that it has been probed *before* the probe
+        # finishes. Two analyses that start together would therefore read
+        # each other's half-finished probe -- one of them would be told the
+        # machine has no backends at all -- so the probe is taken under a
+        # lock and the answer is kept.
+        self._version_lock = threading.Lock()
+        self._versions: dict[str, str | None] | None = None
 
     @property
     def store(self) -> Store:
@@ -148,6 +157,26 @@ class Analyzer:
     @property
     def backends(self) -> BackendRegistry:
         return self._backends
+
+    def tool_versions(self) -> dict[str, str | None]:
+        """The versions of the backends, probed once and read by everybody.
+
+        Probing runs each backend, and that takes long enough for another
+        thread to arrive in the middle of it. The backends remember that
+        they have been probed *before* the probe finishes, so a thread that
+        arrives in that window is handed ``None`` -- and a run that
+        publishes that answer says a backend that took part was not
+        installed. The evidence of that backend is dropped as well, because
+        "did this backend take part" is answered by its recorded version.
+
+        Probing under a lock, and keeping the answer, means the second
+        thread waits for the first one's answer instead of being handed a
+        hole.
+        """
+        with self._version_lock:
+            if self._versions is None:
+                self._versions = dict(self._backends.versions())
+            return dict(self._versions)
 
     def analyze(
         self,
@@ -220,7 +249,7 @@ class Analyzer:
             # the versions follow.
             run.tool_versions = {backend.name: None for backend in self._backends.all()}
             self._store.update_run(run)
-            project.tool_versions = self._backends.versions()
+            project.tool_versions = self.tool_versions()
             run.tool_versions = dict(project.tool_versions)
             # Write the versions down too, not when the run's row is next
             # saved. The next save is at the first stage transition after this
@@ -493,6 +522,14 @@ class Analyzer:
         )
         project.status = ProjectStatus.FAILED
         project.errors.append(error)
+        # The run's own row carries the reason too. The "read nothing" path
+        # has always recorded it there (``run.errors = list(project.errors)``);
+        # the exception path did not, so a run that died of an exception was
+        # stored failed with an **empty** error list, while its project said
+        # why. A reader who reads the run -- which is what the workbench's
+        # run list and the stages endpoint hand back -- saw the failure
+        # without its reason.
+        run.errors = list(project.errors)
         try:
             self._store.set_project_state(project.id, ProjectStatus.FAILED, project.errors)
             self._store.update_run(self._finish_run(run, RunStatus.FAILED))

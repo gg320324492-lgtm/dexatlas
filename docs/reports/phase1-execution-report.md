@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1887<!--/fig-->（<!--fig:tests.fast-->1738<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.4%<!--/fig-->**（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1915<!--/fig-->（<!--fig:tests.fast-->1766<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7508<!--/fig-->/<!--fig:coverage.total-->8045<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -131,7 +131,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 ## 2. 测试是怎么设计的
 
-这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.4%<!--/fig--> 这个数字意味着什么。
+这部分值得你重点审核，因为它决定了 <!--fig:coverage.pct-->93.3%<!--/fig--> 这个数字意味着什么。
 
 ### 2.1 分层策略
 
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1738<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1766<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1887<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1915<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -203,6 +203,8 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_backend_status_truth.py` | 后端状态卡分得开「版本还没探测出来」与「压根没装」：页面确实读机器那份名单（`GET /api/backends`）、确实把它交给映射（跨语言接线）（Phase 5 收尾新增） |
 | `test_desktop_card_header_layout.py` | 窄栏里卡片的标题不被角标挤成竖排：标题块占满角标让出的空间、actions 允许收缩、阶段角标允许换行（读 CSS 钉住那几条规则，布局没有单元测试能测）（Phase 5 收尾新增） |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
+| `test_msi_shortcut_repair.py` | MSI 的修复路径：repair 能不能把被删掉的快捷方式修回来（REINSTALLMODE 的 `s` 标志要赶在成本计算之前补上、控制面板的修复入口不能被 `ARPNOREPAIR` 关掉）（Phase 5 A8 新增） |
+| `test_desktop_version.py` | 桌面应用的版本号跟着发版号走：四处（package.json / tauri.conf.json / Cargo.toml / Cargo.lock）一致，MSI 的版本取自应用版本，设置页把「应用版本」与「后端版本」分两行说（Phase 5 A11 新增） |
 | `test_desktop_locator_vocabulary.py` | 前端镜像后端的 locator 词汇（跨语言，JS 单测读不了 Python 源码）：工具前缀、落点类别与后端常量不许漂移 |
 | `test_desktop_stale_copy.py` | 界面上的三句陈旧文案：错误提示不再写死回退端口而取自实际的 baseUrl（端口不可知时说「后端地址未知」）；分析页脚注与 workbench 实际提供的 `/api/backends` 一致；报告页的时间戳按本地时区显示并附 UTC 标注（打包 exe 二次验收新增） |
 | `test_upload_lifecycle.py` | 上传的保留与清理；正在运行的分析可以被取消 |
@@ -272,7 +274,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素、**不可用的按钮不夺走焦点**（`aria-disabled` 而不是原生 `disabled`）（Q2 走查 P4 新增，Phase 5 收尾补焦点一条） |
 | `test_desktop_no_stage_simulation.py` | 分析页的阶段时间线不再有前端时间模拟：模块不再导出按时间推进的函数、无 run 数据五格如实「待处理」、runs 请求失败显示「后端不可用，阶段进度无法取得」与重试入口（Phase 5 收尾新增） |
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
+| `test_workspace_redaction.py` | 错误消息里的工作区路径不能漏出机器：脱敏要认 `OSError` 用 `repr()` 引路径的那种形状（反斜杠加倍的那种——CI 的 Linux 上不会复现，规则写成平台无关的形状，每个平台都守着它），路径里分析自身的那一段要留着（2026-11-27 新增） |
 | `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
+| `test_concurrent_uploads.py` | 并发下的三件事：同一 APK 的并发上传只起**一次**分析（后来的上传回 `already_analysed=true`、不产生第二个轮次行）、一次分析的结束**不注销**还在跑的那一次（它仍可取消、令牌真被取消）、参与了的后端不会因为并发读成**没有版本**（2026-11-27 新增） |
 
 ### 2.2 几类值得注意的测试
 
@@ -893,10 +897,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1887<!--/fig--> 个：<!--fig:tests.fast-->1738<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1915<!--/fig--> 个：<!--fig:tests.fast-->1766<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.4%<!--/fig-->（<!--fig:coverage.covered-->7485<!--/fig-->/<!--fig:coverage.total-->8018<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1886<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7508<!--/fig-->/<!--fig:coverage.total-->8045<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1914<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1024,7 +1028,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
   "code": {
     "api_endpoints": 24,
     "cli_commands": 15,
-    "documents": 163,
+    "documents": 165,
     "sample_apks": 5
   },
   "coverage": {
@@ -1046,7 +1050,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "agent/tool_executor.py": [368, 35],
       "api/__init__.py": [3, 0],
       "api/app.py": [320, 21],
-      "api/uploads.py": [184, 14],
+      "api/uploads.py": [197, 18],
       "cli/__init__.py": [3, 0],
       "cli/console.py": [34, 6],
       "cli/main.py": [390, 17],
@@ -1059,8 +1063,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "core/locators.py": [313, 17],
       "core/methods.py": [218, 10],
       "core/models.py": [343, 5],
-      "core/paths.py": [36, 2],
-      "core/pipeline.py": [560, 34],
+      "core/paths.py": [37, 2],
+      "core/pipeline.py": [569, 34],
       "core/runs.py": [106, 0],
       "core/storage.py": [403, 13],
       "mcp/__init__.py": [2, 0],
@@ -1096,11 +1100,11 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/__init__.py": [0, 0],
       "workbench/__main__.py": [69, 29],
       "workbench/agent_tasks.py": [180, 14],
-      "workbench/app.py": [222, 6],
+      "workbench/app.py": [226, 6],
       "workbench/benchmarks.py": [68, 2]
     },
-    "missing": 533,
-    "statements": 8018
+    "missing": 537,
+    "statements": 8045
   },
   "history": {
     "v0.1.0": {
@@ -1117,10 +1121,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:af2cd093c1dfcddfa0198e9128cf25883c150222e44c85abf6dcaa861cfe0b05",
+  "source_fingerprint": "sha256:52186d4ef16ef4ba476b4a1c9db1ae3b6b0b9e78c29a0c6f8a11df1869708c42",
   "suite": {
     "failed": 0,
-    "passed": 1886,
+    "passed": 1914,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1134,8 +1138,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1738,
+    "fast": 1766,
     "slow": 149,
-    "total": 1887
+    "total": 1915
   }
 }-->

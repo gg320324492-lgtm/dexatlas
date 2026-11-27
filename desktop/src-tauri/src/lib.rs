@@ -66,4 +66,25 @@ mod tests {
     fn add_works() {
         assert_eq!(super::add(2, 3), 5);
     }
+
+    /// 应用自己报的版本号必须与 `tauri.conf.json` 里的那个一致。
+    ///
+    /// 设置页「应用版本」显示的就是 `app_info` 返回的值，而 MSI 的
+    /// `ProductVersion` 取的是 `tauri.conf.json` 的 `version`——两者是同一个
+    /// 数字，读者看到的版本号才是这个安装包的版本号。crate 版本
+    /// （`Cargo.toml`）与它的一致性由 `tests/test_desktop_version.py` 断言。
+    #[test]
+    fn app_version_matches_the_tauri_config() {
+        let config: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).expect("tauri.conf.json 读不出来");
+        let configured = config["version"]
+            .as_str()
+            .expect("tauri.conf.json 里没有 version 字段");
+        let reported = super::app_info();
+        assert_eq!(
+            reported["version"].as_str(),
+            Some(configured),
+            "app_info 报的版本与 tauri.conf.json 不一致"
+        );
+    }
 }

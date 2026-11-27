@@ -1,12 +1,12 @@
-# Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装
+# Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装，非 MSIX 容器启动
 
-**日期：** 2026年11月26日
+**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）
 **机器：** Windows 11 Pro 10.0.26300（x64）
-**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`
-**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」。
+**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`
+**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」；§5 补的是 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。
 
 > **本文的地位。** 验收报告是判定书；本文是那两条空白项的**原始记录**：配了什么、跑了什么命令、看到了什么、以及**哪些没看到**。本文只做记录与取证，不改判定——两条空白项的结论由验收报告的作者在看过本文后写。
-> **本文不含新的生产声明。** 每一个数字都来自本次运行的日志或截图，命令与路径都可复现（见 §5）。
+> **本文不含新的生产声明。** 每一个数字都来自本次运行的日志或截图，命令与路径都可复现（见 §6）。
 
 ---
 
@@ -16,8 +16,18 @@
 |---|---|---|
 | 打包 exe + 完整后端（JADX + Apktool + Androguard） | **通过** | 打包 exe 走完「上传 → 分析 → 项目详情 → 证据」，5 个阶段全部「已完成」，**12 条证据**、`missing_backends: []`、`complete: true`；设置页三个后端都显示「已安装 · 参与本次分析」（§2） |
 | MSI 安装 | **通过（有一个前提要说清）** | `msiexec /i … /passive` 退出码 **0**，装到 `C:\Program Files\DexAtlas Studio\`；装完启动应用，侧车起来、连上后端、跑出同样的 **12 条证据**（§3） |
+| 非 MSIX 容器下的启动（2026-11-27 第三轮） | **通过** | 无包身份的进程（`GetCurrentPackageFullName` rc=15700）启动 exe：判别实验证明读的是**真实路径**的 `backend.json`（§5.3）；同样跑出 **12 条证据**、五阶段全完成、三后端参与（§5.4）；NSIS per-user 静默升级 0.1.0→1.2.0 成功、用户数据保留（§5.5） |
 
 **两条空白项都能填上，但 MSI 那一项带一个前提：`msiexec /i … /qn`（静默）装不上，退出码 1603；换成 `/passive` 才装得上。** 原因与边界写在 §3.5——不是包的毛病，是「静默模式下 Windows Installer 不做凭据提升」这条机制。
+
+> **2026-11-27 补测更正：** 上面这句话里的「装不上」只对**未提升的会话**成立。**在已提升的会话里 `/qn` 装得上**
+> （退出码 0，见 §4.1）；而且未提升会话里的 1603 有**两个不同的失败点**（`Error 1730` / `Error 1925`），
+> 原先笼统的「1603」没有区分它们。**升级 / 卸载 / repair 三条路径也已实跑过，见 §4.2。**
+>
+> **2026-11-27 非容器补测（§5）：** 验收报告 §7.3 第 2 项「非 MSIX 容器下的启动」在本轮补上——
+> 无包身份的进程启动 exe，判别实验证明配置读的是**真实路径**，分析同样跑出完整一档
+> （12 条证据、`complete: true`），NSIS per-user 升级路径也验过。**结论（是否关闭该验收项）
+> 仍由验收报告的作者写**，本文只交证据。
 
 ---
 
@@ -260,6 +270,10 @@ E-0006 | observation | jadx did not complete in this run: jadx is not installed 
 
 ### 3.5 为什么 `/qn` 装不上、`/passive` 装得上
 
+> **2026-11-27 补测更正：** 这一节讲的是**未提升的会话**里的现象，结论仍然成立但**不是完整结论**。
+> 在**已提升**的会话里 `/qn` **装得上**（退出码 0）——见 §4.1。所以「不要加 `/qn`」要改成
+> **「在未提升的会话里不要加 `/qn`；要无人值守 + 静默，就先拿到一个已提升的会话」**。
+
 **这不是 DexAtlas 的包有问题，是 Windows Installer 的机制：**
 
 - Tauri 2.12.7 的 `bundle.windows.wix` 配置里**没有 `installMode` 选项**（只有 NSIS 有，默认 `currentUser`）→ **MSI 只能是 per-machine**，装到 Program Files 必须提权。
@@ -269,6 +283,9 @@ E-0006 | observation | jadx did not complete in this run: jadx is not installed 
 
 **给使用者的一句话：** 装这个 MSI 时**不要加 `/qn`**；用 `/passive`（或双击走 UI）即可。**这与打包配置无关，不需要改 `tauri.conf.json`。**
 
+> **2026-11-27 补测更正：** 上面这句「不要加 `/qn`」只对**未提升的会话**成立。**在已提升的会话里 `/qn` 装得上**
+> （退出码 0，见 §4.1）——无人值守部署要的是「静默 **且** 管理员令牌」，而不是「静默」本身。
+
 ---
 
 ## 4. 这次测量看不到什么
@@ -276,8 +293,8 @@ E-0006 | observation | jadx did not complete in this run: jadx is not installed 
 诚实地列出来，不要在别处被当成已验证：
 
 1. **macOS / Linux 的打包产物真机验证——没做**，也不在执行单范围内。本轮所有结论只对 Windows 11 成立。
-2. **`msiexec /i … /qn` 的无人值守安装——没做成**（退出码 1603）。做成的 `/passive` 路径在日志里表现为「Installer 提升了凭据」。**本轮没有验证 `/qn` 在一个已提升的会话里能不能装**（那需要一个人工提升的终端，本会话没有）。
-3. **MSI 的升级 / 卸载 / 修复（repair）路径——没测**。只做了一次全新安装。
+2. **`msiexec /i … /qn` 的无人值守安装——已覆盖（2026-11-27 补测）**：在**已提升**的会话里 `/qn` **装得上**，退出码 **0**；在**未提升**的会话里 `/qn` 仍然失败（1603），但失败点有两个，日志分别写得很清楚：已装旧版时是 `Error 1730`（移除旧产品需管理员权限），空场时是 `Error 1925`（权限不足）。原先「`/qn` 装不上」的结论要改成：**装不上的是未提升的会话，不是 `/qn` 本身**。详见 §4.1。
+3. **MSI 的升级 / 卸载 / repair 路径——已覆盖（2026-11-27 补测）**：升级（卸旧装新）、卸载、repair（`/fa`）三条路径都实跑过，退出码与落地状态见 §4.2。**发现一个缺陷**：`/fa` 修不回被删掉的 `Uninstall DexAtlas Studio.lnk`，而控制面板的「修复」入口被 `ARPNOREPAIR=yes` 关掉——详见 §4.2.3。
 4. **代码签名**——MSI 与 exe 都没签名（`SOFTWARE RESTRICTION POLICY: … is not digitally signed`，本机策略是 `unrestricted`，所以没拦）。**在有签名要求的机器上会怎样，未知。**
 5. **强制结束 exe 时的孤儿后端——仍未实测**（验收报告 §7 第 4 项，本轮不涉及）。本轮所有退出都是正常退出路径。
 6. **failed / cancelled run 的时间线——仍未实跑**（验收报告 §7 第 7 项）。本轮只跑成了 completed 的路径。
@@ -286,9 +303,345 @@ E-0006 | observation | jadx did not complete in this run: jadx is not installed 
 9. **多轮 / 大体量 APK**——只跑了一轮 3 KB 的样例。**并发上传、大文件（>100 MB）、畸形 APK 的桌面端表现未测。**
 10. **本轮跑的是 `dexatlas-desktop.exe` 这个「裸」可执行文件**（`target/release/`），以及它的 MSI 安装态。**NSIS 安装器本轮没有装**（上一轮验收已装过）。
 
+### 4.1 `/qn` 在提升会话里能不能装——能（2026-11-27 补测）
+
+**怎么做的提升：** 本机 `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System` 的
+`ConsentPromptBehaviorAdmin` = **0**、`EnableLUA` = 1——管理员组成员**静默提升，不弹 UAC**。
+用户 `pc` 在本机 `Administrators` 组里，所以 `Start-Process -Verb RunAs` 直接拿到了提升令牌，
+**全程无人值守、没有人工点任何按钮**：
+
+```
+Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
+```
+
+提升后的会话自报身份（写进结果文件，不是推断）：
+
+```
+ELEVATED=True
+USER=DESKTOP-BJJHSDF\pc
+INTEGRITY=Mandatory Label\High Mandatory Level 标签   S-1-16-12288
+```
+
+**计划任务那条路走不通，如实记下：** 先试了「计划任务 `-RunLevel Highest`」，
+`Register-ScheduledTask` 直接返回 **`PermissionDenied`（HRESULT 0x80070534 / 0x80070005）**——
+注册一个以最高权限运行的任务需要管理员权限，而**发起注册的那个会话本身没有管理员令牌**。
+所以本轮走的是 `Start-Process -Verb RunAs`（第 2 条）。
+
+**四组对照，每组都记了 msiexec 的退出码：**
+
+| # | 会话 | 机器状态 | 命令 | 退出码 | 日志里的失败点 / 成功点 |
+|---|---|---|---|---|---|
+| 1 | 未提升 | 已装旧版 | `msiexec /i <msi> /qn` | **1603** | `Error 1730`：移除旧产品需要管理员权限；失败动作是 `RemoveExistingProducts` |
+| 2 | 未提升 | 空场 | `msiexec /i <msi> /qn` | **1603** | `Error 1925`：权限不足；失败动作是 `InstallFinalize` |
+| 3 | **已提升** | 已装旧版 | `msiexec /i <msi> /qn` | **0** | 装上了（旧产品被移除、新产品装上） |
+| 4 | **已提升** | 空场 | `msiexec /i <msi> /qn` | **0** | 装上了（干净安装） |
+
+第 1 组与第 2 组的**失败点不是同一个**：第 1 组死在「移除旧版本」，第 2 组死在「安装新版本」。
+两组的共同前置条件都是 `MSI_LUA: Installation UI level is silent, no credential elevation is possible`
+——**静默模式不做凭据提升**；而 `/passive` 会做，日志原话是：
+
+```
+MSI_LUA: Elevation required to install product, will prompt for credentials
+MSI_LUA: Credential Request return = 0x0
+MSI_LUA: Elevated credential consent provided. Install will run elevated
+```
+
+（`/passive` 在本机同样**不需要人工交互**——凭据请求直接返回 0x0。）
+
+**给使用者的一句话（与 §3.5 那句要一起读）：** 装这个 MSI **要么用 `/passive`**，**要么在已提升的会话里用
+`/qn`**。在**未提升**的会话里 `/qn` 一定失败——这不是 DexAtlas 的包有问题，是 Windows Installer 的机制。
+
+**本轮没验到的：** `/qn` 在**已提升**会话里装**旧版**（产品码 `{680674BE-…}`）的 MSI 是什么样——本轮没有那份
+旧 MSI（见 §4.2.1 的说明），所以这条路径没有数据。
+
+
+### 4.2 升级 / 卸载 / repair 三条路径（2026-11-27 补测）
+
+#### 4.2.1 先说清楚「旧版本」是哪一份
+
+执行单里写的是「旧版从 GitHub Release 的 v1.1.0 拿」。**本轮做不到——v1.1.0 的 Release 没有任何资产**，
+而且**本仓库所有 Release 都没有资产**（`gh release list` 逐个查过，9 个 Release 的 assets 全为空数组）。
+所以「旧版本」用的是**机器上原本装着的那个 0.1.0**：
+
+| | 旧版（升级前） | 新版（本轮构建） |
+|---|---|---|
+| 来源 | 上一轮（2026-11-26）装的 | 本轮 `npm run tauri build` 产出 |
+| 源码基线 | `bb04ac5` | `f5ccff6`（本 worktree HEAD） |
+| 产品码 | `{680674BE-75AC-4D95-8397-32757BBB8C62}` | `{A8D5B3E6-03C0-4D1A-9A6F-030AC98DA30D}` |
+| ProductVersion | 0.1.0 | 0.1.0 |
+| UpgradeCode | `{1C8C5729-38FC-513A-8777-CB10AB067608}` | 同左 |
+
+**两版 ProductVersion 相同**（`desktop/src-tauri/tauri.conf.json` 的 `"version": "0.1.0"` 在两个基线上都没变过），
+所以这次「升级」实际走的是 **same-version major upgrade**：MSI 模板里有
+`<MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes" />`（WiX 模板落在
+`desktop/src-tauri/target/release/wix/x64/main.wxs`，是构建产物、不入库），新旧产品码不同 → 卸旧装新。
+
+**这与将来的 v1.1.0 → v1.2.0 是同一条路径**：产品码随每次构建变、UpgradeCode 不变、版本号由
+`tauri.conf.json` 决定。**本轮验的是 same-version 的那一种；版本号递增的那种没有单独验过。**
+
+#### 4.2.2 升级：卸旧装新，退出码 0，数据目录没丢
+
+```
+msiexec /i "<msi>" /qn /l*v <log>      # 在 §4.1 第 3 组的已提升会话里
+```
+
+| | 升级前 | 升级后 |
+|---|---|---|
+| 注册的产品码 | `{680674BE-75AC-4D95-8397-32757BBB8C62}` | `{A8D5B3E6-03C0-4D1A-9A6F-030AC98DA30D}` |
+| 安装目录 | `C:\Program Files\DexAtlas Studio\`（旧 exe 14,817,280 B） | 同一路径（**新 exe 14,822,400 B**） |
+| `InstallDate` | 20261126 | 20261127 |
+| `%APPDATA%\io.github.dexatlas.desktop\backend.json` | sha256 `d358dbc4…` | sha256 `d358dbc4…`（**未变**，mtime 也未变） |
+| 开始菜单 / 公共桌面快捷方式 | 在 | 在 |
+
+**新 exe 的字节来源追到了底**：装进机器的那份 exe sha256 = `875a21841caa40e193452660c60a31fe90bfa29bb2f5494da1b3e2c3fd444e00`；
+用 `msiexec /a`（行政安装，只解包不注册产品）把 MSI 解出来，里面 `PFiles\DexAtlas Studio\dexatlas-desktop.exe`
+的 sha256 **与装进机器的那份逐字节相同**。它与 `target/release/dexatlas-desktop.exe` 的 sha256
+（`aeeda776…`）不同，原因是 Tauri 打包时对 exe 打了 bundle-type 补丁（构建日志里写着
+*Patching … with bundle type information: msi*，随后又 patch 成 nsis，留在构建目录里的是 nsis 那一份）。
+
+**升级后应用能起来、能连上后端**（从 `C:\Program Files\DexAtlas Studio\dexatlas-desktop.exe` 启动，
+CDP 读页面）：标题 `DexAtlas Studio`、origin `http://tauri.localhost/`、首页渲染完整；
+设置页显示 **侧车运行中 · 127.0.0.1:55759 · DexAtlas 后端已就绪**，三个后端
+（jadx v1.5.2 / apktool v2.11.1 / androguard v4.1.4）都是「已安装 · 可用」。
+
+![升级后应用启动](../assets/phase5/machine-09-upgraded-home.png)
+
+> **一个容易读错的地方：** 设置页「关于」里的 **v1.2.0 是侧车后端的版本**，不是被测的桌面 exe 的版本——
+> 它来自 `src/dexatlas/__init__.py:11` 的 `__version__`（主检出里主会话正在做的发版改动），经 workbench 的
+> health 接口回到前端。**桌面 exe 自己的版本是 0.1.0**（`Cargo.toml` 与 `tauri.conf.json`）。
+
+#### 4.2.3 repair：`/fa` 修得回 exe，修不回卸载快捷方式（缺陷）
+
+**破坏**（在提升会话里，删掉安装目录里的两个文件）：`dexatlas-desktop.exe` 与 `Uninstall DexAtlas Studio.lnk`。
+
+```
+msiexec /fa "<msi>" /qn /l*v <log>      # 退出码 0
+```
+
+| | 结果 |
+|---|---|
+| `dexatlas-desktop.exe` | **修回来了**，14,822,400 B，sha256 `875a2184…`（与 §4.2.2 里 MSI 内含的那份一致） |
+| `Uninstall DexAtlas Studio.lnk` | **没修回来**（仍然缺失） |
+| 注册的产品码 | `{A8D5B3E6-…}`，不变 |
+| repair 后应用能不能启动 | **能**：首页渲染完整，侧车起来、后端三个都「已安装 · 可用」 |
+
+![repair 后的设置页](../assets/phase5/machine-08-repaired-settings.png)
+
+**为什么修不回（从 MSI 表里读出来的，不是猜的）：** `File` 表**只有一行**——`dexatlas-desktop.exe`；
+那个 `Uninstall DexAtlas Studio.lnk` 在 **`Shortcut` 表**里（`UninstallShortcut` 行，组件 `CMP_UninstallShortcut`），
+而该组件的 **KeyPath 是注册表键**（`reg8F92A735…`）而不是这个 lnk 文件。于是 repair 时 MSI 认为
+「组件已安装（`Installed: Local`）」→ **不重写快捷方式**；日志里 `CreateShortcuts` 动作
+`Return value 1`（跳过），且全文 **0 次**提到那个 lnk 文件名。
+
+**影响面（决定了这是不是一个真缺陷）：** MSI 里 `ARPNOREPAIR = yes`、`ARPNOMODIFY = 1`，
+注册表卸载项里对应着 `NoRepair = 1`、`NoModify = 1`——**控制面板「程序和功能」里的「修复」与「更改」入口
+都被关掉了**。于是用户遇到「卸载快捷方式不见了」时：
+**控制面板点不到修复，只能命令行 `msiexec /fa`（要管理员），而命令行这条路也修不回那个 lnk。**
+
+**这不是本轮引入的**：那个 lnk 是 `UninstallShortcut` 快捷方式，MSI 只在 `INSTALLDIR` 写一份；
+用户桌面上的 `C:\Users\pc\Desktop\DexAtlas Studio.lnk` **指向 `D:\Users\pc\AppData\Local\…`
+且创建于 2026-11-25 17:06:58**（早于本轮，也早于上一轮的 MSI 安装），是更早一次别的安装方式留下的孤儿，
+**本轮原样留着没动**。卸载后它依然在——**不是 MSI 卸不干净**。
+
+**建议（留给修的人，本轮不改代码）**：把卸载快捷方式从 `Shortcut` 表挪进 `File` 表（让它成为受管文件），
+或者在 `REINSTALLMODE`/`REINSTALL` 属性上让 repair 强制重建快捷方式；至少要在发布说明里写明
+「控制面板没有修复入口」。**回归测试建议**：装好后删掉 `Uninstall DexAtlas Studio.lnk`，
+跑 `msiexec /fa`（提升会话），断言该文件回来且哈希与安装态一致。
+
+#### 4.2.4 卸载：退出码 0，安装目录与注册表都清干净，用户配置目录保留
+
+```
+msiexec /x "{A8D5B3E6-03C0-4D1A-9A6F-030AC98DA30D}" /passive /l*v <log>    # 退出码 0
+```
+
+| | 卸载后 |
+|---|---|
+| `C:\Program Files\DexAtlas Studio\` | **整个目录没了** |
+| 注册表卸载项 | 没了（`STILL_REGISTERED=none`） |
+| 开始菜单快捷方式 / 公共桌面快捷方式 | 没了 |
+| `%APPDATA%\io.github.dexatlas.desktop\` | **还在**，`backend.json` sha256 与卸载前逐字节相同 |
+
+**用户配置目录保留是对的**——那是用户自己的数据（后端命令），不属于安装产物。
+
+**用旧产品码卸载会失败（升级后的必然结果）：**
+
+```
+msiexec /x "{680674BE-75AC-4D95-8397-32757BBB8C62}" /passive    # 退出码 1605
+```
+
+1605 = 「此产品未安装」——升级换掉了产品码，旧码不再是注册的产品。**执行单 §3 里那条卸载命令在升级之后
+不再适用**，得用当前产品码。**这次 1605 没有动到安装**（产品码仍是 `{A8D5B3E6-…}`，exe 完好）。
+
+#### 4.2.5 机器已恢复原状
+
+测试结束时的状态：安装目录不存在、注册表无卸载项、开始菜单与公共桌面快捷方式不存在、
+`%APPDATA%\io.github.dexatlas.desktop\backend.json` 与本轮开始时的备份**逐字节相同**
+（sha256 `d358dbc4…`）、无遗留的 dexatlas 进程与侧车进程。
+
 ---
 
-## 5. 复现命令
+## 5. 补测三：非 MSIX 容器下的启动（2026-11-27，第三轮）
+
+**补的是验收报告 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。**
+
+### 5.1 为什么这一轮就是「非容器」：进程没有包身份
+
+前两轮（§2、§3、§4）的 exe 都是由 Claude 桌面应用拉起的。Claude 桌面应用本身是 MSIX 包
+（`Get-AppxPackage`：`Claude_pzs8sxrjxfjjc`，`SignatureKind: Developer`），它启动的子进程被
+放进 MSIX 容器，配置写入被文件系统虚拟化重定向到
+`C:\Users\pc\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\…`——这就是那一项
+当初「未单独验证」的原因。
+
+本轮的驱动进程**没有包身份**，用 `GetCurrentPackageFullName` 直接量过：
+
+```
+rc = 15700 (APPMODEL_ERROR_NO_PACKAGE)   # 本会话的 shell 进程
+```
+
+这个进程用 `subprocess.Popen` 启动的 `dexatlas-desktop.exe` 因此也不在任何容器里——
+它读写的 `%APPDATA%\io.github.dexatlas.desktop\` 就是**真实路径**，不是虚拟化路径。
+这不是推断：§5.3 的判别实验把它证死了。
+
+### 5.2 被测对象：本 worktree 构建的 v1.2.0
+
+| | |
+|---|---|
+| 仓库基线 | worktree `strange-ardinghelli-f4f02c`，HEAD `d9f2f24`；`src/`、`desktop/src/`、`desktop/src-tauri/src/` 与主检出 `diff -rq` **无输出**（完全相同） |
+| 被测 exe | `desktop/src-tauri/target/release/dexatlas-desktop.exe`，14,823,424 B，sha256 `0f843b8b…`（完整：`0f843b8bd357c73a0dd229dfc27a2bc5d6e44b532630331fac22474be9f38a98`） |
+| 版本 | `1.2.0`（`tauri.conf.json`——4769076 之后版本号三处对齐发版号） |
+| 侧车 python | `E:\Dexatlas\.venv\Scripts\python.exe`（editable 指向主检出 `E:\Dexatlas\src`，与上表同一份代码） |
+| 工作区 | 本 worktree `.scratch\ws-nonmsix`（每轮开始前为空） |
+| 驱动 | 与 §2 同一套 CDP 手法（`--remote-debugging-port=9222`）；上传走 `<input type=file>` + `DataTransfer`，与用户操作同构 |
+
+三个后端环境变量与 §1.2 相同（JADX 1.5.2 / Apktool 2.11.1 / Androguard 4.1.4）。
+
+### 5.3 判别实验：exe 读的是真实路径的 backend.json，不是虚拟化那份
+
+**问题所在：** 真实路径与虚拟化路径的两份 `backend.json` 逐字节相同
+（都是 sha256 `c1387ed5…`，`fsutil file queryfileid` 显示两者在文件系统层面也是同一个文件——
+虚拟化视图是真实文件的投影）。读哪份结论都一样，所以**必须人为制造差别**才能判别。
+
+**手法：** 把真实路径的 `backend.json` 改成指向一个 wrapper 批处理——wrapper 先往标记文件
+追加一行，再把参数原样转发给真 python（stdio 继承，侧车照常工作）；虚拟化路径那份**不碰**。
+
+```
+改动前（真实路径）：{"command": "E:\\Dexatlas\\.venv\\Scripts\\python.exe", "args": ["-m","dexatlas.workbench"]}
+改动后（真实路径）：{"command": "<worktree>\\.scratch\\nonmsix-findings\\backend-wrapper.bat", "args": ["-m","dexatlas.workbench"]}
+虚拟化路径：        不动（仍是 python.exe 那份）
+```
+
+**结果（逐字）：**
+
+```
+wrapper-marker.txt: started 21:20:45.04 E:\Dexatlas\.claude\worktrees\strange-ardinghelli-f4f02c
+exe-log2.txt:       [backend-stderr] INFO:  Uvicorn running on http://127.0.0.1:53421
+```
+
+**标记文件出现了**——侧车经 wrapper 启动，即非容器 exe 读的是**真实路径**的 `backend.json`
+（`sidecar.rs` 的 `backend_config_path()` 走 `app_config_dir()`，在无包身份的进程里就是
+`%APPDATA%\io.github.dexatlas.desktop\`）。测完真实路径已恢复，与备份逐字节相同
+（sha256 `c1387ed5…`）；虚拟化路径全程未动。
+
+### 5.4 观察到什么（与 §2 同一档证据）
+
+> **三次启动，先说清。** 本轮的观察来自同一 exe 的**三次独立启动**：第一次跑了完整分析
+> （上传 → 分析 → 12 条证据，下表与两张截图）；第二次是 §5.3 的判别实验（真实
+> `backend.json` 被 wrapper 替换的那次启动）；第三次补拍项目详情 / 证据 / 设置页的导航
+> 截图。三次都是无包身份的进程拉起，工作区同一个（`ws-nonmsix`），分析只跑了第一次那次。
+
+从本 worktree 构建的 exe（非容器）启动 → 上传 `examples/demo-app/demo.apk` → 等分析完成：
+
+- 横幅：**「分析完成：5 类 · 8 方法 · 23 调用点 · 12 条证据。」**
+- 阶段进度：采集 / 解析 / 索引 / 反编译 / 报告 **五格全是「已完成」**
+- `run run_ce4c · completed · 3.0s`；`jadx v1.5.2 · apktool v2.11.1 · androguard v4.1.4`
+- 右上「后端状态」卡：三个后端全「✓ 已完成 · 参与本次分析」
+
+![非容器首页](../assets/phase5/machine-10-01-home.png)
+![非容器上传后](../assets/phase5/machine-10-02-uploaded.png)
+![非容器分析完成](../assets/phase5/machine-10-03-analysis-done.png)
+![非容器项目详情](../assets/phase5/machine-10-04-project-detail.png)
+![非容器证据页](../assets/phase5/machine-10-05-evidence.png)
+
+**工作区数据库里的数字（直查 `.scratch/ws-nonmsix/dexatlas.db`）：**
+
+```
+project apk_80a8fe0e81204c9f  status = completed
+  class_count = 5   method_count = 8   evidence_count = 12
+run run_ce4cfd8eaec14222  status = completed  completeness = complete  errors = []
+  tool_versions = {"jadx": "1.5.2", "apktool": "2.11.1", "androguard": "4.1.4"}
+```
+
+**侧车那侧（判别实验那一次启动，从 exe 日志读出端口 53421，shell 直连——shell 同样无包身份）：**
+
+```
+GET http://127.0.0.1:53421/api/health
+{"version":"1.2.0","workspace":"ws-nonmsix"}
+
+GET http://127.0.0.1:53421/api/backends
+{"available":["jadx","apktool","androguard"],"missing":[],"versions":{"jadx":"1.5.2","apktool":"2.11.1","androguard":"4.1.4"}}
+```
+
+**设置页**（第三次启动，侧车状态卡）：**「侧车：运行中 · 127.0.0.1:55999 · DexAtlas 后端已就绪」**，
+三个后端「已安装 · 可用」，关于区显示 `v1.2.0 · 桌面应用（exe 与 MSI 安装包）`。
+
+![非容器设置页](../assets/phase5/machine-10-07-settings.png)
+
+### 5.5 升级路径在非容器形态下同样成立（NSIS per-user）
+
+§4.2 验的升级是 MSI（per-machine，要提升会话）。非容器形态还有一条对应路径：
+**NSIS per-user 升级**——机器上从 2026-11-25 就装着 NSIS 0.1.0
+（`D:\Users\pc\AppData\Local\DexAtlas Studio\`，HKCU 注册表，per-user、不提权），
+本轮用本 worktree 构建的 NSIS 包静默升级它：
+
+```
+& '…\bundle\nsis\DexAtlas Studio_1.2.0_x64-setup.exe' '/S'    # 退出后核对
+```
+
+| | 升级前 | 升级后 |
+|---|---|---|
+| 注册表 `DisplayVersion` | 0.1.0 | **1.2.0** |
+| 安装目录 | `D:\Users\pc\AppData\Local\DexAtlas Studio\` | 同一路径 |
+| 装进去的 exe | 14,816,256 B，sha256 `14e5f7fd…` | 14,823,424 B，sha256 `8c355d29…` |
+| `.dexatlas\dexatlas.db`（用户数据） | sha256 `a020626f…` | **逐字节相同** |
+
+装进去的 exe 与 `target/release` 那份（`0f843b8b…`）**同尺寸（14,823,424 B）不同哈希**——
+与 §4.2.2 里 MSI 那份的现象一致：打包器给 exe 打了 bundle-type 补丁
+（构建日志：*Patching … with bundle type information: nsis*）。
+
+**升级后从安装目录启动**（安装态 + 非容器；`repo_root_from_exe()` 从
+`D:\Users\pc\AppData\Local\DexAtlas Studio` 反推不出仓库根 → `backend_cwd()` 返回 `None`，
+与 §3.4 记录的机制相同）：
+
+```
+GET http://127.0.0.1:65207/api/health     → {"version":"1.2.0","workspace":"ws-nonmsix"}
+GET http://127.0.0.1:65207/api/backends   → 三个后端齐全（同 §5.4）
+```
+
+![安装态首页](../assets/phase5/machine-10-08-installed-home.png)
+![安装态设置页](../assets/phase5/machine-10-09-installed-settings.png)
+
+### 5.6 这一轮没验到的
+
+- **卸载路径**：NSIS 卸载会把安装目录连同里面的 `.dexatlas` 用户数据一起删掉；那份 0.1.0
+  时代的项目数据不是本轮创建的，删它要作者拍板，本轮没有执行卸载。MSI 的卸载路径 §4.2.4 已验过。
+- **修复（repair）路径**：NSIS 安装器没有 repair 模式（MSI 的 §4.2.3 已验）。
+- **首次安装（空机器 → 装上）**：本轮只验了「在已有 0.1.0 的机器上升 1.2.0」；
+  全新机器的首次 NSIS 安装没验（主会话 2026-11-27 的打包复验轮已覆盖 MSI 首装）。
+- **MSI 在非容器下的重装**：MSI 装卸都验过，但都是在（可能的）容器上下文里跑的命令行；
+  本轮没有再走一遍 MSI。判断上 msiexec 的容器敏感性远低于 GUI 应用（它本来就是系统服务），
+  但没有单独取证。
+
+### 5.7 机器状态（本轮结束时）
+
+- 本 worktree 构建的 exe / MSI / NSIS 三件产物**留在 `target/release`**（主会话发版要用同一棵树的产物）；
+- D 盘的 NSIS 安装**升到了 1.2.0 并保留**（这是机器上原有的安装，升级前是 0.1.0）；
+- 真实路径与虚拟化路径的 `backend.json` 都与本轮开始时逐字节相同（sha256 `c1387ed5…`）；
+- 无遗留 dexatlas / 侧车 / 安装器进程；wrapper 批处理与标记文件留在
+  `<worktree>/.scratch/nonmsix-findings/`（`.scratch/` 不入库）。
+
+---
+
+## 6. 复现命令
 
 ```bash
 # 1) 桌面端依赖与打包（worktree 根目录）
@@ -309,6 +662,47 @@ msiexec /i ".\desktop\src-tauri\target\release\bundle\msi\DexAtlas Studio_0.1.0_
 msiexec /x "{680674BE-75AC-4D95-8397-32757BBB8C62}" /passive
 ```
 
+**2026-11-27 补测用的命令**（升级 / 卸载 / repair / 提升会话里的 `/qn`）：
+
+```powershell
+# 5) 升级（产品码不同 → 走 MajorUpgrade，卸旧装新）。/qn 需要已提升的会话
+msiexec /i "<msi>" /qn /l*v "<log>"
+
+# 6) repair（要管理员）：修得回 exe，修不回被删掉的 Uninstall 快捷方式
+msiexec /fa "<msi>" /qn /l*v "<log>"
+
+# 7) 卸载（用**当前**产品码；升级后旧码会返回 1605）
+msiexec /x "{A8D5B3E6-03C0-4D1A-9A6F-030AC98DA30D}" /passive /l*v "<log>"
+
+# 8) 拿到一个已提升的会话（本机 ConsentPromptBehaviorAdmin=0 → 不弹 UAC）
+Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
+```
+
+**2026-11-27 非容器补测用的命令**（§5）：
+
+```powershell
+# 9) 确认驱动进程没有包身份（rc=15700 = APPMODEL_ERROR_NO_PACKAGE）
+$sig = @'
+using System; using System.Runtime.InteropServices;
+public class PkgId {
+  [DllImport("kernel32.dll", SetLastError=true)]
+  public static extern int GetCurrentPackageFullName(ref uint pn, [MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder b);
+}
+'@
+Add-Type -TypeDefinition $sig
+$sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
+[PkgId]::GetCurrentPackageFullName([ref]$len, $sb)   # → 15700
+
+# 10) NSIS per-user 静默升级（0.1.0 → 1.2.0；per-user 不提权，无重启环节）
+& '<worktree>\desktop\src-tauri\target\release\bundle\nsis\DexAtlas Studio_1.2.0_x64-setup.exe' '/S'
+
+# 11) 判别实验：把真实路径 backend.json 指向落标记的 wrapper，虚拟化那份不动
+#    标记出现 ⇒ exe 读的是真实路径（脚本：<worktree>\.scratch\discriminate-nonmsix.py）
+```
+
+> **msiexec 的两个坑（本轮踩过）：** 包路径含空格要用引号包起来，否则 **1639**（命令行无效）；
+> 包路径用正斜杠会得到 **1619**（打不开安装包）——用原生反斜杠。
+
 **取证脚本**（本轮用的，不入库，放在 worktree 的 `.scratch/`）：
 
 | 脚本 | 作用 |
@@ -322,14 +716,24 @@ msiexec /x "{680674BE-75AC-4D95-8397-32757BBB8C62}" /passive
 
 ---
 
-## 6. 本轮产出的文件
+## 7. 本轮产出的文件
 
 | 文件 | 说明 |
 |---|---|
 | `docs/reports/phase5-machine-verification.md` | 本文 |
 | `docs/assets/phase5/machine-01-home.png` … `machine-06b-settings-window.png` | 打包 exe（`target/release`）全链路截图，CDP 截图 + 原生整窗截图 |
 | `docs/assets/phase5/machine-07-*.png` | MSI 安装后从 `C:\Program Files\DexAtlas Studio\` 启动的应用截图 |
+| `docs/assets/phase5/machine-08-repaired-settings.png` | 2026-11-27 补测：repair 之后的应用设置页（侧车运行中 · 三个后端「已安装 · 可用」） |
+| `docs/assets/phase5/machine-09-upgraded-home.png` | 2026-11-27 补测：升级之后的应用首页 |
+| `docs/assets/phase5/machine-10-01-home.png` … `machine-10-05-evidence.png`、`machine-10-07-settings.png` | 2026-11-27 非容器补测（§5）：无包身份进程启动 exe 的全链路截图 |
+| `docs/assets/phase5/machine-10-08-installed-home.png`、`machine-10-09-installed-settings.png` | 2026-11-27 非容器补测（§5.5）：NSIS 静默升级到 1.2.0 后从安装目录启动的截图 |
 
 **没有改任何生产代码**：`src/**`、`tests/**`、`desktop/src/**`、`desktop/src-tauri/src/**` 一个字没动；`desktop/src-tauri/tauri.conf.json` 也没动（MSI 打包不需要改 bundle 配置）。第三方 APK / DEX / `so` / 密钥没有进仓库（只用了仓库自带的一方样例）。
 
-**机器上留下的状态：** DexAtlas Studio **仍然装着**（`C:\Program Files\DexAtlas Studio\`，MSI 产品码 `{680674BE-75AC-4D95-8397-32757BBB8C62}`）。要清掉就 `msiexec /x "{680674BE-75AC-4D95-8397-32757BBB8C62}" /passive`。除此之外，本轮没有在系统上留下别的东西（自制的探针 MSI **没有**装上，探查用的高权限计划任务已删除）。
+**机器上留下的状态（2026-11-27 补测结束时）：** DexAtlas Studio **已经卸干净了**——安装目录 `C:\Program Files\DexAtlas Studio\` 不存在、注册表没有卸载项、开始菜单与公共桌面快捷方式不存在。**用户配置目录 `%APPDATA%\io.github.dexatlas.desktop\backend.json` 保留**（卸载不该删用户数据），内容与本轮开始时的备份逐字节相同（sha256 `d358dbc4…`）。没有遗留 dexatlas 进程或侧车进程，也没有遗留计划任务（本轮用来提权的任务始终**注册失败**，机器上从未存在过）。
+
+> 2026-11-26 那一轮结束时的状态是「仍然装着、产品码 `{680674BE-…}`」；2026-11-27 的补测把它卸掉了，
+> 并把产品码换成了 `{A8D5B3E6-…}`。**要再装回来，用本轮构建的 MSI 即可。**
+>
+> 2026-11-27 非容器补测结束时的状态见 §5.7：D 盘的 NSIS per-user 安装从 0.1.0 升到了
+> 本 worktree 构建的 1.2.0 并保留；两份 `backend.json` 都与轮前逐字节相同。

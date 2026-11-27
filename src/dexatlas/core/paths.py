@@ -130,10 +130,20 @@ def redact_workspace(message: str, *roots: Path) -> str:
     read back through the API, through the JSON report and through the
     Markdown report, and redacting it at each of those is three chances to
     forget one. Redacted once, where it is written, it is redacted everywhere.
+
+    The path is looked for in **two** shapes, because an exception quotes it
+    in two shapes. ``OSError.__str__`` renders the file name through
+    ``repr()``, which doubles the backslashes -- so on Windows the message
+    holds ``E:\\\\work\\\\ws`` where the path is ``E:\\work\\\\ws``, and the
+    plain form does not match it. That is the commonest failure there is
+    ("this file was not there"), and it is the one that leaked: the path went
+    into the message, into the database and into the interface unchanged.
     """
     for root in roots:
         for candidate in (str(root), str(root.resolve())):
             message = message.replace(candidate, "<workspace>")
+            # The repr() shape: the same path with every backslash doubled.
+            message = message.replace(candidate.replace("\\", "\\\\"), "<workspace>")
     return message
 
 
