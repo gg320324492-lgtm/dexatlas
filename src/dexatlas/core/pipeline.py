@@ -493,6 +493,14 @@ class Analyzer:
         )
         project.status = ProjectStatus.FAILED
         project.errors.append(error)
+        # The run's own row carries the reason too. The "read nothing" path
+        # has always recorded it there (``run.errors = list(project.errors)``);
+        # the exception path did not, so a run that died of an exception was
+        # stored failed with an **empty** error list, while its project said
+        # why. A reader who reads the run -- which is what the workbench's
+        # run list and the stages endpoint hand back -- saw the failure
+        # without its reason.
+        run.errors = list(project.errors)
         try:
             self._store.set_project_state(project.id, ProjectStatus.FAILED, project.errors)
             self._store.update_run(self._finish_run(run, RunStatus.FAILED))
