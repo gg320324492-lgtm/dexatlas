@@ -542,3 +542,95 @@ describe("deriveBackends", () => {
     expect(jadx?.detail).toContain("未记录");
   });
 });
+
+/**
+ * `tool_versions` 里的 `null` 有**三种**含义，卡片能分开其中哪两种。
+ *
+ * 一个 `null` 是这三件事之一：
+ *
+ * - ① **还没探测** —— 探测还在跑，或者刚开始。管道在探测前先把名字写下去。
+ * - ② **压根没装** —— 机器上没有这个后端。
+ * - ③ **探测失败** —— 后端**装着**（机器名单上它不在 `missing` 里），但
+ *   `--version` 跑起来什么都没返回。
+ *
+ * 能分开哪两种、靠的是哪条证据：
+ *
+ * | 含义 | 靠什么分开 |
+ * |------|-----------|
+ * | ① vs ② | 机器名单：② 在 `missing` 里，① 不在 |
+ * | ② vs ③ | 机器名单：② 在 `missing` 里，③ 不在（它装着） |
+ * | ① vs ③ | **分不开**（轮次还在跑时）：两者都是「装着、版本没记下来」 |
+ *
+ * ① vs ③ 分不开的时候，卡片说的那句「参与本次分析 · 版本尚未记录」对两者
+ * **都成立**——它不是谎话，它是不猜。
+ *
+ * 后端那半（每一种 `null` 是在哪里写出来的）由
+ * `tests/test_desktop_backend_status_truth.py` 钉住；这里钉的是界面怎么说。
+ */
+describe("deriveBackends：null 的三种含义", () => {
+  /** 一轮还活着的分析：三个后端都在名单上，版本都还没记下来。 */
+  const liveRun = {
+    status: "running",
+    tool_versions: { jadx: null, apktool: null, androguard: null },
+  };
+
+  it("separates ② (not installed) from ① (not probed yet)", () => {
+    // 机器上没装 jadx：它是 ②，卡片必须说「未安装」，
+    // 不能说「版本尚未记录」——那会把一个根本没参与的后端说成参与了。
+    const backends = deriveBackends(liveRun, { missing: ["jadx"] });
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("error");
+    expect(jadx?.detail).toContain("未安装或未配置");
+    expect(jadx?.detail).toContain("未参与本次分析");
+  });
+
+  it("separates ② (not installed) from ③ (the probe failed)", () => {
+    // jadx 装着（机器名单上没有它），但版本没问出来：这是 ③。
+    // 卡片不能把它说成「未安装」——那是对机器的一句谎话，而机器上明明装着。
+    const backends = deriveBackends(liveRun, { missing: [] });
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).not.toBe("error");
+    expect(jadx?.detail).not.toContain("未安装");
+  });
+
+  it("cannot separate ① from ③, and says the one thing that is true of both", () => {
+    // 轮次还活着：①（还没探测完）与 ③（探测失败）在这一刻**分不开**——
+    // 机器名单分不开，它答的是「装没装」，而两者都是装着的。
+    //
+    // 卡片对两者说的是同一句：「参与本次分析 · 版本尚未记录」。
+    // 这句对 ① 和 ③ 都成立，所以它不是谎话。
+    const backends = deriveBackends(liveRun, { missing: [] });
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.state).toBe("running");
+    expect(jadx?.detail).toContain("参与本次分析");
+    expect(jadx?.detail).toContain("版本尚未记录");
+    // 不能声称自己分得出 ① 和 ③：分不出时说得出，就是猜。
+    expect(jadx?.detail).not.toContain("探测失败");
+    expect(jadx?.detail).not.toContain("探测中");
+  });
+
+  it("separates ③ from ① once the run is over", () => {
+    // 轮次结束了，版本还是空的：探测早就结束了，所以「还没探测」已经不成立，
+    // 只剩 ③。卡片这时说的是「版本未知」——不再说「版本尚未记录」。
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { jadx: null, apktool: null, androguard: null } },
+      { missing: [] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.detail).toContain("版本未知");
+    expect(jadx?.detail).not.toContain("版本尚未记录");
+    expect(jadx?.detail).not.toContain("未安装");
+  });
+
+  it("still says not-installed for a backend the machine really does not have", () => {
+    // 三种含义分开之后，最容易丢的是 ②：机器上真没有的后端，不能被说成
+    // 「版本未知」或者「正在探测」。
+    const backends = deriveBackends(
+      { status: "completed", tool_versions: { jadx: null, apktool: null, androguard: null } },
+      { missing: ["jadx", "apktool"] },
+    );
+    const jadx = backends.find((b) => b.name === "JADX");
+    expect(jadx?.detail).toContain("未安装或未配置");
+    expect(jadx?.detail).not.toContain("版本未知");
+  });
+});
