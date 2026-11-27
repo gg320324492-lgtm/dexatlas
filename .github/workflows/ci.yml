@@ -888,12 +888,48 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Install dependencies
         run: uv sync --extra dev --frozen
+      # Which release this gate is about is decided here, from the ref that
+      # was pushed -- not from a constant in the script. A hardcoded default
+      # named one release forever: the gate went on checking v1.0.0 after
+      # every later release had shipped, and it reported on v1.0.0 while
+      # the reader assumed it was about the release that had just gone out.
+      #
+      # * a tag push -- that tag. The release it names is the one being
+      #   published, so it is the one to check.
+      # * a branch push -- the newest release tag in the repository. There
+      #   is no new release to check, and the newest one is what the
+      #   outward texts are still describing.
+      # * a pull request -- no release at all. A pull request cuts no tag
+      #   and publishes no release body, so the gate says that rather than
+      #   checking some other release's body and reporting it as if it were
+      #   this one's.
+      #
+      # A tag's CI runs before the release is published -- on v1.2.0 the job
+      # finished at 04:18:18Z and the release was published at 04:26:58Z --
+      # so the published body of a tag push is allowed to be missing. The
+      # gate then says which release it did not check, and the checks it
+      # could do still run.
       - name: The outward texts agree on the release numbers
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          uv run --no-sync python scripts/check-release-numbers.py
-          --repo "${{ github.repository }}"
+          EVENT: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            uv run --no-sync python scripts/check-release-numbers.py \
+              --repo "${{ github.repository }}" \
+              --no-release "a pull request publishes no release body"
+          elif [ "$REF_TYPE" = "tag" ]; then
+            uv run --no-sync python scripts/check-release-numbers.py \
+              --repo "${{ github.repository }}" \
+              --tag "$REF_NAME" \
+              --expect-unpublished
+          else
+            uv run --no-sync python scripts/check-release-numbers.py \
+              --repo "${{ github.repository }}"
+          fi
       # Some numbers are written by hand, in a sentence: the CI job count, the
       # number of MCP tools, the test count the portfolio quotes. Nothing
       # rewrites those, so a number that goes stale is a number nobody
