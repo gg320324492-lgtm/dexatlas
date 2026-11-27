@@ -40,10 +40,10 @@ Androguard 和 JADX 会为同一个类各产出一条 `ClassRef`（第 2 节讲�
 - **JADX 不产出方法、字段、交叉引用里的任何一条。** JADX 后端只产出 `ClassRef`
   （`tools/jadx/adapter.py:303-310`）。方法表、字段表、交叉引用表 100% 来自 Androguard。
   **JADX 在方法上的唯一贡献是 `decompiled` 这个标志**：它是 JADX 对「这个方法我反编译出来了」的
-  回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:1399-1416` 的 `_apply_decompilation`）。
+  回答，被记在 Androguard 产出的那一条方法上（`core/pipeline.py:1407-1424` 的 `_apply_decompilation`）。
   它是**状态**，不是结构——方法的签名、描述符、访问标志仍然全部来自 Androguard。
 - **Apktool 不产出任何符号。** 它产出 manifest、Smali 文件和资源表里的文本；
-  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:799-823` 的 `class_source` / `method_source`），
+  Smali 是**按需读取**的，不进索引、不进证据表（`core/pipeline.py:807-831` 的 `class_source` / `method_source`），
   资源字符串则进 `resources` 表，也进全文索引（见 5.4）。
 - **资源覆盖了一部分，不是全部。** Apktool 会把 `res/` 解码到工作区，`src/` 里现在**有**代码读它：
   `read_resources()` 读 `res/values*/` 下的文本声明（`tools/apktool/adapter.py:233-355`），
@@ -101,7 +101,7 @@ JADX 报 `interface` 时结果是 `interface`，哪怕 Androguard 报的是 `cla
 
 **还有一处不是「冲突」，是分工：** `MethodRef.decompiled`（这个方法有没有被反编译成
 Java）只有 JADX 知道，Androguard 读 DEX 根本答不了这个问题。所以这条标志是
-**JADX 写、Androguard 的那条方法上记**（`core/pipeline.py:1399-1416` 的 `_apply_decompilation`）。
+**JADX 写、Androguard 的那条方法上记**（`core/pipeline.py:1407-1424` 的 `_apply_decompilation`）。
 它不是结构，合并规则对它不适用：方法表里没有第二个来源跟它抢。
 
 ---
@@ -546,7 +546,7 @@ $ uv run dexatlas analyze examples/demo-app/demo.apk
 这一行整个不出现——不是 0，是「没有这一说」。
 同理，方法表里的 `decompiled` 全部是 `false`：没有反编译器，就没有反编译出来的 Java。
 
-这时候 `class_source` 会落到 Smali（`core/pipeline.py:808-816`）：
+这时候 `class_source` 会落到 Smali（`core/pipeline.py:816-824`）：
 
 ```smali
 .class public final Lcom/example/demo/Crypto;

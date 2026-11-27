@@ -272,6 +272,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_keyboard_accessibility.py` | 桌面外壳的键盘契约：skip-link 是第一跳且聚焦时显形、它的落点（main）必须画出焦点环、浮层焦点陷阱两端环绕、Esc 关闭且焦点回到触发元素、**不可用的按钮不夺走焦点**（`aria-disabled` 而不是原生 `disabled`）（Q2 走查 P4 新增，Phase 5 收尾补焦点一条） |
 | `test_desktop_no_stage_simulation.py` | 分析页的阶段时间线不再有前端时间模拟：模块不再导出按时间推进的函数、无 run 数据五格如实「待处理」、runs 请求失败显示「后端不可用，阶段进度无法取得」与重试入口（Phase 5 收尾新增） |
 | `test_desktop_open_source_inline.py` | 证据抽屉的「打开来源」内联展示后端返回的源码：真实路径与行数/字节等可核对信息、截断时明示上限、无落点 locator 仍禁用且说明可见（Phase 5 收尾新增） |
+| `test_workspace_redaction.py` | 错误消息里的工作区路径不能漏出机器：脱敏要认 `OSError` 用 `repr()` 引路径的那种形状（反斜杠加倍的那种——CI 的 Linux 上不会复现，规则写成平台无关的形状，每个平台都守着它），路径里分析自身的那一段要留着（2026-11-27 新增） |
 | `test_desktop_polling_terminal.py` | 桌面端的终态口径与轮询停止：唯一一份终态判定（completed / failed / cancelled，未知状态按「不是终态」）、项目状态与 runs 列表与阶段事件三处轮询进终态即停、页面接线不再用裸 setInterval（Phase 5 收尾新增） |
 
 ### 2.2 几类值得注意的测试

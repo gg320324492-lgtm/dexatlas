@@ -542,7 +542,7 @@ REST 段有两项是条件检查：`server comes up` 只在服务起不来时记
 | `analyze` 无可用代码索引（三后端全失败，manifest 仍可解析） | 6 | ✅ / ✅ |
 
 `source` 与 `resources` 那两个调用点按「这次分析里有没有对应后端参与」分支。前提从项目
-自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1081-1096` 的
+自己记下的 `tool_versions` 读——那是 `src/dexatlas/core/pipeline.py:1089-1104` 的
 `_took_part` 用的同一份记录，问的是「这次运行有没有这个后端」，不是「这台机器上装没装」：
 
 - 无源码后端（JADX、Apktool 都不在环境里）时：`source` 答 1（空），并在 stderr 点名缺

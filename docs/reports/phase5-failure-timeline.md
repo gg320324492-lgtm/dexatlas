@@ -182,7 +182,7 @@ HTTP 202
 
 ![时间线 C：取消请求已受理（202），分析还在跑，日志区记下了这一条](../assets/phase5/timeline-04-cancel-requested.png)
 
-**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1113` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:506-507`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
+**管线怎么停的：** 取消不是立刻掐断。请求只是把取消令牌置位，管线在**下一个检查点**才停——`src/dexatlas/core/pipeline.py:1121` 的 `_check_cancelled`。实测：`parse-apktool` 阶段从 11:59:35 跑到 12:00:14（39 秒，这个阶段本身要解 1200 个 dex），阶段结束后管线抛出 `AnalysisCancelled`，`_record_cancellation`（`src/dexatlas/core/pipeline.py:514-515`）把项目记成失败、把 run 记成 `cancelled`。阶段事件里因此**没有** `index-androguard` 和 `decompile-jadx`（阶段事件与数据库里的时间是 UTC，界面日志里的时间是本地时间，差 8 小时）：
 
 ```
 inspect           11:59:35.44 -> 11:59:35.44
@@ -337,7 +337,7 @@ androguard: androguard could not parse classes.dex
 4. ~~**取消发生在别的阶段。**~~ **已覆盖（2026-11-27 收尾）**：在打包 exe 里造出了「取消发生在索引期」与「取消发生在反编译期」两个场景，各跑一遍。
    **基线：** 本条**测了两棵树**，两次都是当轮 `npm run tauri build` 出来的 exe：① `8140661`（PR #32 之前）；② `b6c0438`（`main` 合了 PR #32 `4ddf469`「阶段格与后端推进点一一对应」，再合 PR #33 `ec5de0a`、复测量 `0a231d0`、外发材料 `b6c0438`）。上传的是与第 3 条同一个合成 APK（300 个类 / 12,000 个方法 / 300 个 dex 文件）。取消用**真实鼠标点击**（CDP `Input.dispatchMouseEvent`）按下，不是键盘。
 
-   **怎么造的场景：** 取消不是立刻掐断的——请求只是把取消令牌置位，管线在**下一个检查点**才停（`src/dexatlas/core/pipeline.py:1113`）。所以「在哪个阶段取消」不是靠盯着界面猜的：脚本轮询后端自己的阶段事件端点 `GET /api/projects/{id}/runs/{run_id}/stages`，**等到目标阶段的 `finished_at` 还是 `null`（也就是它正在跑）的那一刻**，再用真实鼠标点击按下「取消」。
+   **怎么造的场景：** 取消不是立刻掐断的——请求只是把取消令牌置位，管线在**下一个检查点**才停（`src/dexatlas/core/pipeline.py:1121`）。所以「在哪个阶段取消」不是靠盯着界面猜的：脚本轮询后端自己的阶段事件端点 `GET /api/projects/{id}/runs/{run_id}/stages`，**等到目标阶段的 `finished_at` 还是 `null`（也就是它正在跑）的那一刻**，再用真实鼠标点击按下「取消」。
 
    前端每 2 秒轮询一次，所以界面会比后端的阶段事实**最多晚一个轮询周期**。第二轮（`b6c0438`）在点了取消之前**额外等页面自己把这一格点着**（等到那格的徽标变成「◌ 进行中」再截屏、再点），这样截到的是「读者读得到的那句话」，而不是页面还停在上一格时的样子。
 
