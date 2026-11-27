@@ -1,12 +1,12 @@
-# Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装
+# Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装，非 MSIX 容器启动
 
-**日期：** 2026年11月26日
+**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）
 **机器：** Windows 11 Pro 10.0.26300（x64）
-**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`
-**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」。
+**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`
+**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」；§5 补的是 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。
 
 > **本文的地位。** 验收报告是判定书；本文是那两条空白项的**原始记录**：配了什么、跑了什么命令、看到了什么、以及**哪些没看到**。本文只做记录与取证，不改判定——两条空白项的结论由验收报告的作者在看过本文后写。
-> **本文不含新的生产声明。** 每一个数字都来自本次运行的日志或截图，命令与路径都可复现（见 §5）。
+> **本文不含新的生产声明。** 每一个数字都来自本次运行的日志或截图，命令与路径都可复现（见 §6）。
 
 ---
 
@@ -16,12 +16,18 @@
 |---|---|---|
 | 打包 exe + 完整后端（JADX + Apktool + Androguard） | **通过** | 打包 exe 走完「上传 → 分析 → 项目详情 → 证据」，5 个阶段全部「已完成」，**12 条证据**、`missing_backends: []`、`complete: true`；设置页三个后端都显示「已安装 · 参与本次分析」（§2） |
 | MSI 安装 | **通过（有一个前提要说清）** | `msiexec /i … /passive` 退出码 **0**，装到 `C:\Program Files\DexAtlas Studio\`；装完启动应用，侧车起来、连上后端、跑出同样的 **12 条证据**（§3） |
+| 非 MSIX 容器下的启动（2026-11-27 第三轮） | **通过** | 无包身份的进程（`GetCurrentPackageFullName` rc=15700）启动 exe：判别实验证明读的是**真实路径**的 `backend.json`（§5.3）；同样跑出 **12 条证据**、五阶段全完成、三后端参与（§5.4）；NSIS per-user 静默升级 0.1.0→1.2.0 成功、用户数据保留（§5.5） |
 
 **两条空白项都能填上，但 MSI 那一项带一个前提：`msiexec /i … /qn`（静默）装不上，退出码 1603；换成 `/passive` 才装得上。** 原因与边界写在 §3.5——不是包的毛病，是「静默模式下 Windows Installer 不做凭据提升」这条机制。
 
 > **2026-11-27 补测更正：** 上面这句话里的「装不上」只对**未提升的会话**成立。**在已提升的会话里 `/qn` 装得上**
 > （退出码 0，见 §4.1）；而且未提升会话里的 1603 有**两个不同的失败点**（`Error 1730` / `Error 1925`），
 > 原先笼统的「1603」没有区分它们。**升级 / 卸载 / repair 三条路径也已实跑过，见 §4.2。**
+>
+> **2026-11-27 非容器补测（§5）：** 验收报告 §7.3 第 2 项「非 MSIX 容器下的启动」在本轮补上——
+> 无包身份的进程启动 exe，判别实验证明配置读的是**真实路径**，分析同样跑出完整一档
+> （12 条证据、`complete: true`），NSIS per-user 升级路径也验过。**结论（是否关闭该验收项）
+> 仍由验收报告的作者写**，本文只交证据。
 
 ---
 
@@ -474,7 +480,168 @@ msiexec /x "{680674BE-75AC-4D95-8397-32757BBB8C62}" /passive    # 退出码 1605
 
 ---
 
-## 5. 复现命令
+## 5. 补测三：非 MSIX 容器下的启动（2026-11-27，第三轮）
+
+**补的是验收报告 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。**
+
+### 5.1 为什么这一轮就是「非容器」：进程没有包身份
+
+前两轮（§2、§3、§4）的 exe 都是由 Claude 桌面应用拉起的。Claude 桌面应用本身是 MSIX 包
+（`Get-AppxPackage`：`Claude_pzs8sxrjxfjjc`，`SignatureKind: Developer`），它启动的子进程被
+放进 MSIX 容器，配置写入被文件系统虚拟化重定向到
+`C:\Users\pc\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\…`——这就是那一项
+当初「未单独验证」的原因。
+
+本轮的驱动进程**没有包身份**，用 `GetCurrentPackageFullName` 直接量过：
+
+```
+rc = 15700 (APPMODEL_ERROR_NO_PACKAGE)   # 本会话的 shell 进程
+```
+
+这个进程用 `subprocess.Popen` 启动的 `dexatlas-desktop.exe` 因此也不在任何容器里——
+它读写的 `%APPDATA%\io.github.dexatlas.desktop\` 就是**真实路径**，不是虚拟化路径。
+这不是推断：§5.3 的判别实验把它证死了。
+
+### 5.2 被测对象：本 worktree 构建的 v1.2.0
+
+| | |
+|---|---|
+| 仓库基线 | worktree `strange-ardinghelli-f4f02c`，HEAD `d9f2f24`；`src/`、`desktop/src/`、`desktop/src-tauri/src/` 与主检出 `diff -rq` **无输出**（完全相同） |
+| 被测 exe | `desktop/src-tauri/target/release/dexatlas-desktop.exe`，14,823,424 B，sha256 `0f843b8b…`（完整：`0f843b8bd357c73a0dd229dfc27a2bc5d6e44b532630331fac22474be9f38a98`） |
+| 版本 | `1.2.0`（`tauri.conf.json`——4769076 之后版本号三处对齐发版号） |
+| 侧车 python | `E:\Dexatlas\.venv\Scripts\python.exe`（editable 指向主检出 `E:\Dexatlas\src`，与上表同一份代码） |
+| 工作区 | 本 worktree `.scratch\ws-nonmsix`（每轮开始前为空） |
+| 驱动 | 与 §2 同一套 CDP 手法（`--remote-debugging-port=9222`）；上传走 `<input type=file>` + `DataTransfer`，与用户操作同构 |
+
+三个后端环境变量与 §1.2 相同（JADX 1.5.2 / Apktool 2.11.1 / Androguard 4.1.4）。
+
+### 5.3 判别实验：exe 读的是真实路径的 backend.json，不是虚拟化那份
+
+**问题所在：** 真实路径与虚拟化路径的两份 `backend.json` 逐字节相同
+（都是 sha256 `c1387ed5…`，`fsutil file queryfileid` 显示两者在文件系统层面也是同一个文件——
+虚拟化视图是真实文件的投影）。读哪份结论都一样，所以**必须人为制造差别**才能判别。
+
+**手法：** 把真实路径的 `backend.json` 改成指向一个 wrapper 批处理——wrapper 先往标记文件
+追加一行，再把参数原样转发给真 python（stdio 继承，侧车照常工作）；虚拟化路径那份**不碰**。
+
+```
+改动前（真实路径）：{"command": "E:\\Dexatlas\\.venv\\Scripts\\python.exe", "args": ["-m","dexatlas.workbench"]}
+改动后（真实路径）：{"command": "<worktree>\\.scratch\\nonmsix-findings\\backend-wrapper.bat", "args": ["-m","dexatlas.workbench"]}
+虚拟化路径：        不动（仍是 python.exe 那份）
+```
+
+**结果（逐字）：**
+
+```
+wrapper-marker.txt: started 21:20:45.04 E:\Dexatlas\.claude\worktrees\strange-ardinghelli-f4f02c
+exe-log2.txt:       [backend-stderr] INFO:  Uvicorn running on http://127.0.0.1:53421
+```
+
+**标记文件出现了**——侧车经 wrapper 启动，即非容器 exe 读的是**真实路径**的 `backend.json`
+（`sidecar.rs` 的 `backend_config_path()` 走 `app_config_dir()`，在无包身份的进程里就是
+`%APPDATA%\io.github.dexatlas.desktop\`）。测完真实路径已恢复，与备份逐字节相同
+（sha256 `c1387ed5…`）；虚拟化路径全程未动。
+
+### 5.4 观察到什么（与 §2 同一档证据）
+
+> **三次启动，先说清。** 本轮的观察来自同一 exe 的**三次独立启动**：第一次跑了完整分析
+> （上传 → 分析 → 12 条证据，下表与两张截图）；第二次是 §5.3 的判别实验（真实
+> `backend.json` 被 wrapper 替换的那次启动）；第三次补拍项目详情 / 证据 / 设置页的导航
+> 截图。三次都是无包身份的进程拉起，工作区同一个（`ws-nonmsix`），分析只跑了第一次那次。
+
+从本 worktree 构建的 exe（非容器）启动 → 上传 `examples/demo-app/demo.apk` → 等分析完成：
+
+- 横幅：**「分析完成：5 类 · 8 方法 · 23 调用点 · 12 条证据。」**
+- 阶段进度：采集 / 解析 / 索引 / 反编译 / 报告 **五格全是「已完成」**
+- `run run_ce4c · completed · 3.0s`；`jadx v1.5.2 · apktool v2.11.1 · androguard v4.1.4`
+- 右上「后端状态」卡：三个后端全「✓ 已完成 · 参与本次分析」
+
+![非容器首页](../assets/phase5/machine-10-01-home.png)
+![非容器上传后](../assets/phase5/machine-10-02-uploaded.png)
+![非容器分析完成](../assets/phase5/machine-10-03-analysis-done.png)
+![非容器项目详情](../assets/phase5/machine-10-04-project-detail.png)
+![非容器证据页](../assets/phase5/machine-10-05-evidence.png)
+
+**工作区数据库里的数字（直查 `.scratch/ws-nonmsix/dexatlas.db`）：**
+
+```
+project apk_80a8fe0e81204c9f  status = completed
+  class_count = 5   method_count = 8   evidence_count = 12
+run run_ce4cfd8eaec14222  status = completed  completeness = complete  errors = []
+  tool_versions = {"jadx": "1.5.2", "apktool": "2.11.1", "androguard": "4.1.4"}
+```
+
+**侧车那侧（判别实验那一次启动，从 exe 日志读出端口 53421，shell 直连——shell 同样无包身份）：**
+
+```
+GET http://127.0.0.1:53421/api/health
+{"version":"1.2.0","workspace":"ws-nonmsix"}
+
+GET http://127.0.0.1:53421/api/backends
+{"available":["jadx","apktool","androguard"],"missing":[],"versions":{"jadx":"1.5.2","apktool":"2.11.1","androguard":"4.1.4"}}
+```
+
+**设置页**（第三次启动，侧车状态卡）：**「侧车：运行中 · 127.0.0.1:55999 · DexAtlas 后端已就绪」**，
+三个后端「已安装 · 可用」，关于区显示 `v1.2.0 · 桌面应用（exe 与 MSI 安装包）`。
+
+![非容器设置页](../assets/phase5/machine-10-07-settings.png)
+
+### 5.5 升级路径在非容器形态下同样成立（NSIS per-user）
+
+§4.2 验的升级是 MSI（per-machine，要提升会话）。非容器形态还有一条对应路径：
+**NSIS per-user 升级**——机器上从 2026-11-25 就装着 NSIS 0.1.0
+（`D:\Users\pc\AppData\Local\DexAtlas Studio\`，HKCU 注册表，per-user、不提权），
+本轮用本 worktree 构建的 NSIS 包静默升级它：
+
+```
+& '…\bundle\nsis\DexAtlas Studio_1.2.0_x64-setup.exe' '/S'    # 退出后核对
+```
+
+| | 升级前 | 升级后 |
+|---|---|---|
+| 注册表 `DisplayVersion` | 0.1.0 | **1.2.0** |
+| 安装目录 | `D:\Users\pc\AppData\Local\DexAtlas Studio\` | 同一路径 |
+| 装进去的 exe | 14,816,256 B，sha256 `14e5f7fd…` | 14,823,424 B，sha256 `8c355d29…` |
+| `.dexatlas\dexatlas.db`（用户数据） | sha256 `a020626f…` | **逐字节相同** |
+
+装进去的 exe 与 `target/release` 那份（`0f843b8b…`）**同尺寸（14,823,424 B）不同哈希**——
+与 §4.2.2 里 MSI 那份的现象一致：打包器给 exe 打了 bundle-type 补丁
+（构建日志：*Patching … with bundle type information: nsis*）。
+
+**升级后从安装目录启动**（安装态 + 非容器；`repo_root_from_exe()` 从
+`D:\Users\pc\AppData\Local\DexAtlas Studio` 反推不出仓库根 → `backend_cwd()` 返回 `None`，
+与 §3.4 记录的机制相同）：
+
+```
+GET http://127.0.0.1:65207/api/health     → {"version":"1.2.0","workspace":"ws-nonmsix"}
+GET http://127.0.0.1:65207/api/backends   → 三个后端齐全（同 §5.4）
+```
+
+![安装态首页](../assets/phase5/machine-10-08-installed-home.png)
+![安装态设置页](../assets/phase5/machine-10-09-installed-settings.png)
+
+### 5.6 这一轮没验到的
+
+- **卸载路径**：NSIS 卸载会把安装目录连同里面的 `.dexatlas` 用户数据一起删掉；那份 0.1.0
+  时代的项目数据不是本轮创建的，删它要作者拍板，本轮没有执行卸载。MSI 的卸载路径 §4.2.4 已验过。
+- **修复（repair）路径**：NSIS 安装器没有 repair 模式（MSI 的 §4.2.3 已验）。
+- **首次安装（空机器 → 装上）**：本轮只验了「在已有 0.1.0 的机器上升 1.2.0」；
+  全新机器的首次 NSIS 安装没验（主会话 2026-11-27 的打包复验轮已覆盖 MSI 首装）。
+- **MSI 在非容器下的重装**：MSI 装卸都验过，但都是在（可能的）容器上下文里跑的命令行；
+  本轮没有再走一遍 MSI。判断上 msiexec 的容器敏感性远低于 GUI 应用（它本来就是系统服务），
+  但没有单独取证。
+
+### 5.7 机器状态（本轮结束时）
+
+- 本 worktree 构建的 exe / MSI / NSIS 三件产物**留在 `target/release`**（主会话发版要用同一棵树的产物）；
+- D 盘的 NSIS 安装**升到了 1.2.0 并保留**（这是机器上原有的安装，升级前是 0.1.0）；
+- 真实路径与虚拟化路径的 `backend.json` 都与本轮开始时逐字节相同（sha256 `c1387ed5…`）；
+- 无遗留 dexatlas / 侧车 / 安装器进程；wrapper 批处理与标记文件留在
+  `<worktree>/.scratch/nonmsix-findings/`（`.scratch/` 不入库）。
+
+---
+
+## 6. 复现命令
 
 ```bash
 # 1) 桌面端依赖与打包（worktree 根目录）
@@ -511,6 +678,28 @@ msiexec /x "{A8D5B3E6-03C0-4D1A-9A6F-030AC98DA30D}" /passive /l*v "<log>"
 Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
 ```
 
+**2026-11-27 非容器补测用的命令**（§5）：
+
+```powershell
+# 9) 确认驱动进程没有包身份（rc=15700 = APPMODEL_ERROR_NO_PACKAGE）
+$sig = @'
+using System; using System.Runtime.InteropServices;
+public class PkgId {
+  [DllImport("kernel32.dll", SetLastError=true)]
+  public static extern int GetCurrentPackageFullName(ref uint pn, [MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder b);
+}
+'@
+Add-Type -TypeDefinition $sig
+$sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
+[PkgId]::GetCurrentPackageFullName([ref]$len, $sb)   # → 15700
+
+# 10) NSIS per-user 静默升级（0.1.0 → 1.2.0；per-user 不提权，无重启环节）
+& '<worktree>\desktop\src-tauri\target\release\bundle\nsis\DexAtlas Studio_1.2.0_x64-setup.exe' '/S'
+
+# 11) 判别实验：把真实路径 backend.json 指向落标记的 wrapper，虚拟化那份不动
+#    标记出现 ⇒ exe 读的是真实路径（脚本：<worktree>\.scratch\discriminate-nonmsix.py）
+```
+
 > **msiexec 的两个坑（本轮踩过）：** 包路径含空格要用引号包起来，否则 **1639**（命令行无效）；
 > 包路径用正斜杠会得到 **1619**（打不开安装包）——用原生反斜杠。
 
@@ -527,7 +716,7 @@ Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
 
 ---
 
-## 6. 本轮产出的文件
+## 7. 本轮产出的文件
 
 | 文件 | 说明 |
 |---|---|
@@ -536,6 +725,8 @@ Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
 | `docs/assets/phase5/machine-07-*.png` | MSI 安装后从 `C:\Program Files\DexAtlas Studio\` 启动的应用截图 |
 | `docs/assets/phase5/machine-08-repaired-settings.png` | 2026-11-27 补测：repair 之后的应用设置页（侧车运行中 · 三个后端「已安装 · 可用」） |
 | `docs/assets/phase5/machine-09-upgraded-home.png` | 2026-11-27 补测：升级之后的应用首页 |
+| `docs/assets/phase5/machine-10-01-home.png` … `machine-10-05-evidence.png`、`machine-10-07-settings.png` | 2026-11-27 非容器补测（§5）：无包身份进程启动 exe 的全链路截图 |
+| `docs/assets/phase5/machine-10-08-installed-home.png`、`machine-10-09-installed-settings.png` | 2026-11-27 非容器补测（§5.5）：NSIS 静默升级到 1.2.0 后从安装目录启动的截图 |
 
 **没有改任何生产代码**：`src/**`、`tests/**`、`desktop/src/**`、`desktop/src-tauri/src/**` 一个字没动；`desktop/src-tauri/tauri.conf.json` 也没动（MSI 打包不需要改 bundle 配置）。第三方 APK / DEX / `so` / 密钥没有进仓库（只用了仓库自带的一方样例）。
 
@@ -543,3 +734,6 @@ Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList "<脚本>"
 
 > 2026-11-26 那一轮结束时的状态是「仍然装着、产品码 `{680674BE-…}`」；2026-11-27 的补测把它卸掉了，
 > 并把产品码换成了 `{A8D5B3E6-…}`。**要再装回来，用本轮构建的 MSI 即可。**
+>
+> 2026-11-27 非容器补测结束时的状态见 §5.7：D 盘的 NSIS per-user 安装从 0.1.0 升到了
+> 本 worktree 构建的 1.2.0 并保留；两份 `backend.json` 都与轮前逐字节相同。
