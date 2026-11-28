@@ -941,6 +941,78 @@ desktop/src-tauri/Cargo.lock  version = "1.2.1"
   抬到 1.2.1 的那棵**副本**在 `.scratch/nsis-verify/bumptree/`（`.scratch/` 不入库，
   **仓库里的文件一个都没改**）。
 
+#### 5.8.7 修复与复验（2026-11-28，修复分支 `peaceful-liskov-141f8f`）
+
+§5.8.4 的缺陷已经修掉，并在同一台机器上复验。修的是两件事，分开验证：
+**根因**（工作区不再落在安装目录）在应用侧，**兜底**（卸载器删得掉非空
+安装目录）在打包侧。
+
+**1. 根因：安装形态的侧车有了自己的 cwd 与工作区。**
+`desktop/src-tauri/src/sidecar.rs:1028` 的 `backend_launch()` 在安装形态
+（exe 反推不出仓库根）把 cwd 与 `DEXATLAS_WORKSPACE` 都指到
+`%LOCALAPPDATA%\io.github.dexatlas.desktop\workspace`
+（`installed_workspace_dir()`，`sidecar.rs:1053`；环境变量在
+`backend_command()`，`sidecar.rs:779`），并在 spawn 之前把目录建好
+（`prepare_workspace()`，`sidecar.rs:1065`）。dev 形态的行为不变：cwd 仍是
+仓库根，工作区仍是 `<repo>/.dexatlas`。
+
+**2. 兜底：`NSIS_HOOK_POSTUNINSTALL` 递归删除安装目录。**
+`desktop/src-tauri/nsis/installer-hooks.nsh`（由 `tauri.conf.json:44` 的
+`bundle.windows.nsis.installerHooks` 接线，生成器把它 `!include` 在脚本
+顶层）在卸载末尾执行 `RMDir /r "$INSTDIR"`
+（`installer-hooks.nsh:47`），只在**确认过主程序 exe 曾在目录里**
+（`NSIS_HOOK_PREUNINSTALL`，`installer-hooks.nsh:34`）且**不是升级**
+（`$UpdateMode <> 1`）时执行。`%APPDATA%` 的 `backend.json` 不在
+`$INSTDIR` 里，钩子不碰它。
+
+**3. 回归测试与必红证明。**
+
+- Rust（`cargo test --lib`：37 passed / 2 ignored）：
+  `installed_form_keeps_the_workspace_out_of_the_install_directory`
+  断言安装形态的 cwd/workspace 都在 `%LOCALAPPDATA%\…\workspace`、且不在
+  安装目录里；`the_backend_process_receives_the_workspace_environment`
+  起真进程读回 `DEXATLAS_WORKSPACE`；`dev_form_…` 断言 dev 形态不变。
+  **必红**：临时把安装形态退回 `BackendLaunch::default()`（旧行为
+  "不设 cwd"），该测试以 `left: None / right: Some("…\\workspace")` 失败；
+  恢复后复跑 37 passed。
+- Python（`tests/test_nsis_uninstall_cleanup.py`：7 passed）：
+  `tauri.conf.json` 的接线、两个钩子宏、`RMDir /r "$INSTDIR"` 及其
+  「主程序 exe + 非升级」守卫、钩子不碰 `%APPDATA%`、侧车源码里
+  `app_local_data_dir()` 与 `DEXATLAS_WORKSPACE` 的存在。**必红**：
+  删掉 `bundle.windows.nsis` 一段 ⇒ 6 条失败；把 `RMDir /r` 改回
+  `RMDir` ⇒ 对应的那条失败。
+- 静态断言的边界：NSIS 编译器不是 Python 套件的依赖，`installer.nsi`
+  也只在 `tauri build` 时生成；行为由下面的真机复验补上。
+
+**4. 真机复验（全程 `/S`，无重启）。**
+
+对照组——**旧包**（本轮开工时机器上注册的那套 1.2.0）：
+静默卸载退出码 0，注册表项与两份快捷方式没了，
+`D:\Users\pc\AppData\Local\DexAtlas Studio\` **还在**，里面只剩
+`.dexatlas\dexatlas.db`（208896 字节）与 `.dexatlas\projects\`。
+§5.8.4 的缺陷原样复现。该 `.dexatlas` 已备份到本 worktree 的
+`.scratch/nsis-verify/legacy-workspace/`（`dexatlas.db` sha256 `a020626f…`）。
+
+修复后的包（`target/release/bundle/nsis/DexAtlas Studio_1.2.0_x64-setup.exe`，3.61 MiB）：
+
+| 步骤 | 观察 |
+|---|---|
+| 干净基线 → 静默首装 | 退出码 0；1 秒内出现 `%LOCALAPPDATA%\DexAtlas Studio\dexatlas-desktop.exe` 与 `uninstall.exe`；两份快捷方式的 `WorkingDirectory` 仍是安装目录（Tauri 行为不变） |
+| 从**开始菜单快捷方式**启动（继承安装目录 cwd） | 3 秒内 `%LOCALAPPDATA%\io.github.dexatlas.desktop\workspace\dexatlas.db` 出现；**安装目录里没有 `.dexatlas`**（只有 exe 与 uninstall.exe） |
+| 正常关窗 → 静默卸载 | 退出码 0；**安装目录整个消失**；注册表卸载项与两份快捷方式消失；`%APPDATA%\io.github.dexatlas.desktop\backend.json` sha256 仍是 `c1387ed5…`（逐字节不变）；`workspace\` 按「不勾删除应用数据」保留 |
+| 重装后人为造非空目录：`$INSTDIR\.dexatlas\dexatlas.db` 与 `$INSTDIR\unexpected-leftover.txt` → 静默卸载 | 退出码 0；2 秒内**连未知残留一起整个消失**——`RMDir /r` 确实删得掉非空安装目录，而不是只认 `.dexatlas` |
+
+**5. 机器状态（本轮结束时）。** 两处历史安装目录（C: 与 D:）与
+`HKCU\…\Uninstall\DexAtlas Studio`、`HKCU\Software\github\DexAtlas Studio`
+都已清掉（历史残留是上一轮「逐字节恢复」保留下来的那套安装；其中的
+`.dexatlas` 已先备份，程序文件由构建产物可再生成）；
+`%APPDATA%\…\backend.json` 保持 sha256 `c1387ed5…`；
+`%LOCALAPPDATA%\io.github.dexatlas.desktop\` 的 `.cookies` 与
+`EBWebView\` 保留；本轮启动应用时新建的 `workspace\`（只含本轮测试数据）
+在收尾时删除，恢复开工前「该目录下没有工作区」的形态；本轮启动的
+桌面/侧车进程全部退出；无重启。旧工作区备份在
+`.scratch/nsis-verify/legacy-workspace/`（`.scratch/` 不入库）。
+
 
 ### 5.7 机器状态（本轮结束时）
 

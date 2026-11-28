@@ -225,6 +225,10 @@ ignore = ["E501"]
 "tests/test_msi_shortcut_repair.py" = ["RUF001", "RUF002"]
 # The desktop version regression tests do the same, in Chinese.
 "tests/test_desktop_version.py" = ["RUF001", "RUF002"]
+# The NSIS uninstall regression tests name the measured facts in Chinese
+# (the leftover workspace, the non-empty install directory), so their
+# assertion messages carry fullwidth punctuation; same reason as above.
+"tests/test_nsis_uninstall_cleanup.py" = ["RUF001", "RUF002"]
 
 [tool.mypy]
 python_version = "3.12"
