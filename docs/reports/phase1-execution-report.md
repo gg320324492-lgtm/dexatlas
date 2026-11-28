@@ -73,8 +73,8 @@ Phase 2 的任务清单应在你的评审结论之后再写，而不是照搬原
 
 | 指标 | 数值 | 计划书目标 |
 |------|------|-----------|
-| 测试数 | <!--fig:tests.total-->1915<!--/fig-->（<!--fig:tests.fast-->1766<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
-| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7508<!--/fig-->/<!--fig:coverage.total-->8045<!--/fig--> 行） | ≥80% |
+| 测试数 | <!--fig:tests.total-->1931<!--/fig-->（<!--fig:tests.fast-->1782<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成） | — |
+| 一方代码覆盖率 | **<!--fig:coverage.pct-->93.3%<!--/fig-->**（<!--fig:coverage.covered-->7510<!--/fig-->/<!--fig:coverage.total-->8047<!--/fig--> 行） | ≥80% |
 | mypy | strict 通过 | strict |
 | ruff | 通过 | 通过 |
 | CI | 6 job 全绿（3.12 / 3.13 / 部分后端 / Docker / 依赖审计 / lint） | 全绿 |
@@ -139,9 +139,9 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 
 | 层 | 数量 | 特点 |
 |----|------|------|
-| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1766<!--/fig--> | **不需要任何外部工具**，秒级完成 |
+| 快速套件（`-m "not slow"`） | <!--fig:tests.fast-->1782<!--/fig--> | **不需要任何外部工具**，秒级完成 |
 | 集成套件（`-m slow`） | <!--fig:tests.slow-->149<!--/fig--> | 需要 JADX / Apktool / Androguard / 演示 APK |
-| 合计 | <!--fig:tests.total-->1915<!--/fig--> | |
+| 合计 | <!--fig:tests.total-->1931<!--/fig--> | |
 
 **关键约束：`pytest -m "not slow"` 在完全没装任何分析工具的机器上必须通过。**
 这条约束保证了降级路径是被测试的，不是被假设的。
@@ -897,10 +897,10 @@ uv run python scripts/refresh-report-figures.py
 当前分支的状态：
 
 ```bash
-uv run pytest          # 收集 <!--fig:tests.total-->1915<!--/fig--> 个：<!--fig:tests.fast-->1766<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
+uv run pytest          # 收集 <!--fig:tests.total-->1931<!--/fig--> 个：<!--fig:tests.fast-->1782<!--/fig--> 快 + <!--fig:tests.slow-->149<!--/fig--> 集成
 uv run pytest --cov=dexatlas --cov-report=term
-                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7508<!--/fig-->/<!--fig:coverage.total-->8045<!--/fig--> 行）
-                      # 完整环境下的结果：<!--fig:suite.passed-->1914<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
+                      # 一方代码覆盖率 <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered-->7510<!--/fig-->/<!--fig:coverage.total-->8047<!--/fig--> 行）
+                      # 完整环境下的结果：<!--fig:suite.passed-->1930<!--/fig--> passed + <!--fig:suite.xfailed-->0<!--/fig--> xfailed，<!--fig:suite.skipped-->1<!--/fig--> skipped
 ```
 
 各历史版本（这些数字描述的是**那些 tag 当时的套件规模**，由脚本对每个 tag
@@ -1074,7 +1074,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "mcp/server.py": [57, 12],
       "mcp/tools/__init__.py": [1, 0],
       "mcp/tools/evidence.py": [29, 1],
-      "mcp/tools/projects.py": [48, 4],
+      "mcp/tools/projects.py": [50, 4],
       "mcp/tools/references.py": [29, 0],
       "mcp/tools/resources.py": [27, 1],
       "mcp/tools/symbols.py": [71, 1],
@@ -1104,7 +1104,7 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
       "workbench/benchmarks.py": [68, 2]
     },
     "missing": 537,
-    "statements": 8045
+    "statements": 8047
   },
   "history": {
     "v0.1.0": {
@@ -1121,10 +1121,10 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     }
   },
   "schema": 4,
-  "source_fingerprint": "sha256:52186d4ef16ef4ba476b4a1c9db1ae3b6b0b9e78c29a0c6f8a11df1869708c42",
+  "source_fingerprint": "sha256:528e2b73578bdd3cbd7cfd376d243bb7199918964735844087e6d8bc9b61df13",
   "suite": {
     "failed": 0,
-    "passed": 1914,
+    "passed": 1930,
     "skipped": 1,
     "skipped_tests": [
       "tests.test_backend_timeout::test_a_posix_launcher_that_spawns_work_is_stopped_with_its_work"
@@ -1138,8 +1138,8 @@ Python 文件、`tests/` 下的全部 Python 文件、`pyproject.toml`、
     "stale_rows": []
   },
   "tests": {
-    "fast": 1766,
+    "fast": 1782,
     "slow": 149,
-    "total": 1915
+    "total": 1931
   }
 }-->
