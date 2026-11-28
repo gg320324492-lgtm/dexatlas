@@ -52,7 +52,7 @@ uv run --no-sync pytest --collect-only -q -m "slow"         # → 149/1775 tests
    不是插图。页面上它们仍以 `<!--fig:…-->` 标记包裹，渲染出来只有数字与句子本身。
 
 **页面改法**：两页 §2.3 的两条命令行注释里，期望输出换成
-`<!--fig:tests.collect.fast-->1789/1938 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1938 tests collected (1789 deselected)<!--/fig-->`；
+`<!--fig:tests.collect.fast-->1815/1964 tests collected (149 deselected)<!--/fig-->` / `<!--fig:tests.collect.slow-->149/1964 tests collected (1815 deselected)<!--/fig-->`；
 §4 的清单补一句「collect 期望输出也是这套标记写的」。
 
 **守卫改法**（`tests/test_how_to_verify.py`）：
@@ -138,6 +138,14 @@ Markdown 它就变——此前要人手跟。`prose-to-markers.md` §4 留的方
 | 两页后端版本、契约条数 49、M6/M10 成绩 | 钉死/别的脚本 | 不是本机制的对象——**维持**（各有各的门禁） |
 | `docs/releases/`、`docs/outreach/` 的一切 | 历史记录 / 对外素材 | 机制**明确不写**（`FIGURE_EXCLUSIONS`）——**按设计保留** |
 | 报告里的历史 `documents read`（`ci-gate-coverage.md:443` 的 115、`new-pages-crosscheck.md` 的 114/110） | 当时实跑的记录 | **历史快照**，页面正文已写明「份数是快照」——**不改判定**；活的那两处已改标记 |
+
+> **2026-11-28 更新：上面那张表里 `docs/outreach/` 那一行不再成立。**
+> 那一行写的是「机制**明确不写**（`FIGURE_EXCLUSIONS`）——**按设计保留**」，那是
+> 2026-11-20 的结论。此后 `docs/outreach/` 的四份材料**接进了机制**：它们的测试数
+> 与覆盖率现在由测量写入 `fig:` 标记，另有一个导出脚本把标记渲染成发出去的纯
+> 文本（仓库里的源带标记，发出去的是导出件）。设计改的理由、代价与取舍写在
+> [`outreach-figures.md`](outreach-figures.md)。
+> **表里其余各行不动**——它们说的是别的事实。
 
 **结论**：仓库里会随树漂移、且读者会照着核对的测量数，现在要么由机制写（标记），
 要么有门禁守性质，要么明确登记为「不归自动管」并写明理由。C17 的三个闭环全部闭合。

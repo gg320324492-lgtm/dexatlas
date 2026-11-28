@@ -133,10 +133,11 @@
       "runs_on": "ubuntu-latest",
       "gate_scripts": [
         "scripts/check-release-numbers.py",
-        "scripts/check-unguarded-numbers.py"
+        "scripts/check-unguarded-numbers.py",
+        "scripts/export-outreach.py"
       ],
       "temp_redirect": "yes",
-      "local_counterpart": "the hand-written numbers: uv run --no-sync python scripts/check-unguarded-numbers.py; the outward release numbers are checked only in CI"
+      "local_counterpart": "the hand-written numbers: uv run --no-sync python scripts/check-unguarded-numbers.py; the outward export: uv run --no-sync python scripts/export-outreach.py --check; the outward release numbers are checked only in CI"
     }
   },
   "platform_tests": {

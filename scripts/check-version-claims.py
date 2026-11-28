@@ -1309,6 +1309,26 @@ def plain_number(raw: str) -> int | None:
         return None
 
 
+def figure_number(raw: str) -> float | None:
+    """A number a generated figure holds, read the way the figure writes it.
+
+    The figures the outward materials carry are counts ("1,938") and
+    percentages ("93.4%").  ``plain_number`` reads the counts and returns
+    nothing for a percentage -- and two percentages that both read as
+    nothing would compare equal, which is how a drifted coverage went
+    unnoticed.  A number that cannot be read is read as nothing and
+    compared as nothing, so the two spellings of one number -- "1,938" and
+    "1938" -- are one number here too.
+    """
+    text = raw.strip().rstrip("%").replace(",", "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
 def quoted_spans(text: str) -> list[tuple[int, int]]:
     """The spans of a text that are somebody else's words.
 
@@ -1391,6 +1411,10 @@ def check_outward_numbers(
 
     A number that belongs to an earlier release is not a claim about this one
     and is left alone, exactly as it is in the release documents.
+
+    The materials also carry **generated figures** — the numbers the
+    measurement writes between ``<!--fig:...-->`` markers.  Those are checked
+    here as well: see ``check_outward_figures``.
     """
     findings: list[Finding] = []
     expected = {
@@ -1407,6 +1431,101 @@ def check_outward_numbers(
             check_stated_numbers(name, text, 0, expected, version, "the project", "outward", quoted)
         )
         findings.extend(check_outward_counts(name, text, figures, tools, samples, version, quoted))
+        findings.extend(check_outward_figures(name, text, figures, version))
+    return findings
+
+
+#: The figures the outward materials carry, and the figure of the report they
+#: are the same number as.
+#:
+#: The materials are prose and the report is a table, so the same count is
+#: spelled differently in the two: the report writes ``1938`` and the
+#: materials write ``1,938``.  Both spellings are one number, and the pair
+#: is compared as the pair it is — the material's number, read without its
+#: separator, against the report's number.
+#:
+#: A key that is not in this table is a figure the materials carry that this
+#: check cannot compare, and it is reported: a number nobody checks is a
+#: number nobody can trust.
+OUTWARD_FIGURES = {
+    "tests.total": "tests.total",
+    "tests.fast": "tests.fast",
+    "tests.slow": "tests.slow",
+    "tests.total.grouped": "tests.total",
+    "tests.fast.grouped": "tests.fast",
+    "tests.slow.grouped": "tests.slow",
+    "coverage.pct": "coverage.pct",
+    "coverage.covered": "coverage.covered",
+    "coverage.total": "coverage.total",
+    "coverage.covered.grouped": "coverage.covered",
+    "coverage.total.grouped": "coverage.total",
+}
+
+
+def check_outward_figures(
+    name: str, text: str, figures: dict[str, str], version: str
+) -> list[Finding]:
+    """The generated figures of the outward materials, against the report's.
+
+    The materials carry their numbers between ``<!--fig:...-->`` markers, and
+    the measurement writes them there.  A marker whose value disagrees with
+    the report is a number that was written by hand inside a marker — the
+    failure this check exists to catch, and the one the marker was supposed
+    to make impossible.
+
+    It is also the check that keeps this gate alive.  The rest of this gate
+    ignores the numbers inside markers, because a generated number is not a
+    claim the text makes: it is a claim the *measurement* makes.  So if the
+    markers were the only numbers the materials carried, the gate would have
+    nothing left to say about them — and a gate with nothing to say is a
+    gate that stopped guarding.  This is the gate's remaining work, and it
+    is stronger than what it replaced: a hand-written number in the
+    materials was compared with a tolerance, while a marker is compared
+    exactly.
+    """
+    findings: list[Finding] = []
+    lines = text.splitlines()
+    for number, line in enumerate(lines, 1):
+        for match in FIGURE.finditer(line):
+            key = match.group(1)
+            stated = match.group(2).strip()
+            source = OUTWARD_FIGURES.get(key)
+            if source is None:
+                findings.append(
+                    Finding(
+                        path=name,
+                        line=number,
+                        kind="outward-figure-unknown",
+                        version=version,
+                        message=(
+                            f"it carries the figure {key}, and this gate cannot say "
+                            "what that figure should be"
+                        ),
+                        excerpt=collapse(line)[:160],
+                    )
+                )
+                continue
+            measured = figures.get(source)
+            if measured is None:
+                # The report does not carry it: nothing is claimed about it.
+                continue
+            stated_number = figure_number(stated)
+            measured_number = figure_number(measured)
+            if stated_number is None or measured_number is None:
+                continue
+            if stated_number != measured_number:
+                findings.append(
+                    Finding(
+                        path=name,
+                        line=number,
+                        kind="outward-figure",
+                        version=version,
+                        message=(
+                            f"the figure {key} says {stated}, the measured number is {measured}"
+                        ),
+                        excerpt=collapse(line)[:160],
+                    )
+                )
     return findings
 
 

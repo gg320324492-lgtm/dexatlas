@@ -243,14 +243,16 @@ INLINE_CODE = re.compile(r"`[^`\n]*`")
 #:
 #: A release note states what a past release measured: it is a historical
 #: record, and a script that rewrote it would change what it says happened.
-#: The outward material is written for other platforms; its numbers are
-#: checked against the measurement by ``scripts/check-version-claims.py``,
-#: not filled in by it. Everything else that carries a generated figure is
-#: written by this script.
-FIGURE_EXCLUSIONS = (
-    REPO_ROOT / "docs" / "releases",
-    REPO_ROOT / "docs" / "outreach",
-)
+#: Everything else that carries a generated figure is written by this script.
+#:
+#: The outward materials under ``docs/outreach/`` used to be excluded too, and
+#: the reason was that they are sent out: a marker in a text that is pasted
+#: into a form is visible markup. The exclusion did not solve that -- it
+#: only meant that the numbers in those texts were copied by hand, and a
+#: hand-copied number is the most perishable thing in this project. The
+#: materials carry markers now, and ``scripts/export-outreach.py`` renders
+#: them to plain text before anything is sent.
+FIGURE_EXCLUSIONS = (REPO_ROOT / "docs" / "releases",)
 
 #: ``<!--report-figures:{...}-->`` — the machine-readable record of the measurement.
 RECORD = re.compile(r"<!--report-figures:(.*?)-->", re.DOTALL)
@@ -1261,6 +1263,25 @@ def percent(covered: int, total: int) -> str:
     return f"{covered / total * 100:.1f}%" if total else "n/a"
 
 
+def grouped(number: int | str) -> str:
+    """A count as a person writes it: ``1,938``.
+
+    The report writes its counts without a separator (``1938``) because a
+    table cell is narrow. The outward materials are prose read by people who
+    have never opened a test file, and a person writing ``1938`` there would
+    write ``1,938``. The two spellings of one number are one number, but the
+    prose one is a second format to keep right, so it is generated too.
+
+    A value that is not a whole number of lines or tests -- a percentage,
+    say -- is returned as it is: a separator inside it would make a number
+    nobody writes.
+    """
+    text = str(number).replace(",", "").strip()
+    if not text.isdigit():
+        return str(number)
+    return f"{int(text):,}"
+
+
 def weak_modules(files: dict[str, list[int]]) -> list[str]:
     """The modules below the disclosure threshold, weakest first.
 
@@ -1321,6 +1342,13 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "tests.total": str(tests["total"]),
         "tests.fast": str(tests["fast"]),
         "tests.slow": str(tests["slow"]),
+        # The same three counts as the outward materials write them: with a
+        # thousands separator, because that is how a person writes a count in
+        # a sentence. The materials are prose, not a table, so the report's
+        # spelling would read as a number nobody writes.
+        "tests.total.grouped": grouped(tests["total"]),
+        "tests.fast.grouped": grouped(tests["fast"]),
+        "tests.slow.grouped": grouped(tests["slow"]),
         # The three counts as one phrase, because that is how the pages read
         # them: the total, then the fast half and the integration half. The
         # fullwidth punctuation is written as escapes: ``ruff``'s RUF001 reads
@@ -1348,6 +1376,10 @@ def render_figures(record: dict[str, Any]) -> dict[str, str]:
         "coverage.covered": str(covered),
         "coverage.total": str(coverage["statements"]),
         "coverage.missed": str(coverage["missing"]),
+        # The same two line counts as the outward materials write them: with
+        # a thousands separator, because that is how a person writes them.
+        "coverage.covered.grouped": grouped(covered),
+        "coverage.total.grouped": grouped(coverage["statements"]),
         "coverage.weak_modules": render_weak_modules(coverage["files"]),
         # What the version-claim checker prints as "documents read": the
         # count of the tree's markdown documents. The pages show it inside a

@@ -1,7 +1,7 @@
 # `docs/reports/` 索引
 
-这个目录里是 DexAtlas 从 Phase 1 到 Phase 5 收口之间的**69 份报告**
-（**这是 2026-11-27 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
+这个目录里是 DexAtlas 从 Phase 1 到 Phase 5 收口之间的**70 份报告**
+（**这是 2026-11-28 的快照**；份数是快照，不是常数——新增报告时把数改过来）。新读者打开这一层，
 看到的是一堵墙；不知道哪一份是现状、哪一份是当时的快照、哪一份已经被后面的检查推翻了。
 
 本页只做三件事：
@@ -38,8 +38,8 @@ ls docs/reports/*.md | wc -l      # 减掉本页自己（README.md）就是报�
 ```
 
 **下面 §1–§6 的每一行都点名了一个文件**，所以「哪几份没被收录」可以直接比出来。
-（2026-11-27 复核（逐行实测，C9 轮起沿用该口径）：目录里 69 份报告中 69 份被分组表点名，
-无遗漏、无虚指。分组表共 71 行，其中 7 行同时点名多份报告，行内点名 79 次、去重后是 69 份
+（2026-11-28 复核（逐行实测，C9 轮起沿用该口径）：目录里 70 份报告中 70 份被分组表点名，
+无遗漏、无虚指。分组表共 72 行，其中 7 行同时点名多份报告，行内点名 79 次、去重后是 70 份
 （8 份报告被两处或三处点名）。
 历史快照（2026-11-18 的 95、C9 轮的 98）与实测对不上——
 那是只加行不核数累积出来的，且去平台化清理（2026-11-21）移除了 46 份，本页从 C9 轮起以「逐行实测」为准。）
@@ -132,6 +132,7 @@ M6 的基准报告不在本目录，在 [`docs/benchmarks/`](../benchmarks/)；�
 | [docker-image-samples.md](docker-image-samples.md) | **C6 方案 A 的落地**：镜像里能不能跑仓库自带的案例。结论：**能，而且由 CI 验证**——`Dockerfile` 末尾多一行 `COPY examples/ examples/`（放在最后一次 `uv sync` 与后端安装之后，改样本不会让依赖层失效）；CI 的 `docker` job 多一步，在刚构建的镜像里用**相对路径**跑通 `analyze examples/demo-app/demo.apk`，核出退出码 0 与 classes / methods / call sites / call edges 四个非空计数；`docs/install.md` 的 Docker 段改成「镜像自带样本」，挂卷只留「用你自己的 APK」。**边界**：镜像内未本地实跑（本地不构建镜像），由 CI 验证。 | 改动进了 `Dockerfile`、`.github/workflows/ci.yml` 的 `docker` job（job 显示名与 `docs/status.md` 的 job 行同步改）、`docs/install.md` 与本索引的份数；本报告已登记进 `scripts/check-doc-citations.py` 的 `DOCS` 清单。`tests/` 的回归测试按本轮约束未加，需求写在报告的「需要主会话接手」一节。 |
 | [post-release-rehearsal.md](post-release-rehearsal.md) | 「**发布后修正并重打 tag**」这条路径的端到端演练（只读，演练记录不是发版记录）。结论：12 条（R1–R12）里 **8 条**「§3 步骤 8 本该拦住但没拦住」，另 3 处判据含糊；给出三条该补的判据——按**指纹**而不是数字决定要不要重测量、本地 tag 与远端 tag 分开查且引用检查排在 tag 移过之后、把「同一批数字相等」写成一份让每份副本都有东西在比的清单。 | 只出记录。三条建议尚未落进清单，等主线处置。 |
 | [outward-number-parity.md](outward-number-parity.md) | **判据 C 的落地**：对外文本里的同一批数字（测试总数、快/集成、passed、skipped、xfailed、一方覆盖率），机器逐个数比对。结论：仓库内的文本彼此一致、也与执行报告一致；**GitHub 上已发布的那一份 Release 正文不一致**——它写的是旧树上的数（1620 一族），而 tag `v1.0.0` 指向的树上是 1695 一族。 | 新增门禁 `scripts/check-release-numbers.py` + CI job `release-numbers`；**没有**改文本里的任何数字。门禁第一次跑就是红的，等主线重新发布 Release 正文。 |
+| [outreach-figures.md](outreach-figures.md) | **外发材料里的数接进「数字是生成的」**：四份材料手抄的测试数与覆盖率改由测量写入 `<!--fig:…-->` 标记，并新增 `scripts/export-outreach.py` 把标记渲染成发出去的纯文本。顺带量出两件事：门禁对覆盖率有 0.5 容差（93.3 与 93.4 不报），以及它读不出百分比（两个读不出数的百分比会被当成相等）。 | 材料里的数不再手抄（2026-11-27 → 11-28 手抄过三次：1887 / 1915 / 1931）；门禁新增一道「标记里的数与报告比对」的检查，CI 新增 `export-outreach.py --check`。代价：仓库里存的是**带标记的源**，发出去前要跑一次导出。 |
 | [figures-coverage-design.md](figures-coverage-design.md) | **测量数字自动覆盖设计**（只读调研）：怎样让「数字随测量走」管住所有手写位置。结论：源指纹只覆盖 `src/`、`tests/`、`pyproject.toml` 与测量脚本本身，`docs/` 下手写的数字不受它管。 | 只出调研（提交 `d6b8edf`），方案尚未落成改动。 |
 | [handover-tails-audit.md](handover-tails-audit.md) | 三个已合并窗口**交接尾巴**的逐条只读核对：每条按「已落实 / 未落实 / 进行中」三档判定，判定只认当前树上的证据。 | 三条未落实项（D13 / R3 / R4）分别进提交 `6842a98` 与 `07129f0`；本报告的 `file:line` 只在它声明的基线树上成立。 |
 | [v1.1.0-candidate-c10-manifest.md](v1.1.0-candidate-c10-manifest.md) | 证据包清单的**第四个键**（核对 + 登记，**这一轮不实施**）：清单今天只有三个 `not_included` 键，没有一条说「包里只有本次分析的文件」；补第四个键是**公共契约变更**——升 `schema_version`、改**五个文件里的九处**钉死、同步验收材料、处置**四个已入库的旧包**（都是 `schema_version = 1`，新代码下会验不过）。 | 登记成 v1.1.0 候选 **C16**，按作者的决定**留到 v1.1.0**；C10 改成「主体完成」（守卫 + 契约明文 + 5 条红→绿测试已落地）。本报告的 `file:line` **已进引用检查器的 `DOCS` 名单**，有自动门禁在看。 |
@@ -200,4 +201,4 @@ phase5-failure-timeline 的截图数（9→24）与边界、phase5-machine-verif
 四类件数、gate-self-checks 的回归测试条数（6→8）。截图数按
 `ls docs/assets/phase5/timeline-*.png | wc -l`（24）与
 `ls docs/assets/phase5/machine-*.png | wc -l`（34）实测。份数与分组计数未变：目录
-`ls docs/reports/*.md | wc -l` 实测 70（减本页为 69 份），分组表 71 行、行内点名 79 次。
+`ls docs/reports/*.md | wc -l` 实测 71（减本页为 70 份），分组表 72 行、行内点名 79 次。

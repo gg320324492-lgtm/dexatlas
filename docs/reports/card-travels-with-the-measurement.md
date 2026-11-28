@@ -15,8 +15,8 @@
 - 原来的做法是**两件事靠顺序连起来**：先重画卡片，再测量，测完再重画一遍。
   谁忘了中间那步，测量就会把整个仓库锁死（§1）。
 - 现在测量自己会画：**报告落盘之后，测量顺手把卡片按新数重画**
-  （`scripts/refresh-report-figures.py:2602` 的调用点，
-  函数定义在 `scripts/refresh-report-figures.py:2722` `anchor: draw_social_preview`）。于是「测量 → 卡片」不再是一段要人记得的顺序，
+  （`scripts/refresh-report-figures.py:2687` 的调用点，
+  函数定义在 `scripts/refresh-report-figures.py:2754` `anchor: draw_social_preview`）。于是「测量 → 卡片」不再是一段要人记得的顺序，
   而是一次测量里的一个步骤。
 - 时序只有一条规矩：**卡片画的是落盘后的报告**，不是收敛循环手里那份还没落盘的候选（§3）。
 - 画不出来，这一次测量就失败——因为「画不出来的卡片」正是那个会把下一次测量锁死的状态（§2.3）。

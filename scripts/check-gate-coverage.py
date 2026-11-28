@@ -53,6 +53,7 @@ GATES: dict[str, str] = {
     "scripts/check-release-numbers.py": "the release numbers the outward texts state",
     "scripts/check-unguarded-numbers.py": "the hand-written numbers in the documents against the tree",
     "scripts/check-version-claims.py": "the version claims in the documentation",
+    "scripts/export-outreach.py": "that the outward materials render to text that carries no markup",
     "scripts/m10_selfcheck.py": "the M10 acceptance pack's automatable half",
     "scripts/make-social-preview.py": "the numbers on the front page's card",
     "scripts/refresh-report-figures.py": "the measurement the report records",
