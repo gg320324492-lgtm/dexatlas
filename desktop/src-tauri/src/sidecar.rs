@@ -16,6 +16,7 @@
 //!   能通过 ACL（`Manager::add_capability` 的 global scope 是增量合并的）。
 
 use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::atomic::{AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -185,9 +186,9 @@ impl ManagedChild {
     fn spawn_unmanaged(
         program: &str,
         args: &[String],
-        cwd: Option<&std::path::Path>,
+        launch: &BackendLaunch,
     ) -> std::io::Result<Self> {
-        let child = spawn_backend(program, args, cwd)?;
+        let child = spawn_backend(program, args, launch)?;
         Ok(Self {
             child: Arc::new(Mutex::new(child)),
             job: None,
@@ -203,13 +204,13 @@ impl ManagedChild {
     fn spawn(
         program: &str,
         args: &[String],
-        cwd: Option<&std::path::Path>,
+        launch: &BackendLaunch,
     ) -> std::io::Result<Self> {
         #[cfg(windows)]
         {
             match job::Job::new() {
                 Some(job) => {
-                    let mut child = job::spawn_suspended(&mut backend_command(program, args, cwd))?;
+                    let mut child = job::spawn_suspended(&mut backend_command(program, args, launch))?;
                     let in_job = job.assign(&child) && job.contains(&child);
                     if !in_job {
                         // 进不了作业（或进去了却查不到）：照样把挂起的子进程放行，
@@ -229,19 +230,19 @@ impl ManagedChild {
                         eprintln!(
                             "[sidecar] 恢复后端主线程失败（{err}），改用不带作业对象的启动方式"
                         );
-                        return Self::spawn_unmanaged(program, args, cwd);
+                        return Self::spawn_unmanaged(program, args, launch);
                     }
                     Ok(Self {
                         child: Arc::new(Mutex::new(child)),
                         job: Some(job),
                     })
                 }
-                None => Self::spawn_unmanaged(program, args, cwd),
+                None => Self::spawn_unmanaged(program, args, launch),
             }
         }
         #[cfg(not(windows))]
         {
-            Self::spawn_unmanaged(program, args, cwd)
+            Self::spawn_unmanaged(program, args, launch)
         }
     }
 
@@ -765,11 +766,17 @@ fn allow_backend_port(app: &AppHandle<impl Runtime>, port: u16) {
 }
 
 /// 拼好后端命令（启动与测试共用）。
-fn backend_command(program: &str, args: &[String], cwd: Option<&std::path::Path>) -> Command {
+///
+/// `launch.workspace` 非空时显式设置 `DEXATLAS_WORKSPACE`：安装形态下后端
+/// 没有仓库根可依附，工作区必须由宿主点名，不能靠相对路径碰运气。
+fn backend_command(program: &str, args: &[String], launch: &BackendLaunch) -> Command {
     let mut command = Command::new(program);
     command.args(args);
-    if let Some(dir) = cwd {
+    if let Some(dir) = launch.cwd.as_deref() {
         command.current_dir(dir);
+    }
+    if let Some(dir) = launch.workspace.as_deref() {
+        command.env("DEXATLAS_WORKSPACE", dir);
     }
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     command
@@ -814,19 +821,20 @@ fn forward_lines<R: BufRead>(mut reader: R, stream: &str, mut on_line: impl FnMu
 
 /// 启动后端命令。
 ///
-/// `cwd` 是**可选**的工作目录：`None` 表示"推断不到仓库根"（安装形态）。
-/// 推断不到**不是**拒绝启动的理由——那样绝对路径的后端命令永远不会被执行。
-/// 旧实现把两件事用 `and_then` 串死：cwd 推断失败 ⇒ 短路 ⇒ `Command::new`
-/// 从未被调用 ⇒ 安装形态下侧车从未被拉起。
+/// `launch` 的 cwd 是**可选**的：`None` 表示宿主连应用数据目录都拿不到
+/// （正常安装形态下它指向 `%LOCALAPPDATA%\<bundle id>\workspace`）。
+/// 推断不到 cwd **不是**拒绝启动的理由——那样绝对路径的后端命令永远
+/// 不会被执行。旧实现把两件事用 `and_then` 串死：cwd 推断失败 ⇒ 短路 ⇒
+/// `Command::new` 从未被调用 ⇒ 安装形态下侧车从未被拉起。
 ///
 /// 这条路径**不做**进程托管：托管在 [`ManagedChild::spawn`] 里（Windows 上
 /// 还要"挂起创建 → 进作业对象 → 放行"）。
 fn spawn_backend(
     program: &str,
     args: &[String],
-    cwd: Option<&std::path::Path>,
+    launch: &BackendLaunch,
 ) -> std::io::Result<Child> {
-    backend_command(program, args, cwd).spawn()
+    backend_command(program, args, launch).spawn()
 }
 
 /// 命令里是否带了目录部分（`python` 与 `E:\venv\Scripts\python.exe` 的区别）。
@@ -861,8 +869,17 @@ pub fn spawn_sidecar(app: AppHandle<impl Runtime>) -> bool {
     let status = SidecarStatus::starting(&program);
     app.state::<SidecarState>().set_status(status);
 
-    let cwd = backend_cwd(&app);
-    let managed = match ManagedChild::spawn(&program, &args, cwd.as_deref()) {
+    let launch = backend_launch_for(&app);
+    // 安装形态的工作区目录要赶在 spawn 之前建好：`Command::current_dir`
+    // 指向不存在的目录时 CreateProcess 直接失败。失败就如实报告，**不能**
+    // 静默退回安装目录（那正是要修的缺陷）。
+    if let Err(reason) = prepare_workspace(&launch) {
+        let failure = SidecarStatus::spawn_failed(&program, &reason);
+        app.state::<SidecarState>().set_status(failure);
+        let _ = app.emit("sidecar:status", app.state::<SidecarState>().status());
+        return false;
+    }
+    let managed = match ManagedChild::spawn(&program, &args, &launch) {
         Ok(managed) => managed,
         Err(err) => {
             let reason = spawn_failure_reason(&program, &err);
@@ -986,13 +1003,71 @@ fn backend_process_alive() -> bool {
     }
 }
 
-/// 侧车后端的工作目录：仓库根（保证 `python -m dexatlas.workbench` 能找到包）。
+/// 侧车的启动位置：进程 cwd 与显式工作区。
 ///
-/// **推断不到仓库根不是错误**：安装形态下 exe 位于安装目录，反推不出仓库，
-/// 此时后端命令应当是绝对路径（如 venv 的 python.exe），workbench 自带前端，
-/// cwd 无关紧要。返回 `None` 的含义是"不设 cwd"，**不是"不启动"**。
-fn backend_cwd(_app: &AppHandle<impl Runtime>) -> Option<std::path::PathBuf> {
-    repo_root_from_exe(&std::env::current_exe().ok()?)
+/// `workspace` 只在安装形态下非空——它同时作为 cwd 与 `DEXATLAS_WORKSPACE`
+/// 传给后端；dev 形态沿用「cwd = 仓库根、工作区是相对路径 `.dexatlas`」。
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct BackendLaunch {
+    cwd: Option<PathBuf>,
+    workspace: Option<PathBuf>,
+}
+
+/// 决定侧车的 cwd 与工作区（纯函数，测试直接调用）。
+///
+/// - **dev 形态**（exe 的祖先链里有 `src/dexatlas`）：cwd = 仓库根，
+///   工作区沿用文档约定的 `<repo>/.dexatlas`（不设环境变量）。
+/// - **安装形态**：cwd 与 `DEXATLAS_WORKSPACE` 都指向
+///   `%LOCALAPPDATA%\<bundle id>\workspace`。
+///
+/// 安装形态**不能**让后端继承启动器的 cwd：快捷方式的 `WorkingDirectory`
+/// 就是安装目录，`Settings` 的默认工作区 `.dexatlas` 是相对路径，会被建进
+/// 安装目录里；而 NSIS 卸载器只做 `RMDir "$INSTDIR"`（只删空目录），
+/// 于是「用过一次再卸载」会留下整个安装目录（2026-11-28 真机实测，
+/// `docs/reports/phase5-machine-verification.md` §5.8.4）。
+fn backend_launch(exe: Option<&Path>, app_local_data: Option<&Path>) -> BackendLaunch {
+    if let Some(root) = exe.and_then(repo_root_from_exe) {
+        return BackendLaunch {
+            cwd: Some(root),
+            workspace: None,
+        };
+    }
+    match app_local_data {
+        Some(dir) => {
+            let workspace = installed_workspace_dir(dir);
+            BackendLaunch {
+                cwd: Some(workspace.clone()),
+                workspace: Some(workspace),
+            }
+        }
+        // 连应用数据目录都拿不到：退回旧行为（不设 cwd）。这条路径由
+        // 卸载器的兜底清理接住（desktop/src-tauri/nsis/installer-hooks.nsh）。
+        None => BackendLaunch::default(),
+    }
+}
+
+/// 安装形态的工作区目录：`%LOCALAPPDATA%\<bundle id>\workspace`。
+///
+/// 放在应用自己的本地数据目录下：卸载器「删除应用数据」复选框会连同它
+/// 一起清掉，不勾选则保留——与 `%APPDATA%` 的 `backend.json` 一致。
+fn installed_workspace_dir(app_local_data: &Path) -> PathBuf {
+    app_local_data.join("workspace")
+}
+
+/// 把应用上下文解析成启动位置。
+fn backend_launch_for(app: &AppHandle<impl Runtime>) -> BackendLaunch {
+    let exe = std::env::current_exe().ok();
+    let local_data = app.path().app_local_data_dir().ok();
+    backend_launch(exe.as_deref(), local_data.as_deref())
+}
+
+/// 创建工作区目录；失败时给出能照做的原因（不静默退回安装目录）。
+fn prepare_workspace(launch: &BackendLaunch) -> Result<(), String> {
+    let Some(dir) = launch.workspace.as_deref() else {
+        return Ok(());
+    };
+    std::fs::create_dir_all(dir)
+        .map_err(|err| format!("无法创建后端工作区目录 {}：{err}", dir.display()))
 }
 
 /// 从 exe 路径反推仓库根。
@@ -1337,12 +1412,146 @@ mod tests {
         // 回归：旧实现把 cwd 推断与 spawn 用 and_then 串起来，推断失败 ⇒ 短路
         // ⇒ Command::new 从未被调用 ⇒ 安装形态下侧车永远起不来。
         let exe = std::path::Path::new(r"C:\Users\pc\AppData\Local\DexAtlas Studio\dexatlas-desktop.exe");
-        let cwd = repo_root_from_exe(exe);
-        assert!(cwd.is_none(), "安装目录不该被当成仓库根");
+        let launch = backend_launch(Some(exe), None);
+        assert!(launch.cwd.is_none(), "安装目录不该被当成仓库根");
         let (program, args) = noop_command();
-        let mut child = spawn_backend(&program, &args, cwd.as_deref())
+        let mut child = spawn_backend(&program, &args, &launch)
             .expect("推断不出仓库根时也必须尝试启动后端命令");
         let _ = child.wait();
+    }
+
+    #[test]
+    fn installed_form_keeps_the_workspace_out_of_the_install_directory() {
+        // 回归（2026-11-28 真机实测，报告 §5.8.4）：安装形态下侧车没有自己的
+        // cwd，继承了快捷方式的 WorkingDirectory（= 安装目录），相对路径的
+        // 工作区 `.dexatlas` 就被建进安装目录；NSIS 的 `RMDir "$INSTDIR"` 只删
+        // 空目录，于是「用过一次再卸载」会留下安装目录。
+        //
+        // 修复后：安装形态的 cwd 与 DEXATLAS_WORKSPACE 都显式指向
+        // `%LOCALAPPDATA%\<bundle id>\workspace`，与安装目录无关。
+        let install_dir = Path::new(r"C:\Users\pc\AppData\Local\DexAtlas Studio");
+        let exe = install_dir.join("dexatlas-desktop.exe");
+        let local_data = Path::new(r"C:\Users\pc\AppData\Local\io.github.dexatlas.desktop");
+
+        let launch = backend_launch(Some(&exe), Some(local_data));
+
+        let workspace = local_data.join("workspace");
+        assert_eq!(
+            launch.cwd.as_deref(),
+            Some(workspace.as_path()),
+            "安装形态的侧车 cwd 必须是应用本地数据目录下的工作区"
+        );
+        assert_eq!(
+            launch.workspace.as_deref(),
+            Some(workspace.as_path()),
+            "安装形态必须显式告诉后端 DEXATLAS_WORKSPACE"
+        );
+        assert!(
+            !workspace.starts_with(install_dir),
+            "工作区不能落在安装目录里，否则卸载器的 RMDir 删不掉它"
+        );
+    }
+
+    #[test]
+    fn dev_form_uses_the_repository_root_and_leaves_the_workspace_relative() {
+        // dev 形态的行为不变：cwd = 仓库根，工作区沿用 `<repo>/.dexatlas`。
+        // 不能为了修安装形态，把开发者的工作区也搬走。
+        let root = std::env::temp_dir().join(format!(
+            "dexatlas-launch-dev-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        let repo = root.join("repo");
+        std::fs::create_dir_all(repo.join("src").join("dexatlas")).expect("创建仓库标记");
+        let exe = repo
+            .join("desktop")
+            .join("src-tauri")
+            .join("target")
+            .join("release")
+            .join("dexatlas-desktop.exe");
+
+        let launch = backend_launch(Some(&exe), Some(Path::new(r"C:\Users\pc\AppData\Local\io.github.dexatlas.desktop")));
+
+        assert_eq!(launch.cwd.as_deref(), Some(repo.as_path()), "dev 形态 cwd = 仓库根");
+        assert_eq!(launch.workspace, None, "dev 形态沿用相对路径 .dexatlas，不强行改工作区");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn the_installed_workspace_is_created_before_spawn() {
+        // `Command::current_dir` 指向不存在的目录时 CreateProcess 直接失败，
+        // 所以安装形态的工作区必须赶在 spawn 之前建好。
+        let root = std::env::temp_dir().join(format!("dexatlas-workspace-{}", std::process::id()));
+        let workspace = root.join("nested").join("workspace");
+        let launch = BackendLaunch {
+            cwd: Some(workspace.clone()),
+            workspace: Some(workspace.clone()),
+        };
+
+        prepare_workspace(&launch).expect("创建工作区");
+
+        assert!(workspace.is_dir(), "工作区目录必须真的被创建");
+        std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn the_backend_process_receives_the_workspace_environment() {
+        // 真进程验证：`DEXATLAS_WORKSPACE` 必须出现在子进程的环境里，
+        // 而不只是拼在 Command 对象上。
+        let workspace = std::env::temp_dir().join(format!(
+            "dexatlas-ws-env-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("clock")
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&workspace).expect("创建工作区");
+        let launch = BackendLaunch {
+            cwd: Some(workspace.clone()),
+            workspace: Some(workspace.clone()),
+        };
+        let (program, args) = if cfg!(windows) {
+            (
+                "cmd".to_string(),
+                vec!["/C".into(), "echo %DEXATLAS_WORKSPACE%".into()],
+            )
+        } else {
+            (
+                "sh".to_string(),
+                vec!["-c".into(), "printf '%s' \"$DEXATLAS_WORKSPACE\"".into()],
+            )
+        };
+
+        let output = backend_command(&program, &args, &launch)
+            .output()
+            .expect("运行子进程");
+
+        let printed = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        assert_eq!(
+            printed,
+            workspace.display().to_string(),
+            "DEXATLAS_WORKSPACE 必须传给后端子进程"
+        );
+        std::fs::remove_dir_all(&workspace).ok();
+    }
+
+    #[test]
+    fn dev_form_does_not_override_the_workspace_environment() {
+        // dev 形态不注入 DEXATLAS_WORKSPACE：开发者自己的环境变量说了算。
+        let launch = BackendLaunch {
+            cwd: Some(PathBuf::from(r"C:\repo")),
+            workspace: None,
+        };
+        let command = backend_command("python", &[], &launch);
+        assert_eq!(
+            command.get_envs().count(),
+            0,
+            "dev 形态不该注入 DEXATLAS_WORKSPACE"
+        );
     }
 
     #[test]
@@ -1438,8 +1647,18 @@ mod tests {
         //
         // 这里刻意用**没有作业对象**的后端：否则作业对象会替 Drop 把进程收走，
         // 测到的就不是 Drop 了。
-        let managed = ManagedChild::spawn_unmanaged("cmd", &long_running_command(), None)
-            .or_else(|_| ManagedChild::spawn_unmanaged("sh", &long_running_command(), None))
+        let managed = ManagedChild::spawn_unmanaged(
+            "cmd",
+            &long_running_command(),
+            &BackendLaunch::default(),
+        )
+        .or_else(|_| {
+            ManagedChild::spawn_unmanaged(
+                "sh",
+                &long_running_command(),
+                &BackendLaunch::default(),
+            )
+        })
             .expect("启动后端");
         let child = managed.child.clone();
         {
@@ -1454,8 +1673,18 @@ mod tests {
 
     #[test]
     fn terminate_stops_the_backend() {
-        let managed = ManagedChild::spawn_unmanaged("cmd", &long_running_command(), None)
-            .or_else(|_| ManagedChild::spawn_unmanaged("sh", &long_running_command(), None))
+        let managed = ManagedChild::spawn_unmanaged(
+            "cmd",
+            &long_running_command(),
+            &BackendLaunch::default(),
+        )
+        .or_else(|_| {
+            ManagedChild::spawn_unmanaged(
+                "sh",
+                &long_running_command(),
+                &BackendLaunch::default(),
+            )
+        })
             .expect("启动后端");
         let child = managed.child.clone();
         let mut managed = managed;
@@ -1477,7 +1706,7 @@ mod tests {
         let child = job::spawn_suspended(&mut backend_command(
             "cmd",
             &["/C".into(), format!("echo hi > {}", marker.display())],
-            None,
+            &BackendLaunch::default(),
         ))
         .expect("挂起创建");
 
@@ -1516,7 +1745,7 @@ mod tests {
         let mut child = job::spawn_suspended(&mut backend_command(
             "cmd",
             &long_running_command(),
-            None,
+            &BackendLaunch::default(),
         ))
         .expect("挂起创建");
         let job = job::Job::new().expect("作业对象");
@@ -1545,7 +1774,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn the_spawned_backend_runs_inside_the_job_object() {
-        let managed = ManagedChild::spawn("cmd", &long_running_command(), None).expect("启动后端");
+        let managed = ManagedChild::spawn("cmd", &long_running_command(), &BackendLaunch::default())
+            .expect("启动后端");
         let guard = managed.child.lock().expect("child mutex poisoned");
         let job = managed.job.as_ref().expect("作业对象");
         assert!(job.contains(&guard), "后端进程必须在作业对象里");
@@ -1563,7 +1793,7 @@ mod tests {
                 "/C".into(),
                 "ping -t 127.0.0.1 > nul & start /B ping -t 127.0.0.1 > nul".into(),
             ],
-            None,
+            &BackendLaunch::default(),
         )
         .expect("启动后端");
         let job = managed.job.as_ref().expect("作业对象");
@@ -1594,7 +1824,8 @@ mod tests {
         let Ok(marker) = std::env::var("DEXATLAS_TEST_HOST_MARKER") else {
             return;
         };
-        let managed = ManagedChild::spawn("cmd", &long_running_command(), None).expect("启动后端");
+        let managed = ManagedChild::spawn("cmd", &long_running_command(), &BackendLaunch::default())
+            .expect("启动后端");
         let pid = managed.child.lock().expect("child mutex poisoned").id();
         std::fs::write(&marker, pid.to_string()).expect("记下后端的 pid");
         // 一直活着，直到父测试把它强杀。父测试先动手，所以这个 sleep 只会

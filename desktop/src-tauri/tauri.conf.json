@@ -40,6 +40,9 @@
       "wix": {
         "template": "wix/main.wxs",
         "upgradeCode": "1c8c5729-38fc-513a-8777-cb10ab067608"
+      },
+      "nsis": {
+        "installerHooks": "nsis/installer-hooks.nsh"
       }
     }
   }
