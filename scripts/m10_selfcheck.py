@@ -243,25 +243,47 @@ def check_document_links(report: Report) -> None:
     )
 
 
+#: The section headings Keep a Changelog defines. A newest section is
+#: expected to carry at least one of them; which one is the release's to say.
+KEEP_A_CHANGELOG_HEADINGS = (
+    "Added",
+    "Changed",
+    "Deprecated",
+    "Removed",
+    "Fixed",
+    "Security",
+)
+
+
 def check_changelog(report: Report) -> None:
-    """The changelog's newest section carries Added/Changed headings.
+    """The changelog's newest section carries a Keep-a-Changelog heading.
 
     Before a release that section is ``[Unreleased]``; after it, it is the
     version just tagged. The check follows the newest section rather than a
     fixed name, so it does not expire the day the section is renamed.
+
+    It used to require ``### Added`` **and** ``### Changed`` in that
+    section. That is a shape a release often has and a release does not have
+    to have: a section that only fixes things carries ``### Fixed`` and
+    nothing else, and it is a perfectly good one. The check failed such a
+    section for being what it is (2026-11-28), which is the same mistake as
+    the hard-coded exit-code set this file's tests were written for: an
+    expectation written down twice, failing a correct tree. What it asks now
+    is that the newest section carries at least one of the headings Keep a
+    Changelog defines -- the point being that the newest section was written
+    in the changelog rather than left as a bare heading.
     """
     text = CHANGELOG_PATH.read_text(encoding="utf-8")
     match = re.search(r"^## \[([^\]]+)\]", text, re.MULTILINE)
     heading = match.group(1) if match else ""
     section = text[match.end() :].split("\n## ", 1)[0] if match else ""
-    has_added = "### Added" in section
-    has_changed = "### Changed" in section
+    present = [name for name in KEEP_A_CHANGELOG_HEADINGS if f"### {name}" in section]
     report.add(
         outcome_of(
             "DOC.changelog",
-            "CHANGELOG 最新段有 Added / Changed 小节",
-            bool(match) and has_added and has_changed,
-            f"最新段 {heading!r}，Added={has_added}，Changed={has_changed}",
+            "CHANGELOG 最新段带 Keep a Changelog 的小节",
+            bool(match) and bool(present),
+            f"最新段 {heading!r}，小节：{', '.join(present) if present else '无'}",
         )
     )
 

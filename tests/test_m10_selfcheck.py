@@ -240,3 +240,70 @@ def test_the_package_criterion_passes_when_the_cli_prints_the_archive_count(
     )
     outcome = _outcome(script, "check_package_entry_count", root)
     assert outcome.state == "pass", f"the archive's count was rejected: {outcome.detail}"
+
+
+def _changelog_outcome(tmp_path: Path, monkeypatch: Any, text: str) -> tuple[bool, str]:
+    """The DOC.changelog outcome for a changelog written to a temp file."""
+    script = _selfcheck_script()
+    changelog = tmp_path / "CHANGELOG.md"
+    changelog.write_text(text, encoding="utf-8")
+    monkeypatch.setattr(script, "CHANGELOG_PATH", changelog)
+    outcomes: list[Any] = []
+
+    class _Recorder:
+        def add(self, outcome: Any) -> None:
+            outcomes.append(outcome)
+
+    script.check_changelog(_Recorder())
+    assert len(outcomes) == 1, "the check must report exactly one outcome"
+    outcome = outcomes[0]
+    passed = str(getattr(outcome, "state", "")).lower() in {"pass", "passed"}
+    return passed, str(getattr(outcome, "detail", ""))
+
+
+def test_a_section_that_only_fixes_things_passes_the_changelog_check(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """``### Fixed`` alone is a good section, and the check used to fail it.
+
+    It required ``### Added`` **and** ``### Changed``, so a release that
+    only fixed things failed for being what it is (2026-11-28: the
+    ``[Unreleased]`` section carried the contract tightening as its only
+    entry, and the M10 self-check went red on a correct tree).
+    """
+    passed, detail = _changelog_outcome(
+        tmp_path,
+        monkeypatch,
+        "# Changelog\n\n## [Unreleased]\n\n### Fixed\n\n- a fix\n\n"
+        "## [1.0.0] — 2026-01-01\n\n### Added\n\n- a feature\n",
+    )
+
+    assert passed, detail
+    assert "Fixed" in detail
+
+
+def test_a_section_with_no_heading_at_all_fails_the_changelog_check(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """The point of the check survives the loosening: something has to be there."""
+    passed, detail = _changelog_outcome(
+        tmp_path,
+        monkeypatch,
+        "# Changelog\n\n## [Unreleased]\n\nnothing written yet\n",
+    )
+
+    assert not passed, detail
+    assert "无" in detail
+
+
+def test_a_section_that_only_adds_passes_the_changelog_check(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """``### Added`` alone was also failed by the old rule; it is a good section."""
+    passed, detail = _changelog_outcome(
+        tmp_path,
+        monkeypatch,
+        "# Changelog\n\n## [1.0.0] — 2026-01-01\n\n### Added\n\n- a feature\n",
+    )
+
+    assert passed, detail
