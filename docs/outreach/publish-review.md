@@ -18,8 +18,8 @@
 
 | 要核对的量 | 取值 | 来源（仓库内可复核） |
 |---|---|---|
-| 测试总数 | 1,938（1,789 快 + 149 集成） | `docs/reports/phase1-execution-report.md` 的 `<!--fig:tests.total-->` / `tests.fast` / `tests.slow` |
-| 一方代码覆盖率 | 93.4%（7,485 / 8,018 行） | 同上的 `<!--fig:coverage.pct-->` / `coverage.covered` / `coverage.total`；`docs/status.md` 同值 |
+| 测试总数 | <!--fig:tests.total.grouped-->1,964<!--/fig-->（<!--fig:tests.fast.grouped-->1,815<!--/fig--> 快 + <!--fig:tests.slow.grouped-->149<!--/fig--> 集成） | `docs/reports/phase1-execution-report.md` 的 `tests.total` / `tests.fast` / `tests.slow` 三个标记 |
+| 一方代码覆盖率 | <!--fig:coverage.pct-->93.3%<!--/fig-->（<!--fig:coverage.covered.grouped-->7,510<!--/fig--> / <!--fig:coverage.total.grouped-->8,047<!--/fig--> 行） | 同上的 `coverage.pct` / `coverage.covered` / `coverage.total` 三个标记；`docs/status.md` 同值 |
 | MCP 只读工具数 | 11 | `src/dexatlas/mcp/server.py` 实际注册的 `@server.list_tools()`；`README.md` 与 `docs/architecture/workbench.md` 均写 “eleven” |
 | case study 数 | 3 | `docs/case-studies/README.md`：「Three complete walkthroughs」，三篇正文标题即 *Case study 1/2/3* |
 | M6 层级 2 实测 | 49/60 = 81.7%（逐轮 15/16/18），未达验收线 | `docs/benchmarks/m6-level2-retest4.md` |
@@ -27,8 +27,15 @@
 | M6 窄验证三轮 | 转通过 3/6（门槛 ≥4），未达标 | `docs/benchmarks/m6-level2-narrow-verify3.md` |
 | 最新已发布版本 | `v1.0.0`（tag 2026-11-17；`src/dexatlas/__init__.py` 的 `__version__` 是 `1.0.0`） | `git tag` / `src/dexatlas/__init__.py` |
 
-报告里的数字由 `scripts/refresh-report-figures.py` 从真实测量生成，**本轮没有手改任何
-`<!--fig:...-->` 标记**，只按它们已落盘的值改写对外文案。
+报告里的数字由 `scripts/refresh-report-figures.py` 从真实测量生成。
+
+> **2026-11-28 更新：对外文案里的数也不手抄了。** 本文件 §0 那张表的数，与
+> 另外三份材料里的测试数与覆盖率，现在都由测量**写进 `<!--fig:…-->` 标记**
+> （`tests.total.grouped` / `coverage.pct` 等），`scripts/check-version-claims.py`
+> 会把标记里的值与执行报告比对。
+> **上面那句「本轮没有手改任何 `fig:` 标记，只按它们已落盘的值改写
+> 对外文案」说的是 2026-11-21 那一轮**——那一轮确实没有手改标记，但**手改了
+> 对外文案里的数**（就是下面 §1 记的那四处）。现在没有数要手改了。
 
 > **一处事实错误的更正（本轮改）。** 上一版把 M6 窄验证的结果记成「**二轮**
 > 转通过 **3/6**」——**3/6 是三轮的结果**（`docs/benchmarks/m6-level2-narrow-verify3.md`
@@ -40,7 +47,12 @@
 
 ## 1. 对外数字核对：4 处不一致，已全部改正
 
-四处都是**文案比仓库落盘值旧**（写的是更早一次测量的数字），不是夸大。改正后
+> **这张表是历史轮次的记录。** 它记的是**那一轮**（落盘真值 1,612 / 93.3%
+> 那一版）的核对：当时四处文案比仓库落盘值旧，已改正。表里的数**属于那一轮**，
+> 不随今天的测量变动——变的是 §0 的那张表，那张表的数由标记写入。
+> 当前这一轮要核的数在 §0，发送前要看的是 §0 与 §7。
+
+四处都是**文案比仓库落盘值旧**（写的是更早一次测量的数），不是夸大。改正后
 数字与 `docs/reports/phase1-execution-report.md` 逐字一致。
 
 | # | 文件 | 修正前 | 修正后 | 落盘真值 |
@@ -172,11 +184,30 @@ Markdown 语法（`**粗体**`、列表符号、`>` 引用）后的正文字符�
 下面这段脚本就是口径本身，**表里的每个数字都能用它复算**（纯标准库，不写
 任何测量产物）：
 
+> **量的是导出件，不是仓库里的源。** 四份材料在仓库里是**带标记的源**
+> （**HTML 注释形式的 `fig:` 标记**），发出去的是
+> `scripts/export-outreach.py` 渲染出来的**纯文本**。标记让源多出几十个字符，
+> 而下面的门限贴线（Template 2 余 0、`scope-backend` 全文余 59），所以量源会
+> 得出一个偏大的数——**偏大就偏安全，但偏大的数不是发出去的那一版的数**。
+> 脚本因此先导出再量：
+>
+> ```bash
+> uv run --no-sync python scripts/export-outreach.py
+> ```
+>
+> `scope-ai-mcp.md` 不带标记（它不写测试数与覆盖率），所以它既不在导出列表里，
+> 也仍然直接量源。
+
 ```bash
 python - <<'EOF'
 import pathlib, re
+EXPORTED = pathlib.Path(".scratch/outreach-export")
+def source_of(name):
+    """The file to measure: the exported copy when there is one, else the source."""
+    exported = EXPORTED / name
+    return exported if exported.is_file() else pathlib.Path("docs/outreach") / name
 def sections(path):
-    lines = pathlib.Path(path).read_text(encoding="utf-8").splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
     out, name, cur = [], None, []
     for l in lines:
         if l.startswith("## "):
@@ -202,13 +233,14 @@ def strip_md(text):
     while out and not out[0].strip(): out.pop(0)
     while out and not out[-1].strip(): out.pop()
     return "\n".join(out)
-for path in ["docs/outreach/cover-letter-templates.md", "docs/outreach/project-brief.md",
-             "docs/outreach/scope-ai-mcp.md", "docs/outreach/scope-backend-automation.md"]:
-    raw = len(pathlib.Path(path).read_text(encoding="utf-8").strip("\n"))
-    print(f"### {path} 全文 raw={raw} plain={len(strip_md(pathlib.Path(path).read_text(encoding='utf-8')))}")
-    for name, body in sections(path):
+for name in ["cover-letter-templates.md", "project-brief.md",
+             "scope-ai-mcp.md", "scope-backend-automation.md"]:
+    path = source_of(name)
+    raw = len(path.read_text(encoding="utf-8").strip("\n"))
+    print(f"### {name} 全文 raw={raw} plain={len(strip_md(path.read_text(encoding='utf-8')))}")
+    for section, body in sections(path):
         text = "\n".join(body).strip("\n")
-        print(f"    {name:<50} raw={len(text):>6} plain={len(strip_md(text)):>6}")
+        print(f"    {section:<50} raw={len(text):>6} plain={len(strip_md(text)):>6}")
 EOF
 ```
 
@@ -216,9 +248,9 @@ EOF
 |---|---|---:|---:|---:|---|
 | **Project title** | `project-brief.md` | **53** | 53 | 60 | ✅ |
 | Role | `project-brief.md` | 438 | 438 | 5,000 | ✅ |
-| **Short description** | `project-brief.md` | 1,410 | 1,404 | 5,000 | ✅ |
+| **Short description** | `project-brief.md` | 1,412 | 1,406 | 5,000 | ✅ |
 | Skills | `project-brief.md` | 311 | 271 | 5,000 | ✅ |
-| Deliverables shown in the repository | `project-brief.md` | 1,455 | 1,437 | 5,000 | ✅ |
+| Deliverables shown in the repository | `project-brief.md` | 1,457 | 1,439 | 5,000 | ✅ |
 | Third-party components (attribution) | `project-brief.md` | 458 | 452 | 5,000 | ✅ |
 | Honest limitations | `project-brief.md` | 426 | 428 | 5,000 | ✅ |
 | Links | `project-brief.md` | 1,178 | 947 | 5,000 | ✅ |
@@ -228,6 +260,15 @@ EOF
 | §What I offer（粘贴段） | `scope-ai-mcp.md` | 781 | 773 | 5,000 | ✅ |
 | Template 1 正文 | `cover-letter-templates.md` | 2,185 | 2,174 | 2,500 | ✅ |
 | Template 2 正文 | `cover-letter-templates.md` | **2,500** | 2,485 | 2,500 | ⚠ 压线（见 §5.3） |
+
+> **本轮这张表改按导出件算。** 三份带标记的材料在仓库里是**源**，发出去的是
+> `scripts/export-outreach.py` 渲染出来的**纯文本**，而**发出去的那一版才是要粘
+> 进表单的那一版**。变化只有两行（`Short description`、`Deliverables` 各 +2 字符，
+> 因为标记剥掉后行折叠的位置变了），**判定不变**：Template 2 仍然**正好压线**
+> （plain 2,485 / 上限 2,500，余 0），`scope-backend` 全文仍然只余 59 字符。
+>
+> 上一轮那张表按**源**算。源比导出件长几十个字符（标记的标记），所以**按源算
+> 是偏大的**——偏大偏安全，但偏大的数不是发出去的那一版的数，所以口径改了。
 
 > 本轮重出整表：`Template 1` / `Template 2` / `scope-backend §What I offer`
 > 三行的旧值（2,216 / 3,005 / 621）在文件上**无法复算**，原因是旧表用的是
@@ -329,10 +370,20 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
    请在真实表单上逐个字段确认。**素材顶部引用的官方指南链接也要联网核实**
    （`support.upwork.com/hc/en-us/articles/360016144974`）：本轮**没有联网**，
    那条链接与其中的限制值都还没对过现网。
-5. **对外数字要跟最后一次测量同步。** 本轮的 1,612 / 93.3% 取自最近一次完整
-   测量落盘的报告（源指纹 `sha256:4e72ac49…`）——完整测量已重跑，这四份素材的
-   数字已按新值核过一遍。**以后任何一次测量都会再改这两个数**，发版前请再核
-   一次。
+5. **发出去之前要跑一次导出。** 仓库里的四份材料是**带标记的源**
+   （**HTML 注释形式的 `fig:` 标记**），发出去的是
+   `scripts/export-outreach.py` 渲染出来的纯文本：
+   ```bash
+   uv run --no-sync python scripts/export-outreach.py
+   ```
+   然后粘 `.scratch/outreach-export/` 里的文件。**不要粘仓库里的源**——那里面
+   有标记，粘进表单是可见的乱码。
+   **对外的数字本身不用再核了**：测试数与覆盖率现在由测量写进材料
+   （`<!--fig:…-->` 标记），`scripts/check-version-claims.py` 会把标记里的值
+   与执行报告比对——**标记里的数对不上，门禁就红**。这条是本轮（2026-11-28）
+   改掉的：以前每次测量都要人记得改四处手抄的数，2026-11-27 到 11-28 之间
+   手抄过三次（1887 / 1915 / 1931）。
+   还要核的只剩**字符数**（第 2、3 条）——那是编辑判断，不是测量。
 6. **`{{...}}` 占位符全部替换后才能发。** 模板里的占位符若漏改会直接发出去。
    Template 1 有 11 处、Template 2 有 10 处；改完逐个搜 `{{` 确认没有残留。
 7. **联系方式与可用性要按平台要求补齐。** 四份素材现在是**零联系方式、零时区、
@@ -392,7 +443,8 @@ Template 2 的正文原为 **raw 2,966 / plain 2,951**（超 2,500 门限 466）
 （`tools/androguard/worker.py` 72.3%、`tools/apktool/adapter.py` 93.1%），
 测量脚本也已改成每次用私有数据文件 + 同 checkout 互斥槽位，不会再被并发顶掉。
 **当前 `docs/reports/phase1-execution-report.md` 落盘的是最近一轮完整测量的值**
-（1,938 tests / 93.4%，7,485/8,018 行；Phase 5 收尾批次修界面后端状态区与窄栏布局之后的测量轮）。
+（该报告 §1 的表里就是这三个数；**这里不转述**——转述出来的数会过期，而报告是
+权威；Phase 5 收尾批次修界面后端状态区与窄栏布局之后的测量轮）。
 
 ---
 

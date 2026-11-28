@@ -9,8 +9,8 @@
 [![CI](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml/badge.svg)](https://github.com/gg320324492-lgtm/dexatlas/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1937%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
-[![Coverage](https://img.shields.io/badge/coverage-93.4%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
+[![Tests](https://img.shields.io/badge/tests-1963%20passing-brightgreen.svg)](docs/reports/phase1-execution-report.md#21-分层策略)
+[![Coverage](https://img.shields.io/badge/coverage-93.3%25-brightgreen.svg)](docs/reports/phase1-execution-report.md#12-工程指标)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://docs.astral.sh/ruff/)
 [![Typed: mypy](https://img.shields.io/badge/typed-mypy%20strict-1a73e8.svg)](https://mypy-lang.org/)
 

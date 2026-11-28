@@ -47,8 +47,9 @@ recorded as verified. A backend that fails is reported as a value, not a
 crash: an APK that defeats the decompiler still yields a manifest, an index
 and a report that says which steps did not run.
 
-- 1,938 automated tests, 93.3% coverage, mypy strict, ruff, and a CI pipeline
-  across Python 3.12/3.13 and multiple backend configurations.
+- <!--fig:tests.total.grouped-->1,964<!--/fig--> automated tests,
+  <!--fig:coverage.pct-->93.3%<!--/fig--> coverage, mypy strict, ruff, and a CI
+  pipeline across Python 3.12/3.13 and multiple backend configurations.
 - Full documentation with three complete case studies on first-party sample
   APKs that anyone can reproduce from the repository.
 
@@ -82,7 +83,8 @@ and a report that says which steps did not run.
 - **Benchmark harness.** Scripted and real-model comparison runs with
   committed traces and reproducible metrics; scripted and real-model results
   are reported separately and never mixed.
-- **Engineering quality gates.** 1,938 tests, coverage and dead-code gates,
+- **Engineering quality gates.** <!--fig:tests.total.grouped-->1,964<!--/fig--> tests,
+  coverage and dead-code gates,
   strict typing, lint/format, documentation citation checks, and CI across
   multiple Python and backend configurations.
 

@@ -947,3 +947,16 @@ jobs:
       - name: The hand-written numbers in the documents agree with the tree
         run: uv run --no-sync python scripts/check-unguarded-numbers.py
 
+      # The outward materials are pasted into forms and attached to
+      # proposals, so what gets sent must carry no markup: a marker in a
+      # proposal is a bug with a client's name on it. The materials hold
+      # their numbers between markers, and this check renders them the way
+      # they are sent and says whether any marker would survive -- and
+      # whether every one of them is a number the report stands behind.
+      #
+      # It lives in this job for the same reason the step above does: a step
+      # added to the lint job moves every line below it, and several reports
+      # cite those lines.
+      - name: The outward materials render to text that carries no markup
+        run: uv run --no-sync python scripts/export-outreach.py --check
+
