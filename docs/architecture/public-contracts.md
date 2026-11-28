@@ -310,7 +310,7 @@ APK 里有什么」；阶段进度是**这一次分析进行到哪了**——一
 
 两个传输与三种报告对"点/边"使用同一组数：`call_site_count` 是
 `reference_count` 的别名（`src/dexatlas/api/app.py:205-211`、
-`src/dexatlas/mcp/tools/projects.py:53`）。`xrefs` 响应用 `total_unit:
+`src/dexatlas/mcp/tools/projects.py:81`）。`xrefs` 响应用 `total_unit:
 "call_sites"` 把单位写死（`src/dexatlas/api/app.py:775-779`）。
 
 证据三级（`EvidenceLevel`，`src/dexatlas/core/models.py:537-571`）：

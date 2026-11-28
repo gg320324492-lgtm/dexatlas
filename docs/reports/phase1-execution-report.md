@@ -204,6 +204,7 @@ Apktool / Androguard、拉取两个第三方集成样本、装上 demo extra，�
 | `test_desktop_card_header_layout.py` | 窄栏里卡片的标题不被角标挤成竖排：标题块占满角标让出的空间、actions 允许收缩、阶段角标允许换行（读 CSS 钉住那几条规则，布局没有单元测试能测）（Phase 5 收尾新增） |
 | `test_desktop_version_badge.py` | 桌面版本展示只有一个权威来源：侧栏不写死版本号，设置页从 `/api/health` 读版本（Q2 E2E P1 新增） |
 | `test_msi_shortcut_repair.py` | MSI 的修复路径：repair 能不能把被删掉的快捷方式修回来（REINSTALLMODE 的 `s` 标志要赶在成本计算之前补上、控制面板的修复入口不能被 `ARPNOREPAIR` 关掉）（Phase 5 A8 新增） |
+| `test_nsis_uninstall_cleanup.py` | NSIS 卸载不再把安装目录留在磁盘上：钩子与配置接线、两个卸载宏都在、非空目录会被删、递归删除带两道守卫（确实本应用目录 + 非升级）、钩子不碰 roaming 配置、安装形态的侧车工作区钉在 app-local-data（2026-11-28 新增） |
 | `test_desktop_version.py` | 桌面应用的版本号跟着发版号走：四处（package.json / tauri.conf.json / Cargo.toml / Cargo.lock）一致，MSI 的版本取自应用版本，设置页把「应用版本」与「后端版本」分两行说（Phase 5 A11 新增） |
 | `test_desktop_locator_vocabulary.py` | 前端镜像后端的 locator 词汇（跨语言，JS 单测读不了 Python 源码）：工具前缀、落点类别与后端常量不许漂移 |
 | `test_desktop_stale_copy.py` | 界面上的三句陈旧文案：错误提示不再写死回退端口而取自实际的 baseUrl（端口不可知时说「后端地址未知」）；分析页脚注与 workbench 实际提供的 `/api/backends` 一致；报告页的时间戳按本地时区显示并附 UTC 标注（打包 exe 二次验收新增） |
