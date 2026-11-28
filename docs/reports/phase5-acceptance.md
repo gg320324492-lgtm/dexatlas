@@ -299,7 +299,9 @@ W2 合入 `9614cb0` 后做过一次只读端到端复测，逐条判据的结论
 v1.0.0（2026-11-28 改为按被推的 ref 选）；重复上传提示看不见（2026-11-27 修）；
 侧车 stderr 线程遇坏字节就停（2026-11-27 修）；`/fa` 修不回快捷方式
 （2026-11-27 修，根因是 `REINSTALLMODE` 的 `s` 标志）；版本号三处各说各的
-（2026-11-27 修）；并发重复上传与不可取消（2026-11-27 修）。
+（2026-11-27 修）；并发重复上传与不可取消（2026-11-27 修）；把「版本探测失败」
+的后端说成「没参与」（2026-11-28 修，`missing_backends()`；打包 exe 复验见
+§7.12 第 3 条）。
 
 ### 7.4 一项已知且如实标注的低危残留（2026-11-27 已关闭）
 
@@ -405,6 +407,11 @@ run 的记录，并在说明里写出来。
 `tests/test_desktop_backend_status_truth.py` 4 例钉住**接线**（页面确实读了
 机器名单、确实把它交给映射），去掉修复后 3 例红。
 
+**打包 exe 复验（2026-11-28）：** 另用一个「装着、但 `--version` 探测失败」的
+jadx（wrapper 只对 `--version` 失败，真正的反编译仍交给真的 jadx）跑了一次真实
+分析：`missing_backends` 为空，桌面分析页、项目详情页与工作台网页版都不写
+「缺失后端：jadx」。逐条证据见 §7.12 第 3 条。
+
 ### 7.8 同一轮复验带出的一个键盘可达性缺陷（已修）
 
 **现象：** 打包 exe 里用键盘走到「取消」按钮（7 次 Tab：跳转链接 → 5 个侧栏
@@ -422,6 +429,11 @@ run 的记录，并在说明里写出来。
 
 **回归测试：** `tests/test_desktop_keyboard_accessibility.py` 新增 3 例（去掉修复
 后全红）；`desktop/src/stages.test.ts` 仍 70 例全绿。
+
+**打包 exe 复验（2026-11-28）：** 键盘 Enter → 浏览器自己的确认框 → 取消受理；
+逐帧采样里按钮处于 `aria-disabled` 的那几帧，焦点仍在**同一个**按钮元素上
+（没有一帧落到 `<body>`），取消真的发生（run 记 `cancelled`、未发布任何结果）。
+采样与后端事实见 §7.12 第 2 条。
 
 ### 7.9 复验带出并已修的两个核心缺陷（2026-11-27）
 
@@ -506,6 +518,9 @@ KeyPath 是注册表键）**是错的**，这一轮用三组对照量出来了�
 802 次采样 0 次抓到）。修法：不再跳转，提示以 `role="alert"` 的告示块留在首页，
 并给一个「打开已有项目」的显式入口，由用户自己决定去不去。
 
+**打包 exe 复验（2026-11-28）：** 同一个已分析过的 APK 再拖一次，提示留在首页、
+地址不变、后端没有第二次分析，点「打开已有项目」落到既有项目。见 §7.12 第 1 条。
+
 **A10 —— 侧车转发后端 stderr 的线程遇非 UTF-8 一行就整个停掉。** 旧实现用
 `read_line` 往 `String` 里读，一行坏字节就让它返回 `Err(InvalidData)`，代码
 随即 `break`——整条流就此停止，那一行之后的 traceback 再也到不了运营者手里。
@@ -519,6 +534,102 @@ exe 自身与 MSI 的 `ProductVersion` 一直是 0.1.0。修法：发版号单�
 核心）」两行。**「桌面版本要不要跟着发版号走」已由作者拍板为「跟随」**
 （2026-11-27），另外两种做法与代价存档在[打包说明](../desktop-packaging.md)
 §1.3。
+
+### 7.12 三件已修界面问题的打包 exe 复验（2026-11-28）
+
+**对象与做法。** 工作树 `exciting-chaum-4cb5a1`（HEAD `3262f65`，应用版本 1.2.0）
+用 `npm run tauri build` 产出的打包 exe（`desktop/src-tauri/target/release/dexatlas-desktop.exe`，
+14,833,152 字节；NSIS 与 MSI 同批产出）。侧车按 `backend.json` 拉起本工作树
+`.venv` 里的 `python -m dexatlas.workbench`——该文件先做临时备份再改写，验完
+逐字节还原。界面经 WebView2 远程调试端口
+（`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`）用 CDP
+驱动；工作台网页版由**同一个侧车端口**提供，在 Edge 里打开（它是浏览器界面，
+不是 Tauri 窗口里的内嵌视图）。**没有改产品代码，也没有加测试。** 三件都已有
+单测；这一节只记录它们在**打包 exe**上的行为。
+
+#### 7.12.1 重复上传的提示看得见（§7.11 的 A9）
+
+`examples/demo-app/demo.apk`（sha256 前 12 位 `80a8fe0e8120`）先经首页的文件
+输入分析完成（12 条证据，已发布）。随后把同一个文件**拖回**首页拖拽区
+（真实 `DragEvent` + `File`）：
+
+- 提示块出现且 `role="alert"`，原文：「这个 APK 已经分析过了 / sha256 前 12 位
+  80a8fe0e8120；没有重复分析，已有的分析结果还在。」/「打开已有项目」；
+- 地址**没有变**（仍是 `#/`），首页没有被卸载；
+- 后端没有第二次分析：该项目的 run 总数仍是 1（`completed`，且是已发布轮次）；
+- 用真实鼠标点击「打开已有项目」，落到 `#/analysis/apk_80a8fe0e81204c9f`
+  （既有项目的分析页，显示「已完成」）。
+
+![重复上传：提示留在首页而不是随跳转消失](../assets/phase5/recheck-a9-duplicate-notice.png)
+
+![点「打开已有项目」落到既有项目](../assets/phase5/recheck-a9-open-existing-project.png)
+
+#### 7.12.2 不可用的按钮不夺走焦点（§7.8 的复验）
+
+用 `scripts/generate-large-apk.py --scale large` 现场生成一个合成大 APK；另复制
+一份、在 zip 里加一个无害条目得到不同 hash（这样取消来得及落在分析中间，且不会
+被「已分析过」挡下）。在页面显示「当前阶段：索引」时：
+
+1. 用 DOM 给「取消」按钮键盘焦点（计算样式
+   `outline: rgb(184, 167, 245) solid 1.71429px`，与 §7.8 记录的一致）；
+2. 用 CDP `Input.dispatchKeyEvent` 按 Enter——这是**浏览器自己的**
+   `window.confirm`，`Page.javascriptDialogOpening` 原文：「确认取消本次分析？
+   已生成的中间结果将被丢弃。」；由 CDP 的 `Page.handleJavaScriptDialog`
+   替用户回答「确定」；
+3. 按键前先装一个**只读**的 `requestAnimationFrame` 采样器，逐帧记录
+   `document.activeElement` 是否仍是按键前那个元素、以及它的 `aria-disabled`。
+
+**结果：** 采样 119 帧（约 0.73 秒）；其中 2 帧按钮处于 `aria-disabled="true"`
+（带 `loading` 类）。**这 2 帧的 `activeElement` 都是按键前那个按钮元素**
+（记录 `same: true`、`tag: BUTTON`、`hasFocus: true`），没有任何一帧焦点落到
+`<body>`；取消流程结束后同一个节点仍在焦点上。后端侧：本轮 run（`run_a035d62a5de748b4`）
+记 `cancelled`、项目 `failed`、`published_run` 为 null。取消**真的发生**了，不只是
+按钮换了样式；同一路径的上一轮（`run_6c1e7b7f31c94873`）里，页面日志出现了
+「已向后端发送取消请求（202），等待状态确认」——下图第二张就是那一刻的截图。
+
+> 复验方法上的两句限定：① 单独发 `rawKeyDown` 不会激活按钮，必须带 `text: "\r"`
+> 的 `keyDown`——这是驱动脚本的细节，不是产品行为；② 本地侧车的 `POST /cancel`
+> 有时几帧就返回，所以「焦点没被夺走」的证据是**逐帧采样**，截图只是旁证。
+
+![键盘焦点落在「取消」上](../assets/phase5/recheck-7.8-cancel-focused.png)
+
+![取消已受理（202），焦点仍在按钮上](../assets/phase5/recheck-7.8-cancel-requested.png)
+
+![取消之后：项目失败、未发布任何结果](../assets/phase5/recheck-7.8-cancel-final.png)
+
+#### 7.12.3 核心修复：「探测失败」不再被说成「没参与」
+
+构造「装着、但 `--version` 探测失败」的 jadx：一个 `.cmd` wrapper 只对
+`--version` 返回 3，其余参数原样交给真的 jadx，等它写完输出后返回 1——于是 run
+在 jadx 名下记 `EXIT_NONZERO`，版本保持 `null`。用一份内容与 demo 相同、hash
+不同的副本（`apk_268272c52c691c47`）跑一次真实分析：
+
+| 后端事实（`GET /api/projects/{id}`） | 实测值 |
+|---|---|
+| 项目状态 / 证据数 | `completed` / 13 条 |
+| `tool_versions.jadx` | `null`（探测失败） |
+| `errors` | `jadx: jadx exited with code 1` |
+| `missing_backends` | `[]` |
+| 按旧判据（`tool_versions` 里 null 的键）推演 | `["jadx"]` |
+
+- **桌面应用·分析页**：JADX 卡是「✕ 失败 / 版本未知：本次分析没有记下该后端的
+  版本」；页面上没有「缺失后端」四个字。
+- **桌面应用·项目详情页**：横幅是「部分状态：jadx: jadx exited with code 1」，
+  **没有**「缺失后端：jadx」。
+- **工作台网页版**（`#/projects/{id}`）：COMPLETENESS 一行就是
+  `jadx: jadx exited with code 1`；没有「the jadx backend did not take part」，
+  项目列表行也没有 missing 标记。
+
+![分析页：JADX 失败，但不在「缺失」名单里](../assets/phase5/recheck-missing-jadx-analysis.png)
+
+![项目详情页：只报 jadx 的错误，不写「缺失后端：jadx」](../assets/phase5/recheck-missing-jadx-project-detail.png)
+
+![工作台网页版：只报 jadx 的错误](../assets/phase5/recheck-missing-jadx-workbench.png)
+
+**这条复验的边界：** 用的是仓库形态（exe 的祖先链里有 `src/dexatlas`，侧车工作区
+是 `<repo>/.dexatlas`），不是 NSIS 安装形态；被测的三处界面行为与安装位置无关，
+但「安装形态下的同一组界面」没有在这一轮重新截图。合成 APK 由仓库脚本现场生成
+并留在工作树 `.scratch/`，没有入库；截图只进了 `docs/assets/phase5/`。
 
 ## 8. 判定与下一步
 
