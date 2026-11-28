@@ -1,9 +1,9 @@
 # Phase 5 真机补测：打包 exe + 完整后端配置，MSI 安装，非 MSIX 容器启动
 
-**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）；2026年11月28日（NSIS 首装/卸载补测，§5.8）
+**日期：** 2026年11月26日（第一、二轮）；2026年11月27日（提升会话/升级/卸载/repair 补测）；2026年11月27日（非 MSIX 容器补测）；2026年11月28日（NSIS 首装/卸载补测，§5.8）；2026年11月28日（MSI 版本号递增升级与降级补测，§5.9）
 **机器：** Windows 11 Pro 10.0.26300（x64）
-**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`；NSIS 首装/卸载轮（§5.8）基线 `273536b`，worktree `zen-sammet-4b7f5e`
-**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」；§5 补的是 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」。
+**代码基线：** `bb04ac5`（Merge PR #24），worktree `.claude/worktrees/elegant-bouman-297a2f`；非容器轮（§5）基线 `d9f2f24`，worktree `strange-ardinghelli-f4f02c`；NSIS 首装/卸载轮（§5.8）基线 `273536b`，worktree `zen-sammet-4b7f5e`；MSI 版本号递增升级轮（§5.9）基线 `3262f65`，worktree `loving-pike-73c47a`
+**本文补的是：** [Phase 5 验收报告](phase5-acceptance.md) §7 的第 2 项与第 3 项——「打包 exe 在装了 jadx + apktool 的配置下未跑」与「MSI 安装路径未验证」；§5 补的是 §7.3 第 2 项——「非 MSIX 容器下的启动未单独验证」；§5.9 补的是 §7.3 的「版本号递增的 MSI 升级路径」（原第 4 项），并顺带实测了降级。
 
 > **本文的地位。** 验收报告是判定书；本文是那两条空白项的**原始记录**：配了什么、跑了什么命令、看到了什么、以及**哪些没看到**。本文只做记录与取证，不改判定——两条空白项的结论由验收报告的作者在看过本文后写。
 > **本文不含新的生产声明。** 每一个数字都来自本次运行的日志或截图，命令与路径都可复现（见 §6）。
@@ -20,6 +20,8 @@
 | NSIS 首次安装（2026-11-28 第四轮） | **通过** | 机器清到首装形态后静默 `/S` 退出码 **0**，装到 `C:\Users\pc\AppData\Local\DexAtlas Studio\`；装完的应用起来、侧车起来、一次真实分析跑出同样的 **12 条证据**、五阶段全完成、三后端参与（§5.8.1） |
 | NSIS 卸载（2026-11-28 第四轮） | **通过，但查出一个缺陷** | 静默卸载退出码 **0**，安装目录整个没了、注册表卸载项没了、两份快捷方式都没了，**`%APPDATA%` 的 `backend.json` 逐字节保留**；但 `HKCU\Software\github\DexAtlas Studio`（记住安装位置的键）**没删**，判别实验证明它决定下一次装到哪（§5.8.3）。**缺陷：用户用过一次之后，卸载就卸不干净**——工作区建在安装目录里，而 NSIS 的 `RMDir` 只删空目录，卸完还剩 `.dexatlas\`（§5.8.4） |
 | NSIS 的 `ProductVersion` 跟着发版号走（2026-11-28 第四轮） | **通过** | 另建一棵树把发版号抬到 1.2.1，由**项目自己的** `sync-desktop-version.py` 推到四个文件，打出的包 `ProductVersion` **1.2.1**——不是巧合，是跟着走（§5.8.2） |
+| MSI 的 `ProductVersion` 跟着发版号走 + 版本号递增升级 1.2.0 → 1.2.1（2026-11-28 第五轮） | **通过** | 同一棵临时树先后打出 1.2.0 与 1.2.1 两个 MSI，`Property` 表的 `ProductVersion` 分别是 **1.2.0 / 1.2.1**；在已提升会话里 `msiexec /i … /qn` 两次都退出 **0**；升级后 ARP `DisplayVersion` **1.2.1**、产品码换新、安装的 exe 与 1.2.1 包内 payload **逐字节相同**；`backend.json` 在两次动作前后都是 `D6C4B32F…`（§5.9.1–§5.9.3） |
+| MSI 降级 1.2.1 → 1.2.0（2026-11-28 第五轮） | **与预期相反：没有被拒绝** | 装 1.2.1 后再装 1.2.0，`/qn` 退出码 **0**、**无任何报错**，ARP 回到 1.2.0、exe 也退回 1.2.0，应用「关于」页显示 `v1.2.0`。原因是 Tauri 的 `bundle.windows.allowDowngrades` **默认为 true**，生成的 WiX 是 `AllowDowngrades="yes"`；MSI 里**没有**降级拦截行，也**没有** `LaunchCondition`（§5.9.4） |
 
 **两条空白项都能填上，但 MSI 那一项带一个前提：`msiexec /i … /qn`（静默）装不上，退出码 1603；换成 `/passive` 才装得上。** 原因与边界写在 §3.5——不是包的毛病，是「静默模式下 Windows Installer 不做凭据提升」这条机制。
 
@@ -38,6 +40,15 @@
 > **这一轮只做验证与记录，没有改产品代码、没有加测试**（主会话在并行发版，改源码会让
 > 源码指纹变、测量要重跑）。机器状态**已恢复到本轮开始之前**，逐项核对过（§5.8.6）。
 > **结论（是否关闭相应验收项）仍由验收报告的作者写。**
+>
+> **2026-11-28 MSI 版本号递增升级补测（§5.9）：** 验收报告 §7.3 的「版本号递增的 MSI
+> 升级路径」（原第 4 项）在本轮补上。1.2.0 与 1.2.1 两个 MSI 由**同一棵临时树**构建
+> （只差版本号），两次静默安装都退出 0；升级后 ARP 的 `DisplayVersion` 为 1.2.1、产品码换新、
+> 安装的 exe 与 1.2.1 包里的 payload 逐字节相同、`backend.json` 逐字节保留，应用起来并跑出 12 条证据。
+> **顺带实测了降级：它没有被拒绝**——Tauri 的 `allowDowngrades` 默认是 true，旧 MSI 会
+> **静默**把应用换回旧版；这与本轮之前「MSI 默认不允许降级」的预期相反（§5.9.4）。
+> **这一轮只做验证与记录，没有改产品代码、没有改仓库里的版本号文件、没有加测试，
+> 也没有提交；机器已恢复（§5.9.5）。结论仍由验收报告的作者写。**
 
 ---
 
@@ -1022,6 +1033,193 @@ desktop/src-tauri/Cargo.lock  version = "1.2.1"
 - 无遗留 dexatlas / 侧车 / 安装器进程；wrapper 批处理与标记文件留在
   `<worktree>/.scratch/nonmsix-findings/`（`.scratch/` 不入库）。
 
+### 5.9 版本号递增的 MSI 升级（1.2.0 → 1.2.1，2026-11-28 第五轮）
+
+> **这一轮补的是验收报告 §7.3 的「版本号递增的 MSI 升级路径」**：2026-11-27 验的 MSI
+> 升级是**同版本**的大版本升级（`ProductVersion` 一直是 0.1.0），NSIS 侧已在 §5.8.2
+> 验过版本号递增（1.2.0 → 1.2.1），**MSI 侧没有**。本轮还实测了任务书里预期「会被拒绝」
+> 的**降级**路径。**只做验证与记录，不改产品代码、不改仓库里的版本号文件、不加测试、
+> 不提交。全程没有重启。**
+
+#### 5.9.0 被测对象与这一轮的做法
+
+| | |
+|---|---|
+| 仓库基线 | worktree `loving-pike-73c47a`，HEAD `3262f65`（本轮开始时 `main` 正指在这里；之后 `main` 又前进了） |
+| 临时树 | **另建**一棵 detached worktree：`.scratch/msi-verify/bumptree`，起点也是 `3262f65`；**版本号只在这棵树里改**，用完即删，仓库里的文件一个没动 |
+| 版本号同步 | 把 `src/dexatlas/__init__.py` 的 `__version__` 从 `"1.2.0"` 改成 `"1.2.1"`，再跑**项目自己的** `scripts/sync-desktop-version.py`；`git diff --stat` 正好 **5 个文件各 1 行**：`src/dexatlas/__init__.py`、`desktop/package.json`、`desktop/src-tauri/tauri.conf.json`、`desktop/src-tauri/Cargo.toml`、`desktop/src-tauri/Cargo.lock` |
+| 1.2.0 的 MSI | 临时树**在抬版本号之前**构建：`npm run tauri -- build --bundles msi`，Rust 编译 4m39s；产物 `DexAtlas Studio_1.2.0_x64_en-US.msi`，5,443,584 B，sha256 `3cd02769…` |
+| 1.2.1 的 MSI | 抬完版本号后在同一棵树重建（增量）；产物 `DexAtlas Studio_1.2.1_x64_en-US.msi`，5,443,584 B，sha256 `98981e9c…` |
+| 驱动进程 | 无包身份（与 §5.1 同一套量法）；`msiexec` 在**已提升**会话里跑（`ConsentPromptBehaviorAdmin=0`，静默提升、无 UAC 弹窗，与 §4.1 同一前提） |
+| 机器形态 | 本轮开始时**没有任何 DexAtlas 产品安装**：ARP（HKLM 64/32 + HKCU）无条目、`C:\Program Files\DexAtlas Studio` 不存在、NSIS 的 `HKCU\Software\github\DexAtlas Studio` 不存在 |
+
+**两个包都由同一棵树构建，只差版本号**——升级的差异因此只剩版本，而不是「另一棵树的其它改动」。
+
+**MSI 的 `Property` 表（用 Windows Installer COM 直接读，不按文件名猜）：**
+
+| | 1.2.0 的包 | 1.2.1 的包 |
+|---|---|---|
+| `ProductVersion` | **1.2.0** | **1.2.1** |
+| `ProductCode` | `{97060FAF-F1C5-4CDC-B562-FDA2C7CF62A3}` | `{82B6492C-1168-4806-8F31-4987276DDAED}` |
+| `UpgradeCode` | `{1C8C5729-38FC-513A-8777-CB10AB067608}` | **同一个** |
+| `ALLUSERS` / `REINSTALLMODE` | `1` / `amus` | `1` / `amus` |
+| `File` 表里的 exe | `dexatlas-desktop.exe`，14,833,152 B，`FileVersion 1.2.0.0` | 同名同大小，`FileVersion 1.2.1.0` |
+| `Upgrade` 表 | 1 行：`VersionMin='0'`、`VersionMax=''`、`Attributes=257`、`WIX_UPGRADE_DETECTED` | 同左（这一行的含义见 §5.9.4） |
+
+**结论先说：MSI 的 `ProductVersion` 跟着发版号走（1.2.1），版本号递增的升级路径成立；
+降级没有被拒绝——它会静默地把应用换回旧版，详见 §5.9.4。**
+
+#### 5.9.1 1.2.0 的干净安装：退出码 0，装到 `C:\Program Files\DexAtlas Studio\`
+
+```
+msiexec /i "…\DexAtlas Studio_1.2.0_x64_en-US.msi" /qn /norestart /l*v install-1.2.0.log
+```
+
+| | 装完的样子 |
+|---|---|
+| 退出码 | **0**（1.2 s）；日志 `Installation completed successfully`、`MainEngineThread is returning 0` |
+| ARP 条目（HKLM） | `{97060FAF-F1C5-4CDC-B562-FDA2C7CF62A3}`：`DisplayName DexAtlas Studio`、`DisplayVersion` **1.2.0**、`WindowsInstaller 1`、`NoModify 1`、`InstallLocation C:\Program Files\DexAtlas Studio\`、`UninstallString MsiExec.exe /X{97060FAF-…}` |
+| 安装目录 | `dexatlas-desktop.exe`（14,833,152 B，sha256 `C4C7002F…`，`FileVersion/ProductVersion 1.2.0`）与 `Uninstall DexAtlas Studio.lnk`（963 B，sha256 `2E7ED220…`） |
+| 快捷方式 | 公共桌面 `C:\Users\Public\Desktop\DexAtlas Studio.lnk`；开始菜单在 `C:\ProgramData\Microsoft\Windows\Start Menu\Programs\DexAtlas Studio\DexAtlas Studio.lnk`（**子目录里**，不在 `Programs\` 根下） |
+| `%APPDATA%\…\backend.json` | sha256 **`D6C4B32F…`**（160 B），mtime `11:18:25`——**与安装前逐字节相同** |
+| 提权 / 重启 | 提权用了静默提升的已提升会话；**未遇 3010，未触发重启** |
+
+**关于 `MsiSystemRebootPending=1`（如实记）：** 安装日志里出现了
+`PROPERTY CHANGE: Adding MsiSystemRebootPending property. Its value is '1'`。
+这不是本次安装造成的：机器的 `PendingFileRenameOperations` 在本轮开始前就有 5 条
+**ToDesk / Edge 的**待重命名项，安装前后**逐条相同**，没有新增任何 DexAtlas 路径；
+命令带了 `/norestart`，退出码是 **0** 而不是 3010。**本轮没有重启，也不要求重启。**
+
+**一个操作细节：** 同一个 MSI 用**正斜杠**路径（`E:/…/DexAtlas Studio_1.2.0_x64_en-US.msi`）
+调用 `msiexec` 时返回 **1619**（`MainEngineThread is returning 2`），换成**反斜杠**路径后退出码 **0**。
+两次调用的日志都在 `.scratch/msi-verify/`；本报告记录的是成功那次。
+
+#### 5.9.2 升级到 1.2.1：退出码 0，产品码换新，exe 换成 1.2.1 的 payload
+
+```
+msiexec /i "…\DexAtlas Studio_1.2.1_x64_en-US.msi" /qn /norestart /l*v upgrade-1.2.1.log
+```
+
+| | 升级后 |
+|---|---|
+| 退出码 | **0**（1.2 s）；日志 `Installation completed successfully`、`MainEngineThread is returning 0` |
+| ARP 条目 | 只剩**一条**：`{82B6492C-1168-4806-8F31-4987276DDAED}`，`DisplayVersion` **1.2.1**；旧的 `{97060FAF-…}` **已消失**（产品码换新） |
+| exe | 14,833,152 B，sha256 **`64169227…`**，`FileVersion/ProductVersion` **1.2.1**——与 1.2.0 的 `C4C7002F…` 不同，**exe 确实被替换** |
+| 与安装包内 payload 比对 | `msiexec /a` 把 1.2.1 的 MSI 解到 `extract-1.2.1\PFiles\DexAtlas Studio\dexatlas-desktop.exe`，sha256 **`64169227…`**——**安装后的 exe 与包里那份逐字节相同** |
+| 快捷方式 | 公共桌面与开始菜单（子目录）**都还在** |
+| `%APPDATA%\…\backend.json` | sha256 **`D6C4B32F…`**，mtime `11:18:25`——**升级前后逐字节相同**（MSI 不碰用户配置） |
+| 提权 / 重启 | 同上：`MsiSystemRebootPending=1` 是机器原有的待重启项（ToDesk/Edge），队列逐条未变；退出码 0，**无重启** |
+
+#### 5.9.3 升级后的应用：启动、侧车、一次真实分析，版本页显示 1.2.1
+
+```
+"C:\Program Files\DexAtlas Studio\dexatlas-desktop.exe"      # CDP 9333
+```
+
+- **环境说明（如实记）：** 本轮开始时机器上还有一个**兄弟会话的开发版实例**
+  （另一个 worktree 的 `dexatlas-desktop.exe`）在运行，两个实例共用同一个
+  `%LOCALAPPDATA%\io.github.dexatlas.desktop\EBWebView`。已装应用第一次启动时
+  WebView2 创建失败（终端记录 `HRESULT(0x8007139F)`；该次日志已被后续成功运行覆盖，
+  未保留）；等那个实例退出后重跑，应用正常起来。**这是「同一 bundle id 不能并发两个
+  实例」的实际表现，本轮只记录，不修。**
+- **侧车：** 设置页显示 `侧车：运行中 · 127.0.0.1:64311 · DexAtlas 后端已就绪`；
+  三个后端 `jadx v1.5.2` / `apktool v2.11.1` / `androguard v4.1.4` 都是「已安装 · 可用」。
+- **版本页：** 「关于」区块分两行——**应用版本 `v1.2.1`（桌面应用：exe 与 MSI 安装包）**、
+  后端版本 `v1.2.0`（分析核心）。两行说的是两样东西，这正是 2026-11-27 修过的那个问题
+  （见 [桌面打包文档](../desktop-packaging.md) §1.3）。
+
+  ![升级后关于区块：应用 1.2.1、后端 1.2.0](../assets/phase5/machine-12-02b-settings-about-1.2.1.png)
+
+- **一次真实分析：** 通过首页的 `<input type=file>` 走用户同构的 `DataTransfer` 上传
+  `examples/demo-app/demo.apk`（2,951 B），等待完成——**五阶段全部「已完成」**
+  （采集 / 解析 / 索引 / 反编译 / 报告）、耗时 **4.6 s**、**12 条证据**、三后端都参与。
+
+  ![分析完成](../assets/phase5/machine-12-04-analysis-done.png)
+
+  ![12 条证据](../assets/phase5/machine-12-05-evidence.png)
+
+- **工作区落在哪：** 分析数据写在安装形态的固定工作区
+  `%LOCALAPPDATA%\io.github.dexatlas.desktop\workspace`（§5.8.7 修过的 cwd/工作区行为），
+  **不在**安装目录里。本轮结束时该目录已移到 `.scratch/msi-verify/workspace-aside/`。
+
+**`backend.json` 的一处外部改写（与 MSI 无关，但要说清）：** 应用启动后，这个文件的哈希
+变成了 `c1387ed5…`（111 B，指向 `E:\Dexatlas\.venv\Scripts\python.exe`），mtime `11:37:17`。
+**两次 `msiexec` 动作前后它都是 `D6C4B32F…`**，所以这次改写不是 MSI 做的；本报告
+**不推断**是谁写的（当时另一个兄弟会话的实例也在同一台机器上运行）。本轮的
+「逐字节保留」结论只覆盖**安装与升级这两个 MSI 动作**。
+
+#### 5.9.4 降级：预期是「被拒绝」，实测是**静默降级成功**
+
+**任务书原本预期 MSI 默认不允许降级、要记录它的报错文案。实测没有报错文案可记——**
+在 1.2.1 已安装的机器上再装 1.2.0：
+
+```
+msiexec /i "…\DexAtlas Studio_1.2.0_x64_en-US.msi" /qn /norestart /l*v downgrade-1.2.0.log
+```
+
+| | 结果 |
+|---|---|
+| 退出码 | **0**（1.2 s）；日志 `Installation completed successfully`、`MainEngineThread is returning 0`，**没有任何错误或警告** |
+| ARP | `{97060FAF-…}`（1.2.0 的产品码）回来了，`DisplayVersion` **1.2.0**；1.2.1 的条目消失 |
+| exe | sha256 **`C4C7002F…`**、`FileVersion/ProductVersion 1.2.0`——**退回旧版** |
+| 应用自己怎么说 | 降级后启动应用，设置页「关于」显示 **应用版本 `v1.2.0`** |
+
+  ![降级后的应用版本 1.2.0](../assets/phase5/machine-12-08-settings-about-1.2.0-after-downgrade.png)
+
+**机制（从打包产物与 Tauri 配置读出来的，不是猜的）：**
+
+- 项目的 `desktop/src-tauri/tauri.conf.json` **没有**设置 `bundle.windows.allowDowngrades`；
+  Tauri v2 的这个开关**默认是 `true`**（`tauri-utils-2.10.4/src/config.rs` 的
+  `allow_downgrades` 字段，注释写明默认 true，并写明设为 false 时 MSI 才会拒绝旧版本）。
+- 于是打包器生成 WiX 时走了 `allow_downgrades` 分支：本仓库模板
+  `desktop/src-tauri/wix/main.wxs:70`–`:71` 是
+  `<MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="yes" />`。
+- 产物里能对上：`Upgrade` 表**只有一行**（`VersionMin='0'`、`VersionMax=''`），
+  **没有** `LaunchCondition` 表——既没有「降级被拒」的条件，也没有那句报错文案。
+
+**这意味着什么（只陈述，不判定）：** 用户如果双击了旧的 MSI，应用会**静默退回旧版**，
+`%APPDATA%` 的用户数据保留（与升级一致）。要不要把
+`"bundle": {"windows": {"allowDowngrades": false}}` 写进配置、从而让旧包装不上，
+是产品决定；**本轮没有改配置，也没有替作者做这个决定。**
+
+> **与 NSIS 的对照（引自 Tauri 自己的字段注释，本轮没有复测 NSIS）：** 同一个开关设为
+> false 时，「MSI 不会装旧版本」；NSIS 则「在静默 / passive / update 模式下不装旧版本，
+> 交互式安装器只允许用户先卸载新版再装旧版」。**当前开关是默认的 true，所以 MSI 这一侧
+> 没有这层保护。**
+
+#### 5.9.5 机器状态（本轮结束时）
+
+**已恢复**，逐项核对：
+
+| | 本轮开始时 | 本轮结束时 |
+|---|---|---|
+| DexAtlas 的 MSI 产品 | 无（ARP 无条目） | **无**（`msiexec /x` 卸载，退出码 0） |
+| `C:\Program Files\DexAtlas Studio\` | 不存在 | **不存在** |
+| 公共桌面 / 开始菜单快捷方式 | 不存在 | **不存在**（含 `Programs\DexAtlas Studio\` 子目录） |
+| `HKCU\Software\github\DexAtlas Studio` | 不存在 | **不存在** |
+| `%APPDATA%\…\backend.json` | `D6C4B32F…` | **`c1387ed5…`**——差异来自 §5.9.3 说的那次**外部改写**（发生在两次 msiexec 之后、卸载之前），不是 MSI 动作；卸载前后它不变 |
+| `%LOCALAPPDATA%\io.github.dexatlas.desktop\workspace` | 不存在 | 本轮分析建出（`dexatlas.db` 208,896 B）→ **已移到 `.scratch/msi-verify/workspace-aside/`**；`EBWebView` 与 `.cookies` 是轮前就有的，保留 |
+| 进程 | 只有兄弟会话的开发版实例 | **无 DexAtlas / 侧车进程**（那个实例在本轮中途退出了） |
+| `PendingFileRenameOperations` | 5 条 ToDesk/Edge 项 | **同样 5 条，逐条相同** |
+| 重启 | — | **全程没有重启** |
+
+- 临时树 `.scratch/msi-verify/bumptree` **已删除**（`git worktree remove --force`），
+  两个 MSI、日志、快照、提取出的 payload 留在 `.scratch/msi-verify/`（`.scratch/` 不入库）。
+- 仓库里的文件只改了本文与验收报告，外加 `docs/assets/phase5/machine-12-*.png`；
+  `src/`、`tests/`、`desktop/` 一个字没动。
+
+#### 5.9.6 这一轮没验到的
+
+- **图形安装器 / passive 模式的升级与降级界面**：全程 `/qn`，没有走 WiX 的 UI。
+- **降级在 `allowDowngrades=false` 下的表现**：配置没改，所以「拒绝降级」的那句文案
+  本轮**没有机会出现**；要验它得先改配置重新打包（那是产品改动，不在本轮范围）。
+- **MSI 的 repair**：§4.2.3 已验过（`/fa` 修不回快捷方式的问题已修）；本轮没再复测。
+- **未提升会话**的安装 / 升级：本轮全部在已提升会话里跑；未提升的 1603 两个失败点见 §4.1。
+- **同一 bundle id 两个实例并发**：只观察到 WebView2 创建失败（`0x8007139F`），
+  没有做「第二个实例该不该被拦住 / 该提示什么」的产品判断。
+- **签名**：MSI 与 exe 仍未签名（与 §4 第 4 条一致）。
+- **第三方 APK**：仍然只用一方样例 `examples/demo-app/demo.apk`。
+
 ---
 
 ## 6. 复现命令
@@ -1139,12 +1337,19 @@ $sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
 | `docs/assets/phase5/machine-10-08-installed-home.png`、`machine-10-09-installed-settings.png` | 2026-11-27 非容器补测（§5.5）：NSIS 静默升级到 1.2.0 后从安装目录启动的截图 |
 | `docs/assets/phase5/machine-11-02-settings-saved.png` … `machine-11-09-settings-after-analysis.png` | 2026-11-28 NSIS 首装补测（§5.8.1）：首装后应用从「配好后端」到「跑出 12 条证据」的截图 |
 | `docs/assets/phase5/machine-11-10-first-launch-home.png`、`machine-11-11-first-launch-settings-unconfigured.png` | 2026-11-28 NSIS 首装补测（§5.8.1）：**全新安装、还没有 `backend.json`** 时的首页与设置页——侧车起不来的真实形态 |
+| `docs/assets/phase5/machine-12-01-home-after-upgrade.png` … `machine-12-06-home-recent-project.png` | 2026-11-28 MSI 版本号递增升级补测（§5.9.3）：从 `C:\Program Files\DexAtlas Studio\` 启动 1.2.1 应用、上传 demo.apk 到跑出 12 条证据的全链路截图 |
+| `docs/assets/phase5/machine-12-02b-settings-about-1.2.1.png` | 2026-11-28 MSI 补测（§5.9.3）：「关于」区块的两行分列——应用 **1.2.1**（exe 与 MSI 安装包）、后端 **1.2.0**（分析核心） |
+| `docs/assets/phase5/machine-12-08-settings-about-1.2.0-after-downgrade.png` | 2026-11-28 MSI 补测（§5.9.4）：**降级之后**「关于」区块显示应用版本 v1.2.0——静默降级成功的应用侧证据 |
 
 **没有改任何生产代码**：`src/**`、`tests/**`、`desktop/src/**`、`desktop/src-tauri/src/**` 一个字没动；`desktop/src-tauri/tauri.conf.json` 也没动（MSI 打包不需要改 bundle 配置）。第三方 APK / DEX / `so` / 密钥没有进仓库（只用了仓库自带的一方样例）。
 
 > **2026-11-28 那一轮（§5.8）同样没改任何生产代码，也没有加测试。** 那一轮把发版号抬到 1.2.1 的
 > 做法是**复制一份树到 `.scratch/`** 再改那份，**仓库里的文件一个都没动**——
 > 主会话在并行发版，改源码会让源码指纹变、测量要重跑。
+>
+> **2026-11-28 第五轮（§5.9）同样没改任何生产代码，也没有加测试。** 版本号只在
+> `.scratch/msi-verify/bumptree` 那棵**临时树**里抬到 1.2.1，仓库里的版本号文件一字未动；
+> 两个 MSI 与全部日志留在 `.scratch/msi-verify/`（不入库）。
 
 **机器上留下的状态（2026-11-27 补测结束时）：** DexAtlas Studio **已经卸干净了**——安装目录 `C:\Program Files\DexAtlas Studio\` 不存在、注册表没有卸载项、开始菜单与公共桌面快捷方式不存在。**用户配置目录 `%APPDATA%\io.github.dexatlas.desktop\backend.json` 保留**（卸载不该删用户数据），内容与本轮开始时的备份逐字节相同（sha256 `d358dbc4…`）。没有遗留 dexatlas 进程或侧车进程，也没有遗留计划任务（本轮用来提权的任务始终**注册失败**，机器上从未存在过）。
 
@@ -1157,3 +1362,8 @@ $sb = New-Object System.Text.StringBuilder 256; $len = [uint32]256
 > **2026-11-28 那一轮（§5.8）结束时，机器回到了那一轮开始之前的状态**——逐项核对过，
 > 不是「大概恢复」：两棵安装目录、两个注册表键、两份快捷方式、`backend.json`
 > **哈希与 mtime 都与轮前相同**（§5.8.6 的表）。**没有重启。**
+>
+> **2026-11-28 第五轮（§5.9）结束时：** MSI 产品已卸干净（ARP 无条目、`C:\Program Files\DexAtlas Studio\`
+> 与快捷方式都不存在），临时树已删，**全程无重启**。`%APPDATA%\…\backend.json` 在本轮中途被
+> **外部**改写为 `c1387ed5…`（两次 `msiexec` 前后都是 `D6C4B32F…`，见 §5.9.3）；本轮分析建出的
+> `%LOCALAPPDATA%\…\workspace` 已移到 `.scratch/msi-verify/workspace-aside/`。
