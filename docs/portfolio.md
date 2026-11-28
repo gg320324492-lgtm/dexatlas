@@ -70,7 +70,7 @@ questions with cited evidence, or in a local web workbench.
   process with resource bounds, so a malformed file costs a recorded error,
   not the host service.
 - **Quality gates.** Strict mypy typing, ruff lint/format,
-  <!--fig:tests.total-->1931<!--/fig--> tests at <!--fig:coverage.pct-->93.3%<!--/fig--> coverage on the
+  <!--fig:tests.total-->1938<!--/fig--> tests at <!--fig:coverage.pct-->93.4%<!--/fig--> coverage on the
   first-party code, and fifteen CI jobs (sixteen runs on a tag —
   the test job is a 3.12/3.13 matrix): lint and format; the test suite on Python
   3.12 (all backends) and 3.13 (no Java backends); the suite with Apktool only;
